@@ -302,8 +302,8 @@ resource LocaleIndex ( kSDKDefStringsResourceID)
 		// every menu, panel and prompt as its RAW KEY (measured on a Japanese UI - memory
 		// plugin-ui-localization-fr-encoding).
 		//
-		// The Japanese KFC speaks is not in a table (the author's call): it is switched in at RUN
-		// TIME by UI language - see KFCLoc.h. The official jaJP shape (kInDesignJapaneseFS + a
+		// The Japanese KFC speaks - the How to Use page alone - is not in a table (the author's call): it
+		// is switched in at RUN TIME by UI language - see KFCLoc.h. The official jaJP shape (kInDesignJapaneseFS + a
 		// jaJP table) matched NO row on a Roman-engine install running a Japanese UI. kWildFS is
 		// what covers both, because the featureset and the UI language are separate axes and this
 		// table is meant for every combination of them.
@@ -316,5 +316,5 @@ resource LocaleIndex ( kSDKDefStringsResourceID)
 #endif // __ODFRC__
 
 #include "KFC_enUS.fr"
-// (No KFC_jaJP.fr: the Japanese lives in KFCLoc.h and is switched at run time by UI language. See the
-//  LocaleIndex note above.)
+// (No KFC_jaJP.fr: these strings are English in every UI language, Edit > Undo's names among them (the author's
+//  call). See the LocaleIndex note above.)

@@ -30,8 +30,7 @@
 #include "KFCBookScope.h"
 #include "KFCDiag.h"
 #include "KFCDiagWrittenDocs.h"	// a test build's written-document check (nothing in a shipping one)
-#include "KFCID.h"				// kKFCReplaceStepKey
-#include "KFCLoc.h"
+#include "KFCID.h"				// kKFCReplaceStepKey - the key the Undo step is named by
 #include "KFCObjectReplace.h"
 #include "KFCObjectSearch.h"
 #include "KFCPageItemFacts.h"
@@ -353,7 +352,7 @@ bool KFCObjectReplace::ReplaceRow(int32 chapterIdx, int32 hitIdx, PMString& outS
 		Refuse(outStatus, "InDesign would not start a command sequence - nothing was changed.");
 		return false;
 	}
-	sequence->SetName(KFCLoc::Text(kKFCReplaceStepKey, KFCJa::kReplaceStep));
+	sequence->SetName(kKFCReplaceStepKey);
 	bool reached = false, walkFailed = false, ok = false;
 	{
 		// 7. WALK TO IT: InDesign's own matching, from the document's first match to the row's item. The walk ends by
@@ -608,7 +607,7 @@ bool KFCObjectReplace::ReplaceRows(const KFCRowsByChapter& rows, PMString& outSt
 	// sequence around every document's walk and none inside it - the measured rule for a step across documents
 	// (KFCReplaceEngine.cpp, ReplaceRowsNow's note).
 	const bool acrossDocuments = documents > 1;
-	const PMString stepName(KFCLoc::Text(kKFCReplaceStepKey, KFCJa::kReplaceStep));
+	const PMString stepName(kKFCReplaceStepKey);
 	ICommandSequence* sequence = nil;
 	IAbortableCmdSeq* acrossSequence = nil;
 	if (acrossDocuments)

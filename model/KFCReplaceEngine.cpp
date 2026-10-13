@@ -45,7 +45,6 @@
 #include "KFCDiagCommands.h"	// the test build's command count (KFC_DIAG_COMMANDS)
 #include "KFCDiagWrittenDocs.h"	// the test build's written-document check (nothing in a shipping one)
 #include "KFCID.h"				// kKFCReplaceStepKey - the string key the Undo step is named from
-#include "KFCLoc.h"				// runtime Japanese - there is no jaJP string table
 #include "KFCResultModel.h"
 #include "KFCRowFoci.h"			// ReanchorStory - the rows' text foci put back after a write, its rollback and a preview
 #include "KFCRunGuard.h"		// is anything ELSE of ours running? (the modal bar pumps events)
@@ -1524,7 +1523,7 @@ static bool ReplaceRowsNow(std::vector<ChapterWrite>& chapters,
 		// backwards with it.
 		const KFCBackwardSearchScope writeDirection(WriteBackward());
 
-		const PMString stepName(KFCLoc::Text(kKFCReplaceStepKey, KFCJa::kReplaceStep));
+		const PMString stepName(kKFCReplaceStepKey);
 		ICommandSequence* sequence = nil;
 		IAbortableCmdSeq* acrossSequence = nil;
 		if (acrossDocuments)

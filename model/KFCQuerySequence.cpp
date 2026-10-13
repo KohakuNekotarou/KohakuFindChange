@@ -38,8 +38,7 @@
 #include "KFCDiag.h"
 #include "KFCDiagCommands.h"	// the test build's command count (KFC_DIAG_COMMANDS)
 #include "KFCDiagWrittenDocs.h"	// the test build's written-document check (nothing in a shipping one)
-#include "KFCID.h"				// kKFCRunQueriesStepKey
-#include "KFCLoc.h"
+#include "KFCID.h"				// kKFCRunQueriesStepKey - the key the Undo step and the bar are named by
 #include "KFCObjectReplace.h"	// ReplaceAllInDoc - an Object query's write, a document at a time
 #include "KFCObjectSearch.h"	// HasChangeObjectFormat, the shared walker aimed back at the front
 #include "KFCProgressBar.h"		// the run's one bar - the UI half's, asked for through IKFCUIServices
@@ -264,14 +263,14 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 		outSummary.Append("Could not start an undoable step - nothing was run.");
 		return 0;
 	}
-	seq->SetName(KFCLoc::Text(kKFCRunQueriesStepKey, KFCJa::kRunQueriesStep));
+	seq->SetName(kKFCRunQueriesStepKey);
 
 	// ONE BAR FOR THE WHOLE RUN: a query x document a step, its Cancel
 	// asked between steps - one document's Change All does not stop half way (the dialog's own rule). It comes down
 	// before the sequence ends: the chapters are handed back with no bar up.
 	{
 		const int32 units = static_cast<int32>(queries.size() * targets.size());
-		KFCProgressBar runBar(KFCLoc::Text(kKFCRunQueriesStepKey, KFCJa::kRunQueriesStep), 0, units, kTrue, kTrue);
+		KFCProgressBar runBar(kKFCRunQueriesStepKey, 0, units, kTrue, kTrue);
 		int32 unit = 0;
 #ifdef KFC_DIAG
 		// (Fault switch queries-cancel, a test build's only - KFCDiag.h: Cancel taken as pressed while step <n> was being

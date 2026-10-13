@@ -978,7 +978,7 @@ resource LocaleIndex ( kSDKDefStringsResourceID)
 	{
 		// ONE wild row, the same as the model half's: model/KFC.fr's LocaleIndex says why (a single
 		// table, matched by every locale; a named-locale list strands every locale it leaves out on raw
-		// keys; the Japanese is switched in at run time - KFCLoc.h).
+		// keys; the How to Use page's Japanese is switched in at run time - KFCLoc.h).
 		kWildFS, k_Wild, kSDKDefStringsResourceID + index_enUS
 	}
 };

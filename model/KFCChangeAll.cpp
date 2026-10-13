@@ -42,8 +42,7 @@
 #include "KFCBookScope.h"
 #include "KFCDiag.h"
 #include "KFCDiagWrittenDocs.h"	// the test build's written-document check (nothing in a shipping one)
-#include "KFCID.h"				// kKFCChangeAllStepKey
-#include "KFCLoc.h"
+#include "KFCID.h"				// kKFCChangeAllStepKey - the key the Undo step and the bar are named by
 #include "KFCObjectReplace.h"	// ReplaceAllInDoc - the Object tab's Change All in one chapter
 #include "KFCObjectSearch.h"	// the Object tab's doors and Search:, the shared walker aimed back at the front
 #include "KFCProgressBar.h"		// the run's bar - the UI half's, asked for through IKFCUIServices
@@ -351,9 +350,9 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 		outSummary.Append("Could not start an undoable step - nothing was changed.");
 		return 0;
 	}
-	seq->SetName(KFCLoc::Text(kKFCChangeAllStepKey, KFCJa::kChangeAllStep));
+	seq->SetName(kKFCChangeAllStepKey);
 	{
-		KFCProgressBar bar(KFCLoc::Text(kKFCChangeAllStepKey, KFCJa::kChangeAllStep), 0,
+		KFCProgressBar bar(kKFCChangeAllStepKey, 0,
 			static_cast<int32>(targets.size()), kTrue, kTrue);
 		for (size_t d = 0; d < targets.size(); ++d)
 		{

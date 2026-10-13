@@ -168,10 +168,13 @@ DECLARE_PMID(kImplementationIDSpace, kKFCBoundaryImpl, kKFCPrefix + 45)
 
 
 // StringKeys - the model half's (KFC_enUS.fr): what Edit > Undo calls a KFC write. Every other key is the UI
-// half's (KFCUIID.h, KFCUI_enUS.fr). The English lives in KFC_enUS.fr; the Japanese in KFCLoc.h.
+// half's (KFCUIID.h, KFCUI_enUS.fr). Handed over AS KEYS - to ICommandSequence::SetName, and the query run's and
+// Change All's to their progress bars - for Edit > Undo and the bar to translate, the way the SDK's own code names
+// its sequences and bars (xmldataupdater's DataUpdaterFacade.cpp, textimportfilter's TxtImpFilter.cpp). There is
+// one table, so the names are English in every UI language (the author's call).
 // (No alert of its own: a row's Replace says why it did not write on the status line.)
-// What Edit > Undo calls a row's Replace ("Replace" - the author's call; the Japanese UI's is
-// KFCJa::kReplaceStep). See BeginPlainSequence in KFCReplaceEngine.cpp.
+// What Edit > Undo calls a row's Replace ("Replace" - the author's call). See BeginPlainSequence in
+// KFCReplaceEngine.cpp.
 #define kKFCReplaceStepKey			kKFCStringPrefix "kKFCReplaceStepKey"
 #define kKFCRunQueriesStepKey		kKFCStringPrefix "kKFCRunQueriesStepKey"	// the query run's undo step (KFCQuerySequence)
 #define kKFCChangeAllStepKey		kKFCStringPrefix "kKFCChangeAllStepKey"	// Change All in Book (No List)'s undo step (KFCChangeAll)

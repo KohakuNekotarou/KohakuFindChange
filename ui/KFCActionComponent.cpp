@@ -462,10 +462,9 @@ void KFCActionComponent::DoAbout()
 {
 	CAlert::ModalAlert
 	(
-		// THE ONE STRING KFC DOES NOT SWITCH BY UI LANGUAGE. The About box is the plug-in's name and version,
-		// and it reads the same in every UI language (the author's call), so it comes straight from the string
-		// table rather than through KFCLoc::Text. The name and the version are not words - translating them
-		// would be translating an identifier.
+		// The About box is the plug-in's name and version, the same in every UI language (the author's call) - as is
+		// everything from the string table; only the How to Use page's body is switched (KFCLoc::JapaneseUI). The
+		// name and the version are not words - translating them would be translating an identifier.
 		//
 		// The KEY goes in as a key, and the alert translates it: CAlert.h:70 says the message
 		// "will be translated unless the string has been translated already or isn't

@@ -31,7 +31,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
         kEuropeanWinToMacEncodingConverter,		// Character encoding converter (irp) I made this WinToMac as we have a bias to generate on Win...
         {
                 // The model half's strings: what the model writes itself. Every other string is the UI
-                // half's (ui/KFCUI_enUS.fr). The Japanese for these is KFCLoc.h's.
+                // half's (ui/KFCUI_enUS.fr). English in every UI language - one table (the author's call).
                 // What Edit > Undo calls KFC's writes: a row's Replace (rows replaced together too), the
                 // query run, and Change All in Book.
                 kKFCReplaceStepKey,				"Replace",

@@ -420,8 +420,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryLoadOrderButtonWidgetID, kKFCUIPrefix + 44
 // The book, document and story rows' menus.
 #define kKFCSelectAllRowsMenuKey		kKFCStringPrefix "kKFCSelectAllRowsMenuKey"
 // "How to Use...": the operating reference. English in every UI language, like the rest of the
-// flyout - there is one string table, and what KFCLoc.h switches to Japanese at run time is the model
-// half's Undo names (kKFCReplaceStepKey and friends, KFCID.h) and this page's body.
+// flyout - there is one string table, and the one thing switched to Japanese at run time is this page's
+// body (KFCLoc::JapaneseUI).
 // The BODY of the reference is not here at all: it lives in KFCHowTo.cpp, because odfrc caps a single
 // string at about 3.1KB and this text is several times that.
 #define kKFCHowToMenuKey				kKFCStringPrefix "kKFCHowToMenuKey"

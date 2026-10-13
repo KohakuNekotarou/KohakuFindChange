@@ -17,9 +17,9 @@
 
 namespace KFCHowTo
 {
-	/** Show the operating reference. Japanese on a Japanese InDesign, English otherwise - the same
-	    split KFCLoc makes for the names Edit > Undo shows for KFC's writes, asked through the one
-	    function KFCLoc::JapaneseUI(). */
+	/** Show the operating reference. Japanese on a Japanese InDesign, English otherwise - the one
+	    thing KFC switches by UI language, asked through KFCLoc::JapaneseUI() (everything from the
+	    string table is English in every UI language). */
 	void Show();
 }
 
