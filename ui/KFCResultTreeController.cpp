@@ -51,6 +51,7 @@
 #include "KFCModelAccess.h"			// GetHitItem - what a row is
 #include "KFCResultNodeID.h"
 #include "KFCResultTree.h"
+#include "KFCDiag.h"				// the select-all-expand-once and list-landing-guard-off fault switches - test builds only
 
 namespace
 {
@@ -199,6 +200,20 @@ void KFCResultTreeController::ProcessSelectionRules(IEvent* event, UID nodeWidge
 		CTreeViewController::ProcessSelectionRules(event, nodeWidgetUID, notifyOfChange);
 		return;
 	}
+	// NOT UNDER A LANDING OR A RUN OF OURS (KFCJump::IsLanding - a click's, its document opening; KFCRuns()->IsAnyRunning -
+	// a search, a write, a row's Replace): their message loop can dispatch this press, and the landing it asks for is turned
+	// away (KFCJump::ActivateNode) - the row would be selected while the page shows another, and the next Return would write
+	// the one the page does not show. The press is dropped, as its landing is; the arrows keep the same rule
+	// (KFCResultTreeEH::HandleUpDownKey).
+	bool underWay = KFCJump::IsLanding() || KFCRuns()->IsAnyRunning();
+#ifdef KFC_DIAG
+	// (Test builds only) Fault switch list-landing-guard-off: nothing asked, the old way - the case that shows what this
+	// stops (land-click-closed-armed).
+	if (KFC_DIAG_FAULT("list-landing-guard-off"))
+		underWay = false;
+#endif
+	if (underWay)
+		return;
 	const NodeID node(data->Get());
 	const bool modified = (event->GetType() == IEvent::kLButtonDn) && (event->ShiftKeyDown() || event->CmdKeyDown());
 	if (modified && !IsSelected(node) && !fSelectedNodes.empty())
@@ -294,6 +309,24 @@ void CollectHitRows(ITreeViewHierarchyAdapter* adapter, const NodeID& node, Node
 			CollectHitRows(adapter, child, out, most);
 	}
 }
+
+// EVERY BRANCH ROW FROM `node` DOWN OPENED, each before the rows under it. ITreeViewMgr::ExpandNode with
+// expandAllDescendants does not reach them under a row that is open already - KIDMCP measured it on this list: a book
+// result's chapters stayed closed under the open root (memory paneltreeview-tree-panel; KIDMCP walks the rows and opens
+// each itself) - and a book result comes up with its book row open and its chapters closed (KFCResultTree::Rebuild). A
+// row that is open is left as it is.
+void OpenBranchRows(ITreeViewHierarchyAdapter* adapter, ITreeViewMgr* treeMgr, const NodeID& node)
+{
+	treeMgr->ExpandNode(node, kFalse /*expandAllDescendants*/);
+	const int32 children = adapter->GetNumChildren(node);
+	for (int32 i = 0; i < children; ++i)
+	{
+		const NodeID child(adapter->GetNthChild(node, i));
+		TreeNodePtr<KFCResultNodeID> childID(child);
+		if (childID != nil && !childID->IsHitRow())
+			OpenBranchRows(adapter, treeMgr, child);
+	}
+}
 }	// anonymous namespace
 
 bool KFCResultTree::CanSelectAllRows(const NodeID& row)
@@ -318,8 +351,19 @@ bool KFCResultTree::SelectAllRows(const NodeID& row)
 	CollectHitRows(adapter, row, rows);
 	if (rows.empty())
 		return false;
-	// Drawn first: a collapsed document's or story's rows are not drawn, and the list's runs and keys walk what is.
-	treeMgr->ExpandNode(row, kTrue /*expandAllDescendants*/);
+	// Drawn first, every branch row under it opened (OpenBranchRows): the list's runs and keys walk what is drawn - and
+	// Return and the right-click Replace ask the selection in the order drawn (GetSelectedItemsDisplayOrder walks the open
+	// rows alone - CTreeViewController.cpp), so a row left under a closed one would be selected and never written.
+	bool expandOnce = false;
+#ifdef KFC_DIAG
+	// (Test builds only) Fault switch select-all-expand-once: one ExpandNode with all its descendants, the way before -
+	// the case that shows what the opening adds (sel-book-closed-return-armed).
+	expandOnce = KFC_DIAG_FAULT("select-all-expand-once");
+#endif
+	if (expandOnce)
+		treeMgr->ExpandNode(row, kTrue /*expandAllDescendants*/);
+	else
+		OpenBranchRows(adapter, treeMgr, row);
 	// The rows selected, the first of them the run's anchor (the stock controller's master item: the first row selected
 	// into an empty selection) and the last its moving end - Shift+Up / Shift+Down go on from there.
 	controller->DeselectAll(kFalse /*notifyOfChange*/, kTrue /*changeHilite*/);

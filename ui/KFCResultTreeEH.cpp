@@ -522,9 +522,20 @@ bool16 KFCResultTreeEH::HandleUpDownKey(IEvent* e, const VirtualKey& key)
 		return TreeViewEventHandler::HandleUpDownKey(e, key);
 	KFC_DIAG_HIDDEN_DOCS_CHECK("arrow");		// (test builds only - a document left with no window when the key is over)
 
-	// A previous landing is still opening a document - see gWalking. Swallow the key rather than
-	// stepping from a half-made selection.
-	if (gWalking)
+	// NOTHING MOVES UNDER SOMETHING STILL UNDER WAY: a previous walk still landing (gWalking - its document still opening),
+	// a click's landing (KFCJump::IsLanding) or a run of ours - a search, a write, a row's Replace (KFCRuns()->IsAnyRunning).
+	// Each runs the message loop, so a key can arrive in the middle of it, and a step then would move the selection while
+	// its landing is turned away (KFCJump::ActivateNode): the page left on the row before, and the next Return writing a
+	// row the page and its preview do not show. The key is swallowed, as a Return is (TakeReturn); a click's press keeps
+	// the same rule (KFCResultTreeController::ProcessSelectionRules).
+	bool underWay = gWalking || KFCJump::IsLanding() || KFCRuns()->IsAnyRunning();
+#ifdef KFC_DIAG
+	// (Test builds only) Fault switch list-landing-guard-off: the walk alone asked, the old way - the case that shows what
+	// the other two stop (land-arrow-closed-armed).
+	if (KFC_DIAG_FAULT("list-landing-guard-off"))
+		underWay = gWalking;
+#endif
+	if (underWay)
 		return kTrue;
 	WalkGuard walkGuard;
 

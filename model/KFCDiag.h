@@ -117,6 +117,15 @@
 //                the landing's dirty guard, is marked clean when the landing ends, and the next landing's Hide Previous
 //                Chapter sweep closes it unsaved - the case that shows the written-document check catching it
 //                (landing-return-armed)
+//    select-all-expand-once  (UI half) Select All Rows opens the rows under its row with one ITreeViewMgr::ExpandNode with
+//                all its descendants, the old way (ui/KFCResultTreeController.cpp): on a book result as the search left it -
+//                the book row open, its chapters closed - the rows under them would be selected and not drawn, and Return,
+//                which asks the selection in the order drawn, would write none (sel-book-closed-return-armed)
+//    list-landing-guard-off  (UI half) the result list's arrows ask only whether a walk of theirs is still landing, and a
+//                row's press asks nothing - the old way (ui/KFCResultTreeEH.cpp's HandleUpDownKey, ui/KFCResultTreeController.cpp's
+//                ProcessSelectionRules): a key or a press that a click's landing dispatches moves the selection while its
+//                own landing is turned away - the list on one row, the page on another (land-arrow-closed-armed,
+//                land-click-closed-armed)
 //    scope-walk-off  KFCSearchEngine::ScopeHasNothingToWalk answers no, the old way: a document with no story to walk (no
 //                text frame, or master-page text only with Include Master Pages off) meets InDesign's kFailure again - the
 //                search says it "stopped with a search error" and Change All in Book / a query run stops whole
