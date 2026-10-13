@@ -20,6 +20,7 @@
 #include "ISession.h"
 
 // General includes:
+#include "FileUtils.h"			// GetModificationDate - has the file been written since
 #include "PMString.h"
 #include "SDKFileHelper.h"
 
@@ -41,7 +42,7 @@ namespace
 		UIDRef				doc;		// compared, never followed once its document has closed - it goes at the close
 		std::string			name;		// the document's name at the write (UTF-8)
 		std::string			path;		// its file then ("" = none: an untitled document, or a conversion)
-		unsigned long long	fileTime;	// that file's last write time then (0 = none)
+		uint32				fileTime;	// that file's last write time then (FileUtils::GetModificationDate; 0 = none)
 		int32				undoSteps;	// the document's undo steps just after the write - the write the newest (-1 = unread)
 		int32				redoSteps;	// ...and its redo steps then (-1 = unread)
 		Written() : fileTime(0), undoSteps(-1), redoSteps(-1) {}
@@ -72,8 +73,11 @@ namespace
 		return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now().time_since_epoch()).count();
 	}
 
-	// The document's name and file, and that file's last write time - read now, the document open.
-	void ReadDoc(const UIDRef& docRef, std::string& outName, std::string& outPath, unsigned long long& outFileTime)
+	// The document's name and file, and that file's last write time - read now, the document open. The time is the
+	// SDK's (FileUtils::GetModificationDate - the product asks it whether the file on disk changed, InCopyDocUtils.cpp)
+	// and counts SECONDS: a save in the same second as the file's write before the entry reads as unsaved, which can
+	// only make a CLEANED that is not - a case failed loudly - never hide one.
+	void ReadDoc(const UIDRef& docRef, std::string& outName, std::string& outPath, uint32& outFileTime)
 	{
 		outName.clear();
 		outPath.clear();
@@ -94,23 +98,16 @@ namespace
 		outPath = SDKFileHelper(*file).GetPath().GetUTF8String();
 		if (outPath.empty())
 			return;
-		const int wideLength = ::MultiByteToWideChar(CP_UTF8, 0, outPath.c_str(), -1, nil, 0);
-		if (wideLength <= 0)
-			return;
-		std::wstring widePath(static_cast<size_t>(wideLength), L'\0');
-		if (::MultiByteToWideChar(CP_UTF8, 0, outPath.c_str(), -1, &widePath[0], wideLength) <= 0)
-			return;
-		WIN32_FILE_ATTRIBUTE_DATA data;
-		if (::GetFileAttributesExW(widePath.c_str(), GetFileExInfoStandard, &data))
-			outFileTime = (static_cast<unsigned long long>(data.ftLastWriteTime.dwHighDateTime) << 32)
-				| data.ftLastWriteTime.dwLowDateTime;
+		uint32 modified = 0;
+		if (FileUtils::GetModificationDate(*file, &modified))
+			outFileTime = modified;
 	}
 
 	// Saved since the entry was made: another file now (Save As), or the file written after it.
 	bool SavedSince(const Written& w)
 	{
 		std::string name, path;
-		unsigned long long fileTime = 0;
+		uint32 fileTime = 0;
 		ReadDoc(w.doc, name, path, fileTime);
 		return path != w.path || fileTime != w.fileTime;
 	}
@@ -197,7 +194,7 @@ void KFCDiagWrittenDocs::NoteCloseAsked(const UIDRef& docRef)
 	asked.atMs = now;
 	gAsked.push_back(asked);
 	std::string name, path;
-	unsigned long long fileTime = 0;
+	uint32 fileTime = 0;
 	ReadDoc(docRef, name, path, fileTime);
 	KFC_DIAG_LOG("WRITTENDOCS close-asked %s unsaved=%d written=%d", name.c_str(), IsUnsaved(docRef) ? 1 : 0,
 		WrittenIndex(docRef) >= 0 ? 1 : 0);
@@ -223,7 +220,7 @@ void KFCDiagWrittenDocs::Closing(const UIDRef& docRef)
 	if (!askedByKFC && at < 0)
 		return;		// neither a document KFC wrote nor a close it asked for
 	std::string name, path;
-	unsigned long long fileTime = 0;
+	uint32 fileTime = 0;
 	ReadDoc(docRef, name, path, fileTime);
 	const bool unsaved = IsUnsaved(docRef);
 	const bool written = (at >= 0);

@@ -32,7 +32,8 @@
 //
 //  A document is told by its database and UID while it is open (a closed one is taken off the list at its close, so an
 //  address handed to the next document opened is never matched), and NAMED by its name and file in every line. "Saved
-//  since" = its file is another, or was written after the write (Windows' last-write time).
+//  since" = its file is another, or was written after the write (FileUtils::GetModificationDate - in seconds, so a
+//  save in the same second as the write before it can only read as a CLEANED that is not; ReadDoc says why).
 //
 //  In a shipping build every macro below is nothing, and so is the .cpp.
 //
