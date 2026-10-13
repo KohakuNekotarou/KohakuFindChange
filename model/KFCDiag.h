@@ -130,6 +130,9 @@
 //                and the model half takes the UI half for absent (KFCQueryUIServices, IKFCUIServices.h). The UI half
 //                reads it once, at its first door: set it before InDesign starts (the steps:
 //                docs/ai-notes/new-knowledge-sweep.md)
+//    ordinal-runs  KFCResultModel.cpp's NumberHitsWithinPages takes a run of one pageIndex for one page, the old way: the
+//                rows of two parent pages (and the pasteboard's) are numbered as one page's, and a parent page's rows with
+//                another place's between them are not numbered (row-ordinal-pageless-armed)
 //
 //  AND TIMERS: KFC_CLOCK / KFC_SPENT add up the milliseconds a stretch of code takes, and KFCDiagPhase
 //  writes "PHASE <name> begin" and "PHASE <name> end <ms>" around a scope - all of it nothing without KFC_DIAG.

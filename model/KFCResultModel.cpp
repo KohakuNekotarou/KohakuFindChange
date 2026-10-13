@@ -1031,24 +1031,58 @@ void KFCResultModel::BuildHitLocator(Hit& hit)
 		hit.accentFlag.Append("refused");	// its own run, in the accent colour
 }
 
-// Number one chapter's hits within their pages and rebuild each locator (BuildHitLocator). The hits must already stand
-// in page order - OrderHitsByPage, its one caller, puts them there: a run of equal pageIndex is one page, the ordinal is
-// the place in that run, and a page holding ONE row shows none, since there is nothing to tell apart.
+// Are two rows on one page, as a row names its page? Its place in the document's page order AND the page's name: a
+// parent page, the pasteboard and text placed nowhere have no place in that order - IPageList::GetPageIndex answers a
+// parent page and a spread (the pasteboard's) with a negative number, neither being a page of the publication, and text
+// placed nowhere is given -1 - so the number alone does not tell them apart.
+static bool OnOnePage(const KFCResultModel::Hit& a, const KFCResultModel::Hit& b)
+{
+	return a.pageIndex == b.pageIndex && a.pageString.IsEqual(b.pageString);
+}
+
+// Number one chapter's hits within their pages and rebuild each locator (BuildHitLocator): the ordinal is a row's place
+// among its page's rows, and a page holding ONE row shows none, since there is nothing to tell apart (ROW-11). The hits
+// must already stand in page order - OrderHitsByPage, its one caller, puts them there - so a page's rows stand together,
+// all but the rows with no place in that order: those stand at the end in the order InDesign walked them, where two rows
+// of one parent page can have another place's between them. So a row's page is looked for among every page met, not
+// only the row before it's. (Counted as runs of one pageIndex, two parent pages' rows - and the pasteboard's - were
+// numbered as one page's, and a parent page's rows with another's between them were not numbered: case
+// row-ordinal-pageless.)
 static void NumberHitsWithinPages(std::vector<KFCResultModel::Hit>& hits)
 {
-	size_t runStart = 0;
-	while (runStart < hits.size())
+	// (A test build's fault switch: a run of one pageIndex is one page, the old way - case row-ordinal-pageless-armed.)
+	const bool runs = KFC_DIAG_FAULT("ordinal-runs");
+	std::vector<size_t> pageOf(hits.size(), 0);	// each row's page, as an index into the two below
+	std::vector<size_t> firstRowOf;				// each page met: its first row
+	std::vector<int32> rowsOn;					// ...and how many rows it holds
+	for (size_t i = 0; i < hits.size(); ++i)
 	{
-		size_t runEnd = runStart;
-		while (runEnd < hits.size() && hits[runEnd].pageIndex == hits[runStart].pageIndex)
-			++runEnd;
-		const int32 runCount = static_cast<int32>(runEnd - runStart);
-		for (size_t k = runStart; k < runEnd; ++k)
+		size_t page = firstRowOf.size();		// a page not met before, unless found below
+		if (i > 0 && (runs ? hits[i - 1].pageIndex == hits[i].pageIndex : OnOnePage(hits[i - 1], hits[i])))
+			page = pageOf[i - 1];
+		else if (!runs)
 		{
-			hits[k].pageOrdinal = (runCount > 1) ? (static_cast<int32>(k - runStart) + 1) : 0;
-			KFCResultModel::BuildHitLocator(hits[k]);
+			for (size_t p = 0; p < firstRowOf.size(); ++p)
+				if (OnOnePage(hits[firstRowOf[p]], hits[i]))
+				{
+					page = p;
+					break;
+				}
 		}
-		runStart = runEnd;
+		if (page == firstRowOf.size())
+		{
+			firstRowOf.push_back(i);
+			rowsOn.push_back(0);
+		}
+		pageOf[i] = page;
+		++rowsOn[page];
+	}
+	std::vector<int32> numbered(rowsOn.size(), 0);
+	for (size_t i = 0; i < hits.size(); ++i)
+	{
+		const size_t page = pageOf[i];
+		hits[i].pageOrdinal = (rowsOn[page] > 1) ? ++numbered[page] : 0;
+		KFCResultModel::BuildHitLocator(hits[i]);
 	}
 }
 
