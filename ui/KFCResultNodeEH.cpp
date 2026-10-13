@@ -198,16 +198,13 @@ bool16 KFCResultNodeEH::LButtonDn(IEvent* e)
 // Same machinery as the real Links and Layers panel row menus (LinksUITreeRowPanelEH and friends) and as
 // KESCL's own report rows, which this is copied from (KESCLResultNodeEH::RButtonDn): HandlePopupMenu pops a
 // MenuDef subtree by its name (KFCUI.fr), and the item the user picks fires through the ordinary action
-// component. The clicked row is stashed FIRST, in the model (KFCResultModel::GetContextMenuHit): that is what the
-// action reads to learn what the menu was about. (The widget handed to HandlePopupMenu - this row - does reach the
-// action's widget argument, which is how the product's layer panel reads its row - LayerPanelMenuComponent.cpp,
-// ITreeNodeIDData; KFC's actions read the stash instead.)
+// component. THIS ROW - the widget handed to HandlePopupMenu - is what the action reads to learn what the menu was
+// about: the menu hands it on to the action's widget argument (KFCActionComponent's RightClickedRow), which is how the
+// product's row menus read theirs (LayerPanelMenuComponent.cpp, ITreeNodeIDData). Nothing is stashed.
 //
-// A STORY row's right-click pops ITS menu - Search This Story Again (the author's call), stashed the same way
-// (KFCResultModel::GetContextMenuStory); a DOCUMENT row's, Search This Document Again (the author's call -
-// KFCResultModel::GetContextMenuChapter). The story and document menus hold Select All Rows as well, and the BOOK row has
-// a menu of its own for it (the author's call - KFCResultTree::SetContextMenuBook: the book's rows are every row of the
-// list, so the UI half's own flag is all the stash it needs).
+// A STORY row's right-click pops ITS menu - Search This Story Again (the author's call); a DOCUMENT row's, Search This
+// Document Again (the author's call). The story and document menus hold Select All Rows as well, and the BOOK row has a
+// menu of its own for it (the author's call).
 //
 // Deliberately NOT calling the stock handler and NOT changing the selection: the selection is what
 // the arrow keys walk from, and a right-click that is only asking for a menu should not move the
@@ -225,37 +222,14 @@ bool16 KFCResultNodeEH::RButtonDn(IEvent* e)
 		return TreeNodeEventHandler::RButtonDn(e);
 
 	// Every row's right-click is consumed - no stock handling, so the row is not selected and nothing jumps.
-	// EVERY stash is cleared first, so a menu item fired later (a script invoking its ActionID - none of the items is
-	// offered for a shortcut) cannot act on a row nobody right-clicked this time. (With only the story's cleared, a hit
-	// row right-clicked, then a story row, and the Replace action invoked by a script wrote the hit row - measured, case
-	// ctx-hit-stash-story-rclick.)
-	KFCResults()->SetContextMenuHit(-1, -1);
-	KFCResults()->SetContextMenuStory(-1, -1);
-	KFCResults()->SetContextMenuChapter(-1);
-	KFCResultTree::SetContextMenuBook(false);
 	if (nodeID->IsHitRow())
-	{
-		KFCResults()->SetContextMenuHit(nodeID->GetChapter(), nodeID->GetHit());
 		PopRowMenu(kKFCResultHitMenuName, e, this);
-	}
 	else if (nodeID->IsFontRow() && KFCResults()->IsStoryGroup(nodeID->GetChapter(), nodeID->GetFont()))
-	{
-		// A STORY row: its own menu (Search This Story Again; Select All Rows).
-		KFCResults()->SetContextMenuStory(nodeID->GetChapter(), nodeID->GetFont());
-		PopRowMenu(kKFCResultStoryMenuName, e, this);
-	}
+		PopRowMenu(kKFCResultStoryMenuName, e, this);		// a STORY row: Search This Story Again; Select All Rows
 	else if (nodeID->IsDocumentRow())
-	{
-		// A DOCUMENT row: its own menu (Search This Document Again; Select All Rows).
-		KFCResults()->SetContextMenuChapter(nodeID->GetChapter());
-		PopRowMenu(kKFCResultDocumentMenuName, e, this);
-	}
+		PopRowMenu(kKFCResultDocumentMenuName, e, this);	// a DOCUMENT row: Search This Document Again; Select All Rows
 	else if (nodeID->IsBookRow())
-	{
-		// The BOOK row: its own menu (Select All Rows).
-		KFCResultTree::SetContextMenuBook(true);
-		PopRowMenu(kKFCResultBookMenuName, e, this);
-	}
+		PopRowMenu(kKFCResultBookMenuName, e, this);		// the BOOK row: Select All Rows
 	return kTrue;
 }
 

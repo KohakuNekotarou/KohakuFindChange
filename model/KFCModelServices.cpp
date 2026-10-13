@@ -58,8 +58,6 @@ public:
 	virtual KFCResultModel::SearchScopeKind GetSearchScope() { return KFCResultModel::GetSearchScope(); }
 	virtual PMString GetBookName() { return KFCResultModel::GetBookName(); }
 	virtual bool HasRun() { return KFCResultModel::HasRun(); }
-	virtual void SetContextMenuHit(int32 chapterIdx, int32 hitIdx) { KFCResultModel::SetContextMenuHit(chapterIdx, hitIdx); }
-	virtual bool GetContextMenuHit(int32& outChapterIdx, int32& outHitIdx) { return KFCResultModel::GetContextMenuHit(outChapterIdx, outHitIdx); }
 	virtual bool GetChapterLocation(int32 chapterIdx, UIDRef& outDocRef, IDFile& outFile) { return KFCResultModel::GetChapterLocation(chapterIdx, outDocRef, outFile); }
 	virtual bool GetHitLocation(int32 chapterIdx, int32 hitIdx, UIDRef& outDocRef, IDFile& outFile, UID& outStoryUID, TextIndex& outStart, TextIndex& outEnd) { return KFCResultModel::GetHitLocation(chapterIdx, hitIdx, outDocRef, outFile, outStoryUID, outStart, outEnd); }
 	virtual bool GetHitFlags(int32 chapterIdx, int32 hitIdx, bool& outReplaced, bool& outLocked) { return KFCResultModel::GetHitFlags(chapterIdx, hitIdx, outReplaced, outLocked); }
@@ -70,11 +68,7 @@ public:
 	virtual int32 GetChapterReplacedCount(int32 chapterIdx) { return KFCResultModel::GetChapterReplacedCount(chapterIdx); }
 	virtual int32 GetFontReplacedCount(int32 chapterIdx, int32 fontIdx) { return KFCResultModel::GetFontReplacedCount(chapterIdx, fontIdx); }
 	virtual int32 GetTotalReplacedCount() { return KFCResultModel::GetTotalReplacedCount(); }
-	virtual void SetContextMenuStory(int32 chapterIdx, int32 groupIdx) { KFCResultModel::SetContextMenuStory(chapterIdx, groupIdx); }
-	virtual bool GetContextMenuStory(int32& outChapterIdx, int32& outGroupIdx) { return KFCResultModel::GetContextMenuStory(outChapterIdx, outGroupIdx); }
 	virtual UID GetHitItem(int32 chapterIdx, int32 hitIdx) { return KFCResultModel::GetHitItem(chapterIdx, hitIdx); }
-	virtual void SetContextMenuChapter(int32 chapterIdx) { KFCResultModel::SetContextMenuChapter(chapterIdx); }
-	virtual bool GetContextMenuChapter(int32& outChapterIdx) { return KFCResultModel::GetContextMenuChapter(outChapterIdx); }
 };
 
 CREATE_PMINTERFACE(KFCResultsSession, kKFCResultsImpl)

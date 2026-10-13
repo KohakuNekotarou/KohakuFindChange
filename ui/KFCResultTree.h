@@ -125,11 +125,6 @@ namespace KFCResultTree
 	    disabled rather than doing nothing; InDesign leaves a disabled item out of a right-click menu). */
 	bool CanSelectAllRows(const NodeID& row);
 
-	/** The BOOK row's right-click stash for Select All Rows (KFCResultNodeEH::RButtonDn sets it, clears it with the
-	    model's stashes): the book's rows are every row of the list, so a flag is all it needs. */
-	void SetContextMenuBook(bool rightClicked);
-	bool GetContextMenuBook();
-
 	/** THE ROW SELECTED LAST among these rows - the one the page shows (FollowModifiedClick, ExtendSelection): where the
 	    last click or Shift+arrow left the selection, while it is one of them; else the last of them. false for none. A
 	    right-click does not move it (KFCResultNodeEH::RButtonDn takes no row). */

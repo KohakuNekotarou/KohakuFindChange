@@ -913,7 +913,7 @@ resource ActionDef (kSDKDefActionResourceID)
 		kSDKDefInvisibleInKBSCEditorFlag,
 
 		// Search This Story Again - a story row's right-click menu (the author's call).
-		// kCustomEnabling: UpdateActionStates greys it while no story row is stashed or a run is up.
+		// kCustomEnabling: UpdateActionStates greys it when it comes with no story row (pressed by ID) or while a run is up.
 		kKFCActionComponentBoss,
 		kKFCSearchStoryAgainActionID,
 		kKFCSearchStoryAgainMenuKey,	// "Search This Story Again"
@@ -924,7 +924,7 @@ resource ActionDef (kSDKDefActionResourceID)
 		kSDKDefInvisibleInKBSCEditorFlag,
 
 		// Search This Document Again - a document row's right-click menu (the author's call).
-		// kCustomEnabling: UpdateActionStates greys it while no document row is stashed or a run is up.
+		// kCustomEnabling: UpdateActionStates greys it when it comes with no document row (pressed by ID) or while a run is up.
 		kKFCActionComponentBoss,
 		kKFCSearchDocumentAgainActionID,
 		kKFCSearchDocumentAgainMenuKey,	// "Search This Document Again"
@@ -935,7 +935,7 @@ resource ActionDef (kSDKDefActionResourceID)
 		kSDKDefInvisibleInKBSCEditorFlag,
 
 		// Select All Rows - a book, document or story row's right-click menu (the author's call).
-		// kCustomEnabling: UpdateActionStates greys it while no such row is stashed, while that row has no hit
+		// kCustomEnabling: UpdateActionStates greys it when it comes with no such row (pressed by ID), while that row has no hit
 		// row under it, or while a run is up.
 		kKFCActionComponentBoss,
 		kKFCSelectAllRowsActionID,

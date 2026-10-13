@@ -81,8 +81,6 @@ namespace
 		virtual KFCResultModel::SearchScopeKind GetSearchScope() { return KFCResultModel::kScopeDocument; }
 		virtual PMString GetBookName() { PMString none; none.SetTranslatable(kFalse); return none; }
 		virtual bool HasRun() { return false; }
-		virtual void SetContextMenuHit(int32, int32) {}
-		virtual bool GetContextMenuHit(int32& outChapterIdx, int32& outHitIdx) { outChapterIdx = -1; outHitIdx = -1; return false; }
 		virtual bool GetChapterLocation(int32, UIDRef& outDocRef, IDFile&) { outDocRef = UIDRef::gNull; return false; }
 		virtual bool GetHitLocation(int32, int32, UIDRef& outDocRef, IDFile&, UID& outStoryUID, TextIndex& outStart, TextIndex& outEnd)
 			{ outDocRef = UIDRef::gNull; outStoryUID = kInvalidUID; outStart = 0; outEnd = 0; return false; }
@@ -94,11 +92,7 @@ namespace
 		virtual int32 GetChapterReplacedCount(int32) { return 0; }
 		virtual int32 GetFontReplacedCount(int32, int32) { return 0; }
 		virtual int32 GetTotalReplacedCount() { return 0; }
-		virtual void SetContextMenuStory(int32, int32) {}
-		virtual bool GetContextMenuStory(int32& outChapterIdx, int32& outGroupIdx) { outChapterIdx = -1; outGroupIdx = -1; return false; }
 		virtual UID GetHitItem(int32, int32) { return kInvalidUID; }
-		virtual void SetContextMenuChapter(int32) {}
-		virtual bool GetContextMenuChapter(int32& outChapterIdx) { outChapterIdx = -1; return false; }
 	};
 
 	class KFCRunsStandInImpl : public IKFCRuns

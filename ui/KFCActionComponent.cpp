@@ -31,13 +31,14 @@
 #include "IActionManager.h"		// PerformAction - Open Find/Change runs InDesign's own Edit > Find/Change
 #include "IActionStateList.h"	// UpdateActionStates: the items' states, check marks and names
 #include "IApplication.h"		// QueryActionManager
+#include "ITreeNodeIDData.h"	// the row a right-click menu was popped over - its widget's NodeID
 #include "FindChangeID.h"		// kFindDialogActionID - Edit > Find/Change
 
 // Project includes:
 #include "KFCUIID.h"
 #include "KFCModelAccess.h"		// the model half, through its session interfaces (the model/UI split)
 #include "KFCResultTree.h"		// rebuild the result tree after a search
-#include "KFCResultNodeID.h"		// Select All Rows - the book, document or story row right-clicked
+#include "KFCResultNodeID.h"		// the row right-clicked - a hit, story, document or book row
 #include "KFCJump.h"			// the Hide Previous Chapter toggle lives with the jump logic
 #include "KFCPanelTitle.h"		// the panel's tab name carries the current scope
 #include "KFCHowTo.h"			// "How to Use..." - the operating reference
@@ -112,21 +113,68 @@ void FlipWindowToggle(bool16 (*isOn)(), void (*setOn)(bool16), bool16 (*apply)()
 	KFCResultTree::ShowStatus(msg);
 }
 
-// The row Select All Rows is for: the book, document or story row whose right-click stashed itself - never more than
-// one, as KFCResultNodeEH::RButtonDn clears them all first; an empty NodeID when nobody right-clicked one of those rows.
-// The menu's enabled state and the action ask it - one answer for both.
-NodeID SelectAllRowsTarget()
+// THE ROW A RIGHT-CLICK MENU WAS POPPED OVER is the row's own widget: KFCResultNodeEH::RButtonDn hands it to
+// HandlePopupMenu, and the menu hands it on to this component's widget argument - in UpdateActionStates as the menu is
+// drawn and in DoAction as an item is chosen. It is how the product's row menus read their row (conditionaltextui's
+// ConditionTagTVNodeContextMenu.cpp, buttonui's MSOPanelMenuAction.cpp: ITreeNodeIDData off the widget). An item
+// pressed by its ActionID - a script's invoke - comes with no widget and so with no row: it is grey and does nothing
+// (cases ctx-hit-stash-story-rclick and ctx-book-stash-docsearch).
+NodeID RightClickedRow(IPMUnknown* widget)
+{
+	InterfacePtr<const ITreeNodeIDData> nodeData(widget, UseDefaultIID());
+	return (nodeData != nil) ? nodeData->Get() : NodeID();
+}
+
+// The HIT row right-clicked, while the list still holds it. false for any other row, and for none.
+bool RightClickedHit(IPMUnknown* widget, int32& outChapter, int32& outHit)
+{
+	const NodeID node(RightClickedRow(widget));
+	TreeNodePtr<KFCResultNodeID> row(node);
+	bool replaced = false, locked = false;
+	if (row == nil || !row->IsHitRow() || !KFCResults()->GetHitFlags(row->GetChapter(), row->GetHit(), replaced, locked))
+		return false;
+	outChapter = row->GetChapter();
+	outHit = row->GetHit();
+	return true;
+}
+
+// The STORY row right-clicked, while the list still holds it. false for any other row, and for none.
+bool RightClickedStory(IPMUnknown* widget, int32& outChapter, int32& outGroup)
+{
+	const NodeID node(RightClickedRow(widget));
+	TreeNodePtr<KFCResultNodeID> row(node);
+	if (row == nil || !row->IsFontRow() || !KFCResults()->IsStoryGroup(row->GetChapter(), row->GetFont()))
+		return false;
+	outChapter = row->GetChapter();
+	outGroup = row->GetFont();
+	return true;
+}
+
+// The DOCUMENT row right-clicked, while the list still holds it. false for any other row, and for none.
+bool RightClickedDocument(IPMUnknown* widget, int32& outChapter)
+{
+	const NodeID node(RightClickedRow(widget));
+	TreeNodePtr<KFCResultNodeID> row(node);
+	PMString name;
+	int32 hits = 0;
+	if (row == nil || !row->IsDocumentRow() || !KFCResults()->GetChapterDisplay(row->GetChapter(), name, hits))
+		return false;
+	outChapter = row->GetChapter();
+	return true;
+}
+
+// The row Select All Rows is for: the book, document or story row right-clicked; an empty NodeID for any other row, and
+// for none. The menu's enabled state and the action ask it - one answer for both.
+NodeID SelectAllRowsTarget(IPMUnknown* widget)
 {
 	int32 chapter = -1, group = -1;
-	if (KFCResults()->GetContextMenuStory(chapter, group))
+	if (RightClickedStory(widget, chapter, group))
 		return KFCResultNodeID::CreateFont(chapter, group);
-	if (KFCResults()->GetContextMenuChapter(chapter))
+	if (RightClickedDocument(widget, chapter))
 		return KFCResultNodeID::Create(chapter);
-	// THE BOOK ROW'S STASH IS ONLY GOOD WHILE THE LIST HAS A BOOK ROW. It is the UI half's own flag, which a new list
-	// does not clear as it clears the model's stashes: the book row right-clicked, its menu closed unpressed, then a
-	// document search - and the action fired by its ActionID from a script selected every row of a list with no book row
-	// in it (case ctx-book-stash-docsearch).
-	if (KFCResultTree::GetContextMenuBook() && KFCResults()->IsFromBook())
+	const NodeID node(RightClickedRow(widget));
+	TreeNodePtr<KFCResultNodeID> row(node);
+	if (row != nil && row->IsBookRow() && KFCResults()->IsFromBook())
 		return KFCResultNodeID::CreateBook();
 	return NodeID();
 }
@@ -141,7 +189,7 @@ KFCActionComponent::KFCActionComponent(IPMUnknown* boss)
 
 /* DoAction
 */
-void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoint /*mousePoint*/, IPMUnknown* /*widget*/)
+void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoint /*mousePoint*/, IPMUnknown* widget)
 {
 	KFC_DIAG_HIDDEN_DOCS_CHECK("action");		// (test builds only - a document left with no window when the action is over)
 	switch (actionID.Get())
@@ -364,39 +412,38 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 
 		case kKFCReplaceHitActionID:
 		{
-			// A hit row's right-click menu. Nothing stashed = nobody right-clicked a hit row (a script firing the
-			// action by ID): do nothing. Return on a selected row writes through the same door (KFCResultTreeEH::KeyDown).
+			// A hit row's right-click menu - the row it was popped over (RightClickedHit). No hit row (the action pressed by
+			// its ActionID): do nothing. Return on a selected row writes through the same door (KFCResultTreeEH::KeyDown).
 			// The row right-clicked is one of several rows selected together: all of them (the author's calls - object
 			// rows, then text rows). Any other row: that row alone (KFCResultTree::RowsOfRightClick).
 			int32 chapter = -1, hit = -1;
-			if (KFCResults()->GetContextMenuHit(chapter, hit))
+			if (RightClickedHit(widget, chapter, hit))
 				(void)KFCResultTree::ReplaceRows(KFCResultTree::RowsOfRightClick(chapter, hit));
 			break;
 		}
 
 		case kKFCSearchStoryAgainActionID:
 		{
-			// A story row's right-click menu. Nothing stashed = nobody right-clicked a story row: do nothing.
+			// A story row's right-click menu - the row it was popped over. No story row: do nothing.
 			int32 chapter = -1, group = -1;
-			if (KFCResults()->GetContextMenuStory(chapter, group))
+			if (RightClickedStory(widget, chapter, group))
 				(void)KFCResultTree::SearchStoryAgain(chapter, group);
 			break;
 		}
 
 		case kKFCSearchDocumentAgainActionID:
 		{
-			// A document row's right-click menu. Nothing stashed = nobody right-clicked a document row: do nothing.
+			// A document row's right-click menu - the row it was popped over. No document row: do nothing.
 			int32 chapter = -1;
-			if (KFCResults()->GetContextMenuChapter(chapter))
+			if (RightClickedDocument(widget, chapter))
 				(void)KFCResultTree::SearchDocumentAgain(chapter);
 			break;
 		}
 
 		case kKFCSelectAllRowsActionID:
 		{
-			// A book, document or story row's right-click menu: the row its right-click stashed. Nothing stashed: do
-			// nothing.
-			const NodeID row(SelectAllRowsTarget());
+			// A book, document or story row's right-click menu - the row it was popped over. None of those: do nothing.
+			const NodeID row(SelectAllRowsTarget(widget));
 			if (row.IsValid())
 				(void)KFCResultTree::SelectAllRows(row);
 			break;
@@ -438,7 +485,7 @@ void KFCActionComponent::DoAbout()
 
 /* UpdateActionStates
 */
-void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionStateList* listToUpdate, GSysPoint /*mousePoint*/, IPMUnknown* /*widget*/)
+void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionStateList* listToUpdate, GSysPoint /*mousePoint*/, IPMUnknown* widget)
 {
 	// A run of ours is standing - which ones count is KFCRunGuard::IsAnyRunning's to say (a row's Replace among them,
 	// with no bar of its own). Each runs the message loop - a modal progress bar pumps events, a chapter being opened
@@ -623,37 +670,37 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 				// Several rows selected together, the right-clicked among them: while any of them can be - the rows and the
 				// question the Replace itself takes (RowsOfRightClick, CanReplaceAny).
 				int32 chapter = -1, hit = -1;
-				const bool enable = KFCResults()->GetContextMenuHit(chapter, hit)
+				const bool enable = RightClickedHit(widget, chapter, hit)
 					&& KFCResultTree::CanReplaceAny(KFCResultTree::RowsOfRightClick(chapter, hit));
 				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 				break;
 			}
 			case kKFCSearchStoryAgainActionID:
 			{
-				// A story row's menu: Search This Story Again while a story row is stashed (a run standing greys everything,
-				// above). What the engine refuses (a changed query, a search over part of a story) it says on the status line
+				// A story row's menu: Search This Story Again over a story row (a run standing greys everything, above).
+				// What the engine refuses (a changed query, a search over part of a story) it says on the status line
 				// rather than greying the item, so the user learns why (KFCSearchEngine::SearchStoryAgain).
 				int32 chapter = -1, group = -1;
-				const bool enable = KFCResults()->GetContextMenuStory(chapter, group);
+				const bool enable = RightClickedStory(widget, chapter, group);
 				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 				break;
 			}
 			case kKFCSearchDocumentAgainActionID:
 			{
-				// A document row's menu: Search This Document Again while a document row is stashed - its refusals (a changed
-				// query, a search over part of a document) said on the status line, as the story row's are
+				// A document row's menu: Search This Document Again over a document row - its refusals (a changed query, a
+				// search over part of a document) said on the status line, as the story row's are
 				// (KFCSearchEngine::SearchDocumentAgain).
 				int32 chapter = -1;
-				const bool enable = KFCResults()->GetContextMenuChapter(chapter);
+				const bool enable = RightClickedDocument(widget, chapter);
 				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 				break;
 			}
 			case kKFCSelectAllRowsActionID:
 			{
-				// A book, document or story row's menu: Select All Rows while one of those rows is stashed and has a hit row
-				// under it - disabled on one with none (a document row Search This Document Again left at (0/0), a book search's
-				// that found nothing) rather than doing nothing: the author's call.
-				const NodeID row(SelectAllRowsTarget());
+				// A book, document or story row's menu: Select All Rows over one of those rows with a hit row under it -
+				// disabled on one with none (a document row Search This Document Again left at (0/0), a book search's that
+				// found nothing) rather than doing nothing: the author's call.
+				const NodeID row(SelectAllRowsTarget(widget));
 				const bool enable = row.IsValid() && KFCResultTree::CanSelectAllRows(row);
 				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 				break;

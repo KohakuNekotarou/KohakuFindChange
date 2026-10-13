@@ -88,27 +88,6 @@ namespace
 		gRowBackup.push_back(saved);
 	}
 
-	// Which HIT row the result tree's right-click menu was popped over, for its menu (Replace) - KFCResultNodeEH
-	// stashes it just before HandlePopupMenu. -1 = none.
-	int32 gContextMenuHitChapter = -1;
-	int32 gContextMenuHit = -1;
-	// ...and which STORY row it was popped over, for its menu (Search This Story Again, Select All Rows). -1 = none.
-	int32 gContextMenuStoryChapter = -1;
-	int32 gContextMenuStoryGroup = -1;
-	// ...and which DOCUMENT row (Search This Document Again, Select All Rows). -1 = none.
-	int32 gContextMenuChapter = -1;
-
-	// Every right-click target forgotten - the chapters and rows they index have just gone (Clear,
-	// RestoreModelSnapshot, ReplaceStoryRows, ReplaceChapterRows).
-	void ForgetContextMenus()
-	{
-		gContextMenuHitChapter = -1;
-		gContextMenuHit = -1;
-		gContextMenuStoryChapter = -1;
-		gContextMenuStoryGroup = -1;
-		gContextMenuChapter = -1;
-	}
-
 	// Does the tree show this chapter (the cap aside)? Rows, or searched again with none (Chapter::shownEmpty) - the one
 	// question GetDisplayChapterCount, GetShownChapter and GetShownChapterPos ask.
 	bool ChapterShown(const KFCResultModel::Chapter& c)
@@ -266,9 +245,6 @@ void KFCResultModel::Clear()
 	// The rows' text foci go with them (KFCRowFoci - the one thing outside this model that describes these rows; the
 	// replace still checks the stored positions against a fresh walk rather than fingerprinting each chapter).
 	KFCRowFoci::DetachAll();
-	// The right-click target is an index into the chapters that just went away - keeping it would let
-	// the next list's Replace reach a row the user never right-clicked.
-	ForgetContextMenus();
 	// Discarding the results puts the panel back to the state it started in, illustration included.
 	gHasRun = false;
 	gChangeAllWrote = false;
@@ -342,19 +318,6 @@ void KFCResultModel::CloseChapter(int32 chapterIdx)
 	KFCRowFoci::DetachChapter(chapterIdx);
 	// Emptied and unbound, in place (see the header for why the place is kept).
 	EmptyChapter(*c);
-	// A right-click target inside it names rows that are gone.
-	if (gContextMenuHitChapter == chapterIdx)
-	{
-		gContextMenuHitChapter = -1;
-		gContextMenuHit = -1;
-	}
-	if (gContextMenuStoryChapter == chapterIdx)
-	{
-		gContextMenuStoryChapter = -1;
-		gContextMenuStoryGroup = -1;
-	}
-	if (gContextMenuChapter == chapterIdx)
-		gContextMenuChapter = -1;
 }
 
 void KFCResultModel::EmptyChapter(Chapter& chapter)
@@ -883,49 +846,6 @@ bool KFCResultModel::GetHitReach(int32 chapterIdx, int32 hitIdx, bool& outLocked
 	return h != nil;
 }
 
-void KFCResultModel::SetContextMenuHit(int32 chapterIdx, int32 hitIdx)
-{
-	gContextMenuHitChapter = chapterIdx;
-	gContextMenuHit = hitIdx;
-}
-
-bool KFCResultModel::GetContextMenuHit(int32& outChapterIdx, int32& outHitIdx)
-{
-	if (HitAt(gContextMenuHitChapter, gContextMenuHit) == nil)
-		return false;
-	outChapterIdx = gContextMenuHitChapter;
-	outHitIdx = gContextMenuHit;
-	return true;
-}
-
-void KFCResultModel::SetContextMenuStory(int32 chapterIdx, int32 groupIdx)
-{
-	gContextMenuStoryChapter = chapterIdx;
-	gContextMenuStoryGroup = groupIdx;
-}
-
-bool KFCResultModel::GetContextMenuStory(int32& outChapterIdx, int32& outGroupIdx)
-{
-	if (GroupAt(gContextMenuStoryChapter, gContextMenuStoryGroup) == nil)
-		return false;
-	outChapterIdx = gContextMenuStoryChapter;
-	outGroupIdx = gContextMenuStoryGroup;
-	return true;
-}
-
-void KFCResultModel::SetContextMenuChapter(int32 chapterIdx)
-{
-	gContextMenuChapter = chapterIdx;
-}
-
-bool KFCResultModel::GetContextMenuChapter(int32& outChapterIdx)
-{
-	if (ChapterAt(gContextMenuChapter) == nil)
-		return false;
-	outChapterIdx = gContextMenuChapter;
-	return true;
-}
-
 KFCResultModel::ChangeOutcome KFCResultModel::GetHitOutcome(int32 chapterIdx, int32 hitIdx)
 {
 	const Hit* h = HitAt(chapterIdx, hitIdx);
@@ -1226,10 +1146,9 @@ int32 KFCResultModel::ReplaceStoryRows(int32 chapterIdx, UID story, std::vector<
 	NumberHitsWithinStories(*c);
 	c->storyVersions[story] = storyVersion;
 	// THE ROWS' PLACES IN THE LIST CHANGED, so whatever names them by index goes: a kept write (a new layout generation -
-	// KFCUndoFollow drops a write whose layout is not the list's, UNDO-14), the right-click targets and the row backup
-	// (Clear's reasons). The chapter's foci come back on the rows as they stand now.
+	// KFCUndoFollow drops a write whose layout is not the list's, UNDO-14) and the row backup. The chapter's foci come
+	// back on the rows as they stand now.
 	gLayoutGeneration = ++gIdCounter;
-	ForgetContextMenus();
 	ForgetRowBackup();
 	KFCRowFoci::AttachChapter(chapterIdx);
 	int32 count = 0;
@@ -1257,7 +1176,6 @@ int32 KFCResultModel::ReplaceChapterRows(int32 chapterIdx, std::vector<Hit>& doc
 	c->searchedRanges.clear();
 	c->shownEmpty = c->hits.empty();
 	gLayoutGeneration = ++gIdCounter;
-	ForgetContextMenus();
 	ForgetRowBackup();
 	KFCRowFoci::AttachChapter(chapterIdx);
 	return static_cast<int32>(c->hits.size());
@@ -1386,8 +1304,7 @@ void KFCResultModel::RestoreModelSnapshot(const ModelSnapshot& snapshot)
 	gWalkSignature = snapshot.walkSignature;
 	gHasRun = snapshot.hasRun;
 	gChangeAllWrote = snapshot.changeAllWrote;
-	// The right-click targets index the chapters and rows that were just replaced (Clear's reason).
-	ForgetContextMenus();
+	// The row backup names rows by index, and these rows were just replaced (ReplaceStoryRows forgets it the same way).
 	ForgetRowBackup();
 	// The list put back - its rows' foci where KFC knows the stories as they stand (spec T7).
 	KFCRowFoci::AttachOpenChapters();

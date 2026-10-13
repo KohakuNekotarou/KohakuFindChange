@@ -282,9 +282,6 @@ KFCRowsByChapter KFCResultTree::RowsOfRightClick(int32 chapterIdx, int32 hitIdx)
 
 namespace
 {
-// The book row's right-click (SetContextMenuBook).
-bool gContextMenuBook = false;
-
 // Every hit row under `node`, in the order drawn - descending through the rows under it; it stops once `most` are in `out`
 // (CanSelectAllRows asks for one).
 void CollectHitRows(ITreeViewHierarchyAdapter* adapter, const NodeID& node, NodeIDList& out, int32 most = kMaxInt32)
@@ -303,16 +300,6 @@ void CollectHitRows(ITreeViewHierarchyAdapter* adapter, const NodeID& node, Node
 	}
 }
 }	// anonymous namespace
-
-void KFCResultTree::SetContextMenuBook(bool rightClicked)
-{
-	gContextMenuBook = rightClicked;
-}
-
-bool KFCResultTree::GetContextMenuBook()
-{
-	return gContextMenuBook;
-}
 
 bool KFCResultTree::CanSelectAllRows(const NodeID& row)
 {

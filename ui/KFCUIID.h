@@ -312,7 +312,7 @@ DECLARE_PMID(kActionIDSpace, kKFCSearchStoryAgainActionID, kKFCUIPrefix + 50)
 DECLARE_PMID(kActionIDSpace, kKFCSearchDocumentAgainActionID, kKFCUIPrefix + 51)
 // "Select All Rows" on a BOOK, DOCUMENT or STORY row's right-click menu (the author's call): every hit row
 // under that row selected - for Return to replace them all together. One action in the three menus: the row
-// right-clicked is told by the stash its right-click left (KFCActionComponent). + 52: the next after the highest spent.
+// right-clicked is the menu's widget (KFCActionComponent's RightClickedRow). + 52: the next after the highest spent.
 DECLARE_PMID(kActionIDSpace, kKFCSelectAllRowsActionID, kKFCUIPrefix + 52)
 
 

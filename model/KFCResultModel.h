@@ -499,22 +499,6 @@ namespace KFCResultModel
 	    that bears on both questions; the DECISIONS made from it stay one per place. */
 	bool GetHitReach(int32 chapterIdx, int32 hitIdx, bool& outLocked, bool& outHidden);
 
-	/** The hit row the right-click menu was popped over (its Replace acts on it). Cleared with the result set;
-	    false when no hit row is stashed or it is out of range. */
-	void SetContextMenuHit(int32 chapterIdx, int32 hitIdx);
-	bool GetContextMenuHit(int32& outChapterIdx, int32& outHitIdx);
-
-	/** The STORY row the right-click menu was popped over (its Search This Story Again and Select All Rows act on it).
-	    Cleared with the result set and by a right-click on any other row; false when no story row is stashed or it is
-	    out of range. */
-	void SetContextMenuStory(int32 chapterIdx, int32 groupIdx);
-	bool GetContextMenuStory(int32& outChapterIdx, int32& outGroupIdx);
-
-	/** The DOCUMENT row the right-click menu was popped over (its Search This Document Again and Select All Rows act on
-	    it). Cleared as the story row's is; false when no document row is stashed or it is out of range. */
-	void SetContextMenuChapter(int32 chapterIdx);
-	bool GetContextMenuChapter(int32& outChapterIdx);
-
 	/** A row's outcome (kOutcomeNone for an out-of-range index). */
 	ChangeOutcome GetHitOutcome(int32 chapterIdx, int32 hitIdx);
 

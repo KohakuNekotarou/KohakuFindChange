@@ -7,8 +7,8 @@
 //  IKFCResults - one of the doors the UI half reaches the model half through (the model/UI split;
 //  docs/superpowers/specs/2026-10-01-kbs-model-ui-split-design.md section 4.1).
 //
-//  The RESULT SET - KFCResultModel's questions and the few changes the panel makes to it (the row a
-//  right-click menu was popped over, and what a jump learns of a row - its document rebound, its outcome).
+//  The RESULT SET - KFCResultModel's questions and the few changes the panel makes to it (what a jump learns of a
+//  row - its document rebound, its outcome).
 //  Each method is the KFCResultModel function of the same name; the contract is written there.
 //
 //  ON kSessionBoss, NOT A FACADE ON kUtilsBoss - this note is all the doors' (IKFCRuns.h and IKFCChapters.h point
@@ -85,10 +85,6 @@ public:
 	virtual PMString GetBookName() = 0;
 	/** = KFCResultModel::HasRun. */
 	virtual bool HasRun() = 0;
-	/** = KFCResultModel::SetContextMenuHit. */
-	virtual void SetContextMenuHit(int32 chapterIdx, int32 hitIdx) = 0;
-	/** = KFCResultModel::GetContextMenuHit. */
-	virtual bool GetContextMenuHit(int32& outChapterIdx, int32& outHitIdx) = 0;
 	/** = KFCResultModel::GetChapterLocation. */
 	virtual bool GetChapterLocation(int32 chapterIdx, UIDRef& outDocRef, IDFile& outFile) = 0;
 	/** = KFCResultModel::GetHitLocation. */
@@ -108,16 +104,8 @@ public:
 	virtual int32 GetChapterReplacedCount(int32 chapterIdx) = 0;
 	virtual int32 GetFontReplacedCount(int32 chapterIdx, int32 fontIdx) = 0;
 	virtual int32 GetTotalReplacedCount() = 0;
-	/** = KFCResultModel::SetContextMenuStory / GetContextMenuStory (appended) - the story row a right-click menu was
-	    popped over, for its Search This Story Again. */
-	virtual void SetContextMenuStory(int32 chapterIdx, int32 groupIdx) = 0;
-	virtual bool GetContextMenuStory(int32& outChapterIdx, int32& outGroupIdx) = 0;
 	/** = KFCResultModel::GetHitItem (appended) - the page item an object row stands for, kInvalidUID for a text row. */
 	virtual UID GetHitItem(int32 chapterIdx, int32 hitIdx) = 0;
-	/** = KFCResultModel::SetContextMenuChapter / GetContextMenuChapter (appended) - the document row a right-click menu
-	    was popped over, for its Search This Document Again. */
-	virtual void SetContextMenuChapter(int32 chapterIdx) = 0;
-	virtual bool GetContextMenuChapter(int32& outChapterIdx) = 0;
 };
 
 #endif // __IKFCResults_h__
