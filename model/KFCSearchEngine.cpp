@@ -3152,18 +3152,11 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 		KFCObjectSearch::CollectTargets(targets, fromBook, allDocuments, static_cast<int32>(selectionScope), unopenable, tally);
 	else
 		CollectTargets(targets, fromBook, allDocuments, selectionScope, unopenable, tally);
-	const int32 total = tally.total;
-	const int32 chaptersWithHits = tally.chaptersWithHits;
-	const bool collectionTruncated = tally.truncated;
-	const bool cancelled = tally.cancelled;
-	std::vector<PMString>& unsearchable = tally.unsearchable;
-	std::vector<PMString>& brokeOff = tally.brokeOff;
-	std::vector<PMString>& unclosed = tally.unclosed;
 
 	// Cancelled: throw the half-finished result away rather than leave a partial list looking like a
 	// complete one, and give the chapters back - the results that would have needed them are gone.
 	// ReleaseHeldDocs schedules its closes, so it is safe to call from in here.
-	if (cancelled)
+	if (tally.cancelled)
 	{
 		KFCSearchEngine::DropResults();		// the rows, the book (its chapters closed) and the format
 		outSummary.Clear();
@@ -3186,13 +3179,13 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 	// ends - "No matches" is a lie too if a chapter was skipped, or a walk broke off before its end.
 	PMString chapterNotes;
 	chapterNotes.SetTranslatable(kFalse);
-	AppendUnsearchableNote(chapterNotes, unsearchable);
-	AppendSearchErrorNote(chapterNotes, brokeOff);
+	AppendUnsearchableNote(chapterNotes, tally.unsearchable);
+	AppendSearchErrorNote(chapterNotes, tally.brokeOff);
 	KFCBookScope::AppendUnopenableNote(chapterNotes, unopenable);
-	KFCBookScope::AppendUnclosedNote(chapterNotes, unclosed);
+	KFCBookScope::AppendUnclosedNote(chapterNotes, tally.unclosed);
 
 	// No matches: a plain, friendly line rather than "0 hit(s) in 0 chapter(s)".
-	if (total == 0)
+	if (tally.total == 0)
 	{
 		outSummary.Append("No matches");
 		if (fromBook && selection.selected > 0)
@@ -3237,14 +3230,14 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 	// this line, so repeating them costs room in a field that truncates and says nothing the eye
 	// has not already got (the author's call). The "no matches" wording DOES
 	// still name what was searched - there is no tree under it to read.
-	outSummary.AppendNumber(total);
+	outSummary.AppendNumber(tally.total);
 	outSummary.Append(" hit(s)");
 	if (fromBook && selection.selected > 0)
 	{
 		// "in M of S selected document(s) (T in the book)" (the query dialog's spec, section 4-4): M held a hit, S were
 		// the Book panel's selected documents - all that was looked at - and T is the book, so the narrowing is said.
 		outSummary.Append(" in ");
-		outSummary.AppendNumber(chaptersWithHits);
+		outSummary.AppendNumber(tally.chaptersWithHits);
 		outSummary.Append(" of ");
 		outSummary.AppendNumber(static_cast<int32>(targets.size()));
 		outSummary.Append(" selected document(s) (");
@@ -3257,7 +3250,7 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 		// there is no way to tell a book whose other chapters simply had no matches from a book
 		// whose other chapters were never searched.
 		outSummary.Append(" in ");
-		outSummary.AppendNumber(chaptersWithHits);
+		outSummary.AppendNumber(tally.chaptersWithHits);
 		outSummary.Append(" of ");
 		outSummary.AppendNumber(static_cast<int32>(targets.size()));
 		outSummary.Append(" chapter(s).");
@@ -3266,7 +3259,7 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 	{
 		// the same "M of T" for All Documents: the documents that held none are not listed
 		outSummary.Append(" in ");
-		outSummary.AppendNumber(chaptersWithHits);
+		outSummary.AppendNumber(tally.chaptersWithHits);
 		outSummary.Append(" of ");
 		outSummary.AppendNumber(static_cast<int32>(targets.size()));
 		outSummary.Append(" document(s).");
@@ -3279,7 +3272,7 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 	}
 
 	// One limit (F9): collected = drawn.
-	if (collectionTruncated)
+	if (tally.truncated)
 	{
 		// THE LIMIT (F9): the rows are a list to walk and replace one at a time - more than this is a Change All's
 		// work: KFC's own for a book, InDesign's Find/Change dialog's for anything else (F18).
@@ -3303,7 +3296,7 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 	// truncates its tail when it has to.
 	outSummary.Append(" Replace a row with its right-click menu, or select it and press Return."
 		" Shift+Return replaces it and moves on to the next row.");
-	return total;
+	return tally.total;
 }
 
 bool KFCSearchEngine::HasFindQueryNow()
