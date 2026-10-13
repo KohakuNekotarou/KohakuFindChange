@@ -472,7 +472,7 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 {
 	IDataBase* const db = storyRef.GetDataBase();
 	// The walker, and the shared walker's selection utilities the critical section is taken on
-	// (KFCSearchEngine::AcquireWalker - KFC's own).
+	// (KFCSearchEngine::AcquireWalker - the session's shared one, as the SDK's snippet walks).
 	InterfacePtr<ITextWalker> walker;
 	InterfacePtr<ITextWalkerSelectionUtils> selUtils;
 	const bool haveWalker = KFCSearchEngine::AcquireWalker(walker, selUtils);
@@ -1025,7 +1025,7 @@ bool ChapterMovedUnderRows(int32 chapterIdx, const UIDRef& docRef, const WalkerS
 
 	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
 	// The walker, and the shared walker's selection utilities the critical section is taken on
-	// (KFCSearchEngine::AcquireWalker - KFC's own).
+	// (KFCSearchEngine::AcquireWalker - the session's shared one, as the SDK's snippet walks).
 	InterfacePtr<ITextWalker> walker;
 	InterfacePtr<ITextWalkerSelectionUtils> selUtils;
 	if (opts == nil || !KFCSearchEngine::AcquireWalker(walker, selUtils) || walker == nil)

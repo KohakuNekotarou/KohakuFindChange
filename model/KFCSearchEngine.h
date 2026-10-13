@@ -526,14 +526,15 @@ namespace KFCSearchEngine
 	    False when the story cannot be read (no database, a UID that is not valid, no text model). */
 	bool ReadStoryVersion(IDataBase* db, UID story, uint32& outVersion);
 
-	/** THE WALKER A KFC WALK RUNS ON - the search's, the verify walk's and the write's (the speed-up's S1:
-	    docs/superpowers/specs/2026-10-05-kfc-one-at-a-time-and-limits-design.md section 3).
-	    outWalker = the walker to Initialize and drive: a kBasicTextWalkerBoss of KFC's own, which carries IID_ITEXTWALKER
-	    alone - not the session's shared one (kTextWalkerServiceProviderBoss), which Edit > Find/Change and the spelling
-	    panel walk and watch. outSelUtils = what the walk's critical section is taken on: always the SHARED walker's -
-	    InDesign's own spelling Change All takes the same shape (spellpanel SpellChangeAllObserver.cpp:257 walks a
-	    kBasicTextWalkerBoss, :318-319 takes the section on the shared walker). False = no walker at all; outSelUtils
-	    can still be nil - each caller keeps its own gate on it. */
+	/** THE WALKER A KFC WALK RUNS ON - the search's, the verify walk's and the write's. outWalker = the walker to Initialize
+	    and drive: the session's shared one (kTextWalkerServiceProviderBoss), the one Edit > Find/Change walks and the SDK's
+	    snippet takes (SnpFindAndReplace.cpp:758-770) - the author's call of 2026-10-14, "the same way as the official one";
+	    its find composes the text it finds, as InDesign's own does. It costs the dialog's Find Next sequence: after a search,
+	    a write or a jump that looks for its row again from this panel, Find Next goes back to the match it had found
+	    (measured). (From 2026-10-06 to 2026-10-14 a kBasicTextWalkerBoss of KFC's own - the speed-up's S1,
+	    docs/superpowers/specs/2026-10-05-kfc-one-at-a-time-and-limits-design.md section 3 - which a test build's fault
+	    switch own-walker still gives.) outSelUtils = what the walk's critical section is taken on: the shared walker's, as
+	    the snippet takes it. False = no walker at all; outSelUtils can still be nil - each caller keeps its own gate on it. */
 	bool AcquireWalker(InterfacePtr<ITextWalker>& outWalker, InterfacePtr<ITextWalkerSelectionUtils>& outSelUtils);
 
 	/** A WALK SCOPE WITH NOTHING IN IT TO WALK - no story the walker would visit: a document with no text frame at all, or

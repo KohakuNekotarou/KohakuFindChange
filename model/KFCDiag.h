@@ -153,8 +153,13 @@
 //                no layer, the old way: a hit in an anchored frame whose anchor stands on a locked or hidden layer is listed as
 //                neither (layer-anchored-locked-armed, layer-anchored-hidden-armed, obj-anchored-locked-armed)
 //    frame-read-uncomposed  KFCSearchEngine.cpp's FrameUIDForPosition reads the parcels as they stand, the way before
-//                2026-10-14 (ComposeThrough does nothing): a match pushed into overset by an edit not yet composed is listed
-//                in the frame it stood in before the edit (overset-after-edit-armed)
+//                2026-10-14 (ComposeThrough does nothing). With own-walker as well, the whole of the way before: a match pushed
+//                into overset by an edit not yet composed is listed in the frame it stood in before the edit
+//                (overset-after-edit-armed); alone, what the shared walker's find composes by itself
+//                (overset-after-edit-shared-only)
+//    own-walker  KFCSearchEngine::AcquireWalker hands back a kBasicTextWalkerBoss of KFC's own instead of the session's
+//                shared walker - the way from 2026-10-06 to 2026-10-14 (the speed-up's S1): its find composes nothing, and
+//                the dialog's Find Next is left where it was (overset-after-edit-armed, with frame-read-uncomposed)
 //
 //  AND TIMERS: KFC_CLOCK / KFC_SPENT add up the milliseconds a stretch of code takes, and KFCDiagPhase
 //  writes "PHASE <name> begin" and "PHASE <name> end <ms>" around a scope - all of it nothing without KFC_DIAG.

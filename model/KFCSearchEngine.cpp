@@ -381,13 +381,14 @@ using KFCPageItemFacts::StoryLeadText;
 // THE COMPOSITION UP TO A POSITION, BROUGHT UP TO DATE BEFORE IT IS READ. The parcels answer from the last composition, and
 // text edited since - typed just before a search, or written by KFC itself just before the next row's lock test - is
 // composed only when something asks for it: InDesign's background composition is an idle task, and a windowless chapter
-// has no view to want it. The find on the session's shared walker composed the text it found, a frame at a time (measured
-// 2026-10-05, the speed-up study - why is not known; not by selecting it: the find does not select what it finds, the SDK's
-// snippet selects it itself after the find, SnpFindAndReplace.cpp:798-807); KFC's own walker (2026-10-06) does not, so a
-// row read its page, its "overset" and its locks off the composition from before the edit. So the frames up to the
-// position are composed first when any of them is damaged: the SDK's recipe (SnpInspectTextModel.cpp:724-733, as the
-// jump's RecomposeIfDamaged takes it) carried only as far as the position (RecomposeThruTextIndex), the way InDesign's
-// find took it - not the story to its end per row a Replace writes.
+// has no view to want it. The find on the session's shared walker - the one every KFC walk runs on (AcquireWalker) -
+// composes the text it finds, a frame at a time (measured 2026-10-05, the speed-up study; why is not known - not by
+// selecting it: the find does not select what it finds, the SDK's snippet selects it itself after the find,
+// SnpFindAndReplace.cpp:798-807). A walker of one's own does not, and from 2026-10-06 to 2026-10-14 KFC walked one: a row
+// read its page, its "overset" and its locks off the composition from before the edit. So, as the reading's own guard,
+// the frames up to the position are composed first when any of them is damaged - nothing to do where the find composed
+// them: the SDK's recipe (SnpInspectTextModel.cpp:724-733, as the jump's RecomposeIfDamaged takes it) carried only as far
+// as the position (RecomposeThruTextIndex) - not the story to its end per row a Replace writes.
 // Every caller holds a SaveRestoreModifiedState guard or is writing anyway (composing dirties a document).
 void ComposeThrough(ITextModel* textModel, TextIndex pos)
 {
@@ -1284,8 +1285,8 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 		}
 	}
 
-	// KFC's own walker, and the shared walker's selection utilities the critical section below is taken on
-	// (KFCSearchEngine::AcquireWalker).
+	// The session's shared walker, and its selection utilities the critical section below is taken on
+	// (KFCSearchEngine::AcquireWalker - as the SDK's snippet takes them).
 	InterfacePtr<ITextWalker> walker;
 	InterfacePtr<ITextWalkerSelectionUtils> selUtils;
 	if (!KFCSearchEngine::AcquireWalker(walker, selUtils) || walker == nil)
@@ -1301,9 +1302,10 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 	// time and wants to carry on the walk it already has. This panel lists a whole document in one
 	// run, so it always wants a walk of its own from the top.
 	//
-	// (The walker is KFC's own - AcquireWalker - so a search started from this panel leaves a Find
-	// Next sequence the user had going in the Find/Change dialog where it was: measured,
-	// work/note-scripts/2026-10-06-kfc-no-track/s1-findnext2.ps1.)
+	// What that costs: the walker is the session's shared one (AcquireWalker), so a search started from this panel takes a
+	// Find Next sequence the user had going in the Find/Change dialog back to the match it had found - measured,
+	// work/note-scripts/2026-10-06-kfc-no-track/s1-findnext2.ps1 - the price of walking the official way (the author's
+	// call of 2026-10-14).
 	if (walker->IsWalking())
 		walker->Halt();
 
@@ -3324,18 +3326,26 @@ bool KFCSearchEngine::AcquireWalker(InterfacePtr<ITextWalker>& outWalker, Interf
 		return false;
 	InterfacePtr<ITextWalkerSelectionUtils> selUtils(shared, UseDefaultIID());
 	outSelUtils.reset(selUtils.forget());
-	// KFC'S OWN WALKER (the speed-up's S1 - taken: 20-35 % off the writing walk of the time, Change Checked's (since
-	// removed), the per-find composition gone, the answer unchanged; docs/ai-notes/kfc-speedup-ideas-2026-10-05.md
-	// section 12). (Unchanged on text that was composed; on text edited and not yet composed, the frame a row is read
-	// from comes from the composition before the edit - so FrameUIDForPosition composes up to the row first, ComposeThrough,
-	// since 2026-10-14.)
-	// Nothing watches it and nobody else walks it, so the dialog's Find Next is left where it was (measured,
-	// s1-findnext2.ps1: the shared walker sent Find Next back to the match it had just found; KFC's own let it go on
-	// to the next). Change All (KFCChangeAll::WriteDocument) walks the shared one, as the dialog's own Change All does.
-	InterfacePtr<ITextWalker> mine(::CreateObject2<ITextWalker>(kBasicTextWalkerBoss));
-	if (mine == nil)
-		return false;
-	outWalker.reset(mine.forget());
+	// (Fault switch own-walker, a test build's only - KFCDiag.h: a kBasicTextWalkerBoss of KFC's own, the way from
+	// 2026-10-06 to 2026-10-14 - the speed-up's S1, docs/ai-notes/kfc-speedup-ideas-2026-10-05.md section 12.)
+	if (KFC_DIAG_FAULT("own-walker"))
+	{
+		InterfacePtr<ITextWalker> mine(::CreateObject2<ITextWalker>(kBasicTextWalkerBoss));
+		if (mine == nil)
+			return false;
+		outWalker.reset(mine.forget());
+		return true;
+	}
+	// THE SESSION'S SHARED WALKER, THE ONE THE SDK'S SNIPPET WALKS (SnpFindAndReplace.cpp:758-770) - the author's call of
+	// 2026-10-14: "the same way as the official one". Its find composes the text it finds, a frame at a time, as InDesign's
+	// own does (measured 2026-10-05): what a row's frame - its page, "overset", its locks - is then read from.
+	// What it costs, both measured: a search, a write or a jump that looks for its row again from this panel takes the
+	// dialog's Find Next sequence back to the match it had found (2026-10-06,
+	// work/note-scripts/2026-10-06-kfc-no-track/s1-findnext2.ps1: Find Next found cat@8 again, not cat@16); and the
+	// composition costs the writing walk 20-35 % (2026-10-05, a Change Checked of thousands of rows - a row's Replace
+	// writes 300 at most). From 2026-10-06 to 2026-10-14 KFC walked a walker of its own (the switch above), which composes
+	// nothing.
+	outWalker.reset(shared.forget());
 	return true;
 }
 
