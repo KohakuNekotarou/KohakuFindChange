@@ -23,7 +23,8 @@
 //
 //  The visual indent is drawn by explicit frame offsets in ApplyDataToWidget, applied on top of
 //  the framework's own indent rather than instead of it (see GetIndentForNode), as in KESCL. This
-//  file also hosts KFCResultTree::Rebuild (the tree lives here). Ported from KESCL's
+//  file also hosts the KFCResultTree doors that reach the tree and the message area (the head of KFCResultTree.h says
+//  which file holds which). Ported from KESCL's
 //  KESCLResultListWidgetMgr - two levels then (document and hit; the book and story levels
 //  came later) - itself modelled on the paneltreeview sample's PnlTrvTVWidgetMgr.
 //
@@ -363,7 +364,7 @@ private:
 		IPanelControlData* rowData) const
 	{
 		// "<book>  (R/N)" - how many of the hits the book's search holds this list has replaced, of how many (every one
-		// drawn - one limit, F9; the R - AppendCounts). Drawn even when the search found
+		// drawn - the search's limit is the only one; the R - AppendCounts). Drawn even when the search found
 		// nothing - the hierarchy adapter gives the root one child whenever the results came from a book, which is how
 		// the panel goes on naming the book it just searched - and then it reads "(0/0)", which is also how KFCBookWatch
 		// describes it (the user's own measurement, of the "(0)" before the R); keep the two together.
@@ -394,7 +395,6 @@ private:
 		if (KFCResults()->GetSearchScope() == KFCResultModel::kScopeAllDocuments && ChapterHasNoWindow(nodeID->GetChapter()))
 			label.Append(" (no window)");
 		AppendCounts(label, KFCResults()->GetChapterReplacedCount(nodeID->GetChapter()), fullCount);
-		// (No "cancelled" note: a write that does not go through is put back WHOLE, so no chapter is left half-reached.)
 
 		this->LayOutBranchRow(node, widget, rowData, this->LevelShift(), label);
 	}
@@ -703,7 +703,7 @@ IKFCStatusTextData* QueryStatusTextData(IControlView*& outView)
 
 /** Put this message on the panel's message area (IKFCStatusTextData.h) - the sentence alone, in the theme's text
     colour. Does nothing when the panel is closed, which is an ordinary state. Every writer below reaches the box
-    through here; they decide only WHAT it says.
+    through here and decides only WHAT it says - except a preview, which writes its pieces itself (ShowRowPreview).
 
     NO '&' DOUBLING. The line names files the user chose; a stock StaticText takes a lone '&' as a
     keyboard accelerator ("A&B.indd" draws as "AB.indd" with the B underlined) and needs every message

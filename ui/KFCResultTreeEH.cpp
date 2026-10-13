@@ -157,7 +157,8 @@ NodeID NextRowInTreeOrder(const ITreeViewHierarchyAdapter* adapter, const NodeID
 	}
 }
 
-// SHIFT+RETURN GOES ON (the author's call - InDesign's own Change/Find, "replace, then find the next", for the list). After the row it wrote, the next HIT row below it that can be replaced is selected, brought into view and landed
+// SHIFT+RETURN GOES ON (the author's call - InDesign's own Change/Find, "replace, then find the next", for the list).
+// After the row it wrote, the next HIT row below it that can be replaced is selected, brought into view and landed
 // on the way the arrows land on a row (HandleUpDownKey): its action - the jump, and a GREP row's Preview Text - then the
 // keyboard taken back. Rows that cannot be replaced are stepped over (already replaced, locked, not a match of Find/Change:
 // KFCRuns()->CanReplaceHit, the question the row menu greys Replace by), and a closed row above the one landed on is opened
@@ -650,7 +651,7 @@ bool16 KFCReturnFilterEH::KeyDown(IEvent* e)
 	// KEYBOARD FRAME ASKS IT (KFCResultTree::ListHoldsKeyboard - the spec map's PNL-20): InDesign's holder AND the window
 	// the system sends the keys to. Find/Change's title bar clicked leaves InDesign's holder on the list and sends the keys
 	// to the dialog (JMP-33): the frame goes away, and a Return then is the dialog's - with the holder alone asked here, it
-	// replaced the rows selected in the list instead (the 1.3 -> 1.4 re-check of 2026-10-11 night).
+	// would replace the rows selected in the list instead.
 	IControlView* listView = KFCResultTree::ResultListView();
 	if (listView == nil)
 		return kFalse;

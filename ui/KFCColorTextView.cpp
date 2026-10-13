@@ -17,10 +17,11 @@
 //  on BOTH the draw and the measure so a literal '&' in the search text is neither underlined
 //  nor dropped. Selected rows are drawn in the theme's selected-text colours, which a hand-drawn
 //  cell has to ask for itself (a stock StaticText gets all four colours from its .fr and lets the
-//  framework choose) - the same isHilited switch the app's own drawing makes. When a line overflows the cell
-//  the match is kept at full strength and the context is ellipsized around it (the stock rows ellipsize automatically; this custom cell does it by
-//  hand): the leading context loses its HEAD (kEllipsizeBeginning, so the words just before the
-//  match survive with a leading "..."), the trailing context loses its TAIL (kEllipsizeEnd).
+//  framework choose) - the same isHilited switch the app's own drawing makes. When a line overflows
+//  the cell the match is kept at full strength and the context is ellipsized around it (the stock rows
+//  ellipsize automatically; this custom cell does it by hand): the leading context loses its HEAD
+//  (kEllipsizeBeginning, so the words just before the match survive with a leading "..."), the
+//  trailing context loses its TAIL (kEllipsizeEnd).
 //
 //========================================================================================
 
@@ -338,8 +339,9 @@ void KFCColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	//   written.
 	const bool wantCaret = match.IsEmpty();
 
+	// The widths of the line's runs - the match's is the bar's room when it has no characters.
 	const PMReal preW   = KFCDrawnWidth(&gc, pre, fontInfo);
-	const PMReal matchW = KFCDrawnWidth(&gc, wantCaret ? KFCCaretPlaceholder() : match, fontInfo);	// the bar's room, or the characters
+	const PMReal matchW = KFCDrawnWidth(&gc, wantCaret ? KFCCaretPlaceholder() : match, fontInfo);
 	const PMReal postW  = KFCDrawnWidth(&gc, post, fontInfo);
 
 	// The match at the running x: its characters, or the bar in their place - spanning the cell a pixel

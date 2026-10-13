@@ -8,7 +8,7 @@
 //  the text is the text - a lone '&' in a file name is not taken as an accelerator (the spec map's ROW-31) - and so
 //  that it can show more than one colour: a heading on a line of its own, and the characters that matter at full
 //  colour between two faded pieces of context (KCM's IKCMStatusTextData shape) - a selected GREP row's
-//  "Preview Text:" (SetSegments, appended).
+//  "Preview Text:" (SetSegments).
 //
 //  NOT PERSISTENT. This is the message raised last in this session; what outlives the panel
 //  is kept on the tree's side (KFCResultListWidgetMgr.cpp) and written back when the panel is shown.

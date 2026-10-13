@@ -7,7 +7,7 @@
 //  ITreeViewHierarchyAdapter for the result tree: adapts KFCResultModel's chapters and hits to
 //  the tree-view framework. Under a hidden root: one BOOK node when the results came from a book
 //  search - it is then the root's ONLY child and the chapters hang off it - then one DOCUMENT node
-//  per chapter that holds matches (in book order). A document-scope search has no book row, so its
+//  per chapter shown (in book order - see the class's note). A document-scope search has no book row, so its
 //  chapters hang off the root directly, which is the two-level tree KFC started with.
 //
 //  Under a document, a STORY node per group, each holding that story's hits - the code calls the level
@@ -16,8 +16,8 @@
 //  directly - the branches below for a node that names no group (KFCResultModel's BuildFontGroups).
 //
 //  See KFCResultNodeID.h for the five node shapes and for why the root sits at -2. Ported from
-//  KESCL's KESCLResultListAdapter, dropping its filtered-view indirection (KFC shows every chapter
-//  that has hits, no filters) - itself modelled on paneltreeview's adapter.
+//  KESCL's KESCLResultListAdapter, dropping its filtered-view indirection (KFC has no filters) - itself
+//  modelled on paneltreeview's adapter.
 //
 //========================================================================================
 

@@ -42,10 +42,10 @@
 
 // Interface includes:
 #include "IActionManager.h"		// the route from the app to IMenuManager (the right-click popup)
-#include "IApplication.h"		// the app boss carries IKeyBoard
+#include "IApplication.h"		// the app: its action manager (the right-click popup), and the IKeyBoard of the old hand-off
 #include "IEvent.h"				// ShiftKeyDown / CmdKeyDown; GlobalWhere - where to pop the menu
-#include "IEventHandler.h"		// the LIST's handler - the arrow keys' owner (see the hand-off below)
-#include "IKeyBoard.h"			// AcquireKeyFocus - hand the arrows to the list after a click
+#include "IEventHandler.h"		// the list's handler - the old hand-off only (a test build's click-acquire-only)
+#include "IKeyBoard.h"			// AcquireKeyFocus - the old hand-off only (KFCResultTree::TakeKeyboard hands it over now)
 #include "IMenuManager.h"		// HandlePopupMenu - pops the rows' menus at the cursor
 #include "ISession.h"
 #include "ITreeNodeIDData.h"	// this node's NodeID

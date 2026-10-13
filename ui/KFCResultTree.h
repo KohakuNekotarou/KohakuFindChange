@@ -4,14 +4,12 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  Result tree rebuild entry point. Called after KFCResultModel has been filled by a search (or its
-//  shape changed by an Undo): reloads the panel's tree widget from the model. What it opens depends on the scope - a
-//  BOOK result opens the book row and leaves the chapters closed (a book-wide run can fill the
-//  panel with one chapter's hits and bury the fact that others matched), All Documents leaves its
-//  document rows closed for the same reason, a single document opens its one chapter - and the story
-//  rows always come up open. No priming is needed to get the expander arrows drawn: this
-//  panel draws them itself, from the hierarchy adapter's child count. No-op when the panel is closed.
-//  Implemented in KFCResultListWidgetMgr.cpp (it lives with the tree).
+//  The result list's doors for the rest of the UI half: the tree reloaded from KFCResultModel after a search or an
+//  Undo (Rebuild) or its rows repainted, the panel's message area written, the rows' Replace and Search ... Again, the
+//  rows selected together, and the keyboard the list keeps. Defined where each lives: KFCResultListWidgetMgr.cpp (the
+//  tree, its rows, the message area, the rows' Replace and Search ... Again, the keyboard handed to the list),
+//  KFCResultTreeController.cpp (the rows selected together), KFCResultTreeEH.cpp (the Return filter and the keyboard
+//  frame).
 //
 //========================================================================================
 
@@ -78,10 +76,10 @@ namespace KFCResultTree
 	           when it was selected. */
 	bool ShowRowPreview(int32 chapterIdx, int32 hitIdx, const char* notSelectedWhy = nil);
 
-	/** A ROW'S OWN NOTE on the message area: why a click did not select the row's match or item - and, for rows
-	    selected together, why a row was not added. Like a preview it is the row's, not a report - not kept as the last message, and taken away by DropRowPreview when the next row
-	    is landed on (else walking on with the arrows from a locked row would leave its reason standing beside a row
-	    that was selected). Safe when the panel is closed. */
+	/** A ROW'S OWN NOTE on the message area: why a click did not select the row's match or item. Like a preview it is
+	    the row's, not a report - not kept as the last message, and taken away by DropRowPreview when the next row is
+	    landed on (else walking on with the arrows from a locked row would leave its reason standing beside a row that
+	    was selected). Safe when the panel is closed. */
 	void ShowRowNote(const PMString& note);
 
 	/** The message area showing a preview or a row's note goes back to the last ordinary message - for a row that has
@@ -160,20 +158,23 @@ namespace KFCResultTree
 
 	/** THE LIST TAKES THE KEYBOARD, THE PANEL MADE ACTIVE: IPanelMgr::ShowPanelByWidgetID with giveKeyFocus,
 	    then the panel's IPanelControlData::SetKeyboardFocus on the list - and IKeyBoard::AcquireKeyFocus if those did not
-	    land it. For the arrows' walk and a Return's replace (KFCResultTreeEH), after a document window has come forward.
+	    land it. After a row's click (KFCResultNodeEH), the arrows' walk and a Return's replace (KFCResultTreeEH) - a
+	    document window has come forward - and after Select All Rows (a right-click's menu left the keyboard where it was).
 	    Does nothing while the panel is closed. True = the list holds the keyboard. */
 	bool TakeKeyboard();
 
 	/** THE KEYBOARD FRAME (the author's call: "make it plain that the list has the keyboard"):
 	    do the keys go to the result list now - IKeyBoard's focus is the list's own handler, AND the system sends the keys
 	    to the panel's window (KFCPanelHasSystemKeyboard - a click on Find/Change's title bar moves the second and not the
-	    first)? Asked when the panel draws the frame around the list (KFCPanelView::DV_Draw). false while the panel is
-	    closed. Defined in KFCResultTreeEH.cpp, as the next two. */
+	    first)? Asked when the panel draws the frame around the list (KFCPanelView::DV_Draw), and by the Return filter
+	    before it takes a Return - one answer for both. false while the panel is closed. Defined in KFCResultTreeEH.cpp,
+	    as the next two. */
 	bool ListHoldsKeyboard();
 
 	/** The strip around the list drawn again, so the keyboard frame comes or goes - called when the list takes the
-	    keyboard or lets it go (KFCResultTreeEH's PostGetKeyFocus / PostGiveUpKeyFocus), and when a window is made active
-	    or inactive (its Return filter's Activate / Deactivate). Nothing while the panel is closed. */
+	    keyboard or lets it go (KFCResultTreeEH's PostGetKeyFocus / PostGiveUpKeyFocus), when a window is made active
+	    or inactive (its Return filter's Activate / Deactivate), and by TakeKeyboard (the panel's doors can bring the
+	    system's keyboard back with InDesign's holder unchanged). Nothing while the panel is closed. */
 	void RedrawKeyboardFrame();
 
 	/** The keyboard frame's width in pixels, drawn just outside the list's edges - the panel leaves 3 or 4 px around the
