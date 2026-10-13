@@ -127,6 +127,14 @@ const uint32 kKFCBookRetireDelayMs = 300;
     released from inside itself. */
 ICallbackTimer* gRetireTimer = nil;
 
+/** Must the retire wait - is a run of ours, or a row's landing in the panel, under way? ONE question for both places
+    that ask it, the retire itself and the timer callback that waits it out: a guard added to one and not the other
+    would retire under the very thing it was added for. Why each is waited for: RetireBookResultsIfGone. */
+bool RetireMustWait()
+{
+	return KFCRunGuard::IsAnyRunning() || KFCRunGuard::IsLandingUnderWay();
+}
+
 /** Retire the results if the book they were searched in is no longer open. Does nothing - and
     says nothing - when the book is still there, because this runs on every book CLOSE in the session
     (kCloseBookCmdBoss names no book - see the file header), most of them about some other book. */
@@ -144,7 +152,7 @@ void RetireBookResultsIfGone()
 	// a landing opens the row's chapter and its window and runs the message loop while it does, so an idle callback can
 	// land in it too - and this would empty the results the landing is reading and hand back the chapter it is opening,
 	// still windowless (KFCRunGuard::IsLandingUnderWay - the UI half's flag, asked across the split).
-	if (KFCRunGuard::IsAnyRunning() || KFCRunGuard::IsLandingUnderWay())
+	if (RetireMustWait())
 		return;
 
 	// Which book are the results from? Read the path BEFORE releasing anything -
@@ -232,7 +240,7 @@ uint32 RetireTimerCallback(void* /*refPtr*/)
 	// locked, until the next search - not a permanent strand. Named rather than assumed, because a
 	// fallback nobody has written down is one the next change can remove without noticing.
 	// ...and a row's landing is waited out the same way (RetireBookResultsIfGone says why).
-	if (KFCRunGuard::IsAnyRunning() || KFCRunGuard::IsLandingUnderWay())
+	if (RetireMustWait())
 		return kKFCBookRetireDelayMs;
 
 	RetireBookResultsIfGone();

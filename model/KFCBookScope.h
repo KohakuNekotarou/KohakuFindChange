@@ -323,6 +323,17 @@ namespace KFCBookScope
 	    after the search. The query run asks for it at its own commit point as well (one rule for both). */
 	void ReleaseHeldDocs(bool closeNow = false);
 
+	/** What ReleaseHeldDoc did with a chapter (its @return says how to read them). */
+	enum HeldRelease
+	{
+		kNotHeld,		// not on the held list - never ours, or handed back already: nothing done
+		kGoneAlready,	// ours, but no longer open - dropped from the list
+		kLeftToUser,	// ours, with a window - dropped from the list and left open: it is the user's
+		kClosed,		// ours, windowless and clean - closed (on the spot, or on a schedule)
+		kKeptUnsaved,	// ours, windowless, with unsaved work - kept on the list, not closed
+		kKeptRefused	// ours, windowless and clean, but no file handler or CanClose refused - kept on the list
+	};
+
 	/** Close THIS chapter, if KFC is the one who opened it AND it has nothing unsaved in it. A
 	    chapter the user already had open is not held and is left alone, so a run can hand back every
 	    chapter it walked without keeping track of who opened which. UI-suppressed exactly like
@@ -342,37 +353,30 @@ namespace KFCBookScope
 	    A chapter found with a WINDOW is handed to the user, not closed. The panel-raised
 	    window this covers is one this module never saw being opened (the book panel windows a held
 	    chapter without a word to us); the chapter comes off the held list, nothing is closed, and the
-	    answer is TRUE - it is no longer ours to close, which is what "handed back" means.
+	    answer is kLeftToUser - it is no longer ours to close, which is what "handed back" means.
 
-	    @return true when the chapter was actually handed back - closed, or found with a window and
-	            left to the user. false when it was not ours, when it is no longer open, when it
-	            holds unsaved changes (and no window), or when the close was refused. The last two
-	            leave the chapter ON the held list, so a later release gets another try. A caller
-	            that REPORTS having closed chapters has to read this rather than assume: "nothing of ours was open" and
-	            "we closed what was" are different facts, and only this can tell them apart - and
-	            telling the ordinary "no longer open" from the failures takes IsHeldDoc before plus
-	            IsDocStillOpen after - HandBackHeldDocNow, below. */
-	bool ReleaseHeldDoc(const UIDRef& docRef, bool closeNow = false);
+	    @return what became of the chapter - one answer for each case, so no caller has to ask around
+	            the call to tell them apart. kClosed and kLeftToUser are the chapter handed back.
+	            kNotHeld (never ours, or handed back already) and kGoneAlready (someone closed it) are the
+	            ordinary course of a run. kKeptUnsaved and kKeptRefused are a chapter of ours still
+	            standing, windowless with its .indd locked and no window for the user to find it by - it
+	            stays ON the held list, so a later release gets another try. */
+	HeldRelease ReleaseHeldDoc(const UIDRef& docRef, bool closeNow = false);
 
 	/** A RUN HANDS A CHAPTER BACK ON THE SPOT - AND SAYS WHETHER ONE OF OURS IS LEFT STANDING - one
 	    answer for the search, Change All in Book and the query run. ReleaseHeldDoc(docRef, closeNow = true),
-	    its false read with the two questions it cannot answer alone: was the chapter ours (IsHeldDoc,
-	    BEFORE - one the user had open is never ours to close), and is it still open (IsDocStillOpen,
-	    AFTER - one the user closed under the run is not left behind). False ONLY for a chapter of
-	    ours still standing - windowless, its .indd locked - which the run then names
-	    (AppendUnclosedNote). closeNow's rule applies: outside any command sequence, with no walk
-	    standing. */
+	    false ONLY for a chapter of ours still standing (kKeptUnsaved, kKeptRefused) - windowless, its
+	    .indd locked - which the run then names (AppendUnclosedNote); a chapter the user had open is never
+	    ours to close, and one the user closed under the run is not left behind. closeNow's rule applies:
+	    outside any command sequence, with no walk standing. */
 	bool HandBackHeldDocNow(const UIDRef& docRef);
 
 	/** Is this chapter one WE opened - is it on the held list right now?
 
-	    It exists because ReleaseHeldDoc's false cannot be read on its own. That answer
-	    covers four different things: the chapter was never ours, it is no longer open, it holds
-	    unsaved work, or the close was refused. The first two are the ordinary course of a run and
-	    mean nothing is wrong; the last two mean a chapter this plug-in opened WINDOWLESS is still
-	    standing, with its .indd locked and no window for the user to find it by. A caller that wants
-	    to report the second pair has to be able to tell them apart, and this is the question that
-	    does it: ask before the release, and a false afterwards is then a real failure.
+	    Asked wherever a document being one of ours decides what happens to it: which open documents a
+	    document-scope run leaves out (a windowless chapter a book run holds is not the user's), which
+	    written chapter a run gives a window, which document a reach hands back. (ReleaseHeldDoc answers
+	    for itself - see HeldRelease.)
 
 	    Cheap - a walk of a list that holds at most a handful of entries. */
 	bool IsHeldDoc(const UIDRef& docRef);

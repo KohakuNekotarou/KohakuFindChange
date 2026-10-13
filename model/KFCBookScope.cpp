@@ -400,7 +400,7 @@ void KFCBookScope::ReleaseHeldDocs(bool closeNow)
 	// or a refused close = kept on the list for a later call, otherwise closed (kSchedule - this runs
 	// from notifications - unless the caller asks for closeNow, see the header). A copy is walked, because
 	// ReleaseHeldDoc edits the list; a chapter a re-entrant call has already handed back is no longer on it
-	// and answers false here.
+	// and answers kNotHeld here.
 	const K2Vector<UIDRef> held = gHeldDocs;
 	for (int32 i = 0; i < static_cast<int32>(held.size()); ++i)
 		(void)ReleaseHeldDoc(held[i], closeNow);
@@ -408,44 +408,41 @@ void KFCBookScope::ReleaseHeldDocs(bool closeNow)
 
 bool KFCBookScope::IsHeldDoc(const UIDRef& docRef)
 {
-	// The walk ReleaseHeldDoc opens with (HeldIndexOf). Kept as its own function rather than folded into that
-	// one's answer because the two questions are asked at different MOMENTS - this one before the
-	// release, that one after - and only the pair of them says whether a failure to close was real.
-	// See the header.
+	// The walk ReleaseHeldDoc opens with (HeldIndexOf).
 	return HeldIndexOf(docRef) >= 0;
 }
 
 void KFCBookScope::HandBackIfHeld(const UIDRef& docRef)
 {
-	// (See the header.) HandBackHeldDocNow asks IsHeldDoc itself and does nothing to a document that is not held - one
-	// closed since included: the held list is compared against without following the pointer.
+	// (See the header.) HandBackHeldDocNow does nothing to a document that is not held - one closed since included: the
+	// held list is compared against without following the pointer.
 	(void)HandBackHeldDocNow(docRef);
 }
 
 bool KFCBookScope::HandBackHeldDocNow(const UIDRef& docRef)
 {
-	const bool wasOurs = IsHeldDoc(docRef);
 #ifdef KFC_DIAG
 	// Test builds only: the fault switch keep-held (KFCDiag.h) leaves a chapter of ours held, clean and
 	// windowless after its run - the state a window that would not open leaves behind (the regression
 	// case held-chapter-alldocs). Answered as handed back, so the run's summary says nothing about it.
-	if (wasOurs && KFC_DIAG_FAULT("keep-held"))
+	if (IsHeldDoc(docRef) && KFC_DIAG_FAULT("keep-held"))
 	{
 		KFC_DIAG_LOG("FAULT keep-held: doc=%p uid=%u stays held", (void*)docRef.GetDataBase(), docRef.GetUID().Get());
 		return true;
 	}
 #endif
-	return ReleaseHeldDoc(docRef, true /*close now*/) || !wasOurs || !IsDocStillOpen(docRef);
+	const HeldRelease released = ReleaseHeldDoc(docRef, true /*close now*/);
+	return released != kKeptUnsaved && released != kKeptRefused;
 }
 
-bool KFCBookScope::ReleaseHeldDoc(const UIDRef& docRef, bool closeNow)
+KFCBookScope::HeldRelease KFCBookScope::ReleaseHeldDoc(const UIDRef& docRef, bool closeNow)
 {
 	// Ours to close? A chapter the user already had open is not on this list and must stay. That
 	// test lives HERE rather than at every call site: a run walks its chapters without caring who
 	// opened which, and hands every one of them back the same way.
 	const int32 heldIndex = HeldIndexOf(docRef);
 	if (heldIndex < 0)
-		return false;
+		return kNotHeld;
 
 	// AND FROM HERE ON THE ERROR STATE IS THIS FUNCTION'S OWN - PRESERVE, THEN CLEAR. Close
 	// reports nothing at all (IDocFileHandler.h:101), so a failure inside it can only speak through the
@@ -478,13 +475,13 @@ bool KFCBookScope::ReleaseHeldDoc(const UIDRef& docRef, bool closeNow)
 	{
 		gHeldDocs.erase(
 			gHeldDocs.begin() + heldIndex);
-		return false;
+		return kGoneAlready;
 	}
 
 	// A window makes it the user's, whoever raised it. ShowChapterWindow and the jump
 	// take a chapter off this list when THEY raise one; this catches a window raised behind this
 	// module's back (the book panel windows a held chapter without a word to us - see
-	// DocHasAnyWindow). Claim dropped, nothing closed - and TRUE, not false: the chapter is no
+	// DocHasAnyWindow). Claim dropped, nothing closed - and handed back (kLeftToUser): the chapter is no
 	// longer this module's to close, which is what "handed back" means to every caller. Closing it
 	// instead would take a window the user is looking at; once they had saved their work, the
 	// unsaved-work door below would not even stand in the way any more.
@@ -492,7 +489,7 @@ bool KFCBookScope::ReleaseHeldDoc(const UIDRef& docRef, bool closeNow)
 	{
 		gHeldDocs.erase(
 			gHeldDocs.begin() + heldIndex);
-		return true;
+		return kLeftToUser;
 	}
 
 	// Unsaved work in it? Then it is not ours to close. Asked BEFORE it comes off the list, so it
@@ -503,7 +500,7 @@ bool KFCBookScope::ReleaseHeldDoc(const UIDRef& docRef, bool closeNow)
 	// HasUnsavedWork, which asks it of a converted chapter by what was WRITTEN rather than by "has
 	// never been saved", the thing every conversion is.
 	if (HasUnsavedWork(docRef))
-		return false;
+		return kKeptUnsaved;
 
 	// The stock document close: kSchedule defers it until the current notification / idle tick has
 	// unwound, and kSuppressUI plus the run's dirty guard (IDataBase::SaveRestoreModifiedState, which
@@ -527,9 +524,9 @@ bool KFCBookScope::ReleaseHeldDoc(const UIDRef& docRef, bool closeNow)
 
 	InterfacePtr<IDocFileHandler> docFileHandler(Utils<IDocumentUtils>()->QueryDocFileHandler(docRef));
 	if (docFileHandler == nil)
-		return false;
+		return kKeptRefused;
 	if (!docFileHandler->CanClose(docRef))
-		return false;
+		return kKeptRefused;
 
 	// Off the list BEFORE the close goes through, so a re-entrant call cannot schedule the same
 	// close twice - and not a line earlier, for the reason above.
@@ -553,7 +550,7 @@ bool KFCBookScope::ReleaseHeldDoc(const UIDRef& docRef, bool closeNow)
 	KFC_DIAG_NOTE_CLOSE_ASKED(docRef);		// (a test build's written-document check: the close that comes is ours)
 	docFileHandler->Close(docRef, kSuppressUI, kFalse /*allowCancel*/,
 		closeNow ? IDocFileHandler::kProcess : IDocFileHandler::kSchedule);
-	return true;
+	return kClosed;
 }
 
 void KFCBookScope::ReleaseSearchedBook()

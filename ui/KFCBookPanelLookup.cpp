@@ -119,6 +119,16 @@ namespace
 		outFile = panelBookFile;
 		return true;
 	}
+
+	/** Does THIS panel show that book - in front or not? Its book (GetBookFileFromPanelView) and the one asked for are
+	    compared as FILES, not as path strings: FileUtils::IsEqual, the rule KFCBookScope's KFCDocumentLivesInFile keeps
+	    (the model half's MakeBookActive asks IBookManager::FindOpenBookByName with the same IDFile). One place for the
+	    two walks that look for a book's panel (BringBookTabForward, ReadPanelSelection). */
+	bool PanelShowsBook(IControlView* panelView, const IDFile& book)
+	{
+		IDFile panelBookFile;
+		return GetBookFileFromPanelView(panelView, panelBookFile) && FileUtils::IsEqual(panelBookFile, book) != kFalse;
+	}
 }
 
 IPanelMgr* KFCBookPanelLookup::QueryPanelManager()
@@ -214,9 +224,7 @@ void KFCBookPanelLookup::BringBookTabForward(const PMString& bookPath)
 	if (!Utils<IBookUIUtils>().Exists())
 		return;	// the active book was still set; the tab is the part we could not do
 
-	// THE BOOKS ARE COMPARED AS FILES, NOT AS PATH STRINGS.
-	// FileUtils::IsEqual - the rule KFCBookScope's KFCDocumentLivesInFile keeps, and the model half's
-	// MakeBookActive asks IBookManager::FindOpenBookByName with the same IDFile.
+	// The book as a FILE - PanelShowsBook compares files, not path strings.
 	const IDFile wanted(SDKFileHelper(bookPath).GetIDFile());
 
 	InterfacePtr<IPanelMgr> panelMgr(QueryPanelManager());
@@ -224,11 +232,7 @@ void KFCBookPanelLookup::BringBookTabForward(const PMString& bookPath)
 	{
 		// Unlike GetPanelBookFile, visibility is NOT a filter here: the tab we are looking for is
 		// precisely the one that is NOT in front yet.
-		IDFile panelBookFile;
-		if (!GetBookFileFromPanelView(panelView, panelBookFile))
-			return false;
-
-		if (FileUtils::IsEqual(panelBookFile, wanted) == kFalse)
+		if (!PanelShowsBook(panelView, wanted))
 			return false;
 
 		// kFalse = do not take the key focus. The keyboard walk calls this while the user is
@@ -253,8 +257,7 @@ namespace
 		KFCBookPanelLookup::ForEachBookPanel(panelMgr, [&](IControlView* panelView, const WidgetID&) -> bool
 		{
 			// This book's panel - in front or not (the selection belongs to the panel, and the run to the book).
-			IDFile panelBookFile;
-			if (!GetBookFileFromPanelView(panelView, panelBookFile) || FileUtils::IsEqual(panelBookFile, bookFile) == kFalse)
+			if (!PanelShowsBook(panelView, bookFile))
 				return false;
 			InterfacePtr<IPanelControlData> panelData(Utils<IBookUIUtils>()->QueryBookPanelData(panelView));
 			if (panelData == nil)

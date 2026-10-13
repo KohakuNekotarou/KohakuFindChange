@@ -20,7 +20,7 @@
 //
 //  Some bookkeeping DOES run for every close, whatever the scope: everything that holds the closing
 //  document by address lets it go (the held-chapter list, the jump marker, the rows' text foci, the
-//  Undo follow, the remembered Find Format) - see the comments in Respond.
+//  Undo follow, the remembered Find Format) - LetGoOfClosingDocument, ahead of every exit in Respond.
 //
 //  Why kBeforeCloseDoc and not kAfterCloseDoc: the signal data still carries a live IDocument
 //  before the close, and carries nil after it - the document we have to compare against is only
@@ -89,6 +89,38 @@ public:
 
 CREATE_PMINTERFACE(KFCCloseDocResponder, kKFCCloseDocResponderImpl)
 
+// EVERY CLOSE, WHATEVER THE SCOPE: everything that holds the closing document by address lets it go - the five the file
+// header names, in one place. Respond calls it ahead of every exit it has (only the main-thread gate and a document the
+// signal does not name come first): a reused address can hand any of them the next document opened in this one's place.
+static void LetGoOfClosingDocument(const UIDRef& closingDocRef)
+{
+	// The held list. A held chapter someone ELSE closes (the user, after the book panel windowed it; a script) would
+	// otherwise stay on gHeldDocs, its (IDataBase*, UID) dangling - and a reused address can make IsDocStillOpen answer
+	// YES about a DIFFERENT windowless document, which a later ReleaseHeldDocs would then close (the same address-reuse
+	// fault memory uidref-reuse-after-close records, aimed at somebody else's document). Forgetting it here removes the
+	// stale entry at its source. Safe on every path: ForgetHeldDoc does nothing when the document is not held, and the
+	// closes KFC schedules itself come off the list BEFORE their Close call, so this is a no-op for them - which is why
+	// it may run even while a run of ours is going (Respond's run guard comes after it).
+	KFCBookScope::ForgetHeldDoc(closingDocRef);
+
+	// The jump marker, for the same reason as the held list. State only - the document is on its way out, so nothing is
+	// repainted (KFCHitMarker::ForgetDoc).
+	KFCHitMarker::ForgetDoc(closingDocRef.GetDataBase());
+
+	// The rows' text foci on the closing document: it is still alive here (kBeforeCloseDoc) and is not after
+	// (KFCRowFoci::DetachDocument).
+	KFCRowFoci::DetachDocument(closingDocRef.GetDataBase());
+
+	// The Undo follow takes its observer off the closing document (KFCUndoFollow::DocumentClosing): what was attached is
+	// detached.
+	KFCUndoFollow::DocumentClosing(closingDocRef);
+
+	// The Find Format the rows were searched with lets go of the closing database if its UIDs are in it:
+	// FindFormatHasChanged tells databases apart by address, and this one's can be handed to the next document opened
+	// (KFCSearchEngine::ForgetSearchedFindFormatOf).
+	KFCSearchEngine::ForgetSearchedFindFormatOf(closingDocRef.GetDataBase());
+}
+
 void KFCCloseDocResponder::Respond(ISignalMgr* signalMgr)
 {
 	if (signalMgr == nil)
@@ -125,34 +157,8 @@ void KFCCloseDocResponder::Respond(ISignalMgr* signalMgr)
 	// KFCDiagWrittenDocs.h.)
 	KFC_DIAG_DOC_CLOSING(closingDocRef);
 
-	// THE HELD LIST HEARS ABOUT EVERY CLOSE, ahead of every exit below. A held chapter someone ELSE
-	// closes (the user, after the book panel windowed it; a script) would otherwise stay on gHeldDocs,
-	// its (IDataBase*, UID) dangling - and a reused address can make IsDocStillOpen answer YES about a
-	// DIFFERENT windowless document, which a later ReleaseHeldDocs would then close (the same
-	// address-reuse fault memory uidref-reuse-after-close records, aimed at somebody else's document). Forgetting it
-	// here removes the stale entry at its source. Safe on every path: ForgetHeldDoc does nothing
-	// when the document is not held, and the closes KFC schedules itself come off the list BEFORE
-	// their Close call, so this is a no-op for them - which is why it may run even while a run of
-	// ours is going (the guard below).
-	KFCBookScope::ForgetHeldDoc(closingDocRef);
-
-	// The jump marker forgets a closing document too, for every close and ahead of every exit below,
-	// for the same reason as the held list: its address can be handed to the next document opened.
-	// State only - the document is on its way out, so nothing is repainted (KFCHitMarker::ForgetDoc).
-	KFCHitMarker::ForgetDoc(closingDocRef.GetDataBase());
-
-	// ...and the rows' text foci on the closing document are let go, for every close and ahead of every exit below: the
-	// document is still alive here (kBeforeCloseDoc) and is not after (KFCRowFoci::DetachDocument).
-	KFCRowFoci::DetachDocument(closingDocRef.GetDataBase());
-
-	// ...and the Undo follow takes its observer off the closing document, for every close and ahead of every
-	// exit (KFCUndoFollow::DocumentClosing): what was attached is detached.
-	KFCUndoFollow::DocumentClosing(closingDocRef);
-
-	// ...and the Find Format the rows were searched with lets go of the closing database if its UIDs are in it, for every
-	// close and ahead of every exit: FindFormatHasChanged tells databases apart by address, and this one's can be handed
-	// to the next document opened (KFCSearchEngine::ForgetSearchedFindFormatOf).
-	KFCSearchEngine::ForgetSearchedFindFormatOf(closingDocRef.GetDataBase());
+	// Everything that holds the closing document by address lets it go - for every close, ahead of every exit below.
+	LetGoOfClosingDocument(closingDocRef);
 
 	// ...and a chapter of a book's list leaves the kept writes, so that a query run that wrote it is still followed
 	// in the chapters left open, the closed one keeping the rows it has (KFCUndoFollow::ForgetBookChapter - a document of
