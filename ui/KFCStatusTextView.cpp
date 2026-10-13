@@ -147,11 +147,19 @@ PMString KFCEllipsis()
 	return s;
 }
 
-PMReal KFCWidth(IGraphicsContext* gc, const PMString& s, const InterfaceFontInfo& font)
+/* Is the character at pos a line break (CR or LF) - a space? Asked of its Unicode value (PMString::GetWChar), as the
+   cut reads it (KFCSafeCut). PMString::GetChar would answer the same - PlatformChar's IsLineBreakChar is CR or LF and its
+   IsSpace the space alone (PlatformChar.h), and a character the code page lacks is neither - but in the PLATFORM code
+   page, through a conversion for each character (PMString.h). */
+bool16 KFCIsBreakAt(const PMString& s, int32 pos)
 {
-	if (s.IsEmpty())
-		return PMReal(0.0);
-	return StringUtils::PMMeasureString(gc, s, font, kKFCDontConvertAmpersand).X();
+	const uint32 c = s.GetWChar(pos).GetValue();
+	return (c == kTextChar_CR || c == kTextChar_LF) ? kTrue : kFalse;
+}
+
+bool16 KFCIsSpaceAt(const PMString& s, int32 pos)
+{
+	return (s.GetWChar(pos).GetValue() == kTextChar_Space) ? kTrue : kFalse;
 }
 
 /* How many characters from the front of s fit in `room` - measured as WHOLE PREFIXES, not summed per
@@ -162,14 +170,14 @@ int32 KFCFitCount(IGraphicsContext* gc, const InterfaceFontInfo& font, const PMS
 	const int32 total = s.CharCount();
 	if (total <= 0 || room <= PMReal(0.0))
 		return 0;
-	if (KFCWidth(gc, s, font) <= room)
+	if (KFCDrawnWidth(gc, s, font) <= room)
 		return total;
 
 	int32 lo = 0, hi = total;
 	while (lo < hi)
 	{
 		const int32 mid = (lo + hi + 1) / 2;
-		if (KFCWidth(gc, KFCHead(s, mid), font) <= room)
+		if (KFCDrawnWidth(gc, KFCHead(s, mid), font) <= room)
 			lo = mid;
 		else
 			hi = mid - 1;
@@ -223,11 +231,11 @@ bool16 KFCLayoutRuns(IGraphicsContext* gc, const InterfaceFontInfo& font,
 		while (!rest.IsEmpty())
 		{
 			// (1) A break the text asked for.
-			if (rest.GetChar(0).IsLineBreakChar())
+			if (KFCIsBreakAt(rest, 0))
 			{
-				const bool16 wasCR = rest.GetChar(0).IsChar('\r');
+				const bool wasCR = rest.GetWChar(0).GetValue() == kTextChar_CR;
 				rest.Remove(0, 1);
-				if (wasCR && !rest.IsEmpty() && rest.GetChar(0).IsChar('\n'))
+				if (wasCR && !rest.IsEmpty() && rest.GetWChar(0).GetValue() == kTextChar_LF)
 					rest.Remove(0, 1);		// CRLF is one break, not two
 				++line;
 				x = PMReal(0.0);
@@ -241,7 +249,7 @@ bool16 KFCLayoutRuns(IGraphicsContext* gc, const InterfaceFontInfo& font,
 			// EXCEPT THE BAR'S ROOM. The bar stands in one space (KFCCaretPlaceholder); thrown away as "the
 			// space the wrap broke at", a bar at the head of a wrapped line would vanish with the place it
 			// marks. (KCMStatusTextView.cpp, where this came from, keeps the same exception.)
-			if (justWrapped && !isCaret && rest.GetChar(0).IsSpace())
+			if (justWrapped && !isCaret && KFCIsSpaceAt(rest, 0))
 			{
 				rest.Remove(0, 1);
 				continue;
@@ -252,7 +260,7 @@ bool16 KFCLayoutRuns(IGraphicsContext* gc, const InterfaceFontInfo& font,
 			const int32 restLen = rest.CharCount();
 			for (int32 i = 0; i < restLen; ++i)
 			{
-				if (rest.GetChar(i).IsLineBreakChar())
+				if (KFCIsBreakAt(rest, i))
 				{
 					breakAt = i;
 					break;
@@ -269,7 +277,7 @@ bool16 KFCLayoutRuns(IGraphicsContext* gc, const InterfaceFontInfo& font,
 				if (!chunk.IsEmpty())
 				{
 					out.push_back(KFCFrag(chunk, faded, isCaret, line, x));
-					x += KFCWidth(gc, chunk, font);
+					x += KFCDrawnWidth(gc, chunk, font);
 				}
 				rest = (breakAt < 0) ? PMString() : KFCTail(rest, breakAt);	// leave the break itself
 				justWrapped = kFalse;
@@ -283,7 +291,7 @@ bool16 KFCLayoutRuns(IGraphicsContext* gc, const InterfaceFontInfo& font,
 				int32 space = -1;
 				for (int32 i = fit; i > 0; --i)
 				{
-					if (chunk.GetChar(i - 1).IsSpace())
+					if (KFCIsSpaceAt(chunk, i - 1))
 					{
 						space = i;
 						break;
@@ -637,7 +645,7 @@ void KFCStatusTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 		// it, and the space itself never is.
 		if (f.fIsCaret)
 		{
-			KFCDrawCaret(gPort, kStrongColor, at.X(), KFCWidth(&gc, f.fText, fontInfo),
+			KFCDrawCaret(gPort, kStrongColor, at.X(), KFCDrawnWidth(&gc, f.fText, fontInfo),
 						 at.Y() - ascent, lineHeight);
 			continue;
 		}

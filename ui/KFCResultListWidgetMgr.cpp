@@ -647,23 +647,34 @@ void KFCResultTree::BeforeChapterRowGoes(int32 chapterIdx)
 // KFCResultTree::ShowStatus - write the panel's message area
 //----------------------------------------------------------------------------------------
 
-// The last thing ShowStatus was given. Kept in the module rather than read back off the widget: the
-// widget is gone whenever the panel is closed, and the line is written back when the panel is shown
-// again (RestoreStatusOnPanelShow).
-static PMString gLastStatus;
+namespace
+{
+// THE MESSAGE AREA'S OWN STATE. Kept in the module rather than read back off the widget: the widget is gone whenever
+// the panel is closed, and the last message is written back when the panel is shown again (RestoreStatusOnPanelShow).
+// One struct, emptied by one assignment at shutdown (KFCResultTree::ShutdownCleanup).
+struct MessageArea
+{
+	// What the area shows now: the last ordinary message, or a row's own - its preview (ShowRowPreview) or its note
+	// (ShowRowNote) - which DropRowPreview takes away. Set by the write that puts it there.
+	enum Shown { kMessage, kRowPreview, kRowNote };
 
-// The message area shows a row's own note (ShowRowNote): what DropRowPreview takes away, as it takes a preview.
-// Set by ShowRowNote after it writes; every other write - WriteMessage, a preview - clears it.
-static bool gRowNoteShown = false;
+	PMString	lastStatus;		// the last thing ShowStatus was given - a row's preview or note is never kept here
+	Shown		shown;
+
+	MessageArea() : shown(kMessage) {}
+};
+
+MessageArea gArea;
+}	// anonymous namespace
 
 void KFCResultTree::ShutdownCleanup()
 {
 	// The statics this file keeps, emptied for the reason KFCResultModel empties its own: a PMString
 	// still holding storage when the .pln unloads runs its destructor against an application that has
-	// already torn itself down (the KESCL ShutdownCleanup rule). When a static is added above, it is
-	// added here too.
-	gLastStatus.Clear();
-	gRowNoteShown = false;
+	// already torn itself down (the KESCL ShutdownCleanup rule). A FRESH VALUE, not Clear(): Clear() keeps the
+	// string's storage (it is clear() - "Capacity stays the same", UnicodeSavvyString.h), while assigning a fresh one
+	// swaps it away (PMString's move assignment), to be freed now. A field added to MessageArea goes with it.
+	gArea = MessageArea();
 	// ...and the Return filter the list pushes on the application's event dispatcher (KFCResultTreeEH.cpp): off the
 	// stack and released before the .pln goes.
 	ShutdownReturnFilter();
@@ -701,10 +712,11 @@ IKFCStatusTextData* QueryStatusTextData(IControlView*& outView)
     reads "A&B.indd", not a doubled "A&&B.indd". !Do not double it again.
 
     @param forceRedraw kFalse while the panel is still being built (see RestoreStatusOnPanelShow) -
-                       there is nothing on screen to force yet, and this runs mid-construction. */
-void WriteMessage(const PMString& message, bool16 forceRedraw)
+                       there is nothing on screen to force yet, and this runs mid-construction.
+    @param shown       what the message is: an ordinary one, or a row's note (ShowRowNote). */
+void WriteMessage(const PMString& message, bool16 forceRedraw, MessageArea::Shown shown = MessageArea::kMessage)
 {
-	gRowNoteShown = false;		// whatever stood there is replaced (ShowRowNote sets it again after it writes)
+	gArea.shown = shown;		// whatever stood there is replaced by this
 	IControlView* textView = nil;
 	InterfacePtr<IKFCStatusTextData> textData(QueryStatusTextData(textView));
 	if (textData == nil)
@@ -753,11 +765,11 @@ void KFCResultTree::RestoreStatusOnPanelShow()
 	//
 	// So the panel's show is where the line has to be written, exactly as the tab's name and the
 	// illustration already are: whatever is written here outranks the persisted value.
-	if (!gLastStatus.IsEmpty())
+	if (!gArea.lastStatus.IsEmpty())
 	{
 		// Something ran in THIS session: put its message back. This also restores the line when the
 		// panel is closed and reopened mid-session.
-		WriteMessage(gLastStatus, kFalse /*still being built*/);
+		WriteMessage(gArea.lastStatus, kFalse /*still being built*/);
 		return;
 	}
 
@@ -769,8 +781,8 @@ void KFCResultTree::ShowStatus(const PMString& message)
 {
 	// Remembered FIRST, before the panel is even looked for: this has to hold whether or not there
 	// is a panel to draw it on.
-	gLastStatus = message;
-	gLastStatus.SetTranslatable(kFalse);
+	gArea.lastStatus = message;
+	gArea.lastStatus.SetTranslatable(kFalse);
 
 	// The illustration follows the same moments this line does, so it is settled here rather than at
 	// every call site. Both directions run through here: an engine reports what it found (the model
@@ -788,17 +800,16 @@ void KFCResultTree::ShowStatus(const PMString& message)
 // KFCResultTree::ShowRowPreview - a GREP row's after-text on the message area
 //----------------------------------------------------------------------------------------
 
-// The heading of a preview - and how the area is known to be showing one (DropRowPreview: a heading that starts with the
-// stem - "Preview Text:", or "Preview Text (not selected - no width):" when the click could not select the match).
+// The heading of a preview: "Preview Text:", or "Preview Text (not selected - no width):" when the click could not
+// select the match.
 static const char* const kPreviewLabel = "Preview Text:";
 static const char* const kPreviewLabelStem = "Preview Text";
 
 void KFCResultTree::ShowRowNote(const PMString& note)
 {
-	// Not remembered in gLastStatus (the row's, not a report - ShowRowPreview's rule) and no panel icon to settle: a
+	// Not remembered as the last message (the row's, not a report - ShowRowPreview's rule) and no panel icon to settle: a
 	// note reports nothing that ran. Written at once, as a report is - the click that made it is the user's.
-	WriteMessage(note, kTrue /*force the redraw*/);
-	gRowNoteShown = true;		// after the write, which clears it
+	WriteMessage(note, kTrue /*force the redraw*/, MessageArea::kRowNote);
 }
 
 bool KFCResultTree::ShowRowPreview(int32 chapterIdx, int32 hitIdx, const char* notSelectedWhy)
@@ -852,7 +863,7 @@ bool KFCResultTree::ShowRowPreview(int32 chapterIdx, int32 hitIdx, const char* n
 	}
 	label.SetTranslatable(kFalse);
 	textData->SetSegments(label, pre, shown, post, shown.IsEmpty() ? kTrue : kFalse);
-	gRowNoteShown = false;		// a preview stands there now (DropRowPreview knows it by its heading)
+	gArea.shown = MessageArea::kRowPreview;		// what DropRowPreview takes away
 	textView->ForceRedraw();
 	return true;
 }
@@ -860,19 +871,11 @@ bool KFCResultTree::ShowRowPreview(int32 chapterIdx, int32 hitIdx, const char* n
 void KFCResultTree::DropRowPreview()
 {
 	// A row with no preview (replaced, a Text search's, a branch row...) must not leave the last row's standing beside
-	// it: the area goes back to the last ordinary message (gLastStatus - a preview is never kept there). Nor the last
-	// row's note (ShowRowNote): its reason is about that row alone.
-	IControlView* textView = nil;
-	InterfacePtr<IKFCStatusTextData> textData(QueryStatusTextData(textView));
-	if (textData == nil)
+	// it: the area goes back to the last ordinary message (a preview is never kept as that). Nor the last row's note
+	// (ShowRowNote): its reason is about that row alone.
+	if (gArea.shown == MessageArea::kMessage)
 		return;
-	PMString label, pre, mid, post;
-	bool16 wantCaret = kFalse;
-	textData->GetSegments(label, pre, mid, post, wantCaret);
-	const bool preview = label.IndexOfString(PMString(kPreviewLabelStem)) == 0;
-	if (!preview && !gRowNoteShown)
-		return;
-	WriteMessage(gLastStatus.IsEmpty() ? InitialMessage() : gLastStatus, kTrue /*force the redraw*/);
+	WriteMessage(gArea.lastStatus.IsEmpty() ? InitialMessage() : gArea.lastStatus, kTrue /*force the redraw*/);
 }
 
 bool KFCResultTree::RefusedWhileRunning()

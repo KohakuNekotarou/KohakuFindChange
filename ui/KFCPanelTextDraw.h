@@ -6,8 +6,8 @@
 //
 //  What every hand-drawn text widget in this panel has to agree about: how far the CONTEXT around a
 //  match is faded toward the background, how that faded colour is worked out, the two flags every
-//  draw and every measure passes, the BAR that stands where a change has a place and no
-//  characters, and where a shown string may be CUT.
+//  draw and every measure passes and how wide a string comes out with them, the BAR that stands where
+//  a change has a place and no characters, and where a shown string may be CUT.
 //
 //  WHY THIS FILE EXISTS. Two widgets draw "the words that matter at full strength, the words around
 //  them faded": a hit row's cell (KFCColorTextView.cpp) and the panel's MESSAGE AREA
@@ -32,6 +32,7 @@
 #include "IInterfaceColors.h"	// RealAGMColor
 
 // General includes:
+#include "DrawStringUtils.h"	// StringUtils::PMMeasureString - how wide a string comes out
 #include "PMReal.h"
 #include "PMString.h"			// the bar's placeholder
 #include "UnicodeClass.h"		// IsCombiningMark - where a shown string may be cut
@@ -44,6 +45,15 @@
     same way (CRenderingObjectDrawer::DrawRenderObjectUIName). */
 const bool16 kKFCDontConvertAmpersand = kFalse;
 const bool16 kKFCNoUnderline = kFalse;
+
+/** How wide `s` comes out as drawn here - measured with the flag the draws pass (above); 0 for nothing. The one
+    measure of both widgets: a hit row's cell lays its runs out by it, the message area its lines. */
+inline PMReal KFCDrawnWidth(IGraphicsContext* gc, const PMString& s, const InterfaceFontInfo& font)
+{
+	if (s.IsEmpty())
+		return PMReal(0.0);
+	return StringUtils::PMMeasureString(gc, s, font, kKFCDontConvertAmpersand).X();
+}
 
 /** How much of the theme's text colour the CONTEXT keeps: 0 = the background itself (invisible),
     1 = the full text colour (no fade at all).

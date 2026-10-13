@@ -286,16 +286,22 @@ void KFCColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	// keeps that fixed for every row (see KFCResultListWidgetMgr - kHitExtraIndent and kHitCellStep are
 	// one number for every hit row).
 	// Every call below spells out both flags instead of letting the defaults apply - the defaults in
-	// DrawStringUtils.h DISAGREE with each other (KFCPanelTextDraw.h says how, and why '&' survives).
-	const bool16 kDontConvertAmpersand = kKFCDontConvertAmpersand;
-	const bool16 kNoUnderline = kKFCNoUnderline;
+	// DrawStringUtils.h DISAGREE with each other (KFCPanelTextDraw.h says how, and why '&' survives) - and a run's
+	// width is KFCDrawnWidth's, the measure the message area takes as well.
+	//
+	// Draw one run at the running x and advance past it (an empty run is a no-op) - every run of the row: the locator,
+	// its flag word, and the line's three below.
+	auto drawRun = [&](const PMString& s, const RealAGMColor& c)
+	{
+		if (s.IsEmpty())
+			return;
+		StringUtils::PMDrawStringRGB(&gc, PMPoint(x, y), s, fontInfo, c, kKFCDontConvertAmpersand, kKFCNoUnderline);
+		x += KFCDrawnWidth(&gc, s, fontInfo);
+	};
 
 	const PMReal kLocatorGap(8.0);		// space between the locator and the line text
-	if (!locator.IsEmpty() && x < rightEdge)
-	{
-		StringUtils::PMDrawStringRGB(&gc, PMPoint(x, y), locator, fontInfo, kMatchColor, kDontConvertAmpersand, kNoUnderline);
-		x += StringUtils::PMMeasureString(&gc, locator, fontInfo, kDontConvertAmpersand).X();
-	}
+	if (x < rightEdge)
+		drawRun(locator, kMatchColor);
 	// Its own run so it can carry its own colour, with the separating space inside it - the
 	// locator is built without this word for exactly that reason (KFCResultModel::BuildHitLocator).
 	if (!flag.IsEmpty() && x < rightEdge)
@@ -303,8 +309,7 @@ void KFCColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 		PMString flagRun(" ");
 		flagRun.SetTranslatable(kFalse);
 		flagRun.Append(flag);
-		StringUtils::PMDrawStringRGB(&gc, PMPoint(x, y), flagRun, fontInfo, kAccentColor, kDontConvertAmpersand, kNoUnderline);
-		x += StringUtils::PMMeasureString(&gc, flagRun, fontInfo, kDontConvertAmpersand).X();
+		drawRun(flagRun, kAccentColor);
 	}
 	if (x > frame.Left())
 		x += kLocatorGap;
@@ -316,15 +321,6 @@ void KFCColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	const PMReal availWidth = rightEdge - x;
 	if (availWidth <= PMReal(0.0))
 		return;		// the locator consumed the cell; no room left for the line
-
-	// Draw one run at the running x and advance past it (an empty run is a no-op).
-	auto drawRun = [&](const PMString& s, const RealAGMColor& c)
-	{
-		if (s.IsEmpty())
-			return;
-		StringUtils::PMDrawStringRGB(&gc, PMPoint(x, y), s, fontInfo, c, kDontConvertAmpersand, kNoUnderline);
-		x += StringUtils::PMMeasureString(&gc, s, fontInfo, kDontConvertAmpersand).X();
-	};
 
 	// AN EMPTY MATCH IS A PLACE, AND IT IS DRAWN AS A BAR (the author's request: "the bar KCM draws").
 	// A row replaced with nothing, and a zero-width match (^, $, a lookaround), have no characters at the
@@ -342,10 +338,9 @@ void KFCColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	//   written.
 	const bool wantCaret = match.IsEmpty();
 
-	const PMReal preW   = pre.IsEmpty()   ? PMReal(0.0) : StringUtils::PMMeasureString(&gc, pre,   fontInfo, kDontConvertAmpersand).X();
-	const PMReal matchW = StringUtils::PMMeasureString(&gc, wantCaret ? KFCCaretPlaceholder() : match, fontInfo,
-		kDontConvertAmpersand).X();		// (wantCaret is match.IsEmpty(): otherwise there are characters to measure)
-	const PMReal postW  = post.IsEmpty()  ? PMReal(0.0) : StringUtils::PMMeasureString(&gc, post,  fontInfo, kDontConvertAmpersand).X();
+	const PMReal preW   = KFCDrawnWidth(&gc, pre, fontInfo);
+	const PMReal matchW = KFCDrawnWidth(&gc, wantCaret ? KFCCaretPlaceholder() : match, fontInfo);	// the bar's room, or the characters
+	const PMReal postW  = KFCDrawnWidth(&gc, post, fontInfo);
 
 	// The match at the running x: its characters, or the bar in their place - spanning the cell a pixel
 	// short of each edge, as KCM's one-line change row draws it.
@@ -380,7 +375,7 @@ void KFCColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 			//   new string keeps the "do not translate" its source carries (SetSegments), and a PMString starts out
 			//   translatable (PMString.h) - so it is said again: document text that happens to spell a key of the
 			//   string table is drawn as it is, not translated. The two cuts below are the same.
-			PMString m = StringUtils::PMEllipsizeString(&gc, availWidth, match, fontInfo, kEllipsizeEnd, nil, kDontConvertAmpersand);
+			PMString m = StringUtils::PMEllipsizeString(&gc, availWidth, match, fontInfo, kEllipsizeEnd, nil, kKFCDontConvertAmpersand);
 			m.SetTranslatable(kFalse);
 			drawRun(m, kMatchColor);
 		}
@@ -397,16 +392,16 @@ void KFCColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 		PMString preCut = pre;
 		if (!pre.IsEmpty())
 		{
-			preCut = StringUtils::PMEllipsizeString(&gc, rem, pre, fontInfo, kEllipsizeBeginning, nil, kDontConvertAmpersand);
+			preCut = StringUtils::PMEllipsizeString(&gc, rem, pre, fontInfo, kEllipsizeBeginning, nil, kKFCDontConvertAmpersand);
 			preCut.SetTranslatable(kFalse);
 		}
-		const PMReal preCutW = preCut.IsEmpty() ? PMReal(0.0) : StringUtils::PMMeasureString(&gc, preCut, fontInfo, kDontConvertAmpersand).X();
+		const PMReal preCutW = KFCDrawnWidth(&gc, preCut, fontInfo);
 
 		const PMReal postBudget = rem - preCutW;
 		PMString postCut;
 		if (!post.IsEmpty() && postBudget > PMReal(0.0))
 		{
-			postCut = StringUtils::PMEllipsizeString(&gc, postBudget, post, fontInfo, kEllipsizeEnd, nil, kDontConvertAmpersand);
+			postCut = StringUtils::PMEllipsizeString(&gc, postBudget, post, fontInfo, kEllipsizeEnd, nil, kKFCDontConvertAmpersand);
 			postCut.SetTranslatable(kFalse);
 		}
 
