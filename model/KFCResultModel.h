@@ -202,8 +202,9 @@ namespace KFCResultModel
 		std::map<UID, uint32>	storyVersions;
 		// A search over part of a story: the part of each story holding a row (SearchedRange). Empty otherwise.
 		std::map<UID, SearchedRange>	searchedRanges;
-		// SEARCHED AGAIN AND NOTHING FOUND (Search This Document Again - the author's call): shown with no rows, (0/0),
-		// so it can be searched again after the next edit. A chapter with no rows is otherwise not shown - a search
+		// SEARCHED AGAIN AND NOTHING FOUND (Search This Document Again, and Search This Story Again over its last story with
+		// rows - the author's calls): shown with no rows, (0/0), so it can be searched again after the next edit. A
+		// chapter with no rows is otherwise not shown - a search
 		// lists only documents that hold a match, and CloseChapter empties a closed one in place (ChapterShown).
 		bool					shownEmpty;
 
@@ -634,7 +635,8 @@ namespace KFCResultModel
 	    (BuildFontGroups, Hit::storyOrdinal), and the story's version recorded (storyVersion - the story as KFC knows it
 	    now). The rows' places in the list change, so whatever indexes them is let go: a kept write's rows (the layout
 	    generation moves - KFCUndoFollow drops it, UNDO-14), the row backup, the chapter's text foci (attached again,
-	    KFCRowFoci). Returns the story's row count now; -1 = no such chapter. */
+	    KFCRowFoci). With no row left in the chapter it is shown empty (Chapter::shownEmpty), as ReplaceChapterRows
+	    leaves one. Returns the story's row count now; -1 = no such chapter. */
 	int32 ReplaceStoryRows(int32 chapterIdx, UID story, std::vector<Hit>& storyHits, uint32 storyVersion);
 
 	/** SEARCH THIS DOCUMENT AGAIN's change to the list (KFCSearchEngine::SearchDocumentAgain - the author's call):

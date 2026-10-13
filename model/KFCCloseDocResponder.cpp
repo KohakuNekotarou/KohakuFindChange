@@ -70,7 +70,7 @@
 #include "KFCModelNotify.h"		// the panel is told, never called (the model/UI split)
 #include "KFCRunGuard.h"		// never retire results out from under a run of ours
 #include "KFCSearchEngine.h"	// DropResults - the rows, the searched book and the find format, together; ForgetSearchedFindFormatOf
-#include "KFCUndoFollow.h"		// ForgetDocument / ForgetBookChapter - All Documents and a book let one document go
+#include "KFCUndoFollow.h"		// ForgetBookChapter / ForgetClosingDocument - the kept writes let a closing document go
 
 /** Retires a document-scope result set when its document is closed.
 
@@ -156,8 +156,8 @@ void KFCCloseDocResponder::Respond(ISignalMgr* signalMgr)
 	KFCSearchEngine::ForgetSearchedFindFormatOf(closingDocRef.GetDataBase());
 
 	// ...and a chapter of a book's list leaves the kept writes, so that a query run that wrote it is still followed
-	// in the chapters left open, the closed one keeping the rows it has (KFCUndoFollow::ForgetBookChapter - All
-	// Documents' ForgetDocument below empties the chapter instead, its rows leaving the list). Ahead of the run guard
+	// in the chapters left open, the closed one keeping the rows it has (KFCUndoFollow::ForgetBookChapter - a document of
+	// any other list, or of none, is let go below, its chapter emptied: ForgetClosingDocument). Ahead of the run guard
 	// below: a query run closes the chapters it holds at its commit point, before it clears the list, and a write kept
 	// from before it may have written one of them (saved since, so it closes). (The chapters a run hands back at its end
 	// close after the list is cleared - IsFromBook is false by then. A write kept from before it wrote none of them, short
@@ -186,6 +186,15 @@ void KFCCloseDocResponder::Respond(ISignalMgr* signalMgr)
 		KFC_DIAG_LOG("CLOSE - book results: they stay");
 		return;
 	}
+
+	// THE KEPT WRITES LET IT GO, WHATEVER THE LIST SHOWS (the author's call, 2026-10-13 - the spec map's UNDO-12 for a query
+	// run): All Documents, one document, or no list at all - a query run leaves it empty (F7) while its write, kept, still
+	// names this document. Its stories and items come off every write and its chapter is emptied in every kept list
+	// (KFCUndoFollow::ForgetClosingDocument - a chapter of a kept book's list is frozen instead), so an Undo in a document
+	// still open is still followed. Until then they let it go only while the list showed its rows (case
+	// xq-alldocs-close-undo). Past the run guard, not ahead of it: the chapters a query run hands back close before the
+	// run is kept, and nothing would yet lead back from the list it leaves to the writes kept for the list it found.
+	KFCUndoFollow::ForgetClosingDocument(closingDocRef);
 
 	// Nothing on display, nothing to retire. This signal fires for every document close in the
 	// session, so past the held-list bookkeeping above it leaves as early as it can.
@@ -216,8 +225,8 @@ void KFCCloseDocResponder::Respond(ISignalMgr* signalMgr)
 
 	// ALL DOCUMENTS: ONLY THAT DOCUMENT'S ROWS GO (the author's call). The list is the
 	// open documents', and the others are still open - their rows and their Undo stay. The chapter
-	// keeps its place in the model (KFCResultModel::CloseChapter says why) and the kept writes let the
-	// document go too (KFCUndoFollow::ForgetDocument). When it was the last document with rows, the list
+	// keeps its place in the model (KFCResultModel::CloseChapter says why); the kept writes let the
+	// document go above (KFCUndoFollow::ForgetClosingDocument). When it was the last document with rows, the list
 	// goes the way a Document list always has, below.
 	if (KFCResultModel::GetSearchScope() == KFCResultModel::kScopeAllDocuments
 		&& KFCResultModel::GetTotalHitCount() > KFCResultModel::GetHitCount(closingChapter))
@@ -226,7 +235,6 @@ void KFCCloseDocResponder::Respond(ISignalMgr* signalMgr)
 		int32 closedCount = 0;
 		KFCResultModel::GetChapterDisplay(closingChapter, closedName, closedCount);
 		KFC_DIAG_LOG("CLOSE - All Documents: chapter %d's %d row(s) go, the others stay", closingChapter, closedCount);
-		KFCUndoFollow::ForgetDocument(closingDocRef);
 		// Only that row goes, and the others stay as they are (open or closed): the panel draws every row a list
 		// holds (docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md F9), so taking one out
 		// brings no other into view.

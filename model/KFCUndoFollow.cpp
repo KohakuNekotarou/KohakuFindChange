@@ -950,6 +950,27 @@ void KFCUndoFollow::DocumentClosing(const UIDRef& docRef)
 	}
 }
 
+void KFCUndoFollow::ForgetClosingDocument(const UIDRef& docRef)
+{
+	IDataBase* const db = docRef.GetDataBase();
+	if (db == nil)
+		return;
+	// A chapter of a kept BOOK's list: a chapter of a whole result set a book's search made (its header's fromBook) - found
+	// by its file, as ForgetBookChapter finds it (the document is still open at this signal). A write of rows keeps no set.
+	bool bookChapter = false;
+	for (size_t i = 0; i < gSteps.size() && !bookChapter; ++i)
+	{
+		const KFCResultModel::ModelSnapshot* const sets[2] = { &gSteps[i].before, &gSteps[i].after };
+		for (size_t s = 0; s < 2 && !bookChapter; ++s)
+			for (size_t c = 0; sets[s]->header.fromBook && c < sets[s]->chapters.size() && !bookChapter; ++c)
+				bookChapter = DocOfFile(sets[s]->chapters[c].file, sets[s]->chapters[c].docRef) == db;
+	}
+	if (bookChapter)
+		ForgetBookChapter(docRef);
+	else
+		ForgetDocument(docRef);
+}
+
 void KFCUndoFollow::ForgetDocument(const UIDRef& docRef)
 {
 	// Its chapter in the list - by its binding, as the close responder finds it (KFCCloseDocResponder).

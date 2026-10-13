@@ -203,8 +203,8 @@ void KFCResultTreeController::ProcessSelectionRules(IEvent* event, UID nodeWidge
 	// NOT UNDER A LANDING OR A RUN OF OURS (KFCJump::IsLanding - a click's, its document opening; KFCRuns()->IsAnyRunning -
 	// a search, a write, a row's Replace): their message loop can dispatch this press, and the landing it asks for is turned
 	// away (KFCJump::ActivateNode) - the row would be selected while the page shows another, and the next Return would write
-	// the one the page does not show. The press is dropped, as its landing is; the arrows keep the same rule
-	// (KFCResultTreeEH::HandleUpDownKey).
+	// the one the page does not show. The press is dropped, as its landing is; the list's keys keep the same rule
+	// (KFCResultTreeEH.cpp's MoveUnderWay).
 	bool underWay = KFCJump::IsLanding() || KFCRuns()->IsAnyRunning();
 #ifdef KFC_DIAG
 	// (Test builds only) Fault switch list-landing-guard-off: nothing asked, the old way - the case that shows what this

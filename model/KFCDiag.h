@@ -121,11 +121,15 @@
 //                all its descendants, the old way (ui/KFCResultTreeController.cpp): on a book result as the search left it -
 //                the book row open, its chapters closed - the rows under them would be selected and not drawn, and Return,
 //                which asks the selection in the order drawn, would write none (sel-book-closed-return-armed)
-//    list-landing-guard-off  (UI half) the result list's arrows ask only whether a walk of theirs is still landing, and a
-//                row's press asks nothing - the old way (ui/KFCResultTreeEH.cpp's HandleUpDownKey, ui/KFCResultTreeController.cpp's
-//                ProcessSelectionRules): a key or a press that a click's landing dispatches moves the selection while its
+//    list-landing-guard-off  (UI half) the result list's keys (the arrows, Home / End, PageUp / PageDown) ask only whether a
+//                walk of theirs is still landing, and a row's press asks nothing - the old way (ui/KFCResultTreeEH.cpp's
+//                MoveUnderWay, ui/KFCResultTreeController.cpp's ProcessSelectionRules): a key or a press that a click's
+//                landing dispatches moves the selection while its
 //                own landing is turned away - the list on one row, the page on another (land-arrow-closed-armed,
 //                land-click-closed-armed)
+//    home-end-stock  (UI half) the result list's Home / End / PageUp / PageDown move the selection alone, the old way
+//                (ui/KFCResultTreeEH.cpp's StockMoveThenLand): the list on the row they reach, the page left on the row before
+//                (click-end-lands-armed, click-pgdn-lands-armed)
 //    scope-walk-off  KFCSearchEngine::ScopeHasNothingToWalk answers no, the old way: a document with no story to walk (no
 //                text frame, or master-page text only with Include Master Pages off) meets InDesign's kFailure again - the
 //                search says it "stopped with a search error" and Change All in Book / a query run stops whole

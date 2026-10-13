@@ -204,7 +204,7 @@
   検索のときに本体が歩いた範囲（文字のかたまりの列＝表があるとその前・セル・後ろの3つ）を記録し、同じかたまりを公式の口（To End＝`QueryToEndOfStoryWalkerScope`・Selection＝`QueryFocusListWalkerScope`）で作り直せることをその場で確かめておく。範囲にはテキストフォーカスを付ける。
   歩き直すときの範囲の端＝ストーリーが記録した版のままなら記録した位置、変わっていればフォーカス（編集に付いてくる）から、**端のすぐ外の8文字が同じに読める一番近い所**（取り消しで古くなったフォーカスも、端のちょうどに打った文字も、これで正しい所に戻る）。
   断る＝範囲が離れたかたまり（2行以上にまたがる表のセルの選択）`... the searched part cannot be searched again on its own (separate stretches) - search again.`（2026-10-09 の最終検査で縮めた＝前の文は約190字で「search again」が切れた）／端のすぐ外の文字が書き換えられた `... the text at the edge of the searched part of this story has changed - search again.`。回帰＝`sr-toend-*`・`sr-selection-*`・`sr-table-*`。
-  KFC が検索の後で閉じた章は、窓なしで開いて歩き、閉じて返す。文は `Searched this story again: N match(es).`。行の並びが変わるので、それより前の KFC の書き込みの取り消しは一覧が追わなくなる（UNDO-14）。回帰＝`sr-*`。
+  KFC が検索の後で閉じた章は、窓なしで開いて歩き、閉じて返す。文は `Searched this story again: N match(es).`。0件ならストーリーの行は消え、それで文書に行が1つも無くなっても文書の行は `(0/0)` で残る（ROW-07・2026-10-13 作者の決定 P-1）。行の並びが変わるので、それより前の KFC の書き込みの取り消しは一覧が追わなくなる（UNDO-14）。回帰＝`sr-*`。
   - 訂正:
 
 ## 8. まとめて選んだ行の置換と、文書の探し直し（1.4.0）

@@ -1134,6 +1134,10 @@ int32 KFCResultModel::ReplaceStoryRows(int32 chapterIdx, UID story, std::vector<
 	OrderHitsByPage(hits);
 	c->hits.swap(hits);
 	c->storyVersions[story] = storyVersion;
+	// ITS LAST STORY SEARCHED AGAIN AND NOTHING FOUND: the document's row stays, (0/0), as Search This Document Again leaves
+	// one (the author's call: the same reason holds - it can be searched again after the next edit). The story's own row
+	// goes with its rows (a story group is built from the rows).
+	c->shownEmpty = c->hits.empty();
 	// THE ROWS' PLACES IN THE LIST CHANGED: indexed again, and whatever names them by index let go, the chapter's foci
 	// back on them (RowsLaidOutAgain).
 	RowsLaidOutAgain(chapterIdx, *c);

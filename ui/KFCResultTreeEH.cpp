@@ -5,8 +5,9 @@
 //  KohakuFindChange (KFC)
 //
 //  Event handler for the result list ITSELF (the tree-view boss, not a row). It adds two things
-//  to the stock up / down arrows, a Shift+Up / Shift+Down of its own and one key of its own -
-//  Return on a hit row - and leaves everything else alone:
+//  to the stock keys that move the selection - the up / down arrows, Home / End and PageUp /
+//  PageDown - a Shift+Up / Shift+Down of its own and one key of its own - Return on a hit row - and
+//  leaves everything else alone:
 //
 //    1. A row that is CLOSED opens when the arrows land on it. The stock keys walk the VISIBLE
 //       rows only, and a book search deliberately comes up with every chapter closed
@@ -34,8 +35,11 @@
 //  its place in the model and is not shown) - and was sent after a node that does not exist.
 //
 //  TreeViewEventHandler is the stock base (source/open/includes/widgets; on the CPP.rsp path) and
-//  HandleUpDownKey is virtual precisely for this. Home / End / PageUp / PageDown and the left /
-//  right expand / collapse keys stay stock.
+//  HandleUpDownKey, HandleHomeKey, HandleEndKey and HandlePageUpDownKey are virtual precisely for
+//  this: each lets the stock move, then lands (StockMoveThenLand). Home / End / PageUp / PageDown
+//  moved the selection alone until the author's call of 2026-10-13 (the page stayed on the row
+//  before, and the next Return wrote a row it did not show). The left / right expand / collapse
+//  keys stay stock.
 //
 //  Shift+Return has no stock move to lean on - it skips rows - so it walks, but through the tree's
 //  OWN hierarchy adapter (KFCResultListAdapter, what the tree view builds its rows from), never the
@@ -68,7 +72,7 @@
 // General includes:
 #include "CEventHandler.h"			// the Return filter's base: every event passed on unless it is taken
 #include "CreateObject.h"			// ::CreateObject2 - the Return filter's boss
-#include "keyboarddefs.h"			// kVirtualUpArrowKey / kVirtualDownArrowKey / kVirtualReturnKey / kVirtualEnterKey
+#include "keyboarddefs.h"			// the arrows, Home / End, PageUp / PageDown, Return / Enter (kVirtual...Key)
 #include "TreeViewEventHandler.h"	// stock base (source/open/includes/widgets; on the CPP.rsp path)
 #include "Utils.h"					// Utils<IEventUtils>
 
@@ -105,6 +109,25 @@ public:
 	WalkGuard() { gWalking = true; }
 	~WalkGuard() { gWalking = false; }
 };
+
+// NOTHING MOVES UNDER SOMETHING STILL UNDER WAY: a previous walk still landing (gWalking - its document still opening),
+// a click's landing (KFCJump::IsLanding) or a run of ours - a search, a write, a row's Replace (KFCRuns()->IsAnyRunning).
+// Each runs the message loop, so a key can arrive in the middle of it, and a step then would move the selection while
+// its landing is turned away (KFCJump::ActivateNode): the page left on the row before, and the next Return writing a
+// row the page and its preview do not show. Asked by every key that moves the selection - the arrows, Home / End,
+// PageUp / PageDown - which then swallows the key, as a Return is (TakeReturn); a click's press keeps the same rule
+// (KFCResultTreeController::ProcessSelectionRules).
+bool MoveUnderWay()
+{
+	bool underWay = gWalking || KFCJump::IsLanding() || KFCRuns()->IsAnyRunning();
+#ifdef KFC_DIAG
+	// (Test builds only) Fault switch list-landing-guard-off: the walk alone asked, the old way - the case that shows what
+	// the other two stop (land-arrow-closed-armed).
+	if (KFC_DIAG_FAULT("list-landing-guard-off"))
+		underWay = gWalking;
+#endif
+	return underWay;
+}
 
 // THE KEYBOARD KEPT THROUGH A RETURN. A Return on a hit row replaces it (KeyDown) and the list must keep the
 // keyboard, so the arrows walk on - but InDesign gives it away the moment KeyDown returns: the widget layer's own event
@@ -159,7 +182,7 @@ NodeID NextRowInTreeOrder(const ITreeViewHierarchyAdapter* adapter, const NodeID
 
 // SHIFT+RETURN GOES ON (the author's call - InDesign's own Change/Find, "replace, then find the next", for the list).
 // After the row it wrote, the next HIT row below it that can be replaced is selected, brought into view and landed
-// on the way the arrows land on a row (HandleUpDownKey): its action - the jump, and a GREP row's Preview Text - then the
+// on the way the arrows land on a row (StockMoveThenLand): its action - the jump, and a GREP row's Preview Text - then the
 // keyboard taken back. Rows that cannot be replaced are stepped over (already replaced, locked, not a match of Find/Change:
 // KFCRuns()->CanReplaceHit, the question the row menu greys Replace by), and a closed row above the one landed on is opened
 // - a book search brings its chapters up closed. false = no such row below: the selection stays where it is.
@@ -185,7 +208,7 @@ bool GoOnToNextReplaceableRow(ITreeViewController* controller, const NodeID& fro
 		}
 	}
 	// Every row above it open, top down, so the tree draws it. (ExpandNode on an open row is a harmless no-op -
-	// HandleUpDownKey leans on the same.)
+	// StockMoveThenLand leans on the same.)
 	std::vector<NodeID> above;
 	for (NodeID up(adapter->GetParentNode(next)); up.IsValid(); up = NodeID(adapter->GetParentNode(up)))
 	{
@@ -351,8 +374,8 @@ void RemoveReturnFilter()
 
 }
 
-/** Up / down arrows that open what they land on, then run that row's action; Return / Enter that replaces a
-    selected hit row (see the top). */
+/** The keys that move the selection - up / down arrows, Home / End, PageUp / PageDown - open what they land on, then run
+    that row's action; Return / Enter replaces a selected hit row (see the top). */
 class KFCResultTreeEH : public TreeViewEventHandler
 {
 public:
@@ -360,6 +383,9 @@ public:
 	virtual ~KFCResultTreeEH() {}
 
 	virtual bool16 HandleUpDownKey(IEvent* e, const VirtualKey& key);
+	virtual bool16 HandleHomeKey(IEvent* e);
+	virtual bool16 HandleEndKey(IEvent* e);
+	virtual bool16 HandlePageUpDownKey(IEvent* e, const VirtualKey& key);
 	virtual bool16 KeyDown(IEvent* e);
 	virtual bool16 KeyUp(IEvent* e);					// ends a Return's hold (gHolding)
 	virtual bool16 WillingToGiveUpKeyFocus();		// refuses while a Return holds
@@ -374,6 +400,11 @@ public:
 	virtual bool16 SuspendKeyFocus();
 	virtual bool16 ResumeKeyFocus();
 #endif
+
+private:
+	// The stock move for `key`, then the landing on the row it reached - one place for the arrows, Home / End and
+	// PageUp / PageDown.
+	bool16 StockMoveThenLand(IEvent* e, const VirtualKey& key);
 };
 
 CREATE_PMINTERFACE(KFCResultTreeEH, kKFCResultTreeEHImpl)
@@ -523,20 +554,8 @@ bool16 KFCResultTreeEH::HandleUpDownKey(IEvent* e, const VirtualKey& key)
 		return TreeViewEventHandler::HandleUpDownKey(e, key);
 	KFC_DIAG_HIDDEN_DOCS_CHECK("arrow");		// (test builds only - a document left with no window when the key is over)
 
-	// NOTHING MOVES UNDER SOMETHING STILL UNDER WAY: a previous walk still landing (gWalking - its document still opening),
-	// a click's landing (KFCJump::IsLanding) or a run of ours - a search, a write, a row's Replace (KFCRuns()->IsAnyRunning).
-	// Each runs the message loop, so a key can arrive in the middle of it, and a step then would move the selection while
-	// its landing is turned away (KFCJump::ActivateNode): the page left on the row before, and the next Return writing a
-	// row the page and its preview do not show. The key is swallowed, as a Return is (TakeReturn); a click's press keeps
-	// the same rule (KFCResultTreeController::ProcessSelectionRules).
-	bool underWay = gWalking || KFCJump::IsLanding() || KFCRuns()->IsAnyRunning();
-#ifdef KFC_DIAG
-	// (Test builds only) Fault switch list-landing-guard-off: the walk alone asked, the old way - the case that shows what
-	// the other two stop (land-arrow-closed-armed).
-	if (KFC_DIAG_FAULT("list-landing-guard-off"))
-		underWay = gWalking;
-#endif
-	if (underWay)
+	// Nothing moves under something still under way (MoveUnderWay): the key is swallowed.
+	if (MoveUnderWay())
 		return kTrue;
 	WalkGuard walkGuard;
 
@@ -551,17 +570,71 @@ bool16 KFCResultTreeEH::HandleUpDownKey(IEvent* e, const VirtualKey& key)
 			(void)KFCResultTree::TakeKeyboard();	// the page's follow fronted the document, which took the keyboard
 		return kTrue;
 	}
+	return StockMoveThenLand(e, key);
+}
 
+// HOME / END / PAGEUP / PAGEDOWN LAND AS THE ARROWS DO (the author's call, 2026-10-13 - they moved the selection alone, the
+// page left on the row before). The stock moves - to the first or the last row, or a screenful up or down - and the row it
+// reached is opened and landed on (StockMoveThenLand). With a modifier the stock's own move is left as it is, and a single
+// row it leaves selected is landed on - as for the arrows with Ctrl or Alt.
+bool16 KFCResultTreeEH::HandleHomeKey(IEvent* e)
+{
+	KFC_DIAG_LOG("RETFOCUS list home walking=%d", gWalking ? 1 : 0);
+	KFC_DIAG_HIDDEN_DOCS_CHECK("home");
+	if (MoveUnderWay())
+		return kTrue;
+	WalkGuard walkGuard;
+	return StockMoveThenLand(e, kVirtualHomeKey);
+}
+
+bool16 KFCResultTreeEH::HandleEndKey(IEvent* e)
+{
+	KFC_DIAG_LOG("RETFOCUS list end walking=%d", gWalking ? 1 : 0);
+	KFC_DIAG_HIDDEN_DOCS_CHECK("end");
+	if (MoveUnderWay())
+		return kTrue;
+	WalkGuard walkGuard;
+	return StockMoveThenLand(e, kVirtualEndKey);
+}
+
+bool16 KFCResultTreeEH::HandlePageUpDownKey(IEvent* e, const VirtualKey& key)
+{
+	KFC_DIAG_LOG("RETFOCUS list page vk=%d walking=%d", static_cast<int>(key.GetDVKeyCode()), gWalking ? 1 : 0);
+	if (!(key == kVirtualPageUpKey) && !(key == kVirtualPageDownKey))
+		return TreeViewEventHandler::HandlePageUpDownKey(e, key);
+	KFC_DIAG_HIDDEN_DOCS_CHECK("page");
+	if (MoveUnderWay())
+		return kTrue;
+	WalkGuard walkGuard;
+	return StockMoveThenLand(e, key);
+}
+
+bool16 KFCResultTreeEH::StockMoveThenLand(IEvent* e, const VirtualKey& key)
+{
 	// The stock handler owns the movement: it knows which rows are on screen, how the selection
 	// scrolls, and it can only ever land on a row the tree really has.
-	const bool16 handled = TreeViewEventHandler::HandleUpDownKey(e, key);
+	bool16 handled = kFalse;
+	if (key == kVirtualHomeKey)
+		handled = TreeViewEventHandler::HandleHomeKey(e);
+	else if (key == kVirtualEndKey)
+		handled = TreeViewEventHandler::HandleEndKey(e);
+	else if (key == kVirtualPageUpKey || key == kVirtualPageDownKey)
+		handled = TreeViewEventHandler::HandlePageUpDownKey(e, key);
+	else
+		handled = TreeViewEventHandler::HandleUpDownKey(e, key);
+#ifdef KFC_DIAG
+	// (Test builds only) Fault switch home-end-stock: Home / End / PageUp / PageDown move the selection alone, the old way -
+	// the case that shows what the landing adds (click-end-lands-armed).
+	if (KFC_DIAG_FAULT("home-end-stock") && !(key == kVirtualDownArrowKey) && !(key == kVirtualUpArrowKey))
+		return handled;
+#endif
 
 	InterfacePtr<ITreeViewController> controller(this, UseDefaultIID());
 	InterfacePtr<ITreeViewMgr> treeMgr(this, UseDefaultIID());
 	if (controller == nil || treeMgr == nil)
 		return handled;
 
-	// Where it landed. A plain arrow leaves one row selected, so anything else means the move did not
+	// Where it landed. A plain move leaves one row selected, so anything else means the move did not
 	// happen (an empty list, or already at the end) and there is nothing to open or run.
 	NodeIDList selected;
 	controller->GetSelectedItems(selected);

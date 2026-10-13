@@ -127,6 +127,18 @@ namespace KFCUndoFollow
 	    user keeps the write). Nothing is processed over an error already standing (the step goes back on it). */
 	void MarkWrite(IDataBase* db);
 
+	/** A DOCUMENT IS CLOSING AND THE LIST ON SCREEN IS NOT A BOOK'S - whatever it shows: All Documents, one document, or
+	    no list at all (a query run leaves it empty - F7). The kept writes let it go all the same (the author's call,
+	    2026-10-13 - the spec map's UNDO-12 for a query run): a chapter of a kept BOOK's list (a whole result set a book's
+	    search made - its header.fromBook) the way a book's chapter goes (ForgetBookChapter: frozen where a write wrote
+	    it), any other document the way All Documents lets one go (ForgetDocument: emptied). Until then a kept write let
+	    a document go only while the list showed its rows: after a query run over two documents, one closed unsaved, an
+	    Undo in the other went unfollowed - the whole run dropped at the next follow, a document of it no longer open
+	    (case xq-alldocs-close-undo).
+	    Called by KFCCloseDocResponder for every close outside a run of ours while the list is not a book's - a book's
+	    list calls ForgetBookChapter itself, ahead of the run guard. */
+	void ForgetClosingDocument(const UIDRef& docRef);
+
 	/** A DOCUMENT OF AN ALL DOCUMENTS LIST IS CLOSING. Only its rows leave the panel
 	    (KFCResultModel::CloseChapter), and the kept writes let it go the same way: its stories and items come off
 	    every write - a write left with none is dropped, as one of a closed document always was; a write of rows of
@@ -134,8 +146,9 @@ namespace KFCUndoFollow
 	    chapter is emptied in every kept whole result set, so an Undo of a query run that also wrote it (it spans
 	    documents) puts back the other documents' rows and not this one's. Without it the whole write would be
 	    dropped at the next follow (a document of it no longer open), and an Undo in the documents still open
-	    would go unfollowed.
-	    Called by KFCCloseDocResponder, before the document goes (its UIDRef is still good). */
+	    would go unfollowed. The same for a document of any list that is not a book's, and of no list
+	    (ForgetClosingDocument).
+	    Called through ForgetClosingDocument, before the document goes (its UIDRef is still good). */
 	void ForgetDocument(const UIDRef& docRef);
 
 	/** A CHAPTER OF A BOOK'S LIST IS CLOSING. A book's rows stay when a chapter closes (KFCCloseDocResponder),
@@ -151,7 +164,8 @@ namespace KFCUndoFollow
 	    went unfollowed (measured with Change Checked, which wrote whole result sets until it went).
 	    Called by KFCCloseDocResponder for every close while a book's list is up - a book search's own hand-backs and a
 	    query run's closes at its commit point too (the chapters a query run hands back at its end close after it has
-	    cleared the list: they do not come here). */
+	    cleared the list: they do not come here) - and through ForgetClosingDocument for a close outside a run while a
+	    kept book's list holds the chapter (a query run over a book left the list empty). */
 	void ForgetBookChapter(const UIDRef& docRef);
 
 	/** A DOCUMENT SAVED AS ANOTHER FILE (KFCSaveAsDocResponder - the spec map's LIFE-14): its chapter in each kept whole
