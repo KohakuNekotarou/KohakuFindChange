@@ -45,29 +45,19 @@
 #include "ITextFocusManager.h"		// the focus that walk is given (TempFocus)
 #include "ISession.h"				// GetExecutionContextSession
 #include "IStoryList.h"				// GetUserAccessibleStoryCount - how many stories a walk will visit
-// For naming the page a match sits on (the "P<page>(<n>)" hit-row locator):
+// For the frame a match is composed into (FrameUIDForPosition - what the frame says, its page, its layer and its
+// locks, is KFCPageItemFacts'):
 #include "ITextParcelList.h"		// GetParcelContaining - the parcel a position is in
 #include "IParcelList.h"			// GetParcelFrameUID - is that parcel placed in a frame?
 #include "ParcelKey.h"				// ParcelKey::IsValid
-#include "IHierarchy.h"				// the parcel frame as a page item
-#include "ITextUtils.h"				// GetPageUIDRef - the purpose-built textFrame -> page lookup
-#include "ILayoutUtils.h"			// GetOwnerPageUID - frame -> page (the general fallback)
-#include "IPageList.h"				// GetPageString / GetPageIndex - page -> "12" / "A:1"
-// For marking a match that sits on a switched-off layer ("Hidden" on the hit-row locator):
-#include "ILayerUtils.h"			// GetLayerUID - the spread layer a frame sits on
-#include "ISpreadLayer.h"			// GetDocLayerUID - spread layer -> the Layers panel's row
-#include "IDocumentLayer.h"			// IsVisible / IsLocked - is that layer switched off, or locked?
-#include "IPageItemVisibilityFacade.h"	// IsHidden - Object > Hide on the frame itself, which no layer says
 // For refusing to rewrite locked text the way the Find/Change dialog does ("Search Only"):
 #include "IItemLockData.h"			// GetInsertLock - the story's own "content cannot be edited"
-#include "ILockPosition.h"			// IsPageItemLocked - Object > Lock on the frame itself
 
 // General includes:
 #include "AttributeBossList.h"		// the Find Format list the search remembers (RememberFindFormat)
 #include "TextWalkerServiceProviderID.h"	// kFindTextCmdBoss, kFindChangeClientBoss, kTextWalkerService(...)
 #include "CTextEnum.h"				// Text::GlyphID / kInvalidGlyphID (the Glyph tab's query)
 #include "TextChar.h"				// kTextChar_Ellipse - the mark a cut segment carries (SplitLineWithScanner)
-#include "UnicodeClass.h"			// IsWhiteSpace / IsIgnoredCharacter - which characters a story row's first words keep
 #include "WalkerScopeOptions.h"
 #include "ErrorUtils.h"				// PMSetGlobalErrorCode
 #include "KFCProgressBar.h"		// the search's progress + cancel (both scopes) - the bar is the UI half's
@@ -75,7 +65,6 @@
 #include "CreateObject.h"
 #include "PreferenceUtils.h"		// QuerySessionPreferences
 #include "PersistUtils.h"			// ::GetDataBase - every open document's, for a Search: walk's dirty guards
-#include "InCopySharedID.h"			// kDeletedTextBoss - the thread Track Changes keeps a deletion's text in
 #include "IDataBase.h"				// SaveRestoreModifiedState
 #include "Utils.h"
 #include "WideString.h"
@@ -229,7 +218,7 @@ bool gSearching = false;
 
 // The FIND FORMAT the results on the panel were searched with - a shallow copy of the dialog's find
 // attribute list, taken when the search ran and compared before a row's Replace re-walks. See
-// KFCSearchEngine::RememberFindFormat for why the list is COPIED rather than described.
+// RememberFindFormat for why the list is COPIED rather than described.
 //
 // WHY IT LIVES HERE AND NOT ON KFCResultModel, beside the walk signature it belongs with: that
 // header states its own rule - the search mode is "held as a plain int so this header needs no text
@@ -339,28 +328,33 @@ bool CommitGlyphID(Text::GlyphID glyphID, bool16 findSide)
 	return ProcessFindChangeCmd(cmd);
 }
 
-// Process one of the find/change option commands that carry a single int - the shape of
+// One of the find/change option commands that carry a single int, made and filled - the shape of
 // SnpFindAndReplace's ProcessFindChangeCommandInt32: the value in the default IIntData, and which
 // mode's settings are being addressed in IID_IFINDCHANGEMODEDATA where the boss carries one
 // (kFindChangeModeCmdBoss does; the two character-type bosses hold only the value - checked
-// against a live object-model dump - so that field is set only when it answers).
-//
-// Returns whether the value was stated, for the same reason CommitGlyphID does: the snippet this is
-// shaped after hands its ErrorCode back too, and every caller of it stops on a failure
-// (SnpFindAndReplace.cpp:511-516, :598-603, :623-628).
-bool CommitFindChangeInt(const ClassID& cmdBoss, int32 value, int32 mode)
+// against a live object-model dump - so that field is set only when it answers). nil = not made.
+ICommand* CreateFindChangeIntCmd(const ClassID& cmdBoss, int32 value, int32 mode)
 {
 	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(cmdBoss));
 	if (cmd == nil)
-		return false;
+		return nil;
 	InterfacePtr<IIntData> valueData(cmd, UseDefaultIID());
 	if (valueData == nil)
-		return false;
+		return nil;
 	valueData->Set(value);
 	InterfacePtr<IIntData> modeData(cmd, IID_IFINDCHANGEMODEDATA);
 	if (modeData != nil)
 		modeData->Set(mode);
-	return ProcessFindChangeCmd(cmd);
+	return cmd.forget();
+}
+
+// That command processed. Returns whether the value was stated, for the same reason CommitGlyphID does: the snippet
+// this is shaped after hands its ErrorCode back too, and every caller of it stops on a failure
+// (SnpFindAndReplace.cpp:511-516, :598-603, :623-628).
+bool CommitFindChangeInt(const ClassID& cmdBoss, int32 value, int32 mode)
+{
+	InterfacePtr<ICommand> cmd(CreateFindChangeIntCmd(cmdBoss, value, mode));
+	return cmd != nil && ProcessFindChangeCmd(cmd);
 }
 
 // The same command SCHEDULED rather than processed (CmdUtils::ScheduleCommand - the queue keeps its own reference, as
@@ -368,17 +362,8 @@ bool CommitFindChangeInt(const ClassID& cmdBoss, int32 value, int32 mode)
 // command, where processing one of its own would nest it in the command being notified. Whether it was scheduled.
 bool ScheduleFindChangeInt(const ClassID& cmdBoss, int32 value, int32 mode)
 {
-	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(cmdBoss));
-	if (cmd == nil)
-		return false;
-	InterfacePtr<IIntData> valueData(cmd, UseDefaultIID());
-	if (valueData == nil)
-		return false;
-	valueData->Set(value);
-	InterfacePtr<IIntData> modeData(cmd, IID_IFINDCHANGEMODEDATA);
-	if (modeData != nil)
-		modeData->Set(mode);
-	return CmdUtils::ScheduleCommand(cmd) == kSuccess;
+	InterfacePtr<ICommand> cmd(CreateFindChangeIntCmd(cmdBoss, value, mode));
+	return cmd != nil && CmdUtils::ScheduleCommand(cmd) == kSuccess;
 }
 
 // THE PAGE-ITEM QUESTIONS - KFCPageItemFacts (the object search asks them too).
@@ -1579,17 +1564,6 @@ bool CollectStoryHits(const UIDRef& storyRef, const WalkerScopeOptions& scopeOpt
 	return result == kChapterWalked;
 }
 
-// Put a chapter's hits in PAGE order and give each its "P<page>(<n>)" locator (the KESCL convention:
-// page string, section-aware; a within-page ordinal in parens only when the page holds more than one
-// match; "overset" for an overset match, which has no page). The locator is a field of its own, drawn
-// ahead of the line in the normal colour. Pure string / index work - no recompose, so no dirty guard
-// needed here. The search's finishing pass.
-void FinalizeHits(std::vector<KFCResultModel::Hit>& hits)
-{
-	// The model's one page ordering - Search This Story Again orders a chapter it changes with it too.
-	KFCResultModel::OrderHitsByPage(hits);
-}
-
 // The session's search direction for one tab, through the command the dialog's own radio button
 // stands for (the silent one: no panel is told to redraw).
 bool SetSessionSearchBackwards(bool16 backwards, IFindChangeOptions::SearchMode mode)
@@ -1834,7 +1808,14 @@ bool KFCSearchEngine::CommitReplaceSide()
 // Adobe calls neither IsEqual nor IntersectionContainsDifferences anywhere in the SDK.
 // The header's contract is all there is to go on. Measured instead: see the audit note for the two
 // searches - identical but for one attribute's value - that this was checked with.
-void KFCSearchEngine::RememberFindFormat()
+//
+// KEEP A COPY OF THE FIND FORMAT this search ran with - the attribute list behind the dialog's format pane, and on the
+// Glyph tab the query's own font - so the replace can ask whether it is still the same one (FindFormatHasChanged).
+// SearchBook's alone, once per search, beside BuildWalkSignature; a search that cannot read the settings simply
+// remembers nothing, and FindFormatHasChanged then says "cannot tell".
+namespace
+{
+void RememberFindFormat()
 {
 	KFCSearchEngine::ForgetSearchedFindFormat();	// what is remembered below replaces this; a failure remembers nothing
 
@@ -1864,6 +1845,7 @@ void KFCSearchEngine::RememberFindFormat()
 	// Which database that is - the session's own (the options' workspace) or a document's - in a test build.
 	KFC_DIAG_LOG("FINDFORMAT remembered attrDB=%p optionsDB=%p", (void*)db, (void*)::GetDataBase(opts));
 }
+}	// anonymous namespace
 
 bool KFCSearchEngine::FindFormatHasChanged()
 {
@@ -1933,14 +1915,10 @@ void KFCSearchEngine::BuildWalkSignature(PMString& outSignature)
 	outSignature.Append("m");
 	outSignature.AppendNumber(static_cast<int32>(mode));
 
-	// THE OBJECT TAB: what decides which page items come back - the Type, the tab's own five
-	// Include switches, how many conditions Find Object Format holds and the object style it looks for. The conditions'
-	// values are RememberFindFormat's list, as for text. The Change side stays out, as for text.
-	if (mode == IFindChangeOptions::kObjectSearch)
+	// The tab's five Include switches - the five GetKFCWalkerScopeOptions reads - one bit each, for either tab below.
+	auto appendScopeSwitches = [&]()
 	{
-		outSignature.Append(" ot");
-		outSignature.AppendNumber(static_cast<int32>(opts->GetObjectSearchType()));
-		const bool16 objectSwitches[] =
+		const bool16 scopeSwitches[] =
 		{
 			opts->GetIncludeMasterPages(mode),
 			opts->GetIncludeLockedLayersForFind(mode),
@@ -1948,9 +1926,19 @@ void KFCSearchEngine::BuildWalkSignature(PMString& outSignature)
 			opts->GetIncludeLockedStoriesForFind(mode),
 			opts->GetIncludeFootnotes(mode),
 		};
+		for (size_t i = 0; i < sizeof(scopeSwitches) / sizeof(scopeSwitches[0]); ++i)
+			outSignature.Append(scopeSwitches[i] ? "1" : "0");
+	};
+
+	// THE OBJECT TAB: what decides which page items come back - the Type, the tab's own five
+	// Include switches, how many conditions Find Object Format holds and the object style it looks for. The conditions'
+	// values are RememberFindFormat's list, as for text. The Change side stays out, as for text.
+	if (mode == IFindChangeOptions::kObjectSearch)
+	{
+		outSignature.Append(" ot");
+		outSignature.AppendNumber(static_cast<int32>(opts->GetObjectSearchType()));
 		outSignature.Append(" o");
-		for (size_t i = 0; i < sizeof(objectSwitches) / sizeof(objectSwitches[0]); ++i)
-			outSignature.Append(objectSwitches[i] ? "1" : "0");
+		appendScopeSwitches();
 		const AttributeBossList* const objectAttrs = opts->GetFindAttributeBossList(db, mode);
 		outSignature.Append(" n");
 		outSignature.AppendNumber(objectAttrs != nil ? objectAttrs->CountBosses() : 0);
@@ -1995,23 +1983,19 @@ void KFCSearchEngine::BuildWalkSignature(PMString& outSignature)
 	// are CJK-only in the dialog, but they are asked for unconditionally: an option that is not on
 	// screen can still be set, and a signature that only covers what the current UI shows is a
 	// signature with a hole in it.)
-	const bool16 switches[] =
+	const bool16 matchSwitches[] =
 	{
 		opts->GetCaseSensitive(mode),
 		opts->GetEntireWord(mode),
 		opts->GetKanaSensitive(mode),
 		opts->GetWidthSensitive(mode),
-		opts->GetIncludeMasterPages(mode),
-		opts->GetIncludeLockedLayersForFind(mode),
-		opts->GetIncludeHiddenLayers(mode),
-		opts->GetIncludeLockedStoriesForFind(mode),
-		opts->GetIncludeFootnotes(mode),
 		// (No direction: KFC searches and replaces forward only - KFCForwardSearchScope - so the
 		// dialog's direction changes nothing KFC does.)
 	};
 	outSignature.Append(" o");
-	for (size_t i = 0; i < sizeof(switches) / sizeof(switches[0]); ++i)
-		outSignature.Append(switches[i] ? "1" : "0");
+	for (size_t i = 0; i < sizeof(matchSwitches) / sizeof(matchSwitches[0]); ++i)
+		outSignature.Append(matchSwitches[i] ? "1" : "0");
+	appendScopeSwitches();
 
 	// ----- and FIND FORMAT, which is a search condition like any other -----
 	// COUNTED here, not described: how many conditions the dialog's format pane holds (and, on the
@@ -2286,19 +2270,6 @@ const char* SelectionScopeWords(IWalkerScopeFactoryUtils::WalkScopeType selectio
 		default:											return "";
 	}
 }
-// What one walk over a run's targets found (CollectTargets).
-struct CollectTally
-{
-	int32					total;
-	int32					chaptersWithHits;
-	bool					truncated;
-	bool					cancelled;
-	std::vector<PMString>	unsearchable;
-	std::vector<PMString>	brokeOff;
-	std::vector<PMString>	unclosed;
-	CollectTally() : total(0), chaptersWithHits(0), truncated(false), cancelled(false) {}
-};
-
 // EVERY STORY'S VERSION, WHILE ITS DOCUMENT IS STILL OPEN.
 // ITextModel::GetChangeCount of each story holding a hit (ReadStoryVersion) - what the replace compares
 // before it writes, so a story moved since without KFC (typing, Ctrl+Z of anything but a write of KFC's
@@ -2322,7 +2293,7 @@ void ReadStoryVersions(const UIDRef& docRef, const std::vector<KFCResultModel::H
 // under one bar. (A query run does not come here: it is Change All only - KFCQuerySequence.)
 void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBook, bool allDocuments,
 	IWalkerScopeFactoryUtils::WalkScopeType selectionScope,
-	std::vector<KFCBookScope::SkippedChapter>& unopenable, CollectTally& out)
+	std::vector<KFCBookScope::SkippedChapter>& unopenable, KFCSearchEngine::CollectTally& out)
 {
 	// ...and the five scope switches, read ONCE for the whole run. They come off the same dialog as
 	// everything above, they are the same for every chapter by definition (the replace pass has to
@@ -2402,7 +2373,9 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 	auto fileChapter = [&](const KFCBookScope::ChapterDoc& target, std::vector<KFCResultModel::Hit>& hits,
 		std::map<UID, uint32>& storyVersions, std::map<UID, KFCResultModel::SearchedRange>* parts)
 	{
-		FinalizeHits(hits);
+		// The search's finishing pass: page order and each row's "P<page>(<n>)" locator - the model's one ordering,
+		// the Object tab's and a search again's too. Pure string / index work - no recompose, so no dirty guard here.
+		KFCResultModel::OrderHitsByPage(hits);
 		KFCResultModel::Chapter chapter;
 		chapter.name = target.shortName;
 		chapter.name.SetTranslatable(kFalse);
@@ -2425,9 +2398,9 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 	// THE ORDER IS FROM THE TOP, WHEREVER THE CARET IS (the author's call).
 	// The dialog's own scope, given a selection, starts AT it and loops back to the head
 	// (IWalkerScopeFactoryUtils.h:169-171) - Find Next's order, one match at a time from where the user stands.
-	// A list keeps its walk's order within a page (FinalizeHits), so walking that scope numbers the lower
-	// story's match P1(1) whenever the caret stands in it (the regression case sc-selection-caret). Where the
-	// selection decides only where a walk STARTS, the walk starts at the top:
+	// A list keeps its walk's order within a page (KFCResultModel::OrderHitsByPage), so walking that scope numbers
+	// the lower story's match P1(1) whenever the caret stands in it (the regression case sc-selection-caret). Where
+	// the selection decides only where a walk STARTS, the walk starts at the top:
 	//   Document         the active document, by the document form - its range does not depend on the selection;
 	//   All Documents    each open document by it in turn, in `targets`' order - each one a walk of its own, named
 	//                    on its own in the summary's notes;
@@ -2684,7 +2657,7 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 		// Checked, which walked chapters the same way: four chapters, four .idlk files standing at
 		// once.) Safe at this point - the walk has halted, the dirty
 		// guard inside CollectHitsInDoc has already restored the flag, and everything read after
-		// this (FinalizeHits, the Chapter it fills in) is plain values, not database work.
+		// this (the page order, the Chapter it fills in) is plain values, not database work.
 		//
 		// The release's false cannot be read alone - HandBackHeldDocNow asks whether the chapter was ours
 		// and whether it is still open, so a chapter the user closed under the run is not counted as one
@@ -2759,6 +2732,12 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 	out.unclosed.swap(unclosed);
 }
 
+// The run's target sentences: its front doors' (KFCSearchEngine::ResolveRunTarget) and SearchBook's safety nets past its
+// commit point, which say the same words.
+const char* const kNoBookOpen = "Book Scope is on, but no book is open.";
+const char* const kBookHasNoChapters = "That book has no chapters.";
+const char* const kNoDocumentToSearch = "No open document to search.";
+
 }	// anonymous namespace
 
 bool KFCSearchEngine::ResolveRunScope(RunScope& out, PMString& outRefusal)
@@ -2817,30 +2796,37 @@ bool KFCSearchEngine::ResolveRunScope(RunScope& out, PMString& outRefusal)
 		selectionScope = IWalkerScopeFactoryUtils::kDocumentScope;
 	}
 
-	// The target book, asked once - and an EMPTY one refused here, ahead of the commit point like every
-	// other refusal: refused past it (by ListBookChapters below), the previous results would already be
-	// gone - a whole book's results, for a book with nothing in it (KFCBookScope::GetTargetBook says which
-	// case was in mind).
-	const KFCBookScope::TargetBook targetBook = fromBook ? KFCBookScope::GetTargetBook() : KFCBookScope::kNoTargetBook;
-	if (fromBook && targetBook == KFCBookScope::kNoTargetBook)
-	{
-		outRefusal.Append("Book Scope is on, but no book is open.");
+	// What the run would run on - the doors the Object tab asks too (ResolveRunTarget).
+	if (!ResolveRunTarget(fromBook, outRefusal))
 		return false;
-	}
-	if (fromBook && targetBook == KFCBookScope::kTargetBookEmpty)
-	{
-		outRefusal.Append("That book has no chapters.");
-		return false;
-	}
-	if (!fromBook && KFCBookScope::ActiveDocument() == nil)
-	{
-		outRefusal.Append("No open document to search.");
-		return false;
-	}
 	out.fromBook = fromBook;
 	out.allDocuments = allDocuments;
 	out.selectionScope = static_cast<int32>(selectionScope);
 	out.fellBackNote = fellBackNote;
+	return true;
+}
+
+bool KFCSearchEngine::ResolveRunTarget(bool fromBook, PMString& outRefusal)
+{
+	if (fromBook)
+	{
+		const KFCBookScope::TargetBook targetBook = KFCBookScope::GetTargetBook();
+		if (targetBook == KFCBookScope::kNoTargetBook)
+		{
+			outRefusal.Append(kNoBookOpen);
+			return false;
+		}
+		if (targetBook == KFCBookScope::kTargetBookEmpty)
+		{
+			outRefusal.Append(kBookHasNoChapters);
+			return false;
+		}
+	}
+	else if (KFCBookScope::ActiveDocument() == nil)
+	{
+		outRefusal.Append(kNoDocumentToSearch);
+		return false;
+	}
 	return true;
 }
 
@@ -3078,7 +3064,7 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 			// (KFCBookScope::ResolveTargetBook).
 			// (An empty book is refused at the front door. This is the safety net - see the note at the
 			// end of ListBookChapters - and the same sentence.)
-			outSummary.Append("That book has no chapters.");
+			outSummary.Append(kBookHasNoChapters);
 			return 0;
 		}
 	}
@@ -3105,7 +3091,7 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 		}
 		if (targets.empty())
 		{
-			outSummary.Append("No open document to search.");
+			outSummary.Append(kNoDocumentToSearch);
 			return 0;
 		}
 	}
@@ -3117,7 +3103,7 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 		IDocument* doc = KFCBookScope::ActiveDocument();
 		if (doc == nil)
 		{
-			outSummary.Append("No open document to search.");
+			outSummary.Append(kNoDocumentToSearch);
 			return 0;
 		}
 		targets.push_back(KFCBookScope::DocAsChapter(doc));
@@ -3172,23 +3158,12 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 	// list compares itself properly and a hand-written fingerprint of it did not. Taken here, on the
 	// same side of CommitSearchMode as the signature, for the same reason: a value read on one side
 	// of a mode commit and compared against one read on the other could differ with nothing having
-	// changed. See KFCSearchEngine::RememberFindFormat.
-	KFCSearchEngine::RememberFindFormat();
+	// changed. See RememberFindFormat.
+	RememberFindFormat();
 
 	CollectTally tally;
-	if (objectTab)
-	{
-		// THE OBJECT TAB: page items, walked by InDesign's own object search one document at a time.
-		KFCObjectSearch::Tally objects;
-		KFCObjectSearch::CollectTargets(targets, fromBook, allDocuments, static_cast<int32>(selectionScope), unopenable, objects);
-		tally.total = objects.total;
-		tally.chaptersWithHits = objects.chaptersWithHits;
-		tally.truncated = objects.truncated;
-		tally.cancelled = objects.cancelled;
-		tally.unsearchable.swap(objects.unsearchable);
-		tally.brokeOff.swap(objects.brokeOff);
-		tally.unclosed.swap(objects.unclosed);
-	}
+	if (objectTab)		// THE OBJECT TAB: page items, walked by InDesign's own object search one document at a time.
+		KFCObjectSearch::CollectTargets(targets, fromBook, allDocuments, static_cast<int32>(selectionScope), unopenable, tally);
 	else
 		CollectTargets(targets, fromBook, allDocuments, selectionScope, unopenable, tally);
 	const int32 total = tally.total;
@@ -3498,18 +3473,12 @@ const char* KFCSearchEngine::FindCommandName(bool bookScopeOn)
 		return "Find in Book";
 	}
 	// what the search will make of Search: with this selection - the dialog's own display
-	// The Object tab's Search: is read its own way (KFCObjectSearch::ObjectSearchScope - page items, not text).
-	if (CurrentSearchMode() == IFindChangeOptions::kObjectSearch)
-	{
-		PMString note;
-		switch (KFCObjectSearch::ObjectSearchScope(note))
-		{
-			case IWalkerScopeFactoryUtils::kAllDocumentScope:	return "Find in All Documents";
-			case IWalkerScopeFactoryUtils::kSelectionScope:		return "Find in Selection";
-			default:											return "Find in Document";
-		}
-	}
-	switch (SearchScopeForSelection(CurrentSearchScope()))
+	// The Object tab's Search: is read its own way (KFCObjectSearch::ObjectSearchScope - page items, not text: Document,
+	// All Documents or Selection, which the names below cover).
+	PMString note;
+	const int32 scope = (CurrentSearchMode() == IFindChangeOptions::kObjectSearch)
+		? KFCObjectSearch::ObjectSearchScope(note) : SearchScopeForSelection(CurrentSearchScope());
+	switch (scope)
 	{
 		case IWalkerScopeFactoryUtils::kAllDocumentScope:	return "Find in All Documents";
 		case IWalkerScopeFactoryUtils::kStoryScope:			return "Find in Story";
@@ -3599,18 +3568,8 @@ bool ReplacedRowPlaces(int32 chapterIdx, int32 hitIdx, const UIDRef& storyRef, P
 	InterfacePtr<ITextModel> model(storyRef, UseDefaultIID());
 	if (model == nil)
 		return false;
-	std::vector<UTF32TextChar> key;
-	{
-		const WideString w(written);
-		for (WideString::const_iterator it = w.begin(); it != w.end(); ++it)
-			key.push_back(*it);
-	}
-	std::vector<UTF32TextChar> text;
-	{
-		const WideString w(KFCSearchEngine::ReadText(storyRef, 0, model->TotalLength()));
-		for (WideString::const_iterator it = w.begin(); it != w.end(); ++it)
-			text.push_back(*it);
-	}
+	const std::vector<uint32> key = CodePointsOf(written);
+	const std::vector<uint32> text = CodePointsAt(model, 0, model->TotalLength());
 	if (key.empty() || text.size() < key.size())
 		return false;
 	const int32 len = static_cast<int32>(key.size());
@@ -3860,6 +3819,34 @@ KFCResultModel::RowLocation KFCSearchEngine::LocateRow(int32 chapterIdx, int32 h
 	return KFCResultModel::kRowElsewhere;
 }
 
+namespace
+{
+// THE DOOR BOTH SEARCHES AGAIN ASK: has the query changed since the search? Asked, not refused
+// (QueryUnchangedSinceSearch - StaleRowPlaces' note): nothing is cleared, and the tab the walk then runs in is stated.
+// false = changed, and the sentence said.
+bool QueryUnchangedForAgain(PMString& outStatus)
+{
+	if (KFCReplaceEngine::QueryUnchangedSinceSearch())
+		return true;
+	outStatus.Append("the Find/Change settings have changed since the search - search again.");
+	return false;
+}
+
+// WHAT BOTH SEARCHES AGAIN SAY ONCE THE ROWS ARE BACK: what was searched again ("story", "document"), how many matches
+// it holds now, and whether the list's limit cut it short.
+void SayFoundAgain(PMString& outStatus, const char* what, int32 now, bool capped)
+{
+	outStatus.Clear();
+	outStatus.Append("Searched this ");
+	outStatus.Append(what);
+	outStatus.Append(" again: ");
+	outStatus.AppendNumber(now > 0 ? now : 0);
+	outStatus.Append(" match(es).");
+	if (capped)
+		outStatus.Append(" The list's limit of rows was reached - its other matches are not listed.");
+}
+}	// anonymous namespace
+
 // SEARCH THIS STORY AGAIN (a story row's right-click menu - the author's call). A story edited since the
 // search refuses its rows' Replace (REP-13 1: its version is not the one KFC recorded); this takes the edit in without
 // searching the whole list again: the story alone is walked with the search's own query and switches - the search's
@@ -3903,13 +3890,9 @@ bool KFCSearchEngine::SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMStrin
 		outStatus.Append("the searched part cannot be searched again on its own (separate stretches) - search again.");
 		return false;
 	}
-	// Asked, not refused (QueryUnchangedSinceSearch - StaleRowPlaces' note): nothing is cleared, and the tab the walk
-	// below runs in is stated.
-	if (!KFCReplaceEngine::QueryUnchangedSinceSearch())
-	{
-		outStatus.Append("the Find/Change settings have changed since the search - search again.");
+	// Asked, not refused - and the tab the walk below runs in stated (QueryUnchangedForAgain).
+	if (!QueryUnchangedForAgain(outStatus))
 		return false;
-	}
 	// The chapter's document, by its file first (a UIDRef can outlive its document - KFCBookScope::ReachChapterDoc).
 	UIDRef docRef;
 	IDFile file;
@@ -3989,13 +3972,7 @@ bool KFCSearchEngine::SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMStrin
 		part.version = version;
 		KFCResultModel::SetSearchedRange(chapterIdx, story, part);
 	}
-	const int32 now = KFCResultModel::ReplaceStoryRows(chapterIdx, story, hits, version);
-	outStatus.Clear();
-	outStatus.Append("Searched this story again: ");
-	outStatus.AppendNumber(now > 0 ? now : 0);
-	outStatus.Append(" match(es).");
-	if (capped)
-		outStatus.Append(" The list's limit of rows was reached - its other matches are not listed.");
+	SayFoundAgain(outStatus, "story", KFCResultModel::ReplaceStoryRows(chapterIdx, story, hits, version), capped);
 	return true;
 }
 
@@ -4046,12 +4023,9 @@ bool KFCSearchEngine::SearchDocumentAgain(int32 chapterIdx, PMString& outStatus)
 		outStatus.Append(") - search again.");
 		return false;
 	}
-	// Asked, not refused (Search This Story Again's rule): nothing is cleared, and the tab the walk runs in is stated.
-	if (!KFCReplaceEngine::QueryUnchangedSinceSearch())
-	{
-		outStatus.Append("the Find/Change settings have changed since the search - search again.");
+	// Asked, not refused - and the tab the walk runs in stated (QueryUnchangedForAgain).
+	if (!QueryUnchangedForAgain(outStatus))
 		return false;
-	}
 	// The document, by its file first (a UIDRef can outlive its document - KFCBookScope::ReachChapterDoc).
 	if (!KFCBookScope::ReachChapterDoc(file, docRef))
 	{
@@ -4109,13 +4083,7 @@ bool KFCSearchEngine::SearchDocumentAgain(int32 chapterIdx, PMString& outStatus)
 		outStatus.Append("InDesign's search stopped with an error - the document's rows are left as they were.");
 		return false;
 	}
-	const int32 now = KFCResultModel::ReplaceChapterRows(chapterIdx, hits, storyVersions);
-	outStatus.Clear();
-	outStatus.Append("Searched this document again: ");
-	outStatus.AppendNumber(now > 0 ? now : 0);
-	outStatus.Append(" match(es).");
-	if (capped)
-		outStatus.Append(" The list's limit of rows was reached - its other matches are not listed.");
+	SayFoundAgain(outStatus, "document", KFCResultModel::ReplaceChapterRows(chapterIdx, hits, storyVersions), capped);
 	return true;
 }
 

@@ -262,6 +262,7 @@ PMString StoryLeadText(const UIDRef& storyRef)
 	InterfacePtr<IComposeScanner> scanner(model, UseDefaultIID());
 	if (model == nil || scanner == nil)
 		return out;
+	const int32 kShownAtMost = 24;		// what a story row shows (ROW-09)
 	const int32 kReadAtMost = 200;		// plenty for 24 that show
 	WideString lead;
 	WideString pendingBreaks;	// breaks read since the last visible character - kept once one follows
@@ -321,21 +322,15 @@ PMString StoryLeadText(const UIDRef& storyRef)
 				lead.Append(c);
 				continue;
 			}
-			// A visible character: the breaks before it go in first, each one of the 24.
-			for (int32 b = 0; b < pendingBreaks.CharCount(); ++b)
+			// A visible character: the breaks before it go in first, each one of the 24 - and when the 24 are full, the
+			// character (with any break still waiting) does not fit: the row goes on past them.
+			for (int32 b = 0; b < pendingBreaks.CharCount() && shown < kShownAtMost; ++b)
 			{
-				if (shown >= 24)
-				{
-					more = true;
-					break;
-				}
 				lead.Append(pendingBreaks.GetChar(b));
 				++shown;
 			}
 			pendingBreaks.Clear();
-			if (more)
-				break;
-			if (shown >= 24)
+			if (shown >= kShownAtMost)
 			{
 				more = true;
 				break;

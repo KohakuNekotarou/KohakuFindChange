@@ -194,6 +194,9 @@ private:
 	DocProgress& operator=(const DocProgress&);
 };
 
+// One object row for one page item (O8) - defined below, beside the questions it asks (Fingerprint, IsOnSpread).
+void BuildObjectHit(const UIDRef& docRef, UID item, KFCResultModel::Hit& out);
+
 // ONE DOCUMENT'S WALK (O2 / O5): the shared walker initialised for it, InDesign's SearchObject asked "as is" until it
 // stops answering kSuccess, each match read off the shared walker. Read-only: the document's "unsaved" flag is put back
 // (SaveRestoreModifiedState - the text walk's guard).
@@ -253,7 +256,7 @@ WalkEnd WalkDoc(IFindChangeService* svc, IObjectWalker* shared, const UIDRef& do
 			return kWalkDone;
 		}
 		KFCResultModel::Hit hit;
-		KFCObjectSearch::BuildObjectHit(docRef, current.GetUID(), hit);
+		BuildObjectHit(docRef, current.GetUID(), hit);
 		outHits.push_back(std::move(hit));
 		// CANCEL IS ASKED HERE, AT EVERY ITEM LISTED. The bar first, then the question (DocProgress says why both).
 		// kFalse = no global error state.
@@ -505,7 +508,10 @@ bool KFCObjectSearch::HasChangeObjectFormat()
 	return opts->GetObjectChangeStyle(db, kFalse) != kInvalidUID;
 }
 
-void KFCObjectSearch::SelectedPageItems(UIDList& out)
+namespace
+{
+// The page items selected now - what Search: = Selection searches. Empty when none, or no UI half.
+void SelectedPageItems(UIDList& out)
 {
 	out.Clear();
 	InterfacePtr<IKFCUIServices> ui(KFCQueryUIServices());
@@ -513,11 +519,15 @@ void KFCObjectSearch::SelectedPageItems(UIDList& out)
 		(void)ui->GetSelectedPageItems(out);
 }
 
-bool KFCObjectSearch::CursorInText()
+// Is the cursor in text now - a caret or a range? With no page item selected (the callers have just read the page
+// items - SelectedPageItems), Search: = Selection then searches the frame the cursor stands in, as InDesign's own Find
+// does (the author's call; the plan's Task 1 M6 measured it: a caret -> that frame only). false with no UI half.
+bool CursorInText()
 {
 	InterfacePtr<IKFCUIServices> ui(KFCQueryUIServices());
 	return ui != nil && ui->HasTextSelection();
 }
+}	// anonymous namespace
 
 int32 KFCObjectSearch::ObjectSearchScope(PMString& outFellBackNote)
 {
@@ -587,22 +597,8 @@ bool KFCObjectSearch::ResolveObjectRunScope(KFCSearchEngine::RunScope& out, PMSt
 			return false;
 		}
 	}
-	const KFCBookScope::TargetBook targetBook = fromBook ? KFCBookScope::GetTargetBook() : KFCBookScope::kNoTargetBook;
-	if (fromBook && targetBook == KFCBookScope::kNoTargetBook)
-	{
-		outRefusal.Append("Book Scope is on, but no book is open.");
+	if (!KFCSearchEngine::ResolveRunTarget(fromBook, outRefusal))
 		return false;
-	}
-	if (fromBook && targetBook == KFCBookScope::kTargetBookEmpty)
-	{
-		outRefusal.Append("That book has no chapters.");
-		return false;
-	}
-	if (!fromBook && KFCBookScope::ActiveDocument() == nil)
-	{
-		outRefusal.Append("No open document to search.");
-		return false;
-	}
 	out.fromBook = fromBook;
 	out.allDocuments = !fromBook && scope == IWalkerScopeFactoryUtils::kAllDocumentScope;
 	out.selectionScope = (!fromBook && scope == IWalkerScopeFactoryUtils::kSelectionScope)
@@ -727,7 +723,12 @@ void KFCObjectSearch::AimSharedWalkerAtFront()
 	shared->Initialize(WalkerOptionsFor(::GetUIDRef(front), nil));
 }
 
-void KFCObjectSearch::BuildObjectHit(const UIDRef& docRef, UID item, KFCResultModel::Hit& out)
+namespace
+{
+// ONE OBJECT ROW FOR ONE PAGE ITEM (O8): its text ("ID<uid>:<name>"), its page and where it stands - grouped, inline,
+// anchored, in overset text - hidden / locked, its fingerprint. The locator is built later, with the chapter's page
+// order (KFCResultModel::OrderHitsByPage).
+void BuildObjectHit(const UIDRef& docRef, UID item, KFCResultModel::Hit& out)
 {
 	IDataBase* const db = docRef.GetDataBase();
 	const UIDRef itemRef(db, item);
@@ -812,19 +813,20 @@ void KFCObjectSearch::BuildObjectHit(const UIDRef& docRef, UID item, KFCResultMo
 
 	// NO SPREAD HOLDS IT - an inline in overset text (QuerySpread answers nil): its row reads "overset" (BuildHitLocator),
 	// nothing of it is shown or selected, and its row's Replace is refused (IsOnSpread).
-	out.isOverset = !IsOnSpread(itemRef);
+	out.isOverset = !KFCObjectSearch::IsOnSpread(itemRef);
 
 	// Out of the user's reach where it is (the text rows' two words, by the same code).
 	out.isHidden = KFCPageItemFacts::IsFrameHidden(db, item);
 	out.isLocked = KFCPageItemFacts::IsPageItemLockedForEdit(db, item) || KFCPageItemFacts::IsFrameOnLockedLayer(db, item);
 
-	(void)Fingerprint(itemRef, out.itemPrint, out.itemPrintLength);
+	(void)KFCObjectSearch::Fingerprint(itemRef, out.itemPrint, out.itemPrintLength);
 }
+}	// anonymous namespace
 
 void KFCObjectSearch::CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBook, bool allDocuments,
-	int32 selectionScope, std::vector<KFCBookScope::SkippedChapter>& unopenable, Tally& out)
+	int32 selectionScope, std::vector<KFCBookScope::SkippedChapter>& unopenable, KFCSearchEngine::CollectTally& out)
 {
-	out = Tally();
+	out = KFCSearchEngine::CollectTally();
 	InterfacePtr<IFindChangeService> svc(CreateFindChangeService());
 	InterfacePtr<IObjectWalker> shared(QuerySharedWalker());
 	if (svc == nil || shared == nil)

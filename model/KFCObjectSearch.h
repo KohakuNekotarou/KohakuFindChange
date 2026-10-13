@@ -61,35 +61,14 @@ namespace KFCObjectSearch
 	    is stored - measured). */
 	bool ResolveObjectRunScope(KFCSearchEngine::RunScope& out, PMString& outRefusal);
 
-	/** The page items selected now - what Search: = Selection searches. Empty when none, or no UI half. */
-	void SelectedPageItems(UIDList& out);
-
-	/** Is the cursor in text now - a caret or a range? With no page item selected (the callers have just read the page
-	    items - SelectedPageItems), Search: = Selection then searches the frame the cursor stands in, as InDesign's own
-	    Find does (the author's call; the plan's Task 1 M6 measured it: a caret -> that frame only). false
-	    with no UI half. */
-	bool CursorInText();
-
-	/** What one listing over a run's targets found (KFCSearchEngine.cpp's CollectTally, for page items). */
-	struct Tally
-	{
-		int32					total;
-		int32					chaptersWithHits;
-		bool					truncated;
-		bool					cancelled;
-		std::vector<PMString>	unsearchable;
-		std::vector<PMString>	brokeOff;
-		std::vector<PMString>	unclosed;
-		Tally() : total(0), chaptersWithHits(0), truncated(false), cancelled(false) {}
-	};
-
 	/** SEARCHBOOK'S WALK FOR THE OBJECT TAB: every target walked under one bar, a book's chapters opened and handed back
-	    one at a time, each target's rows into the model as a chapter (page order). The user's selection is given back at
+	    one at a time, each target's rows into the model as a chapter (page order) - into the tally the text tabs' walk
+	    fills (KFCSearchEngine::CollectTally). The user's selection is given back at
 	    the end (O6) and the shared walker aimed at the front document (O7). selectionScope = RunScope::selectionScope.
 	    CANCEL IS HEARD INSIDE A DOCUMENT (the author's call): the bar is moved and asked at every item
 	    the walk lists, not only between documents; a Cancel ends the run as one between documents does (out.cancelled). */
 	void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBook, bool allDocuments,
-		int32 selectionScope, std::vector<KFCBookScope::SkippedChapter>& unopenable, Tally& out);
+		int32 selectionScope, std::vector<KFCBookScope::SkippedChapter>& unopenable, KFCSearchEngine::CollectTally& out);
 
 	/** SEARCH THIS DOCUMENT AGAIN on the Object tab (KFCSearchEngine::SearchDocumentAgain): ONE open document
 	    walked whole as CollectTargets walks each of its targets, under a bar of its own ("Document 1 / 1 - <name>"), the
@@ -152,11 +131,6 @@ namespace KFCObjectSearch
 	    same way - its walkFailed.) */
 	enum WalkStep { kWalkStepOn = 0, kWalkStepEnd, kWalkStepBroke };
 	WalkStep ReadWalkStep(IFindChangeService::FindChangeResult result);
-
-	/** One object row for one page item (O8): its text ("ID<uid>:<name>"), its page and where it stands - grouped, inline,
-	    anchored, in overset text - hidden / locked, its fingerprint. The locator is built later, with the chapter's page
-	    order (KFCResultModel::OrderHitsByPage). */
-	void BuildObjectHit(const UIDRef& docRef, UID item, KFCResultModel::Hit& out);
 }
 
 #endif // __KFCObjectSearch_h__

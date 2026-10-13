@@ -30,7 +30,6 @@
 
 #include "BaseType.h"		// TextIndex
 #include "UIDRef.h"			// UID / kInvalidUID
-#include "PMPoint.h"		// PBPMPoint
 #include "KFCModelTypes.h"	// KFCOversetLoc
 
 // (KFCOversetLoc - where the "+" is - lives in KFCModelTypes.h: the UI's jump reads it.)

@@ -27,6 +27,8 @@
 #include "WalkerScopeOptions.h"
 #include "KFCModelTypes.h"	// KFCResultModel::RowLocation - LocateRow's answer
 
+#include <vector>
+
 class ITextWalker;			// AcquireWalker
 class ITextWalkerScope;		// ScopeHasNothingToWalk
 class ITextWalkerSelectionUtils;
@@ -92,10 +94,36 @@ namespace KFCSearchEngine
 		RunScope() : fromBook(false), allDocuments(false), selectionScope(0) { fellBackNote.SetTranslatable(kFalse); }
 	};
 
+	/** WHAT ONE WALK OVER A RUN'S TARGETS FOUND - SearchBook's tally, filled by the text tabs' walk
+	    (CollectTargets, in the .cpp) and the Object tab's (KFCObjectSearch::CollectTargets) alike: the rows
+	    filed, the targets that held one, whether the list reached its limit or the user cancelled, and the
+	    targets the summary has to name - never searched ("name: why"), broken off partway, or opened by the
+	    run and not handed back. */
+	struct CollectTally
+	{
+		int32					total;
+		int32					chaptersWithHits;
+		bool					truncated;
+		bool					cancelled;
+		std::vector<PMString>	unsearchable;
+		std::vector<PMString>	brokeOff;
+		std::vector<PMString>	unclosed;
+		CollectTally() : total(0), chaptersWithHits(0), truncated(false), cancelled(false) {}
+	};
+
 	/** THE SCOPE DOORS SEARCHBOOK HAS ALWAYS ASKED, IN ONE PLACE (so the query run asks the same):
 	    Book Scope with a Search: other than Document, a Search: this panel cannot follow, no target book, an
 	    empty one, no active document. false = refused, outRefusal holds SearchBook's own sentence. Touches nothing. */
 	bool ResolveRunScope(RunScope& out, PMString& outRefusal);
+
+	/** THE RUN'S TARGET DOORS - ResolveRunScope's last three, and the Object tab's
+	    (KFCObjectSearch::ResolveObjectRunScope), so both tabs refuse in the same sentences: Book Scope on with
+	    no book open, a book with no chapters, Book Scope off with no active document. The target book is asked
+	    once, and an EMPTY one refused here, ahead of the commit point like every other refusal: refused past it
+	    (by ListBookChapters), the previous results would already be gone - a whole book's results, for a book
+	    with nothing in it (KFCBookScope::GetTargetBook says which case was in mind). false = refused, its
+	    sentence appended to outRefusal. Touches nothing. */
+	bool ResolveRunTarget(bool fromBook, PMString& outRefusal);
 
 	/** WHAT A RUN WOULD RUN ON, IN WORDS (docs/superpowers/specs/_done/2026-10-07-kfc-query-dialog-and-selected-documents-design.md
 	    section 4-4): the query dialog's Runs on: line, made from ResolveRunScope's answer so the line and the run
@@ -263,8 +291,8 @@ namespace KFCSearchEngine
 	    FIND FORMAT IS ONLY COUNTED HERE, NOT DESCRIBED. The signature carries how MANY
 	    attributes the format pane holds, and the two styles it keeps outside that list - but not the
 	    attributes' values, because the list itself knows how to compare itself and does it better:
-	    see RememberFindFormat / FindFormatHasChanged, which is the pair that answers "same conditions,
-	    different value".
+	    see FindFormatHasChanged (over the copy the search keeps - RememberFindFormat, in the .cpp),
+	    which answers "same conditions, different value".
 
 	    THE DIRECTION IS NOT IN IT. The walk would follow the dialog's "search backwards" (measured: the
 	    walker is handed the live options), but KFC searches and replaces FORWARD ONLY
@@ -279,18 +307,10 @@ namespace KFCSearchEngine
 	    described would be a new way to fail. */
 	void BuildWalkSignature(PMString& outSignature);
 
-	/** Keep a copy of the FIND FORMAT this search ran with - the attribute list behind the dialog's
-	    format pane, and on the Glyph tab the query's own font - so the replace can ask whether it is
-	    still the same one. Called once per search, beside BuildWalkSignature; a search that cannot
-	    read the settings simply remembers nothing, and FindFormatHasChanged then says "cannot tell".
-
-	    THE LIST COMPARES ITSELF (AttributeBossList::IsEqual, a deep compare - why a copy
-	    rather than a description is the note over this function in the .cpp). The copy is shallow
-	    (Duplicate, AttributeBossList.h:157: the attributes' reference counts go up), held in a
-	    boost::shared_ptr the way chmlfilter does it (CHMLFiltTextHelper.cpp:134). */
-	void RememberFindFormat();
-
-	/** Has the Find Format changed since RememberFindFormat was called?
+	/** Has the Find Format changed since the search kept its copy of it? (The search keeps one - the attribute list
+	    behind the dialog's format pane, and on the Glyph tab the query's own font - once per search, beside
+	    BuildWalkSignature: RememberFindFormat, in the .cpp, which says why a copy and not a description. THE LIST
+	    COMPARES ITSELF - AttributeBossList::IsEqual, a deep compare.)
 
 	    @return true ONLY when the two lists can both be read and are positively different. Nothing
 	            remembered, settings unreadable, or a different attribute database - all read as
@@ -298,12 +318,12 @@ namespace KFCSearchEngine
 	            walk signature follows). */
 	bool FindFormatHasChanged();
 
-	/** Drop what RememberFindFormat kept. It goes with EVERY KFCResultModel::Clear(), exactly as
+	/** Drop the Find Format the search kept. It goes with EVERY KFCResultModel::Clear(), exactly as
 	    KFCBookScope::ReleaseSearchedBook does - the remembered format describes the rows that are
 	    being thrown away, so it has no business outliving them. DropResults does all three. */
 	void ForgetSearchedFindFormat();
 
-	/** Drop what RememberFindFormat kept when the database its UIDs are in is the one closing - and
+	/** Drop the Find Format the search kept when the database its UIDs are in is the one closing - and
 	    nothing else. FindFormatHasChanged tells databases apart by address alone, and a closed
 	    document's address is free to be handed to the next document opened, so the copy goes with its
 	    database rather than being compared later against somebody else's ([[uidref-reuse-after-close]]).
@@ -515,7 +535,7 @@ namespace KFCSearchEngine
 	    destructor at DLL unload finds nothing left to do.
 
 	    What there is to let go of: the Find Format this file remembers for the replace's "has the
-	    query changed" door (RememberFindFormat) - an AttributeBossList holding references to the
+	    query changed" door (FindFormatHasChanged) - an AttributeBossList holding references to the
 	    dialog's attributes, and the raw IDataBase* they belong to. Dropping the list releases those
 	    attributes, which is database work, and doing it from a static destructor means doing it
 	    after the application has torn down.
