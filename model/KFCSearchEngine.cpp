@@ -1199,6 +1199,43 @@ struct WalkBar
 		: bar(&onBar), base(sliceBase), span(sliceSpan), stories(CountSearchableStories(docRef)), reported(&ioReported) {}
 };
 
+// THE SHARED WALKER IS NOT LEFT HOLDING A CALLER'S SCOPE (CollectHitsInDoc's givenScope). A searched part's scope - Search
+// This Story Again over a Selection, QueryPartScope - stands on a text focus of KFC's own, which the caller removes the
+// moment the walk returns (TempFocus); the session's shared walker (AcquireWalker) outlives that, and nothing says Halt
+// lets go of the scope it was given (ITextWalker.h: QueryScope answers the scope a walker holds; Halt only "halts the
+// walking"). Not known to matter - InDesign's own Selection walks leave a scope over focuses the selection may drop - but
+// until it is measured (a test build's WALKSCOPE line), the walker is handed the part's story as the walk ends, by any
+// exit past Initialize, and stopped: the scope every story walk of KFC's leaves it with, taken while the focus still
+// stands. (From 2026-10-06 to 2026-10-14 the walker was KFC's own and went with the walk, so the question did not arise.)
+class SharedWalkerLetsGoOfGivenScope
+{
+public:
+	SharedWalkerLetsGoOfGivenScope(ITextWalker* walker, ITextWalkerClient* client, IFindChangeOptions* opts,
+		const UIDRef& story, const WalkerScopeOptions& options)
+		: fWalker(walker), fClient(client), fOpts(opts), fStory(story), fOptions(options) {}
+	~SharedWalkerLetsGoOfGivenScope()
+	{
+		if (fStory == UIDRef::gNull)
+			return;		// no caller's scope (gNull is passed then)
+		InterfacePtr<ITextWalkerScope> storyScope(Utils<IWalkerScopeFactoryUtils>()->QueryStoryWalkerScope(fStory, fOptions));
+		if (storyScope == nil)
+			return;
+		if (fWalker->IsWalking())
+			fWalker->Halt();
+		fWalker->Initialize(fClient, storyScope, fOpts, nil);
+		if (fWalker->IsWalking())
+			fWalker->Halt();
+	}
+private:
+	ITextWalker*				fWalker;	// the walk's own references (CollectHitsInDoc's), which outlive this object
+	ITextWalkerClient*			fClient;
+	IFindChangeOptions*			fOpts;
+	const UIDRef				fStory;
+	const WalkerScopeOptions	fOptions;
+	SharedWalkerLetsGoOfGivenScope(const SharedWalkerLetsGoOfGivenScope&);
+	SharedWalkerLetsGoOfGivenScope& operator=(const SharedWalkerLetsGoOfGivenScope&);
+};
+
 // Walk one document with the user's current Find/Change query and collect every match as a Hit.
 // Read-only: the whole walk sits inside a SaveRestoreModifiedState dirty guard, so a windowless
 // chapter can be closed afterwards without wanting a save. NOTHING is set on opts - the walk uses
@@ -1235,7 +1272,8 @@ struct WalkBar
 //
 // outPieces (a Search: walk only): the stretches InDesign's scope holds (ListScopePieces) - what a search over part of a
 // story records (MakeSearchedRange). givenScope: walk this scope instead (a story's searched part, Search This Story
-// Again - QueryPartScope), docRef being the document it is in.
+// Again - QueryPartScope), docRef being the document it is in and onlyStory its story - which the shared walker is left
+// with in its place (SharedWalkerLetsGoOfGivenScope).
 void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOptions& scopeOptions,
 	HitDetail detail, std::vector<KFCResultModel::Hit>& outHits,
 	bool& outCapped, ChapterWalkResult& outResult,
@@ -1348,6 +1386,9 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 	}
 
 	walker->Initialize(client, scope, opts, nil);
+	// A caller's scope is not left with the shared walker, whichever exit below is taken (SharedWalkerLetsGoOfGivenScope).
+	const SharedWalkerLetsGoOfGivenScope letGoOfGivenScope(walker, client, opts,
+		(givenScope != nil) ? onlyStory : UIDRef::gNull, scopeOptions);
 
 	if (selUtils == nil)
 	{
@@ -1593,6 +1634,12 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 	if (walker->IsWalking())
 		walker->Halt();
 #ifdef KFC_DIAG
+	{
+		// (Test builds only) Does a walker once halted still hold the scope it was given? SharedWalkerLetsGoOfGivenScope's
+		// open question - read before that hands the walker a story's scope.
+		InterfacePtr<ITextWalkerScope> held(walker->QueryScope());
+		KFC_DIAG_LOG("WALKSCOPE halted holds-scope=%d given=%d", (held != nil) ? 1 : 0, (givenScope != nil) ? 1 : 0);
+	}
 	{
 		double tWalk = 0;
 		KFC_SPENT(tWalk, cSearchWalk);
