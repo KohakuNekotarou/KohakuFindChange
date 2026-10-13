@@ -486,8 +486,8 @@ bool KFCObjectReplace::CheckRowsNow(const KFCRowsByChapter& rows, PMString& outS
 	std::vector<UIDRef> reached;
 	for (size_t c = 0; c < rows.size(); ++c)
 	{
-		const int32 chapterIdx = rows[c].first;
-		const std::vector<int32>& hitIdxs = rows[c].second;
+		const int32 chapterIdx = rows[c].chapter;
+		const std::vector<int32>& hitIdxs = rows[c].hits;
 		UIDRef docRef;
 		for (size_t k = 0; k < hitIdxs.size(); ++k)
 		{
@@ -539,8 +539,8 @@ bool KFCObjectReplace::ReplaceRows(const KFCRowsByChapter& rows, PMString& outSt
 	for (size_t c = 0; c < rows.size(); ++c)
 	{
 		ObjectChapterWrite& chapter = chapters[c];
-		chapter.chapterIdx = rows[c].first;
-		const std::vector<int32>& hitIdxs = rows[c].second;
+		chapter.chapterIdx = rows[c].chapter;
+		const std::vector<int32>& hitIdxs = rows[c].hits;
 		for (size_t k = 0; k < hitIdxs.size(); ++k)
 		{
 			if (!RowIsReplaceable(chapter.chapterIdx, hitIdxs[k]))

@@ -697,7 +697,7 @@ public:
 	explicit HandBackChaptersOnExit(const KFCRowsByChapter& rows)
 	{
 		for (size_t c = 0; c < rows.size(); ++c)
-			fChapters.push_back(rows[c].first);
+			fChapters.push_back(rows[c].chapter);
 	}
 	~HandBackChaptersOnExit()
 	{
@@ -1148,7 +1148,7 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx, NotSelected& outWhy)
 	// here - the window in front, the dirty guard standing. The panel's door must turn it away: KFCJump::IsLanding.)
 	if (KFC_DIAG_FAULT("landing-return"))
 	{
-		const bool wrote = KFCResultTree::ReplaceRows(KFCRowsByChapter(1, std::make_pair(chapterIdx, std::vector<int32>(1, hitIdx))));
+		const bool wrote = KFCResultTree::ReplaceRows(KFCRowsByChapter(1, KFCChapterRows(chapterIdx, hitIdx)));
 		KFC_DIAG_LOG("FAULT landing-return: the row's Replace inside the landing wrote=%d", wrote ? 1 : 0);
 	}
 #endif

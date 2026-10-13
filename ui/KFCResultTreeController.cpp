@@ -259,9 +259,9 @@ bool KFCResultTree::GetSelectedHitRows(KFCRowsByChapter& outRows, bool* outObjec
 			return false;		// (never - the rules keep one kind; asked anyway)
 		}
 		// A document's rows are drawn together, under its row: a new chapter starts a new group.
-		if (outRows.empty() || outRows.back().first != nodeID->GetChapter())
-			outRows.push_back(std::make_pair(nodeID->GetChapter(), std::vector<int32>()));
-		outRows.back().second.push_back(nodeID->GetHit());
+		if (outRows.empty() || outRows.back().chapter != nodeID->GetChapter())
+			outRows.push_back(KFCChapterRows(nodeID->GetChapter()));
+		outRows.back().hits.push_back(nodeID->GetHit());
 	}
 	if (outObjects != nil)
 		*outObjects = objects;
@@ -271,13 +271,13 @@ bool KFCResultTree::GetSelectedHitRows(KFCRowsByChapter& outRows, bool* outObjec
 KFCRowsByChapter KFCResultTree::RowsOfRightClick(int32 chapterIdx, int32 hitIdx)
 {
 	KFCRowsByChapter rows;
-	if (GetSelectedHitRows(rows) && (rows.size() >= 2 || rows[0].second.size() >= 2))
+	if (GetSelectedHitRows(rows) && (rows.size() >= 2 || rows[0].hits.size() >= 2))
 	{
 		for (size_t k = 0; k < rows.size(); ++k)
-			if (rows[k].first == chapterIdx && std::find(rows[k].second.begin(), rows[k].second.end(), hitIdx) != rows[k].second.end())
+			if (rows[k].chapter == chapterIdx && std::find(rows[k].hits.begin(), rows[k].hits.end(), hitIdx) != rows[k].hits.end())
 				return rows;		// one of several selected together: all of them
 	}
-	return KFCRowsByChapter(1, std::make_pair(chapterIdx, std::vector<int32>(1, hitIdx)));
+	return KFCRowsByChapter(1, KFCChapterRows(chapterIdx, hitIdx));
 }
 
 namespace
@@ -361,18 +361,18 @@ bool KFCResultTree::LastSelectedHit(const KFCRowsByChapter& rows, int32& outChap
 	// Where the last click or Shift+arrow left the selection (the run's moving end), while it is one of these rows - else
 	// the last of them in the list's order (a Ctrl+click took the row it was at away).
 	for (size_t k = 0; k < rows.size(); ++k)
-		if (rows[k].first == gRunEnd.chapter
-			&& std::find(rows[k].second.begin(), rows[k].second.end(), gRunEnd.hit) != rows[k].second.end())
+		if (rows[k].chapter == gRunEnd.chapter
+			&& std::find(rows[k].hits.begin(), rows[k].hits.end(), gRunEnd.hit) != rows[k].hits.end())
 		{
 			outChapter = gRunEnd.chapter;
 			outHit = gRunEnd.hit;
 			return true;
 		}
 	for (size_t k = rows.size(); k-- > 0; )
-		if (!rows[k].second.empty())
+		if (!rows[k].hits.empty())
 		{
-			outChapter = rows[k].first;
-			outHit = rows[k].second.back();
+			outChapter = rows[k].chapter;
+			outHit = rows[k].hits.back();
 			return true;
 		}
 	outChapter = -1;
@@ -392,8 +392,8 @@ void KFCResultTree::FollowModifiedClick(const NodeID& clicked)
 	if (!GetSelectedHitRows(rows))
 		return;
 	for (size_t k = 0; k < rows.size(); ++k)
-		if (rows[k].first == nodeID->GetChapter()
-			&& std::find(rows[k].second.begin(), rows[k].second.end(), nodeID->GetHit()) != rows[k].second.end())
+		if (rows[k].chapter == nodeID->GetChapter()
+			&& std::find(rows[k].hits.begin(), rows[k].hits.end(), nodeID->GetHit()) != rows[k].hits.end())
 		{
 			KFCJump::ActivateNode(nodeID->GetChapter(), nodeID->GetHit());
 			return;

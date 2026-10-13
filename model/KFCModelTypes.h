@@ -24,7 +24,6 @@
 #include "PMString.h"
 #include "UIDRef.h"
 
-#include <utility>			// KFCRowsByChapter
 #include <vector>
 
 namespace KFCResultModel
@@ -124,14 +123,23 @@ struct KFCSavedQuery
 
 // HIT ROWS SELECTED TOGETHER, by document (the author's call: rows of several documents are replaced together, in one
 // undo step): each chapter of the result model with its hit rows, in the order the list draws them.
-typedef std::vector<std::pair<int32, std::vector<int32> > > KFCRowsByChapter;
+struct KFCChapterRows
+{
+	int32				chapter;	// the chapter's index into the result model
+	std::vector<int32>	hits;		// its hit rows - indices into that chapter's hits - in the order the list draws them
+
+	KFCChapterRows() : chapter(-1) {}
+	explicit KFCChapterRows(int32 c) : chapter(c) {}					// no row yet
+	KFCChapterRows(int32 c, int32 hit) : chapter(c), hits(1, hit) {}	// one row
+};
+typedef std::vector<KFCChapterRows> KFCRowsByChapter;
 
 // How many rows they are - every chapter's together.
 inline size_t KFCRowCount(const KFCRowsByChapter& rows)
 {
 	size_t total = 0;
 	for (size_t k = 0; k < rows.size(); ++k)
-		total += rows[k].second.size();
+		total += rows[k].hits.size();
 	return total;
 }
 
@@ -141,10 +149,10 @@ inline size_t KFCRowCount(const KFCRowsByChapter& rows)
 inline bool KFCFirstRow(const KFCRowsByChapter& rows, int32& outChapter, int32& outHit)
 {
 	for (size_t k = 0; k < rows.size(); ++k)
-		if (!rows[k].second.empty())
+		if (!rows[k].hits.empty())
 		{
-			outChapter = rows[k].first;
-			outHit = rows[k].second[0];
+			outChapter = rows[k].chapter;
+			outHit = rows[k].hits[0];
 			return true;
 		}
 	outChapter = -1;

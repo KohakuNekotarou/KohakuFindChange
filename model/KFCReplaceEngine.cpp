@@ -1802,8 +1802,8 @@ bool KFCReplaceEngine::ReplaceHits(const KFCRowsByChapter& rowsByChapter, PMStri
 	for (size_t k = 0; k < rowsByChapter.size(); ++k)
 	{
 		ChapterWrite c;
-		c.chapterIdx = rowsByChapter[k].first;
-		const std::vector<int32>& hits = rowsByChapter[k].second;
+		c.chapterIdx = rowsByChapter[k].chapter;
+		const std::vector<int32>& hits = rowsByChapter[k].hits;
 		for (size_t h = 0; h < hits.size(); ++h)
 		{
 			const GreyedReason why = WhyGreyed(c.chapterIdx, hits[h]);

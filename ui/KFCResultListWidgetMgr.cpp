@@ -975,8 +975,8 @@ bool KFCResultTree::TakeKeyboard()
 bool KFCResultTree::CanReplaceAny(const KFCRowsByChapter& rows)
 {
 	for (size_t c = 0; c < rows.size(); ++c)
-		for (size_t k = 0; k < rows[c].second.size(); ++k)
-			if (KFCRuns()->CanReplaceHit(rows[c].first, rows[c].second[k]))
+		for (size_t k = 0; k < rows[c].hits.size(); ++k)
+			if (KFCRuns()->CanReplaceHit(rows[c].chapter, rows[c].hits[k]))
 				return true;
 	return false;
 }
@@ -1000,11 +1000,11 @@ bool KFCResultTree::ReplaceRows(const KFCRowsByChapter& rows, PMString* outStatu
 	// documents the ones written to (the note on a hidden document below names those alone - a row left greyed is no write).
 	std::vector<std::pair<int32, int32> > notYet;
 	for (size_t c = 0; c < rows.size(); ++c)
-		for (size_t k = 0; k < rows[c].second.size(); ++k)
+		for (size_t k = 0; k < rows[c].hits.size(); ++k)
 		{
 			bool replaced = false, locked = false;
-			if (KFCResults()->GetHitFlags(rows[c].first, rows[c].second[k], replaced, locked) && !replaced)
-				notYet.push_back(std::make_pair(rows[c].first, rows[c].second[k]));
+			if (KFCResults()->GetHitFlags(rows[c].chapter, rows[c].hits[k], replaced, locked) && !replaced)
+				notYet.push_back(std::make_pair(rows[c].chapter, rows[c].hits[k]));
 		}
 	// OBJECT ROWS are replaced through the jump's machinery - their document fronted around the write (KFCJump);
 	// text rows go straight to the model. One row takes each side's one-row door (ReplaceObjectRows hands it to

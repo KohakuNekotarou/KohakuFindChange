@@ -249,7 +249,7 @@ bool16 TakeReturn(IEvent* e, ITreeViewController* controller)
 	KFCRowsByChapter rows;
 	if (!KFCResultTree::GetSelectedHitRows(rows))
 		return kFalse;
-	const NodeID last(KFCResultNodeID::Create(rows.back().first, rows.back().second.back()));
+	const NodeID last(KFCResultNodeID::Create(rows.back().chapter, rows.back().hits.back()));
 	Utils<IEventUtils>()->RemoveNextKeyCmd(e);
 	KFC_DIAG_LOG("RETFOCUS Return taken focus=%s repeat=%d", KFCResultTree::DiagKeyFocus().c_str(), e->IsRepeatKey() ? 1 : 0);
 	// A RETURN HELD DOWN WRITES ONCE (the author's call). Windows repeats a key held down, and each repeat was one more
