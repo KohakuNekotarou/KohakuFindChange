@@ -186,6 +186,9 @@ DECLARE_PMID(kImplementationIDSpace, kKFCResultTreeControllerImpl, kKFCUIPrefix 
 // The UI half's boundary stamp the model half checks before it asks the UI services for anything (KFCUIServices.cpp,
 // model/IKFCBoundary.h). + 48: the next after the highest spent.
 DECLARE_PMID(kImplementationIDSpace, kKFCUIBoundaryImpl, kKFCUIPrefix + 48)
+// The result list's row observer: a row CLOSED takes the rows selected under it out of the selection
+// (KFCResultNodeObserver.cpp). + 49: the next after the highest spent.
+DECLARE_PMID(kImplementationIDSpace, kKFCResultNodeObserverImpl, kKFCUIPrefix + 49)
 
 
 // ActionIDs:

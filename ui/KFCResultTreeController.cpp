@@ -16,7 +16,8 @@
 //  together in one undo step, KFCResultTree::ReplaceRows).
 //  THE PAGE SHOWS THE ROW SELECTED LAST, as a click does - its match, or its item, selected alone (FollowModifiedClick,
 //  ExtendSelection): the rows selected together are the list's, not the page's.
-//  A story, document or book row is always selected alone.
+//  A story, document or book row is always selected alone. A row closed over selected rows takes them out of the
+//  selection - a selected row is a drawn row (DeselectRowsUnder, asked by the row's observer, KFCResultNodeObserver.cpp).
 //  The shape is Adobe's: the Layers panel's controller runs the stock rules and then takes rows of the other kind out
 //  (open/components/layerpanel/LayersPanelTreeViewController.cpp), and the Multi-State Object panel's changes the stock
 //  rules where its panel needs it (open/components/buttonui/msopanel/MSOPanelTreeViewController.cpp).
@@ -310,11 +311,12 @@ void CollectHitRows(ITreeViewHierarchyAdapter* adapter, const NodeID& node, Node
 	}
 }
 
-// EVERY BRANCH ROW FROM `node` DOWN OPENED, each before the rows under it. ITreeViewMgr::ExpandNode with
-// expandAllDescendants does not reach them under a row that is open already - KIDMCP measured it on this list: a book
-// result's chapters stayed closed under the open root (memory paneltreeview-tree-panel; KIDMCP walks the rows and opens
-// each itself) - and a book result comes up with its book row open and its chapters closed (KFCResultTree::Rebuild). A
-// row that is open is left as it is.
+// EVERY BRANCH ROW FROM `node` DOWN OPENED, each before the rows under it - the way KIDMCP opens a tree, which found
+// ITreeViewMgr::ExpandNode with expandAllDescendants leaving a book result's chapters closed when called on the tree's
+// hidden root (memory paneltreeview-tree-panel). On a book row on screen, open with its chapters closed (the shape a book
+// search comes up in - KFCResultTree::Rebuild), the one call does open them: measured 2026-10-13 night
+// (sel-book-closed-return-armed, the fault switch select-all-expand-once - both rows drawn and written). Row by row stays:
+// the same rows opened, whichever row the walk starts at. A row that is open is left as it is.
 void OpenBranchRows(ITreeViewHierarchyAdapter* adapter, ITreeViewMgr* treeMgr, const NodeID& node)
 {
 	treeMgr->ExpandNode(node, kFalse /*expandAllDescendants*/);
@@ -377,6 +379,59 @@ bool KFCResultTree::SelectAllRows(const NodeID& row)
 	PMString status("Selected ");
 	status.AppendNumber(static_cast<int32>(rows.size()));
 	status.Append(rows.size() == 1 ? " row. Return replaces it." : " rows. Return replaces them all.");
+	status.SetTranslatable(kFalse);
+	ShowStatus(status);
+	return true;
+}
+
+bool KFCResultTree::DeselectRowsUnder(const NodeID& closedRow)
+{
+	InterfacePtr<ITreeViewController> controller(QueryListController());
+	InterfacePtr<ITreeViewHierarchyAdapter> adapter(controller, UseDefaultIID());
+	if (controller == nil || adapter == nil || !closedRow.IsValid())
+		return false;
+	// The selected rows the closed row hides: those it is above - found through each one's rows above it, up to the hidden
+	// root the list's top rows hang from.
+	NodeIDList selected;
+	controller->GetSelectedItems(selected);
+	NodeIDList hidden;
+	for (size_t k = 0; k < selected.size(); ++k)
+	{
+		for (NodeID up(adapter->GetParentNode(selected[k])); up.IsValid(); up = NodeID(adapter->GetParentNode(up)))
+		{
+			if (up == closedRow)
+			{
+				hidden.push_back(selected[k]);
+				break;
+			}
+			TreeNodePtr<KFCResultNodeID> upID(up);
+			if (upID == nil || upID->IsRoot())
+				break;
+		}
+	}
+	if (hidden.empty())
+		return false;
+	// Out of the selection and unhilited, announced once - by the last (SelectAllRows' rule).
+	for (size_t k = 0; k < hidden.size(); ++k)
+		controller->Deselect(hidden[k], (k + 1 == hidden.size()) ? kTrue : kFalse /*notifyOfChange*/, kTrue /*changeHilite*/);
+	// The message area: how many went, and what Return writes now - "Selected 3 rows. Return replaces them all." would
+	// otherwise stand over a selection of one.
+	int32 left = 0;
+	KFCRowsByChapter rows;
+	if (GetSelectedHitRows(rows))
+		for (size_t c = 0; c < rows.size(); ++c)
+			left += static_cast<int32>(rows[c].hits.size());
+	PMString status("Deselected ");
+	status.AppendNumber(static_cast<int32>(hidden.size()));
+	status.Append(hidden.size() == 1 ? " row under the closed row" : " rows under the closed row");
+	if (left > 0)
+	{
+		status.Append(". Selected ");
+		status.AppendNumber(left);
+		status.Append(left == 1 ? " row. Return replaces it." : " rows. Return replaces them all.");
+	}
+	else
+		status.Append(" - none is selected now.");
 	status.SetTranslatable(kFalse);
 	ShowStatus(status);
 	return true;

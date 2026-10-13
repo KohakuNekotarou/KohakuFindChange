@@ -123,6 +123,13 @@ namespace KFCResultTree
 	    disabled rather than doing nothing; InDesign leaves a disabled item out of a right-click menu). */
 	bool CanSelectAllRows(const NodeID& row);
 
+	/** A ROW CLOSED OVER SELECTED ROWS (KFCResultNodeObserver - the author's call O7-2b): the rows selected under
+	    `closedRow` taken out of the selection - a selected row is a drawn row, as Select All Rows keeps it (Return and the
+	    right-click Replace write the selection in the order drawn: they left the hidden rows selected and unwritten while
+	    the message area still counted them). The message area says how many went and what is selected now. false = no
+	    selected row was under it: nothing changed, the message area left as it is. */
+	bool DeselectRowsUnder(const NodeID& closedRow);
+
 	/** THE ROW SELECTED LAST among these rows - the one the page shows (FollowModifiedClick, ExtendSelection): where the
 	    last click or Shift+arrow left the selection, while it is one of them; else the last of them. false for none. A
 	    right-click does not move it (KFCResultNodeEH::RButtonDn takes no row). */
