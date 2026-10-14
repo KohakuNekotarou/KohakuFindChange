@@ -216,6 +216,7 @@
   `Find 2 of 3: <kind>  <name> - <検索の文>`（検索した・次へ）／`... - nothing was searched: <検索の文>`（検索が断られた・位置はそのまま）／`... cannot be found - nothing was searched.`（ファイルが無い＝Run の「1本でも無ければ実行しない」に揃えて、位置はそのまま）／`... skipped: the file could not be read.`・`... skipped: nothing to find.`（読めない・探すものが無い＝Colour のタブ、Object 以外で検索の文字も書式も無い＝Run と同じく飛ばして次へ。Object のクエリは書式が空でも検索する＝パネルの Find と同じ）／`Find: the run order is empty.`／`Find: all <N> queries of the run order have been searched - Clear Results or change the run order to search them again.`（最後の後に押した＝知らせて止まる・一覧は残る）。KFC の実行が立っている間は本体の Busy の文。
   位置（次に検索する1本）は、**段が消えたとき**（ROW-41）と**実行の順が変わったとき**（Add・Remove・Move Up・Move Down・Clear・Load Order...）に1本目へ戻る。InDesign を起動している間だけ覚える（ダイアログを閉じて開いても続きから）。
   **Run が通ると段は消える**（ROW-41）。
+  ★Find で積んだ段も、灰色になった後で中の行をクリックすれば**その段に切り替えられる**（ROW-42・2026-10-14 夕）＝条件は段ができた時に KFC がメモリの中に写したもので戻す＝**元のクエリのファイルは読み直さない**（後でファイルを直しても消しても、段の条件は変わらない）。戻した後の見出しの検算では、段の見出しの先頭の `<n>  ` を除いて比べる。Find の位置（次に検索する1本）は切り替えでは変わらない。
   - 訂正:
 
 ---
