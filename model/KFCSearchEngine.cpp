@@ -3749,9 +3749,10 @@ bool PickByOrder(int32 chapterIdx, int32 hitIdx, const Places& places, TextIndex
 // rows of the story in this chapter take their foci's places:
 //   - a row not replaced whose focus reads its match (hash and length): moved there, its line read again (MoveRowTo -
 //     a Missing word taken off);
-//   - a row not replaced whose focus reads another text - its own match was edited: its place taken from the focus
-//     (SetHitRange), what it found kept - so it does not read as found and nothing writes it - and Missing put on it.
-//     An Undo of that edit brings the focus back over the match, and the next follow takes Missing off;
+//   - a row not replaced whose focus reads another text - its own match was edited: Missing put on it, and its
+//     stored place kept as found - so the length its focus is compared with stays the match's (measured live: a place
+//     moved onto the edited text kept that length, and the row stayed Missing after the edit was undone). An Undo of
+//     the edit brings the focus back over the match, and the next follow moves the row there and takes Missing off;
 //   - a replaced row: moved where its focus reads what its replace wrote (Hit::replacedText); left where it is
 //     otherwise (its jump then looks for what it wrote - LocateRow's old way);
 // and the story is recorded at its version as it stands. QUICK: at the version on record with every focus on its row's
@@ -3836,8 +3837,7 @@ KFCSearchEngine::FollowResult KFCSearchEngine::FollowStoryFoci(int32 chapterIdx,
 		}
 		else
 		{
-			KFCResultModel::SetHitRange(chapterIdx, r.hit, story, r.fs, r.fe);
-			KFCResultModel::SetHitOutcome(chapterIdx, r.hit, KFCResultModel::kOutcomeMissing);
+			KFCResultModel::SetHitOutcome(chapterIdx, r.hit, KFCResultModel::kOutcomeMissing);	// its stored place kept
 			++edited;
 		}
 	}
@@ -3897,7 +3897,17 @@ KFCResultModel::RowLocation KFCSearchEngine::LocateRow(int32 chapterIdx, int32 h
 		ioStart = a;
 		ioEnd = b;
 		if (!RowReadsAsFoundAt(chapterIdx, hitIdx, db, story, a, b))
+		{
+			// Its own text was edited (Missing - FollowStoryFoci keeps its stored place as found): the view goes where the
+			// focus says that text is now.
+			TextIndex fs = kInvalidTextIndex, fe = kInvalidTextIndex;
+			if (KFCRowFoci::Where(chapterIdx, hitIdx, db, fs, fe) == KFCRowFoci::kFocused)
+			{
+				ioStart = fs;
+				ioEnd = fe;
+			}
 			return KFCResultModel::kRowNotFound;
+		}
 		return moved ? KFCResultModel::kRowMoved : KFCResultModel::kRowAtPlace;
 	}
 	const bool atStored = RowReadsAsFoundAt(chapterIdx, hitIdx, db, story, a, b);
