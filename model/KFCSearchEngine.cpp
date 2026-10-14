@@ -3755,7 +3755,9 @@ bool PickByOrder(int32 chapterIdx, int32 hitIdx, const Places& places, TextIndex
 //     the edit brings the focus back over the match, and the next follow moves the row there and takes Missing off;
 //   - a replaced row: moved where its focus reads what its replace wrote (Hit::replacedText); left where it is
 //     otherwise (its jump then looks for what it wrote - LocateRow's old way);
-// and the story is recorded at its version as it stands. QUICK: at the version on record with every focus on its row's
+// and the story row's words are read again (RereadStoryLead - the author, 10-14 night: "the Story part's text is
+// getting different"), and the story is recorded at its version as it stands. QUICK: at the version on record with
+// every focus on its row's
 // place, nothing is done. kFollowNone = no row of this story here has a focus (a chapter whose story KFC did not know
 // when it opened): the version rule decides, as it always has. kFollowBroken = a row without a usable focus among rows
 // that have one, a lost focus, or a version that cannot be read: nothing is moved - a write is refused, a jump takes
@@ -3841,12 +3843,40 @@ KFCSearchEngine::FollowResult KFCSearchEngine::FollowStoryFoci(int32 chapterIdx,
 			++edited;
 		}
 	}
+	RereadStoryLead(chapterIdx, storyRef);	// the story row says what the story says now
 	KFCResultModel::SetStoryVersion(chapterIdx, story, now);
 	KFC_DIAG_LOG("FOLLOW chapter=%d story=%u version %s%u -> %u rows=%d moved=%d edited=%d", chapterIdx, story.Get(),
 		had ? "" : "none:", recorded, now, (int)rows.size(), (int)moved, (int)edited);
 	if (outMoved != nil)
 		*outMoved = true;
 	return kFollowed;
+}
+
+// A LIST SHOWN AGAIN (a tier switched to - KFCTierStore::SwitchTo): its rows follow their foci at once, story by story,
+// so the rows and the story rows draw the text as it is now - while the list was grey the edits moved its foci, not
+// its rows (another tier's write among them). Only a chapter whose document is open (found by its file, as the foci
+// are attached - KFCRowFoci::AttachChapter); a story that cannot be followed is left as it is (FollowStoryFoci).
+void KFCSearchEngine::FollowChapterFoci(int32 chapterIdx)
+{
+	UIDRef docRef;
+	IDFile file;
+	if (!KFCResultModel::GetChapterLocation(chapterIdx, docRef, file) || !KFCBookScope::FindOpenChapterDoc(file, docRef))
+		return;
+	IDataBase* const db = docRef.GetDataBase();
+	if (db == nil)
+		return;
+	std::set<UID> stories;
+	const int32 n = KFCResultModel::GetHitCount(chapterIdx);
+	for (int32 i = 0; i < n; ++i)
+	{
+		UID story = kInvalidUID;
+		TextIndex a = kInvalidTextIndex, b = kInvalidTextIndex;
+		uint64 hash = 0;
+		if (KFCResultModel::GetHitMatchIdentity(chapterIdx, i, story, a, b, hash) && story != kInvalidUID)
+			stories.insert(story);
+	}
+	for (std::set<UID>::const_iterator s = stories.begin(); s != stories.end(); ++s)
+		(void)FollowStoryFoci(chapterIdx, db, *s);
 }
 
 // FIRST, THE ROWS FOLLOW THEIR FOCI (FollowStoryFoci, above - the author's call of 2026-10-14 night): a story whose

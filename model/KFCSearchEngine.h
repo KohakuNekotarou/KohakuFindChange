@@ -532,6 +532,10 @@ namespace KFCSearchEngine
 	    before a Replace, a preview and a jump (KFCReplaceEngine, LocateRow). */
 	FollowResult FollowStoryFoci(int32 chapterIdx, IDataBase* db, UID story, bool* outMoved = nil);
 
+	/** FollowStoryFoci for every story of a chapter whose document is open - a list shown again (a tier switched to -
+	    KFCTierStore::SwitchTo), so its rows and story rows show the text as it is now. */
+	void FollowChapterFoci(int32 chapterIdx);
+
 	/** Search This Story Again (a story row's right-click menu): that story alone walked again with the search's query,
 	    its rows put back as the walk finds them and its version recorded (KFCResultModel::ReplaceStoryRows). False =
 	    refused or failed, the list unchanged; outStatus says what happened either way. */

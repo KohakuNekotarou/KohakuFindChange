@@ -239,6 +239,11 @@ bool KFCTierStore::SwitchTo(uint32 set, PMString& outSummary)
 	// new ones only where its stories are as kept - KFCRowFoci::TakeBack lets those go for the held).
 	KFCRowFoci::TakeBack(wanted.foci);
 	KFCResultModel::ReturnToResultSet(wanted.set);
+	// ITS ROWS FOLLOW THOSE FOCI AT ONCE (KFCSearchEngine::FollowChapterFoci - the author, 10-14 night: "the Story part's
+	// text is getting different"): the edits made while it was grey moved its foci, not its rows; the list is drawn
+	// with the text as it is now - the story rows' words too.
+	for (int32 c = 0; c < KFCResultModel::GetChapterCount(); ++c)
+		KFCSearchEngine::FollowChapterFoci(c);
 	// The Find Format this list was searched with is the one the replace's door compares against (FindFormatHasChanged) -
 	// read off the list's own copy, as Find/Change does not hold it.
 	KFCSearchEngine::RememberFindFormatOf(wanted.list.header.query.get());
