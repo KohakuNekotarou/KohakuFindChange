@@ -11,9 +11,11 @@
 //  The list the model holds is the LIVE tier, under them, and works as the list always has. Clear Results, a Run of the
 //  query dialog and Change All in Book (No List) take the tiers away when they make a list anew; past 10 kept tiers the
 //  oldest goes, and the status line says so.
-//  A CLICK ON A GREY ROW SWITCHES TO ITS TIER (docs/superpowers/specs/2026-10-14-kfc-tier-switch-design.md - the author's
-//  call): the model puts that tier's list back with its query (KFCTierStore::SwitchTo), and the row clicked is selected and
-//  jumped to as a click on a live row is.
+//  A CLICK ON A GREY ROW - OR ON A GREY TIER'S OWN ROW - SWITCHES TO ITS TIER (docs/superpowers/specs/
+//  2026-10-14-kfc-tier-switch-v2-design.md - the author's calls): the model puts that tier's list back (KFCTierStore::
+//  SwitchTo - Find/Change is left alone), the row clicked is selected and jumped to as a click on a live row is, and
+//  nothing moves: the tiers stand in search order, the live one among them (LiveTierPosition), each row open or closed as
+//  it was, the view where it was.
 //
 //  Kept here: the grey copies (each its tier's name, its row's text and a copy of its rows, made with the rows' own look -
 //  KFCResultTree::GetRowLook - so a kept row reads as the row it was), each under its list's result set; the live tier's
@@ -88,6 +90,12 @@ namespace KFCResultHistory
 	    name (one an Undo put back, say). */
 	PMString LiveTierLabel();
 
+	/** WHERE THE LIVE TIER STANDS AMONG THE TIERS (v2 R4 - the tiers stay in search order, the live one in its place: the
+	    author's "the same position"): the number of kept tiers searched before it - their result sets are below the live
+	    list's, as every list made anew is numbered upward (KFCResultModel::GetResultSetId). The root's children are the
+	    kept tiers in the model's order with the live tier at this place (KFCResultListAdapter). */
+	int32 LiveTierPosition();
+
 	/** Kept tier `tier`'s copy as a tree: how many rows hang under `row` (-1 = under the tier's own row), the nth of them
 	    (its row number, -1 when there is none), the row above `row` (-1 = the tier's row) and its place there. Each answers
 	    "nothing" for a tier or a row that is not there - the tree can ask about a row of a tier just taken away before it
@@ -102,34 +110,45 @@ namespace KFCResultHistory
 	/** Is that kept row a hit row - drawn in the colour cell? */
 	bool IsKeptHit(int32 tier, int32 row);
 
-	/** BEFORE THE TREE FORGETS ITS ROWS (KFCResultTree::Rebuild's ClearTree): which kept tiers are open - asked only of the
-	    tiers the last rebuild drew (a tier kept since was the live one then, and comes up closed). The tree still numbers
-	    them as it drew them, so each is matched to its copy by the result set it drew it with: a tier gone since (the cap, a
-	    switch) is passed over, and the rest are found where they stand now. */
+	/** BEFORE THE TREE FORGETS ITS ROWS (KFCResultTree::Rebuild's ClearTree; a switch, before anything moves): which kept
+	    tiers are open, and which of their rows - asked only of the tiers the last rebuild drew (a tier kept since was the
+	    live one then, and keeps what its copy was made with). The tree still numbers them as it drew them, so each is
+	    matched to its copy by the result set it drew it with: a tier gone since (the cap, a switch) is passed over, and the
+	    rest are found where they stand now. And the live tier's own row, while the list drawn last is the live one still
+	    (OpenLiveTier) - v2 R6: nothing opens or closes by itself. */
 	void NoteOpenTiers(ITreeViewMgr* treeMgr);
-	/** ...and after the tree is put back: those tiers opened, and in every kept tier the rows that were open when it was
-	    kept. Returns how many rows it opened (a test build's TREETIME counts them). */
+	/** ...and after the tree is put back: those tiers opened, and in every kept tier the rows that were open as noted.
+	    Returns how many rows it opened (a test build's TREETIME counts them). */
 	int32 OpenKeptRows(ITreeViewMgr* treeMgr);
+	/** ...and the live tier (v2 R6): its own row open or closed as noted (open when nothing was noted - a list drawn for the
+	    first time), and - after a switch - its rows open as the tier's copy had them (each copy row knows the live row it
+	    was made from). True = the rows were opened so, and Rebuild leaves them; false = Rebuild opens them by its rules (a
+	    new search's list, and every other rebuild). ioExpands counts the rows it opened (TREETIME). */
+	bool OpenLiveTier(ITreeViewMgr* treeMgr, int32& ioExpands);
+	/** Did a switch ask the rebuild to leave the view where it is (v2 - the row clicked stays where it was)? Asked once:
+	    the answer is taken. False = the rebuild brings the live tier to the top, as after a search. */
+	bool TakeScrollHold();
 
-	// ----- the tier switch (docs/superpowers/specs/2026-10-14-kfc-tier-switch-design.md section 3-5) -----
+	// ----- the tier switch (docs/superpowers/specs/2026-10-14-kfc-tier-switch-v2-design.md section 3-4) -----
 
-	/** A CLICK ON KEPT TIER `tier`'s ROW `row` (KFCResultNodeEH): the switch booked to run once the double click's time is
-	    over (an ICallbackTimer, ::GetDoubleClickTime) - not inside the row's own click handler: the switch draws the list
-	    anew, and ITreeViewMgr::ClearTree removes every row's widget, this row's with it. Waiting the double click's time out
-	    also keeps a double click one switch: its second click lands on the same grey row, not on the list drawn anew, and
-	    books the same switch again. The tier is booked by its result set and the click by the list it was made on: a tier
-	    gone by then, a list made anew since (a search, Clear Results), the panel closed or a landing under way drop the
-	    booking (RunPendingSwitch) - the click is asked again, as a second click is (KFCActionComponent's Find). */
+	/** A CLICK ON KEPT TIER `tier`'s ROW `row` - `row` -1 for the tier's own row (v2 R5) - (KFCResultNodeEH): the switch
+	    booked to run at the next idle (an ICallbackTimer of 1 ms - v2 R7: no double click's wait, KFC has no double click
+	    of its own), not inside the row's own click handler: the switch draws the list anew, and ITreeViewMgr::ClearTree
+	    removes every row's widget, this row's with it. A double click's second click lands where the first did - the
+	    tiers do not move (R4) - on the row it switched to, and lands on it again. The tier is booked by its result set
+	    and the click by the list it was made on: a tier gone by then, a list made anew since (a search, Clear Results), the
+	    panel closed or a landing under way drop the booking (RunPendingSwitch) - the click is asked again, as a second
+	    click is (KFCActionComponent's Find). */
 	void SwitchToKeptRowLater(int32 tier, int32 row);
 
-	/** THE SWITCH: kept tier `tier` made the live list (IKFCRuns::SwitchToTier - the model puts its rows and its query back
-	    and checks the query three times, the third asked of this half: QueryReadsAsTier). Refused before the model is
-	    asked: a run of ours under way, a landing under way, a tier or row not there, or a tier no search here named (there
-	    is no name to read its query against). Switched: the copies follow the model's tiers (the list before is the newest
-	    grey tier, when the model kept it), the list is drawn again, and the status line says "Switched to: <name>".
-	    `outLiveRow` = the row of the list now that the copy's row `row` was copied from (a kept row carries it), or an
-	    invalid NodeID when it is not in the list now (its chapter emptied while it was grey - a document closed). False =
-	    refused; the status line says why (nothing for a landing - dropped, as a second click is). */
+	/** THE SWITCH: kept tier `tier` made the live list (IKFCRuns::SwitchToTier - the model puts its rows back; Find/Change
+	    is left alone, v2 R1). Refused before the model is asked: a run of ours under way, a landing under way, a tier or
+	    row not there. Switched: the copies follow the model's tiers (the list before goes in as a grey tier at its place in
+	    search order, when the model kept it), the list is drawn again with every row open or closed as it was and the view
+	    where it was, and the status line says "Switched to: <name>". `row` -1 = the tier's own row was clicked: nothing to
+	    land on. `outLiveRow` = the row of the list now that the copy's row `row` was copied from (a kept row carries it),
+	    or an invalid NodeID when there is none (its chapter emptied while it was grey - a document closed - or the tier's
+	    own row). False = refused; the status line says why (nothing for a landing - dropped, as a second click is). */
 	bool SwitchToKeptRow(int32 tier, int32 row, NodeID& outLiveRow);
 
 	/** THE THIRD CHECK OF A LIST'S QUERY STATED FOR A ROW OPERATION, ANSWERED HERE (IKFCUIServices::QueryReadsAsTier - the

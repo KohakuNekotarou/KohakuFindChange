@@ -126,11 +126,20 @@ public:
 			return kInvalidNodeID;
 		if (nodeID->IsRoot() && KFCResultHistory::IsStacking())
 		{
+			// IN SEARCH ORDER (v2 R4 - the tiers do not move): the kept tiers as the model keeps them, the live tier at its
+			// place among them.
 			const int32 kept = KFCResultHistory::KeptTierCount();
-			if (nth >= 0 && nth < kept)
-				return KFCResultNodeID::CreateTier(nth);
-			if (nth == kept && KFCResultHistory::HasLiveList())
-				return KFCResultNodeID::CreateLiveTier();
+			int32 tier = nth;
+			if (KFCResultHistory::HasLiveList())
+			{
+				const int32 live = KFCResultHistory::LiveTierPosition();
+				if (nth == live)
+					return KFCResultNodeID::CreateLiveTier();
+				if (nth > live)
+					tier = nth - 1;
+			}
+			if (tier >= 0 && tier < kept)
+				return KFCResultNodeID::CreateTier(tier);
 			return kInvalidNodeID;
 		}
 		if (nodeID->IsTierRow() && nodeID->GetTier() >= 0)
@@ -155,9 +164,17 @@ public:
 		TreeNodePtr<KFCResultNodeID> childID(child);
 		if (childID == nil || childID->IsRoot())
 			return -1;
-		// A tier's row: its place among the tiers - the live one's after every kept one.
+		// A tier's row: its place among the tiers - in search order, the live one among them (GetNthChild's reverse).
 		if (childID->IsTierRow())
-			return (childID->GetTier() >= 0) ? childID->GetTier() : KFCResultHistory::KeptTierCount();
+		{
+			const int32 tier = childID->GetTier();
+			if (!KFCResultHistory::HasLiveList())
+				return tier;
+			const int32 live = KFCResultHistory::LiveTierPosition();
+			if (tier < 0)
+				return live;
+			return (tier < live) ? tier : tier + 1;
+		}
 		if (childID->IsKeptRow())
 			return KFCResultHistory::KeptChildPos(childID->GetTier(), childID->GetKeptRow());
 		if (childID->IsHitRow())

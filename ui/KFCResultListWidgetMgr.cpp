@@ -641,20 +641,26 @@ void KFCResultTree::Rebuild()
 	(void)keptOpened;
 #endif
 	const bool liveTier = KFCResultHistory::IsStacking() && KFCResultHistory::HasLiveList();
-	if (liveTier)
-		expand(KFCResultNodeID::CreateLiveTier(), kFalse);
+	// THE LIVE TIER AS IT WAS LEFT (v2 R6 - nothing opens or closes by itself - KFCResultHistory::OpenLiveTier): its own row
+	// open or closed as noted, open when nothing was; after a switch its rows too, as the tier's copy had them - and then
+	// the rules below are not run over them.
+	int32 liveExpands = 0;
+	const bool liveRowsOpened = liveTier && KFCResultHistory::OpenLiveTier(treeMgr, liveExpands);
+#ifdef KFC_DIAG
+	expandCalls += liveExpands;
+#endif
 
 	const int32 chapters = KFCResults()->GetDisplayChapterCount();
 	// (A test build's tree-expand mode 1 opens such a document row with everything under it in one call, and the
-	// loop below then leaves its rows alone.)
-	bool chaptersOpenedWhole = false;
-	if (KFCResults()->IsFromBook())
+	// loop below then leaves its rows alone - as do a switch's rows, opened above.)
+	bool chaptersOpenedWhole = liveRowsOpened;
+	if (!liveRowsOpened && KFCResults()->IsFromBook())
 	{
 		// The book row is the root's only child, so leaving it closed would show a panel with one
 		// line on it and nothing else. Open it; the chapters underneath stay closed.
 		expand(KFCResultNodeID::CreateBook(), kFalse);
 	}
-	else if (DocumentRowsOpen())		// (no book here - so: not All Documents)
+	else if (!liveRowsOpened && DocumentRowsOpen())		// (no book here - so: not All Documents)
 	{
 		// A single document has just the one chapter, so open it - otherwise the result is one closed
 		// row and the hits take an extra click to reach.
@@ -691,8 +697,9 @@ void KFCResultTree::Rebuild()
 
 	// THE NEW RESULTS IN VIEW: a rebuild leaves the list at its top, which is the OLDEST tier while there are tiers - so the
 	// live tier's row goes to the top instead, its rows under it, the kept tiers a scroll above (the stacked results' spec,
-	// section 3-4).
-	if (liveTier)
+	// section 3-4). NOT AFTER A SWITCH (v2): it puts the view back where it was itself (KFCResultHistory::SwitchToKeptRow).
+	const bool holdView = KFCResultHistory::TakeScrollHold();
+	if (liveTier && !holdView)
 		treeMgr->ScrollToNode(KFCResultNodeID::CreateLiveTier(), ITreeViewMgr::eScrollToTop);
 }
 

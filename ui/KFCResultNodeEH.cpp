@@ -11,7 +11,8 @@
 //  out which: a hit row jumps, a chapter row shows its document, a STORY ("font") row shows the
 //  document it sits in (it names no hit, so it falls to the same arm as its chapter), the book row
 //  activates its book. A GREY row - a row of a kept tier - switches to its tier, and that row is then selected
-//  and jumped to (KFCResultHistory::SwitchToKeptRowLater; the tier's own row only opens and closes).
+//  and jumped to (KFCResultHistory::SwitchToKeptRowLater); a grey tier's own row switches to it too (v2 R5) - the
+//  live tier's own row only opens and closes.
 //  Simplified from KESCL (which split fresh clicks onto a selection observer).
 //
 //  The shape of the hook is the layer panel's (LayerTreeRowPanelEH::LButtonUp): act on the button
@@ -132,6 +133,13 @@ bool16 KFCResultNodeEH::LButtonUp(IEvent* e)
 	if (nodeID != nil && nodeID->IsKeptRow())
 	{
 		KFCResultHistory::SwitchToKeptRowLater(nodeID->GetTier(), nodeID->GetKeptRow());
+		return result;
+	}
+	// A GREY TIER'S OWN ROW SWITCHES TO IT TOO (v2 R5 - the author's call), booked the same way with no row to land on: a
+	// tier's row is never selected. (Its arrow opens and closes it, as every tier's does - the arrow's own widget.)
+	if (nodeID != nil && nodeID->IsTierRow() && nodeID->GetTier() >= 0)
+	{
+		KFCResultHistory::SwitchToKeptRowLater(nodeID->GetTier(), -1);
 		return result;
 	}
 	if (nodeID == nil || nodeID->IsRoot() || nodeID->IsInert())

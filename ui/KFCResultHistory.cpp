@@ -11,8 +11,10 @@
 #include "VCPlugInHeaders.h"
 
 // Interface includes:
-#include "ICallbackTimer.h"				// StartTimer / StopTimer - a click's switch, run once the double click's time is over
+#include "ICallbackTimer.h"				// StartTimer / StopTimer - a click's switch, run at the next idle
 #include "IControlView.h"
+#include "IPanelControlData.h"			// the tree's row widgets - the row at the top of the view (ShownTop)
+#include "ITreeNodeIDData.h"			// ...each row widget's NodeID
 #include "ITreeViewController.h"		// DeselectAll / Select - the row switched to, selected
 #include "ITreeViewHierarchyAdapter.h"	// GetParentNode - the rows above it opened, so the tree draws it
 #include "ITreeViewMgr.h"				// IsNodeExpanded / ExpandNode - the kept tiers opened as they were
@@ -86,12 +88,28 @@ namespace
 	std::vector<uint32> gDrawnSets;		// the kept tiers the last rebuild drew, by result set, in the tree's order:
 										// NoteOpenTiers finds each where it stands now (a tier gone since is passed over)
 
-	// A CLICK'S SWITCH, BOOKED (SwitchToKeptRowLater) and run by gSwitchTimer once the double click's time is over.
+	// A CLICK'S SWITCH, BOOKED (SwitchToKeptRowLater) and run by gSwitchTimer at the next idle.
 	ICallbackTimer* gSwitchTimer = nil;
 	uint32 gBookedTier = 0;		// the tier clicked, by its result set (0 = nothing booked - the model counts its lists from 1)
 	int32 gBookedRow = -1;		// the row clicked, in that tier's copy
 	uint32 gBookedOn = 0;		// the live list's result set at the click: a list made anew since lets the booking go
 	bool gShutDown = false;		// once ShutdownCleanup has run, nothing is booked again
+
+	/** THE LIVE TIER'S OPEN STATE, NOTED FOR THE NEXT REBUILD (v2 R6 - nothing opens or closes by itself): its own row, while
+	    the list drawn last is the live one still (NoteOpenTiers); after a switch, its rows too - as the tier's copy had them
+	    (SwitchToKeptRow). Used once (OpenLiveTier). */
+	struct LiveOpen
+	{
+		uint32				set;		// the list it was noted for (0 = nothing noted)
+		bool				tierOpen;	// the live tier's own row
+		bool				rowsNoted;	// its rows too - otherwise they open by Rebuild's rules
+		std::vector<NodeID>	open;		// the rows open, when rowsNoted (each a book, document or story row of the list)
+
+		LiveOpen() : set(0), tierOpen(true), rowsNoted(false) {}
+	};
+	LiveOpen gLiveOpen;
+	uint32 gDrawnLive = 0;		// the live list the last rebuild drew as the live tier (0 = none) - NoteOpenTiers' question
+	bool gScrollHold = false;	// a switch's rebuild leaves the view where it is (TakeScrollHold)
 
 	// Is the list the model holds now the one a search that keeps made?
 	bool LiveIsStacked()
@@ -176,6 +194,10 @@ namespace
 		out.name.SetTranslatable(kFalse);
 		out.label = head.label;
 		InterfacePtr<ITreeViewMgr> treeMgr(QueryListTreeMgr());
+		// The tier's own row open or closed as the person left it (v2 R6) - open when the tree does not show it as a tier (a
+		// list drawn with no tiers shows all its rows) or the panel is closed.
+		out.open = (treeMgr != nil && KFCResultHistory::IsStacking())
+			? (treeMgr->IsNodeExpanded(KFCResultNodeID::CreateLiveTier()) != kFalse) : true;
 		CopyRows(treeMgr, KFCResultNodeID::CreateLiveTier(), -1, out);
 		return true;
 	}
@@ -219,6 +241,139 @@ namespace
 				return true;
 		}
 		return false;
+	}
+
+	// Is `row` - a book, document or story row of the live list, as a copy noted it - a row of the list now? Asked of the
+	// model by the row's own numbers, not by a walk of the list for each row: the book searched, the document shown, the
+	// story's group there.
+	bool LiveBranchRowStands(const NodeID& row)
+	{
+		TreeNodePtr<KFCResultNodeID> id(row);
+		if (id == nil || id->IsRoot() || id->IsInert() || id->IsHitRow())
+			return false;
+		if (id->IsBookRow())
+			return KFCResults()->IsFromBook();
+		if (KFCResults()->GetShownChapterPos(id->GetChapter()) < 0)
+			return false;
+		return !id->IsFontRow() || id->GetFont() < KFCResults()->GetDisplayFontCount(id->GetChapter());
+	}
+
+	// THE ROW AT THE TOP OF THE LIST'S VIEW: the tree makes widgets for the rows in view alone, each a widget of a panel of
+	// the tree's with its NodeID (ITreeNodeIDData) - the one standing highest is the top row. Invalid when none is made (an
+	// empty list, the panel closed).
+	NodeID ShownTop()
+	{
+		NodeID top;
+		InterfacePtr<IPanelControlData> treePanel(KFCResultTree::ResultListView(), UseDefaultIID());
+		if (treePanel == nil)
+			return top;
+		bool found = false;
+		PMReal highest = 0;
+		for (int32 i = 0; i < treePanel->Length(); ++i)
+		{
+			InterfacePtr<IPanelControlData> rows(treePanel->GetWidget(i), UseDefaultIID());
+			if (rows == nil)
+				continue;
+			for (int32 j = 0; j < rows->Length(); ++j)
+			{
+				IControlView* const rowView = rows->GetWidget(j);
+				InterfacePtr<const ITreeNodeIDData> data(rowView, UseDefaultIID());
+				if (rowView == nil || data == nil || !rowView->IsVisible())
+					continue;
+				const PMReal y = rowView->GetFrame().Top();
+				if (!found || y < highest)
+				{
+					highest = y;
+					top = data->Get();
+					found = true;
+				}
+			}
+		}
+		return top;
+	}
+
+	/** WHERE THE VIEW STANDS, BY WHAT ITS TOP ROW IS (a switch keeps the view - the row clicked stays where it was): the list
+	    the row is of and its place in it - a tier's own row, a copy's row by its number, a live row by its NodeID - so it is
+	    found again after the switch has made a grey tier live and the live list grey, which gives each of those rows
+	    another NodeID. */
+	struct ViewTop
+	{
+		uint32	set;		// the list (0 = nothing noted)
+		bool	heading;	// the tier's own row
+		int32	keptRow;	// a copy's row, by its number in the copy (-1 = none)
+		NodeID	live;		// a live row - or the live row a copy's row was made from
+
+		ViewTop() : set(0), heading(false), keptRow(-1) {}
+	};
+
+	// The top row noted - before a switch moves anything (the tree numbers the grey tiers as the last rebuild drew them).
+	ViewTop NoteViewTop()
+	{
+		ViewTop at;
+		const NodeID top(ShownTop());
+		if (!top.IsValid())
+			return at;
+		TreeNodePtr<KFCResultNodeID> id(top);
+		if (id == nil || id->IsRoot())
+			return at;
+		if (!id->IsInert())
+		{
+			at.set = KFCResults()->GetResultSetId();		// a row of the live list
+			at.live = top;
+			return at;
+		}
+		const int32 drawn = id->GetTier();
+		if (drawn < 0)
+		{
+			at.set = KFCResults()->GetResultSetId();		// the live tier's own row
+			at.heading = true;
+			return at;
+		}
+		if (drawn >= static_cast<int32>(gDrawnSets.size()))
+			return at;
+		at.set = gDrawnSets[static_cast<size_t>(drawn)];
+		at.heading = (id->IsTierRow() != kFalse);
+		if (!at.heading)
+		{
+			at.keptRow = id->GetKeptRow();
+			for (size_t k = 0; k < gKept.size(); ++k)
+				if (gKept[k].set == at.set && at.keptRow >= 0 && at.keptRow < static_cast<int32>(gKept[k].rows.size()))
+				{
+					at.live = gKept[k].rows[static_cast<size_t>(at.keptRow)].live;
+					break;
+				}
+		}
+		return at;
+	}
+
+	// ...and found again once the switch has drawn the list anew. Invalid when its list is not drawn now.
+	NodeID FindViewTop(const ViewTop& at)
+	{
+		if (at.set == 0)
+			return NodeID();
+		if (at.set == KFCResults()->GetResultSetId() && KFCResultHistory::HasLiveList())
+		{
+			// The list is the live one now: its own row, or the row the copy's row was made from while it is still one.
+			if (at.heading || !at.live.IsValid() || !FindLiveRow(KFCResultNodeID::CreateLiveTier(), at.live))
+				return NodeID(KFCResultNodeID::CreateLiveTier());
+			return at.live;
+		}
+		for (size_t k = 0; k < gKept.size(); ++k)
+		{
+			if (gKept[k].set != at.set)
+				continue;
+			const int32 t = static_cast<int32>(k);
+			if (at.heading)
+				return NodeID(KFCResultNodeID::CreateTier(t));
+			if (at.keptRow >= 0 && at.keptRow < static_cast<int32>(gKept[k].rows.size()))
+				return NodeID(KFCResultNodeID::CreateKept(t, at.keptRow));
+			// A row of the list that was live: the copy's row made from it.
+			for (size_t r = 0; r < gKept[k].rows.size(); ++r)
+				if (at.live.IsValid() && gKept[k].rows[r].live == at.live)
+					return NodeID(KFCResultNodeID::CreateKept(t, static_cast<int32>(r)));
+			return NodeID(KFCResultNodeID::CreateTier(t));
+		}
+		return NodeID();
 	}
 }	// anonymous namespace
 
@@ -390,7 +545,7 @@ int32 KFCResultHistory::KeptTierCount()
 
 PMString KFCResultHistory::LiveTierLabel()
 {
-	if (gLive.set != 0 && gLive.set == KFCResults()->GetResultSetId())
+	if (gLive.set != 0 && gLive.set == KFCResults()->GetResultSetId() && !gLive.label.IsEmpty())
 	{
 		PMString named(gLive.label);
 		named.SetTranslatable(kFalse);
@@ -399,6 +554,16 @@ PMString KFCResultHistory::LiveTierLabel()
 	PMString unnamed("Results");
 	unnamed.SetTranslatable(kFalse);
 	return unnamed;
+}
+
+int32 KFCResultHistory::LiveTierPosition()
+{
+	const uint32 live = KFCResults()->GetResultSetId();
+	int32 before = 0;
+	for (size_t k = 0; k < gKept.size(); ++k)
+		if (gKept[k].set < live)
+			++before;
+	return before;
 }
 
 int32 KFCResultHistory::KeptChildCount(int32 tier, int32 row)
@@ -462,9 +627,23 @@ void KFCResultHistory::NoteOpenTiers(ITreeViewMgr* treeMgr)
 		for (size_t k = 0; k < gKept.size(); ++k)
 			if (gKept[k].set == gDrawnSets[t])
 			{
-				gKept[k].open = (treeMgr->IsNodeExpanded(KFCResultNodeID::CreateTier(static_cast<int32>(t))) != kFalse);
+				KeptTier& kept = gKept[k];
+				kept.open = (treeMgr->IsNodeExpanded(KFCResultNodeID::CreateTier(static_cast<int32>(t))) != kFalse);
+				// Its rows too (v2 R6 - a row the person opened or closed in a grey tier stays so): the branch rows, a hit row
+				// being a leaf.
+				for (size_t r = 0; r < kept.rows.size(); ++r)
+					if (!kept.rows[r].look.hit)
+						kept.rows[r].open = (treeMgr->IsNodeExpanded(KFCResultNodeID::CreateKept(static_cast<int32>(t),
+							static_cast<int32>(r))) != kFalse);
 				break;
 			}
+	// The live tier's own row, while the list drawn last is the live one still - a switch notes what it opens itself.
+	if (gLiveOpen.set == 0 && gDrawnLive != 0 && gDrawnLive == KFCResults()->GetResultSetId())
+	{
+		gLiveOpen.set = gDrawnLive;
+		gLiveOpen.tierOpen = (treeMgr->IsNodeExpanded(KFCResultNodeID::CreateLiveTier()) != kFalse);
+		gLiveOpen.rowsNoted = false;
+	}
 }
 
 int32 KFCResultHistory::OpenKeptRows(ITreeViewMgr* treeMgr)
@@ -489,13 +668,46 @@ int32 KFCResultHistory::OpenKeptRows(ITreeViewMgr* treeMgr)
 				}
 		}
 	}
-	// What this rebuild drew, by result set - NoteOpenTiers' map at the next.
+	// What this rebuild drew, by result set - NoteOpenTiers' map at the next - and the list it draws as the live tier.
 	std::vector<uint32> drawn;
 	drawn.reserve(gKept.size());
 	for (size_t k = 0; k < gKept.size(); ++k)
 		drawn.push_back(gKept[k].set);
 	gDrawnSets.swap(drawn);
+	gDrawnLive = (IsStacking() && HasLiveList()) ? KFCResults()->GetResultSetId() : 0;
 	return opened;
+}
+
+bool KFCResultHistory::OpenLiveTier(ITreeViewMgr* treeMgr, int32& ioExpands)
+{
+	const LiveOpen noted(gLiveOpen);
+	gLiveOpen = LiveOpen();		// used once
+	if (treeMgr == nil || !HasLiveList())
+		return false;
+	const bool forThis = (noted.set != 0 && noted.set == KFCResults()->GetResultSetId());
+	if (!forThis || noted.tierOpen)
+	{
+		treeMgr->ExpandNode(KFCResultNodeID::CreateLiveTier(), kFalse /*expandAllDescendants*/);
+		++ioExpands;
+	}
+	if (!forThis || !noted.rowsNoted)
+		return false;
+	// A switch's: the rows the tier's copy had open, while they are rows of the list (a document closed while it was grey
+	// took its rows) - in the copy's order, a row's parent before it.
+	for (size_t i = 0; i < noted.open.size(); ++i)
+		if (LiveBranchRowStands(noted.open[i]))
+		{
+			treeMgr->ExpandNode(noted.open[i], kFalse /*expandAllDescendants*/);
+			++ioExpands;
+		}
+	return true;
+}
+
+bool KFCResultHistory::TakeScrollHold()
+{
+	const bool hold = gScrollHold;
+	gScrollHold = false;
+	return hold;
 }
 
 bool KFCResultHistory::QueryReadsAsTier(uint32 set, PMString& outName)
@@ -545,26 +757,24 @@ bool KFCResultHistory::SwitchToKeptRow(int32 tier, int32 row, NodeID& outLiveRow
 {
 	outLiveRow = NodeID();
 	// THE DOORS, before anything moves: a run of ours (the status line says so), a landing under way (dropped, as a second
-	// click is - KFCActionComponent's Find), a tier or a row not there.
+	// click is - KFCActionComponent's Find), a tier or a row not there (row -1 = the tier's own row - v2 R5).
 	if (KFCResultTree::RefusedWhileRunning() || KFCJump::IsLanding())
 		return false;
-	const KeptRow* const clicked = RowOf(tier, row);
-	if (clicked == nil)
+	if (tier < 0 || tier >= KeptTierCount() || row < -1)
+		return false;
+	const KeptRow* const clicked = (row >= 0) ? RowOf(tier, row) : nil;
+	if (row >= 0 && clicked == nil)
 		return false;
 	const uint32 set = gKept[static_cast<size_t>(tier)].set;
-	PMString name(gKept[static_cast<size_t>(tier)].name);
-	name.SetTranslatable(kFalse);
-	const NodeID clickedLive(clicked->live);
-	// A TIER NO SEARCH HERE NAMED (a list an Undo put back, kept by the next search): there is no name to read its query back
-	// against - the switch's third check (QueryReadsAsTier) - so the model is not asked.
-	if (name.IsEmpty())
-	{
-		PMString why("Could not switch: that tier was not named by a search, so its query cannot be checked - search it again.");
-		why.SetTranslatable(kFalse);
-		KFCResultTree::ShowStatus(why);
-		KFC_DIAG_LOG("STACK switch refused set=%u (no name)", set);
-		return false;
-	}
+	const NodeID clickedLive(clicked != nil ? clicked->live : NodeID());
+	// (A tier no search here named is switched to as any other - v2: the switch reads no query. Its rows' Replace states its
+	//  query only when Find/Change is on another one, and is refused then: there is no name to read it against.)
+
+	// AS IT STANDS, BEFORE ANYTHING MOVES: which rows are open - the grey tiers' as the person left them, the tier switched
+	// to's among them (v2 R6) - and the row at the top of the view (the view stays where it is).
+	InterfacePtr<ITreeViewMgr> treeMgr(QueryListTreeMgr());
+	NoteOpenTiers(treeMgr);
+	const ViewTop top(NoteViewTop());
 
 	// THE LIVE LIST'S COPY, made before the switch puts the list aside - as Find makes it before a search.
 	KeptTier pending;
@@ -579,26 +789,44 @@ bool KFCResultHistory::SwitchToKeptRow(int32 tier, int32 row, NodeID& outLiveRow
 		return false;
 	}
 
-	// SWITCHED. The tier is the live list now, under its own name; the list before it is the newest copy (the model's order:
-	// KFCTierStore::SwitchTo takes the tier out and puts the list before it in last); then the copies follow the model's
-	// tiers - the list before it goes too, when the model did not keep it.
-	gLive.label = name;
+	// SWITCHED. The tier is the live list now, under its own name, opened as its copy was - its own row, and each row the
+	// copy had open, by the live row the copy's row was made from (OpenLiveTier, in the rebuild below).
+	const KeptTier& switched = gKept[static_cast<size_t>(tier)];
+	gLive.label = switched.name;
+	gLive.label.SetTranslatable(kFalse);
 	gLive.set = set;
 	gLive.stacked = true;
+	gLiveOpen = LiveOpen();
+	gLiveOpen.set = set;
+	gLiveOpen.tierOpen = switched.open;
+	gLiveOpen.rowsNoted = true;
+	for (size_t r = 0; r < switched.rows.size(); ++r)
+		if (switched.rows[r].open && !switched.rows[r].look.hit)
+			gLiveOpen.open.push_back(switched.rows[r].live);
+	// The list before it is a copy now, and the copies follow the model's tiers - in search order, the list before at its
+	// place among them (KFCTierStore::SwitchTo), or let go when the model did not keep it.
 	gKept.erase(gKept.begin() + tier);
 	if (havePending)
 		gKept.push_back(std::move(pending));
 	(void)FollowModelTiers();
+	// DRAWN AGAIN WITH NOTHING MOVED: the rebuild leaves the view alone (TakeScrollHold), and the row that was at its top is
+	// put back there - the tiers stand where they stood (v2 R4), so every row is where it was.
+	gScrollHold = true;
 	KFCResultTree::Rebuild();
+	gScrollHold = false;		// (taken by the rebuild - and let go here when the panel is closed and nothing was drawn)
+	const NodeID topNow(FindViewTop(top));
+	if (treeMgr != nil && topNow.IsValid())
+		treeMgr->ScrollToNode(topNow, ITreeViewMgr::eScrollToTop);
 	// THE ROW CLICKED, in the list now: the live row its copy was made from, while it is still a row of the list (FindLiveRow).
-	// Not there = its chapter emptied while the tier was grey (a document closed): switched, nothing selected.
+	// Not there = its chapter emptied while the tier was grey (a document closed), or the tier's own row was clicked:
+	// switched, nothing selected.
 	if (clickedLive.IsValid() && FindLiveRow(KFCResultNodeID::CreateLiveTier(), clickedLive))
 		outLiveRow = clickedLive;
-	// The status line names the tier switched to - the query Find/Change holds now, read before a replace (the spec's
-	// section 3-3-1, item 7) - and the model's words after it, when it has any.
+	// The status line names the tier switched to (Find/Change is left as it is - a row's Replace says whose query it used) -
+	// and the model's words after it, when it has any.
 	PMString status("Switched to: ");
 	status.SetTranslatable(kFalse);
-	status.Append(name);
+	status.Append(LiveTierLabel());
 	if (!why.IsEmpty())
 	{
 		status.Append(" ");
@@ -639,7 +867,7 @@ namespace
 				break;
 			}
 		NodeID liveRow;
-		if (tier < 0 || !KFCResultHistory::SwitchToKeptRow(tier, row, liveRow) || !liveRow.IsValid())
+		if (tier < 0 || !KFCResultHistory::SwitchToKeptRow(tier, row, liveRow))
 			return IIdleTask::kEndOfTime;
 
 		// THE ROW SWITCHED TO, SELECTED AND LANDED ON - the arrows' landing (KFCResultTreeEH's GoOnToNextReplaceableRow): every
@@ -652,6 +880,13 @@ namespace
 		InterfacePtr<ITreeViewMgr> treeMgr(listView, UseDefaultIID());
 		if (controller == nil || adapter == nil || treeMgr == nil)
 			return IIdleTask::kEndOfTime;
+		// SWITCHED WITH NO ROW TO LAND ON - the tier's own row was clicked (v2 R5), or the row's chapter went while it was
+		// grey: nothing of the list before stays selected (its rows' numbers name other rows of this list).
+		if (!liveRow.IsValid())
+		{
+			controller->DeselectAll(kFalse /*notifyOfChange*/, kTrue /*changeHilite*/);
+			return IIdleTask::kEndOfTime;
+		}
 		std::vector<NodeID> above;
 		for (NodeID up(adapter->GetParentNode(liveRow)); up.IsValid(); up = NodeID(adapter->GetParentNode(up)))
 		{
@@ -675,17 +910,17 @@ namespace
 
 void KFCResultHistory::SwitchToKeptRowLater(int32 tier, int32 row)
 {
-	if (gShutDown || RowOf(tier, row) == nil)
+	if (gShutDown || tier < 0 || tier >= KeptTierCount() || row < -1 || (row >= 0 && RowOf(tier, row) == nil))
 		return;
 	gBookedTier = gKept[static_cast<size_t>(tier)].set;
 	gBookedRow = row;
 	gBookedOn = KFCResults()->GetResultSetId();
 	if (gSwitchTimer == nil)
 		gSwitchTimer = ::CreateObject2<ICallbackTimer>(kCallbackTimerBoss, IID_ICALLBACKTIMER);
-	// Once the double click's time is over (the declaration says why): a double click's second click books the same switch
-	// again, and the timer starts anew.
+	// At the next idle, once the click is over (v2 R7 - no double click's wait: KFC has no double click of its own, and the
+	// tiers not moving, a second click lands on the row the first switched to). A click booked before it ran books anew.
 	if (gSwitchTimer != nil)
-		gSwitchTimer->StartTimer(RunPendingSwitch, static_cast<uint32>(::GetDoubleClickTime()), nil);
+		gSwitchTimer->StartTimer(RunPendingSwitch, 1, nil);
 	KFC_DIAG_LOG("STACK switch booked set=%u row=%d", gBookedTier, static_cast<int>(row));
 }
 
@@ -707,6 +942,9 @@ void KFCResultHistory::ShutdownCleanup()
 	gLive = LiveTier();
 	gNextQuery = 0;
 	gDrawnSets = std::vector<uint32>();
+	gLiveOpen = LiveOpen();
+	gDrawnLive = 0;
+	gScrollHold = false;
 }
 
 // End, KFCResultHistory.cpp.
