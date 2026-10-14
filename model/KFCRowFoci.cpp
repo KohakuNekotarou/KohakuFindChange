@@ -14,6 +14,7 @@
 #include "ITextFocus.h"
 #include "ITextFocusManager.h"
 #include "ITextModel.h"
+#include "IViewObjectChanges.h"	// a focus's target database (KFCRowFocus.h)
 
 // General includes:
 #include "IDThreadingPrimitives.h"	// IDThreading::IsMainThreadDomain - every entry point's gate (spec T10)
@@ -27,6 +28,8 @@
 // Project includes:
 #include "KFCRowFoci.h"
 #include "KFCBookScope.h"		// FindOpenChapterDoc, QueryOpenDocumentList
+#include "KFCID.h"				// kKFCRowFocusBoss
+#include "KFCRowFocus.h"		// IsLost
 #include "KFCResultModel.h"
 #include "KFCSearchEngine.h"	// ReadStoryVersion
 
@@ -70,19 +73,27 @@ bool InManager(ITextFocusManager* mgr, const ITextFocus* f)
 	return false;
 }
 
-// Let one go (spec T9): out of its story's manager, then our reference - only while it is still in that manager's
-// list. Otherwise it is dropped untouched: a leak beats a call into what may be gone (the close responder lets every
-// focus of a closing document go while the document still stands - DetachDocument).
+// Let one go (spec T9): its target database cleared, then out of its story's manager, then our reference - the last
+// two only while it is still in that manager's list. Otherwise it is dropped untouched: a leak beats a call into what
+// may be gone (the close responder lets every focus of a closing document go while the document still stands -
+// DetachDocument). The target is cleared whenever the document stands, its story gone or not: a focus left behind
+// must not keep pointing the view-interface records (KFCRowFocus.h) at a database that will close.
 void Let(Kept& k)
 {
-	if (k.focus != nil && DocOpen(k.db) && k.db->IsValidUID(k.story))
+	if (k.focus != nil && DocOpen(k.db))
 	{
-		InterfacePtr<ITextModel> model(k.db, k.story, UseDefaultIID());
-		InterfacePtr<ITextFocusManager> mgr(model, UseDefaultIID());
-		if (mgr != nil && InManager(mgr, k.focus))
+		InterfacePtr<IViewObjectChanges> view(k.focus, UseDefaultIID());
+		if (view != nil)
+			view->SetTargetDB(nil);
+		if (k.db->IsValidUID(k.story))
 		{
-			mgr->RemoveFocus(k.focus);
-			k.focus->Release();
+			InterfacePtr<ITextModel> model(k.db, k.story, UseDefaultIID());
+			InterfacePtr<ITextFocusManager> mgr(model, UseDefaultIID());
+			if (mgr != nil && InManager(mgr, k.focus))
+			{
+				mgr->RemoveFocus(k.focus);
+				k.focus->Release();
+			}
 		}
 	}
 	k.focus = nil;
@@ -126,9 +137,23 @@ RangeData FocusRange(TextIndex start, TextIndex end)
 	return (start == end) ? RangeData(start, RangeData::kLeanForward) : RangeData(start, end, RangeData::kLeanForward);
 }
 
+// A focus of KFC's own class on `range` of the manager's story, its target the document's database (KFCRowFocus.h:
+// without a target its snapshots go nowhere, and an Undo leaves it behind as InDesign's own focus is left). AddRef'd;
+// nil when none could be made.
+ITextFocus* MakeFocus(ITextFocusManager* mgr, IDataBase* db, const RangeData& range)
+{
+	ITextFocus* f = mgr->NewFocus(range, kKFCRowFocusBoss);	// AddRef'd
+	if (f == nil)
+		return nil;
+	InterfacePtr<IViewObjectChanges> view(f, UseDefaultIID());
+	if (view != nil)
+		view->SetTargetDB(db);
+	return f;
+}
+
 // The story's searched part given its focus in db, on its recorded place (PlaceSearchedRange) - made, moved, or left
-// as it is.
-void PlacePart(int32 chapterIdx, UID story, IDataBase* db)
+// as it is. inStep: a move inside a write's step is marked first (KFCRowFoci::MoveTo's rule).
+void PlacePart(int32 chapterIdx, UID story, IDataBase* db, bool inStep)
 {
 	KFCResultModel::SearchedRange part;
 	if (db == nil || !KFCResultModel::GetSearchedRange(chapterIdx, story, part) || !part.walkable || !db->IsValidUID(story))
@@ -149,13 +174,17 @@ void PlacePart(int32 chapterIdx, UID story, IDataBase* db)
 		{
 			const RangeData r = f->GetCurrentRange();
 			if (r.Start(nil) != part.start || r.End() != part.end)
+			{
+				if (inStep)
+					f->PreDirtyFocus();
 				f->SetRange(kFalse, FocusRange(part.start, part.end));
+			}
 			return;
 		}
 		Let(had->second);		// one from another database, or no longer usable
 		gParts.erase(had);
 	}
-	ITextFocus* f = mgr->NewFocus(FocusRange(part.start, part.end), kInvalidClass);	// AddRef'd
+	ITextFocus* f = MakeFocus(mgr, db, FocusRange(part.start, part.end));
 	if (f == nil)
 		return;
 	Kept k;
@@ -227,7 +256,7 @@ void KFCRowFoci::AttachChapter(int32 chapterIdx)
 		InterfacePtr<ITextFocusManager> mgr(model, UseDefaultIID());
 		if (model == nil || mgr == nil || end > model->TotalLength())
 			continue;
-		ITextFocus* f = mgr->NewFocus(RangeData(start, end, RangeData::kLeanForward), kInvalidClass);	// AddRef'd
+		ITextFocus* f = MakeFocus(mgr, db, RangeData(start, end, RangeData::kLeanForward));
 		if (f == nil)
 			continue;
 		Kept k;
@@ -240,7 +269,7 @@ void KFCRowFoci::AttachChapter(int32 chapterIdx)
 	std::vector<UID> parts;
 	KFCResultModel::GetSearchedRangeStories(chapterIdx, parts);
 	for (size_t i = 0; i < parts.size(); ++i)
-		PlacePart(chapterIdx, parts[i], db);
+		PlacePart(chapterIdx, parts[i], db, false);
 }
 
 void KFCRowFoci::AttachOpenChapters()
@@ -268,7 +297,23 @@ bool KFCRowFoci::Current(int32 chapterIdx, int32 hitIdx, IDataBase* db, TextInde
 	return true;
 }
 
-void KFCRowFoci::MoveTo(int32 chapterIdx, int32 hitIdx, TextIndex start, TextIndex end)
+KFCRowFoci::FocusState KFCRowFoci::Where(int32 chapterIdx, int32 hitIdx, IDataBase* db, TextIndex& outStart, TextIndex& outEnd)
+{
+	if (!IDThreading::IsMainThreadDomain())
+		return kNoFocus;
+	std::map<RowKey, Kept>::iterator it = gKept.find(RowKey(chapterIdx, hitIdx));
+	if (it == gKept.end() || it->second.db != db)
+		return kNoFocus;
+	ITextFocus* f = Usable(it);
+	if (f == nil)
+		return kNoFocus;
+	const RangeData r = f->GetCurrentRange();
+	outStart = r.Start(nil);
+	outEnd = r.End();
+	return KFCRowFocus::IsLost(f) ? kLostFocus : kFocused;
+}
+
+void KFCRowFoci::MoveTo(int32 chapterIdx, int32 hitIdx, TextIndex start, TextIndex end, bool inStep)
 {
 	if (!IDThreading::IsMainThreadDomain() || start < 0 || end < start)
 		return;
@@ -284,18 +329,23 @@ void KFCRowFoci::MoveTo(int32 chapterIdx, int32 hitIdx, TextIndex start, TextInd
 	const RangeData r = f->GetCurrentRange();
 	if (r.Start(nil) == start && r.End() == end)
 		return;
+	// Inside a write's step the move is marked first, so the step's snapshot holds it and the step's Undo and Redo put
+	// the focus where the write left it (KFCRowFocus.h). Outside a step there is no step to hold it, and an Undo after it
+	// reads back the range of before (KT, S7) - out there only a lost focus, or one already in place, is moved.
+	if (inStep)
+		f->PreDirtyFocus();
 	f->SetRange(kFalse, RangeData(start, end, RangeData::kLeanForward));
 }
 
-void KFCRowFoci::Reanchor(int32 chapterIdx, int32 hitIdx)
+void KFCRowFoci::Reanchor(int32 chapterIdx, int32 hitIdx, bool inStep)
 {
 	UID story = kInvalidUID;
 	TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
 	if (StoredPlace(chapterIdx, hitIdx, story, start, end))
-		MoveTo(chapterIdx, hitIdx, start, end);
+		MoveTo(chapterIdx, hitIdx, start, end, inStep);
 }
 
-void KFCRowFoci::ReanchorStory(int32 chapterIdx, UID story)
+void KFCRowFoci::ReanchorStory(int32 chapterIdx, UID story, bool inStep)
 {
 	if (!IDThreading::IsMainThreadDomain())
 		return;
@@ -304,8 +354,8 @@ void KFCRowFoci::ReanchorStory(int32 chapterIdx, UID story)
 		if (it->first.first == chapterIdx && it->second.story == story)
 			rows.push_back(it->first.second);
 	for (size_t i = 0; i < rows.size(); ++i)
-		Reanchor(chapterIdx, rows[i]);
-	PlaceSearchedRange(chapterIdx, story);
+		Reanchor(chapterIdx, rows[i], inStep);
+	PlaceSearchedRange(chapterIdx, story, inStep);
 }
 
 bool KFCRowFoci::CurrentSearchedRange(int32 chapterIdx, UID story, IDataBase* db, TextIndex& outStart, TextIndex& outEnd)
@@ -327,7 +377,7 @@ bool KFCRowFoci::CurrentSearchedRange(int32 chapterIdx, UID story, IDataBase* db
 	return true;
 }
 
-void KFCRowFoci::PlaceSearchedRange(int32 chapterIdx, UID story)
+void KFCRowFoci::PlaceSearchedRange(int32 chapterIdx, UID story, bool inStep)
 {
 	if (!IDThreading::IsMainThreadDomain())
 		return;
@@ -335,7 +385,7 @@ void KFCRowFoci::PlaceSearchedRange(int32 chapterIdx, UID story)
 	UIDRef docRef;
 	IDFile file;
 	if (KFCResultModel::GetChapterLocation(chapterIdx, docRef, file) && KFCBookScope::FindOpenChapterDoc(file, docRef))
-		PlacePart(chapterIdx, story, docRef.GetDataBase());
+		PlacePart(chapterIdx, story, docRef.GetDataBase(), inStep);
 }
 
 void KFCRowFoci::DetachChapter(int32 chapterIdx)
