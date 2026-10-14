@@ -3835,6 +3835,30 @@ KFCResultModel::RowLocation KFCSearchEngine::LocateRow(int32 chapterIdx, int32 h
 	uint64 hash = 0;
 	if (db == nil || !KFCResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, story, a, b, hash))
 		return KFCResultModel::kRowNotFound;
+#ifdef KFC_DIAG
+	// TEST BUILDS ONLY - THE EXPERIMENT replace-by-focus (KFCDiag.h): the jump rides on the focus too - its place reading the
+	// row's MATCH (the line around it may have changed - another tier's write beside it) makes it the row's place, the line
+	// read again there (MoveRowTo - a Missing word taken off).
+	if (KFC_DIAG_FAULT("replace-by-focus"))
+	{
+		TextIndex xs = kInvalidTextIndex, xe = kInvalidTextIndex;
+		KFCResultModel::Hit there;
+		bool replaced = false, locked = false;
+		if (KFCRowFoci::Current(chapterIdx, hitIdx, db, xs, xe) && xe - xs == b - a
+			&& KFCResultModel::GetHitFlags(chapterIdx, hitIdx, replaced, locked) && !replaced)
+		{
+			ReadHitText(UIDRef(db, story), xs, xe, there);
+			if (there.matchHash == hash)
+			{
+				KFC_DIAG_LOG("QFOCUS jump row=%d [%d,%d) -> focus [%d,%d)", (int)hitIdx, (int)a, (int)b, (int)xs, (int)xe);
+				MoveRowTo(chapterIdx, hitIdx, UIDRef(db, story), xs, xe);
+				ioStart = xs;
+				ioEnd = xe;
+				return (xs == a && xe == b) ? KFCResultModel::kRowAtPlace : KFCResultModel::kRowMoved;
+			}
+		}
+	}
+#endif
 	const bool atStored = RowReadsAsFoundAt(chapterIdx, hitIdx, db, story, a, b);
 	TextIndex fs = kInvalidTextIndex, fe = kInvalidTextIndex;
 	const bool atFocus = KFCRowFoci::Current(chapterIdx, hitIdx, db, fs, fe) && !(fs == a && fe == b)
