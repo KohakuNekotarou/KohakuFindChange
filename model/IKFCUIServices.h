@@ -125,13 +125,23 @@ public:
 	    (KFCBookWatch's retire - KFCRunGuard::IsLandingUnderWay) must not empty the results or hand chapters back under it.
 	    The model cannot see the UI half's flag; this is how it asks. */
 	virtual bool				IsLanding() = 0;
-	/** DOES THE QUERY FIND/CHANGE HOLDS NOW READ AS KEPT TIER `resultSet`'s NAME - word for word, in the words the person
-	    reads (docs/superpowers/specs/2026-10-14-kfc-tier-switch-design.md section 3-3-1, item 2 (b))? The tier switch's
-	    third check (KFCTierStore::SwitchTo), after the query is stated back: the names are the UI half's (it names each
-	    tier after its query when the search is made - KFCResultHistory), so this is where the model asks. outName = that
-	    tier's name, for the refusal's words. False = it does not read so, or there is no named copy of that tier to read
-	    it against - the switch is refused either way. */
+	/** DOES THE QUERY FIND/CHANGE HOLDS NOW READ AS LIST `resultSet`'s NAME - the live list's or a kept tier's - word for
+	    word, in the words the person reads? The third check of a list's query stated for a row operation (KFCQueryScope -
+	    docs/superpowers/specs/2026-10-14-kfc-tier-switch-v2-design.md section 3-2), after the field-by-field one and the
+	    walk signature: the names are the UI half's (it names each list after its query when the search is made -
+	    KFCResultHistory), so this is where the model asks. outName = that list's name, for the words said. False = it does
+	    not read so, or there is no named list of that set to read it against - the operation is refused either way. */
 	virtual bool				QueryReadsAsTier(uint32 resultSet, PMString& outName) = 0;
+	/** THE LIVE LIST `resultSet`'s QUERY COPY WAS TAKEN AGAIN (v2 R3 - KFCQueryScope::Finish): a replace went through with
+	    Find/Change as it is, its Change to (or another change-side setting) edited since the search, and the list now
+	    remembers what was used. The UI half names the live list again from the query Find/Change holds (its place in the
+	    query dialog's run order kept), so its heading says what a later replace under it would write - and the third check
+	    above reads that name. Nothing for a set that is not the live list's. */
+	virtual void				LiveQueryRecopied(uint32 resultSet) = 0;
+	/** A NOTICE ON THE PANEL'S MESSAGE LINE where the operation has no words of its own to carry it - Find/Change could not
+	    be put back as it was after a list's query was stated for a GREP row's after-text, or for an operation that left
+	    early (KFCQueryScope). Said at once (KFCResultTree::ShowStatus), so the person checks Edit > Find/Change. */
+	virtual void				ShowNotice(const PMString& words) = 0;
 };
 
 /** HOW THE MODEL HALF ASKS FOR IKFCUIServices - the only way. IKFCUIServices has no kDefaultIID, so a Query of its

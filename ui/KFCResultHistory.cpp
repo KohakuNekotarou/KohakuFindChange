@@ -502,6 +502,16 @@ bool KFCResultHistory::QueryReadsAsTier(uint32 set, PMString& outName)
 {
 	outName.Clear();
 	outName.SetTranslatable(kFalse);
+	// THE LIVE LIST (v2: a row operation on it states its query when Find/Change is on another one - KFCQueryScope): its
+	// name, as LiveTierLabel draws it - a list no search here named has none to read the query against.
+	if (set != 0 && set == gLive.set && gLive.set == KFCResults()->GetResultSetId())
+	{
+		outName = gLive.label;
+		outName.SetTranslatable(kFalse);
+		if (gLive.label.IsEmpty())
+			return false;
+		return (WithoutQueryPlace(gLive.label) == QueryLabel()) != kFalse;
+	}
 	for (size_t k = 0; k < gKept.size(); ++k)
 		if (gKept[k].set == set)
 		{
@@ -514,6 +524,21 @@ bool KFCResultHistory::QueryReadsAsTier(uint32 set, PMString& outName)
 			return (WithoutQueryPlace(gKept[k].name) == QueryLabel()) != kFalse;
 		}
 	return false;
+}
+
+void KFCResultHistory::RenameLiveFromQuery(uint32 set)
+{
+	if (set == 0 || set != gLive.set || gLive.set != KFCResults()->GetResultSetId() || gLive.label.IsEmpty())
+		return;
+	// The query dialog's place in the run order ("<n>  " - its Find names a list so) stays in front; the words after it are
+	// made again from the query Find/Change holds now - the one the replace just used.
+	const PMString words(WithoutQueryPlace(gLive.label));
+	PMString renamed(gLive.label);
+	renamed.Truncate(words.CharCount());	// Truncate takes off that many from the end: the place alone is left
+	renamed.Append(QueryLabel());
+	renamed.SetTranslatable(kFalse);
+	KFC_DIAG_LOG("STACK live renamed set=%u", set);
+	gLive.label = renamed;
 }
 
 bool KFCResultHistory::SwitchToKeptRow(int32 tier, int32 row, NodeID& outLiveRow)

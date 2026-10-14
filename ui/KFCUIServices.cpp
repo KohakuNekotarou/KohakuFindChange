@@ -44,7 +44,8 @@
 #include "IKFCUIServices.h"
 #include "KFCBookPanelLookup.h"
 #include "KFCJump.h"				// ClearFrontSelection - ClearSelection's door; IsLanding - IsLanding's
-#include "KFCResultHistory.h"		// QueryReadsAsTier - the tiers' names are this half's
+#include "KFCResultHistory.h"		// QueryReadsAsTier, RenameLiveFromQuery - the lists' names are this half's
+#include "KFCResultTree.h"			// ShowStatus - ShowNotice's line
 
 namespace
 {
@@ -230,6 +231,18 @@ public:
 	virtual bool QueryReadsAsTier(uint32 resultSet, PMString& outName)
 	{
 		return KFCResultHistory::QueryReadsAsTier(resultSet, outName);
+	}
+
+	virtual void LiveQueryRecopied(uint32 resultSet)
+	{
+		KFCResultHistory::RenameLiveFromQuery(resultSet);
+	}
+
+	virtual void ShowNotice(const PMString& words)
+	{
+		PMString say(words);
+		say.SetTranslatable(kFalse);
+		KFCResultTree::ShowStatus(say);
 	}
 };
 

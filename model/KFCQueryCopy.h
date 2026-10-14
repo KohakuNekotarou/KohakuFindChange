@@ -7,8 +7,10 @@
 //  A COPY OF EDIT > FIND/CHANGE'S QUERY, IN MEMORY (docs/superpowers/specs/2026-10-14-kfc-tier-switch-design.md section
 //  3-3 - the tier switch). Taken when a search goes through - the tab Find/Change is on: its strings, its switches, its
 //  character types or glyphs, its object type, its Find / Change Format - stated back with the dialog's own commands
-//  when its tier is switched to (KFCFindChangeCmds), and compared field by field after: a switch that does not read back
-//  as the copy is refused and put back (section 3-3-1 - the author: "if this goes wrong it is very frightening").
+//  (KFCFindChangeCmds) for the length of a row operation when Find/Change is on another query (KFCQueryScope - v2:
+//  docs/superpowers/specs/2026-10-14-kfc-tier-switch-v2-design.md section 3-2), and compared field by field after: a
+//  query that does not read back as the copy is refused and put back (the author: "if this goes wrong it is very
+//  frightening"). A replace made with Find/Change as it is takes the copy again (v2 R3).
 //  NO FILE IS WRITTEN (the author's call): not a saved query, not a temporary one.
 //  Left out on purpose: Search: (KFC never states it - kScopeCmdBoss) and the direction (KFC walks forward only).
 //  What no command states (the XML tag, the case option and the conditions mode of the change side, the CJK font groups)
@@ -77,12 +79,16 @@ namespace KFCQueryCopier
 {
 	/** The query of the tab Find/Change is on now. out.valid is false when the settings cannot be read. */
 	void Capture(KFCQueryCopy& out);
+	/** The query of tab `mode` (IFindChangeOptions::SearchMode), whichever tab Find/Change is on - what a tab holds while
+	    another is shown, read so it can be put back after a list's query of that tab was stated over it (KFCQueryScope).
+	    Stated back by Apply, which turns to that tab. out.valid is false when the settings cannot be read. */
+	void CaptureMode(KFCQueryCopy& out, int32 mode);
 
 	/** State `copy` back into Find/Change: the tab, then every field that differs from what the dialog holds now, with the
 	    dialog's own commands (KFCFindChangeCmds; the formats with kClearFindFormatCmdBoss / kClearChangeFormatCmdBoss and
 	    kFindChangeFormatCmdBoss). False = a command failed - outWhat names the field; the ones before it went through
-	    (putting everything back is the tier switch's - KFCTierStore::SwitchTo). Call it outside any command sequence
-	    unless the caller means to abort that sequence on a failure. */
+	    (putting everything back is the caller's - KFCQueryScope). Call it outside any command sequence unless the caller
+	    means to abort that sequence on a failure. */
 	bool Apply(const KFCQueryCopy& copy, PMString& outWhat);
 
 	/** Does Find/Change hold `copy` now - every field the copy's tab uses? False = outWhat names the first that differs.

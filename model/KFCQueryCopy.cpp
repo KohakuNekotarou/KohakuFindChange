@@ -204,12 +204,24 @@ void KFCQueryCopier::Capture(KFCQueryCopy& out)
 	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
 	if (opts == nil)
 		return;
+	CaptureMode(out, static_cast<int32>(opts->GetSearchMode()));
+}
+
+void KFCQueryCopier::CaptureMode(KFCQueryCopy& out, int32 tab)
+{
+	out = KFCQueryCopy();
+	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
+	if (opts == nil)
+		return;
 	// The lists' database first: every format question below takes it (BuildWalkSignature's rule - a copy that reads
 	// complete while saying nothing of the formats must never be made).
 	IDataBase* const db = opts->GetUIDAttrDB();
 	if (db == nil)
 		return;
-	const FCO::SearchMode mode = opts->GetSearchMode();
+	// The tab asked for, whichever is on screen: every setting below is read for it (the getters take the tab), and the
+	// few that belong to no tab (the character types, the glyphs, the object type and styles, the CJK font groups) are
+	// read as they stand.
+	const FCO::SearchMode mode = static_cast<FCO::SearchMode>(tab);
 	out.mode = static_cast<int32>(mode);
 	out.changeMode = static_cast<int32>(opts->GetChangeMode());
 	out.findString = PMString(opts->GetFindString(mode));

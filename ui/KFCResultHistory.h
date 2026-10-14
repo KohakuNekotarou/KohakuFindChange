@@ -132,11 +132,18 @@ namespace KFCResultHistory
 	    refused; the status line says why (nothing for a landing - dropped, as a second click is). */
 	bool SwitchToKeptRow(int32 tier, int32 row, NodeID& outLiveRow);
 
-	/** THE SWITCH'S THIRD CHECK, ANSWERED HERE (IKFCUIServices::QueryReadsAsTier - the model asks it inside the switch, after
-	    the query is stated back): does the query Find/Change holds now read, word for word, as kept tier `set`'s name -
-	    QueryLabel() against the name, the query dialog's place in the run order ("<n>  ") taken off it? outName = that
-	    name as the tier's row shows it. False = it does not, or there is no copy of that tier, or no search here named it. */
+	/** THE THIRD CHECK OF A LIST'S QUERY STATED FOR A ROW OPERATION, ANSWERED HERE (IKFCUIServices::QueryReadsAsTier - the
+	    model's KFCQueryScope asks it after the query is stated): does the query Find/Change holds now read, word for word,
+	    as list `set`'s name - the live list's, or a kept tier's - QueryLabel() against the name, the query dialog's place in
+	    the run order ("<n>  ") taken off it? outName = that name as the list's row shows it. False = it does not, or there
+	    is no list of that set, or no search here named it. */
 	bool QueryReadsAsTier(uint32 set, PMString& outName);
+
+	/** v2 R3, the UI half's side (IKFCUIServices::LiveQueryRecopied): the live list `set` named again from the query
+	    Find/Change holds now - its place in the query dialog's run order kept - after a replace made with Find/Change as
+	    it is took the list's copy again, so the heading says what a later replace under it would write. Nothing for a set
+	    that is not the live list's, or a live list no search here named. */
+	void RenameLiveFromQuery(uint32 set);
 
 	/** The controlled shutdown (KFCUIStartupShutdown): every static here holding storage emptied by a fresh value
 	    (KFCResultTree::ShutdownCleanup's rule - Clear() keeps a container's storage), and the switch's timer stopped and let
