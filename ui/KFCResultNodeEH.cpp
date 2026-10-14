@@ -10,7 +10,8 @@
 //  only the button-UP is extended. EVERY row has somewhere to go - KFCJump::ActivateNode sorts
 //  out which: a hit row jumps, a chapter row shows its document, a STORY ("font") row shows the
 //  document it sits in (it names no hit, so it falls to the same arm as its chapter), the book row
-//  activates its book.
+//  activates its book. A GREY row - a row of a kept tier - switches to its tier, and that row is then selected
+//  and jumped to (KFCResultHistory::SwitchToKeptRowLater; the tier's own row only opens and closes).
 //  Simplified from KESCL (which split fresh clicks onto a selection observer).
 //
 //  The shape of the hook is the layer panel's (LayerTreeRowPanelEH::LButtonUp): act on the button
@@ -63,6 +64,7 @@
 #include "KFCDiag.h"			// KFC_DIAG_LOG - the CLICKFOCUS trace, test builds only
 #include "KFCDiagHiddenDocs.h"	// the hidden-document check after a click - test builds only
 #include "KFCResultTree.h"		// TakeKeyboard - the hand-off after a click; DiagKeyFocus - who holds the keyboard, for that trace
+#include "KFCResultHistory.h"	// SwitchToKeptRowLater - a grey row's click
 
 namespace
 {
@@ -124,8 +126,16 @@ bool16 KFCResultNodeEH::LButtonUp(IEvent* e)
 		return result;
 	const NodeID& node = nodeData->Get();
 	TreeNodePtr<KFCResultNodeID> nodeID(node);
+	// A GREY ROW - A ROW OF A KEPT TIER - SWITCHES TO ITS TIER (docs/superpowers/specs/2026-10-14-kfc-tier-switch-design.md
+	// section 2-1, the author's call): booked, not made here - the switch draws the list anew, and this row's widget goes with
+	// the old tree (KFCResultHistory::SwitchToKeptRowLater says when it runs, and why). Nothing of this row is read after.
+	if (nodeID != nil && nodeID->IsKeptRow())
+	{
+		KFCResultHistory::SwitchToKeptRowLater(nodeID->GetTier(), nodeID->GetKeptRow());
+		return result;
+	}
 	if (nodeID == nil || nodeID->IsRoot() || nodeID->IsInert())
-		return result;		// the hidden root has nowhere to go; a tier's row and a kept row go nowhere (never selected)
+		return result;		// the hidden root has nowhere to go; a tier's own row only opens and closes (never selected)
 
 	// The selection lives on the tree, not on the row, so ask upwards for it.
 	InterfacePtr<const IWidgetParent> widgetParent(this, UseDefaultIID());

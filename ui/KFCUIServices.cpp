@@ -44,6 +44,7 @@
 #include "IKFCUIServices.h"
 #include "KFCBookPanelLookup.h"
 #include "KFCJump.h"				// ClearFrontSelection - ClearSelection's door; IsLanding - IsLanding's
+#include "KFCResultHistory.h"		// QueryReadsAsTier - the tiers' names are this half's
 
 namespace
 {
@@ -224,6 +225,11 @@ public:
 	virtual bool IsLanding()
 	{
 		return KFCJump::IsLanding();
+	}
+
+	virtual bool QueryReadsAsTier(uint32 resultSet, PMString& outName)
+	{
+		return KFCResultHistory::QueryReadsAsTier(resultSet, outName);
 	}
 };
 

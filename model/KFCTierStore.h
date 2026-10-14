@@ -25,8 +25,8 @@ class IDataBase;
 
 namespace KFCTierStore
 {
-	/** The most tiers kept (the author's call, 10-14 - 50 being too many searches to keep): past it the oldest goes. */
-	enum { kMaxTiers = 10 };
+	/** The most tiers kept - past it the oldest goes. The one number both halves read (KFCModelTypes.h). */
+	enum { kMaxTiers = KFCResultModel::kMaxKeptTiers };
 
 	/** AT A SEARCH'S COMMIT POINT, BEFORE THE LIST IS THROWN AWAY (KFCSearchEngine::SearchBook): the list kept as the newest
 	    tier - when it has a row, or a search made it (its query was copied: a search that found nothing is kept too) - with
@@ -63,8 +63,9 @@ namespace KFCTierStore
 
 	/** THE TIER SWITCH (the spec's section 3-2): the kept tier `set` made the live list - its rows back as they were kept
 	    (no search), as its own result set again (the writes kept for it are followed again - KFCUndoFollow), its query
-	    stated back into Find/Change (KFCQueryCopier::Apply) and checked twice: field by field (Matches) and by the walk
-	    signature it was searched with. The live list before it goes in as the newest tier (when it is one to keep).
+	    stated back into Find/Change (KFCQueryCopier::Apply) and checked three times: field by field (Matches), by the walk
+	    signature it was searched with, and in the words the person reads - the tier's name, asked of the UI half
+	    (IKFCUIServices::QueryReadsAsTier). The live list before it goes in as the newest tier (when it is one to keep).
 	    REFUSED - nothing changes: a run of ours under way; no such tier; no query kept with it; a book's tier whose book is
 	    not open; or the query not reading back as the copy - then the live list, its result set and the query Find/Change
 	    held before are all put back (section 3-3-1: all or nothing). False = refused; outSummary says why. True = switched

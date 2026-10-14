@@ -15,6 +15,7 @@
 
 // Project includes:
 #include "KFCTierStore.h"
+#include "IKFCUIServices.h"	// QueryReadsAsTier - the switch's third check, asked of the UI half (it names the tiers)
 #include "KFCBookScope.h"	// GetSearchedBookPath - the book a list was searched in; FindOpenChapterDoc - a chapter, by its file
 #include "KFCDiag.h"		// the TIER lines - test builds only
 #include "KFCQueryCopy.h"	// the query stated back into Find/Change and checked (the switch)
@@ -201,8 +202,8 @@ bool KFCTierStore::SwitchTo(uint32 set, PMString& outSummary)
 	KFCResultModel::RestoreModelSnapshot(wanted.list);
 	KFCResultModel::ReturnToResultSet(wanted.set);
 
-	// 4. ITS QUERY STATED BACK, AND CHECKED TWICE (section 3-3-1: field by field - the change side too, which the signature
-	// does not carry - and by the walk signature the list was searched with).
+	// 4. ITS QUERY STATED BACK, AND CHECKED THREE TIMES (section 3-3-1: field by field - the change side too, which the
+	// signature does not carry -, by the walk signature the list was searched with, and in the person's words below).
 	PMString what;
 	bool good = KFCQueryCopier::Apply(*wanted.list.header.query, what);
 	if (good)
@@ -215,6 +216,28 @@ bool KFCTierStore::SwitchTo(uint32 set, PMString& outSummary)
 		{
 			good = false;
 			what = PMString("the walk signature");
+			what.SetTranslatable(kFalse);
+		}
+	}
+	if (good)
+	{
+		// AND A THIRD TIME, IN THE WORDS THE PERSON READS (section 3-3-1, item 2 (b)): the tier's name made again from the query
+		// Find/Change holds now must read, word for word, as the name the tier was given - asked of the UI half, which names
+		// the tiers (IKFCUIServices::QueryReadsAsTier). Here, before the switch is kept, so a mismatch takes the one refusal
+		// below. No UI half to ask = not checked = refused (only the panel asks for a switch in any case).
+		InterfacePtr<IKFCUIServices> ui(KFCQueryUIServices());
+		PMString name;
+		name.SetTranslatable(kFalse);
+		if (ui == nil || !ui->QueryReadsAsTier(wanted.set, name))
+		{
+			good = false;
+			if (name.IsEmpty())
+				what = PMString("there is no name of that tier to read it against");
+			else
+			{
+				what = PMString("it does not read as the tier's name: ");
+				what.Append(name);
+			}
 			what.SetTranslatable(kFalse);
 		}
 	}

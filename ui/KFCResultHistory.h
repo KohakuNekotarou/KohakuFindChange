@@ -7,16 +7,20 @@
 //  THE RESULTS KEPT IN TIERS (docs/superpowers/specs/2026-10-14-kfc-stacked-results-design.md - the author's calls (a) to
 //  (e), and three more the same day: the tiers are always kept - no toggle -, at most 10 of them, each named after its
 //  query). A search into the panel - the panel's Find and the query dialog's Find - puts the list it replaces above the new
-//  one as a TIER: a copy of its rows as they were, drawn grey and nothing more (never selected, no jump, no menu, not
-//  followed by Ctrl+Z). The list the model holds is the LIVE tier, under them, and works as the list always has. Clear
-//  Results, a Run of the query dialog and Change All in Book (No List) take the tiers away when they make a list anew;
-//  past 10 kept tiers the oldest goes, and the status line says so.
+//  one as a TIER: a copy of its rows as they were, drawn grey (never selected, no jump, no menu, not followed by Ctrl+Z).
+//  The list the model holds is the LIVE tier, under them, and works as the list always has. Clear Results, a Run of the
+//  query dialog and Change All in Book (No List) take the tiers away when they make a list anew; past 10 kept tiers the
+//  oldest goes, and the status line says so.
+//  A CLICK ON A GREY ROW SWITCHES TO ITS TIER (docs/superpowers/specs/2026-10-14-kfc-tier-switch-design.md - the author's
+//  call): the model puts that tier's list back with its query (KFCTierStore::SwitchTo), and the row clicked is selected and
+//  jumped to as a click on a live row is.
 //
-//  Kept here, and only here: the kept tiers (each its row's name and a copy of its rows, made with the rows' own look -
-//  KFCResultTree::GetRowLook - so a kept row reads as the row it was); the live tier's name and the list it names
-//  (IKFCResults::GetResultSetId - a new number with every list made anew, which is also how a search that went through is
-//  told from one turned away); and where the query dialog's Find is in the run order.
-//  UI half only, main thread only. Nothing of the model changes: the live tier is the model's list itself.
+//  Kept here: the grey copies (each its tier's name, its row's text and a copy of its rows, made with the rows' own look -
+//  KFCResultTree::GetRowLook - so a kept row reads as the row it was), each under its list's result set; the live tier's
+//  name and the list it names (IKFCResults::GetResultSetId - a new number with every list made anew, which is also how a
+//  search that went through is told from one turned away); and where the query dialog's Find is in the run order.
+//  THE TIERS THEMSELVES - which lists are kept, their order, the cap - are the MODEL's (KFCTierStore, read through
+//  IKFCRuns::GetKeptTierSets): the copies follow them. UI half only, main thread only.
 //
 //========================================================================================
 
@@ -35,8 +39,9 @@ namespace KFCResultHistory
 
 	/** A SEARCH INTO THE PANEL - the one door the panel's Find (KFCActionComponent) and the query dialog's
 	    (KFCQueryDialog.cpp) go through. The panel's tab name written first (KFCPanelTitle::Update), then the search
-	    (KFCRuns()->SearchBook). When it went through - the list made anew - the list it replaced is kept as a tier (as long
-	    as it has a row, or was a tier itself), the oldest tier let go past the cap, and `label` names the new list's tier.
+	    (KFCRuns()->SearchBook). When it went through - the list made anew - the list it replaced is kept as a tier when the
+	    model kept it (KFCTierStore::ParkCurrent), the copies follow the model's tiers (the oldest let go past the cap), and
+	    `label` names the new list's tier.
 	    Then the list drawn again (KFCResultTree::Rebuild) and the status line set to the search's words - with a word on
 	    the tier let go, if one was. Returns the search's answer (the matches found); *outCommitted, when given, says whether
 	    the search went through. */
@@ -98,14 +103,43 @@ namespace KFCResultHistory
 
 	/** BEFORE THE TREE FORGETS ITS ROWS (KFCResultTree::Rebuild's ClearTree): which kept tiers are open - asked only of the
 	    tiers the last rebuild drew (a tier kept since was the live one then, and comes up closed). The tree still numbers
-	    them as it drew them, so the tiers the cap has let go since are passed over and the rest found where they moved. */
+	    them as it drew them, so each is matched to its copy by the result set it drew it with: a tier gone since (the cap, a
+	    switch) is passed over, and the rest are found where they stand now. */
 	void NoteOpenTiers(ITreeViewMgr* treeMgr);
 	/** ...and after the tree is put back: those tiers opened, and in every kept tier the rows that were open when it was
 	    kept. Returns how many rows it opened (a test build's TREETIME counts them). */
 	int32 OpenKeptRows(ITreeViewMgr* treeMgr);
 
+	// ----- the tier switch (docs/superpowers/specs/2026-10-14-kfc-tier-switch-design.md section 3-5) -----
+
+	/** A CLICK ON KEPT TIER `tier`'s ROW `row` (KFCResultNodeEH): the switch booked to run once the double click's time is
+	    over (an ICallbackTimer, ::GetDoubleClickTime) - not inside the row's own click handler: the switch draws the list
+	    anew, and ITreeViewMgr::ClearTree removes every row's widget, this row's with it. Waiting the double click's time out
+	    also keeps a double click one switch: its second click lands on the same grey row, not on the list drawn anew, and
+	    books the same switch again. The tier is booked by its result set and the click by the list it was made on: a tier
+	    gone by then, a list made anew since (a search, Clear Results), the panel closed or a landing under way drop the
+	    booking (RunPendingSwitch) - the click is asked again, as a second click is (KFCActionComponent's Find). */
+	void SwitchToKeptRowLater(int32 tier, int32 row);
+
+	/** THE SWITCH: kept tier `tier` made the live list (IKFCRuns::SwitchToTier - the model puts its rows and its query back
+	    and checks the query three times, the third asked of this half: QueryReadsAsTier). Refused before the model is
+	    asked: a run of ours under way, a landing under way, a tier or row not there, or a tier no search here named (there
+	    is no name to read its query against). Switched: the copies follow the model's tiers (the list before is the newest
+	    grey tier, when the model kept it), the list is drawn again, and the status line says "Switched to: <name>".
+	    `outLiveRow` = the row of the list now that the copy's row `row` was copied from (a kept row carries it), or an
+	    invalid NodeID when it is not in the list now (its chapter emptied while it was grey - a document closed). False =
+	    refused; the status line says why (nothing for a landing - dropped, as a second click is). */
+	bool SwitchToKeptRow(int32 tier, int32 row, NodeID& outLiveRow);
+
+	/** THE SWITCH'S THIRD CHECK, ANSWERED HERE (IKFCUIServices::QueryReadsAsTier - the model asks it inside the switch, after
+	    the query is stated back): does the query Find/Change holds now read, word for word, as kept tier `set`'s name -
+	    QueryLabel() against the name, the query dialog's place in the run order ("<n>  ") taken off it? outName = that
+	    name as the tier's row shows it. False = it does not, or there is no copy of that tier, or no search here named it. */
+	bool QueryReadsAsTier(uint32 set, PMString& outName);
+
 	/** The controlled shutdown (KFCUIStartupShutdown): every static here holding storage emptied by a fresh value
-	    (KFCResultTree::ShutdownCleanup's rule - Clear() keeps a container's storage). */
+	    (KFCResultTree::ShutdownCleanup's rule - Clear() keeps a container's storage), and the switch's timer stopped and let
+	    go (its callback is a raw pointer into this .pln). */
 	void ShutdownCleanup();
 }
 

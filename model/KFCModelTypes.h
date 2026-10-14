@@ -59,6 +59,11 @@ namespace KFCResultModel
 		kScopeSelection
 	};
 
+	/** THE MOST TIERS KEPT (the author's call, 10-14 - 50 being too many searches to keep): past it the oldest goes. One
+	    number for both halves - the model keeps the tiers to it (KFCTierStore::kMaxTiers), the UI half names it when one
+	    goes (KFCResultHistory). */
+	enum { kMaxKeptTiers = 10 };
+
 	/** Everything a hit row needs to lay itself out and paint itself. @see GetHitRow. */
 	struct RowDisplay
 	{
