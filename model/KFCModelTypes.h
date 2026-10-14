@@ -102,13 +102,19 @@ struct KFCNotifyPayload
 		kRebuild = 0,		// the result set changed shape: build the tree again (KFCResultTree::Rebuild)
 		kRefreshRows,		// only what the rows draw changed (KFCResultTree::RefreshRows)
 		kChapterRowGoes,	// chapterIdx's row is about to go (KFCResultTree::BeforeChapterRowGoes)
-		kStatus				// say *text on the message line (KFCResultTree::ShowStatus)
+		kStatus,			// say *text on the message line (KFCResultTree::ShowStatus)
+		kKeptChapterGone	// kept tier `set`'s chapter chapterIdx was emptied - its document closed: its grey copy lets
+							// that document's rows go, and its heading reads `replaced` of `hits`
+							// (KFCResultHistory::KeptChapterGone)
 	};
 	Kind				kind;
 	int32				chapterIdx;
 	const PMString*		text;
+	uint32				set;		// kKeptChapterGone: the kept tier's result set
+	int32				replaced;	// kKeptChapterGone: the kept list's counts now - its hits replaced, of how many
+	int32				hits;
 
-	explicit KFCNotifyPayload(Kind k) : kind(k), chapterIdx(-1), text(nil) {}
+	explicit KFCNotifyPayload(Kind k) : kind(k), chapterIdx(-1), text(nil), set(0), replaced(0), hits(0) {}
 };
 
 /** One saved Find/Change query as the query dialog shows it (KFCSavedQueries;

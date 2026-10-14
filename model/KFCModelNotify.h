@@ -39,6 +39,11 @@ void KFCNotifyRefreshRows();
     leaves (KFCResultTree::BeforeChapterRowGoes says why). */
 void KFCNotifyChapterRowGoes(int32 chapterIdx);
 
+/** Kept tier `set`'s chapter chapterIdx was emptied - its document closed (KFCTierStore::ForgetDocument): the grey
+    copy lets that document's rows go, and its heading reads `replaced` of `hits`, the kept list's counts now
+    (KFCResultHistory::KeptChapterGone). */
+void KFCNotifyKeptChapterGone(uint32 set, int32 chapterIdx, int32 replaced, int32 hits);
+
 /** Say this on the panel's message line. */
 void KFCNotifyStatus(const PMString& message);
 

@@ -259,7 +259,8 @@ namespace KFCResultModel
 	void SetSearchScope(SearchScopeKind scope);
 	SearchScopeKind GetSearchScope();
 
-	/** A DOCUMENT OF AN ALL DOCUMENTS LIST WAS CLOSED (the author's call: only its rows go).
+	/** A DOCUMENT OF THE LIST WAS CLOSED (the author's calls: only its rows go - an All Documents list's, 2026-09-29, and
+	    every list's, its heading staying while it is a tier, 2026-10-14 night - KFCCloseDocResponder).
 	    Its chapter is emptied - rows, groups, story versions - and unbound (no docRef, no file), but
 	    it KEEPS ITS PLACE: KFCUndoFollow names rows by (chapter, row), and closing up the gap would renumber
 	    every chapter after it and cut those off from their Undo. A chapter with no rows is not shown
@@ -800,6 +801,11 @@ namespace KFCResultModel
 	    put back on `list`; no text focus is touched (a kept list has none - the switch attaches them). A row whose index
 	    is out of range is passed over, as ApplyRowStep does. */
 	void ApplyRowStepTo(ModelSnapshot& list, const RowStep& step, bool after);
+
+	/** A LIST'S COUNTS, AS ITS TIER'S ROW READS THEM - how many of its hits it has replaced, of how many - for a list that
+	    is NOT in the model (a kept tier's: KFCTierStore::ForgetDocument tells the panel its heading's counts once a
+	    closed document's rows went). The live list's are GetTotalReplacedCount / GetTotalHitCount, counted the same way. */
+	void GetListCounts(const ModelSnapshot& list, int32& outReplaced, int32& outHits);
 
 	/** Which result set the rows are: a new number with every Clear (a search, a query run, Clear Results, a close) -
 	    a write kept for an Undo belongs to one, and means nothing to the next unless a kept query run leads back to it

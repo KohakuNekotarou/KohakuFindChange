@@ -54,6 +54,16 @@ void KFCNotifyChapterRowGoes(int32 chapterIdx)
 	Emit(payload);
 }
 
+void KFCNotifyKeptChapterGone(uint32 set, int32 chapterIdx, int32 replaced, int32 hits)
+{
+	KFCNotifyPayload payload(KFCNotifyPayload::kKeptChapterGone);
+	payload.set = set;
+	payload.chapterIdx = chapterIdx;
+	payload.replaced = replaced;
+	payload.hits = hits;
+	Emit(payload);
+}
+
 void KFCNotifyStatus(const PMString& message)
 {
 	KFCNotifyPayload payload(KFCNotifyPayload::kStatus);

@@ -23,6 +23,7 @@
 #include "KFCModelAccess.h"		// KFCBoundaryMatches
 #include "KFCModelObserver.h"
 #include "KFCModelTypes.h"		// KFCNotifyPayload
+#include "KFCResultHistory.h"	// KeptChapterGone - a grey tier lets a closed document's rows go
 #include "KFCResultTree.h"
 
 /** The session-attached observer that draws what the model half reports. */
@@ -63,6 +64,9 @@ void KFCModelObserver::Update(const ClassID& theChange, ISubject* /*theSubject*/
 		case KFCNotifyPayload::kStatus:
 			if (payload->text != nil)
 				KFCResultTree::ShowStatus(*payload->text);
+			break;
+		case KFCNotifyPayload::kKeptChapterGone:
+			KFCResultHistory::KeptChapterGone(payload->set, payload->chapterIdx, payload->replaced, payload->hits);
 			break;
 		default:
 			break;

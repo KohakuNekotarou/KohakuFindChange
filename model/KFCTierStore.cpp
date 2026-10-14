@@ -17,6 +17,7 @@
 #include "KFCTierStore.h"
 #include "KFCBookScope.h"	// GetSearchedBookPath - the book a list was searched in; FindOpenChapterDoc - a chapter, by its file
 #include "KFCDiag.h"		// the TIER lines - test builds only
+#include "KFCModelNotify.h"	// KFCNotifyKeptChapterGone - a grey copy lets a closed document's rows go
 #include "KFCRowFoci.h"	// a tier's rows keep their text foci while it is grey (HandOver / TakeBack)
 #include "KFCRunGuard.h"	// no switch while a run of ours is under way
 #include "KFCSearchEngine.h"	// RememberFindFormatOf - the switched list's own Find Format, for the replace's door
@@ -42,15 +43,6 @@ namespace
 			if (gTiers[i].set == set)
 				return &gTiers[i];
 		return nil;
-	}
-
-	// KEPT OR NOT - the one answer, asked of the live list by a search's commit point (ParkCurrent) and by the switch (the
-	// list it puts aside) - the stacked results' ROW-41, the model's side of it: a list with a row, or one a search made (its
-	// query was copied - a search that found nothing is a tier too). A query run's list or Change All's is neither, nor a
-	// list the tiers were let go over (DropAll).
-	bool LiveListIsKeepable()
-	{
-		return KFCResultModel::GetDisplayChapterCount() > 0 || KFCResultModel::GetQueryCopy() != nullptr;
 	}
 
 	// The live list as a tier record - its rows, its result set, its book.
@@ -100,6 +92,11 @@ void KFCTierStore::GetTierSets(std::vector<uint32>& out)
 	out.clear();
 	for (size_t i = 0; i < gTiers.size(); ++i)
 		out.push_back(gTiers[i].set);
+}
+
+bool KFCTierStore::LiveListIsKeepable()
+{
+	return KFCResultModel::GetDisplayChapterCount() > 0 || KFCResultModel::GetQueryCopy() != nullptr;
 }
 
 void KFCTierStore::DropAll()
@@ -159,6 +156,11 @@ void KFCTierStore::ForgetDocument(IDataBase* db)
 			{
 				KFCResultModel::EmptyChapter(chapters[c]);
 				KFC_DIAG_LOG("TIER forget chapter=%d of set=%u", static_cast<int>(c), gTiers[t].set);
+				// THE PANEL'S GREY COPY FOLLOWS (the author, 10-14 night: "only the closed document's part goes"): that
+				// document's rows go from it, and its heading reads the counts the list has now - the tier stays.
+				int32 replaced = 0, hits = 0;
+				KFCResultModel::GetListCounts(gTiers[t].list, replaced, hits);
+				KFCNotifyKeptChapterGone(gTiers[t].set, static_cast<int32>(c), replaced, hits);
 			}
 		}
 	}

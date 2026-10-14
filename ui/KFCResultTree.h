@@ -53,6 +53,12 @@ namespace KFCResultTree
 	    Defined in KFCResultListWidgetMgr.cpp, beside the drawing. */
 	bool GetRowLook(const NodeID& node, RowLook& out);
 
+	/** A branch row's count: "  (R/N)" after its name - R of its N hits replaced by its list (the author's call: the
+	    search's count with the replaced one beside it, "1/3"). One shape for the tier, book, document and story rows, so
+	    they read alike - a grey tier's heading too, written again when a closed document's rows go
+	    (KFCResultHistory::KeptChapterGone). Defined in KFCResultListWidgetMgr.cpp. */
+	void AppendCounts(PMString& label, int32 replaced, int32 hits);
+
 	/** Does a rebuild bring this row of the live list up OPEN? A book row and a story row always do; a document row while the
 	    results came from neither a book nor All Documents (Rebuild says why each). The one place the rule is kept: Rebuild
 	    asks it, and so does a tier's copy made while the panel is closed (KFCResultHistory). Defined in

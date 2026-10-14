@@ -65,6 +65,8 @@ namespace
 		PMString				name;		// the name a search here gave that list (Find's label) - empty when none did (a list
 											// an Undo put back): the switch's third check reads the query against it
 		PMString				label;		// "<name>  (R/N)" as the tier's row read when it was kept
+		PMString				head;		// ...its "<name>" alone (LiveTierLabel then): KeptChapterGone writes
+											// the counts after it again when a closed document's rows go
 		std::vector<KeptRow>	rows;
 		std::vector<int32>		top;		// the rows under the tier's own row, in order
 		bool					open;		// the tier's row open - noted before each rebuild (NoteOpenTiers)
@@ -195,6 +197,8 @@ namespace
 		out.name = LiveIsStacked() ? gLive.label : PMString();
 		out.name.SetTranslatable(kFalse);
 		out.label = head.label;
+		out.head = KFCResultHistory::LiveTierLabel();	// the name GetRowLook wrote it with, before the counts
+		out.head.SetTranslatable(kFalse);
 		InterfacePtr<ITreeViewMgr> treeMgr(QueryListTreeMgr());
 		// The tier's own row open or closed as the person left it (v2 R6) - open when the tree does not show it as a tier (a
 		// list drawn with no tiers shows all its rows) or the panel is closed.
@@ -774,6 +778,63 @@ bool KFCResultHistory::ClearTier(int32 tier)
 	KFCResultTree::ShowStatus(status);
 	KFC_DIAG_LOG("STACK clear tier=%d set=%u tiers=%d", static_cast<int>(tier), set, static_cast<int>(gKept.size()));
 	return true;
+}
+
+void KFCResultHistory::KeptChapterGone(uint32 set, int32 chapterIdx, int32 replaced, int32 hits)
+{
+	int32 tier = -1;
+	for (size_t k = 0; k < gKept.size(); ++k)
+		if (gKept[k].set == set)
+		{
+			tier = static_cast<int32>(k);
+			break;
+		}
+	if (tier < 0)
+		return;
+	KeptTier& kept = gKept[static_cast<size_t>(tier)];
+	// THE TREE IS TOLD ONLY WHERE THE LAST REBUILD DREW THIS TIER, AT THIS PLACE (gDrawnSets - the tree numbers the tiers
+	// as it drew them): a copy drawn elsewhere or not at all - the panel closed - is drawn from the copy at the next
+	// rebuild.
+	InterfacePtr<ITreeViewMgr> treeMgr(QueryListTreeMgr());
+	const bool drawn = treeMgr != nil && tier < static_cast<int32>(gDrawnSets.size())
+		&& gDrawnSets[static_cast<size_t>(tier)] == set;
+	// THE DOCUMENT ROW: a row under the tier's own row, copied from that chapter's row (a book's tier keeps its chapters -
+	// the model sends nothing for one).
+	bool found = false;
+	for (size_t i = 0; i < kept.top.size() && !found; ++i)
+	{
+		const int32 row = kept.top[i];
+		TreeNodePtr<KFCResultNodeID> id(kept.rows[static_cast<size_t>(row)].live);
+		if (id == nil || !id->IsDocumentRow() || id->GetChapter() != chapterIdx)
+			continue;
+		found = true;
+		// Out of the tree first, while the copy still holds it (KFCResultTree::BeforeChapterRowGoes' order for the live
+		// list).
+		if (drawn)
+			treeMgr->BeforeNodeDeleted(KFCResultNodeID::CreateKept(tier, row));
+		// Out of the copy: off the tier's own row, the rows after it one place up. The rows themselves stay in `rows` - the
+		// others are numbered by their place there, as the tree knows them - closed, the row and the rows under it, so
+		// OpenKeptRows never opens one of them again.
+		kept.top.erase(kept.top.begin() + static_cast<std::ptrdiff_t>(i));
+		for (size_t j = i; j < kept.top.size(); ++j)
+			kept.rows[static_cast<size_t>(kept.top[j])].pos = static_cast<int32>(j);
+		std::vector<int32> under(1, row);
+		while (!under.empty())
+		{
+			KeptRow& gone = kept.rows[static_cast<size_t>(under.back())];
+			under.pop_back();
+			gone.open = false;
+			under.insert(under.end(), gone.children.begin(), gone.children.end());
+		}
+	}
+	// ITS HEADING READS THE KEPT LIST'S COUNTS NOW - the tier stays, "(0/0)" once its last document is gone.
+	kept.label = kept.head;
+	kept.label.SetTranslatable(kFalse);
+	KFCResultTree::AppendCounts(kept.label, replaced, hits);
+	if (drawn)
+		treeMgr->NodeChanged(KFCResultNodeID::CreateTier(tier));
+	KFC_DIAG_LOG("STACK kept chapter gone set=%u chapter=%d found=%d drawn=%d counts=%d/%d", set,
+		static_cast<int>(chapterIdx), found ? 1 : 0, drawn ? 1 : 0, static_cast<int>(replaced), static_cast<int>(hits));
 }
 
 void KFCResultHistory::RenameLiveFromQuery(uint32 set)

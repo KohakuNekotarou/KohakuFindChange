@@ -11,8 +11,12 @@
 //
 //  The rule this implements, for the DOCUMENT scope only:
 //
-//      the user closes a searched document -> its rows go, and the panel goes back to empty when they
-//      were the list's last (an All Documents list keeps the other documents' rows - Respond).
+//      the user closes a searched document -> its rows go, and the list stays while it is one to keep
+//      (KFCTierStore::LiveListIsKeepable - a row left, or a search made it): an All Documents list keeps
+//      the other documents' rows, and a list a search made keeps its heading - "(0/0)" once its last
+//      document is gone (the author, 2026-10-14 night: "only the closed document's part goes"). Only a
+//      list that is no tier any more goes, the panel back to empty (Respond). The kept tiers lose that
+//      document's rows too, their headings staying (KFCTierStore::ForgetDocument).
 //
 //  Book scope is deliberately left alone here - for the RESULTS. A book chapter carries its .indd
 //  file, so it can be reopened (KFCBookScope::ReopenChapterDoc) and dropping twenty chapters'
@@ -71,10 +75,10 @@
 #include "KFCModelNotify.h"		// the panel is told, never called (the model/UI split)
 #include "KFCRunGuard.h"		// never retire results out from under a run of ours
 #include "KFCSearchEngine.h"	// DropResults - the rows, the searched book and the find format, together; ForgetSearchedFindFormatOf
-#include "KFCTierStore.h"		// ForgetDocument - a closing document's chapters emptied in the kept tiers
+#include "KFCTierStore.h"		// ForgetDocument - the kept tiers' chapters emptied; LiveListIsKeepable - a list that stays
 #include "KFCUndoFollow.h"		// DocumentClosing, ForgetBookChapter, ForgetClosingDocument - a closing document let go
 
-/** Retires a document-scope result set when its document is closed.
+/** Takes a closed document's rows out of a document-scope result set - the list itself goes only once it is no tier.
 
 	There is no ServiceProvider here on purpose: a boss that answers ONE signal names the API's own
 	provider implementation in the .fr (kBeforeCloseDocSignalRespServiceImpl) and writes only the
@@ -234,37 +238,42 @@ void KFCCloseDocResponder::Respond(ISignalMgr* signalMgr)
 		return;
 	}
 
-	// ALL DOCUMENTS: ONLY THAT DOCUMENT'S ROWS GO (the author's call). The list is the
-	// open documents', and the others are still open - their rows and their Undo stay. The chapter
-	// keeps its place in the model (KFCResultModel::CloseChapter says why); the kept writes let the
-	// document go above (KFCUndoFollow::ForgetClosingDocument). When it was the last document with rows, the list
-	// goes the way a Document list always has, below.
-	if (KFCResultModel::GetSearchScope() == KFCResultModel::kScopeAllDocuments
-		&& KFCResultModel::GetTotalHitCount() > KFCResultModel::GetHitCount(closingChapter))
+	// ONLY THAT DOCUMENT'S ROWS GO (the author's calls: an All Documents list's, 2026-09-29 - the others are still open,
+	// their rows and their Undo stay; every list's, 2026-10-14 night - "can the title part stay? only the closed
+	// document's part goes"). The chapter keeps its place in the model (KFCResultModel::CloseChapter says why); the kept
+	// writes let the document go above (KFCUndoFollow::ForgetClosingDocument). Only that row goes, and the others stay
+	// as they are (open or closed): the panel draws every row a list holds
+	// (docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md F9), so taking one out brings no other
+	// into view.
+	PMString closedName;
+	int32 closedCount = 0;
+	KFCResultModel::GetChapterDisplay(closingChapter, closedName, closedCount);
+	KFC_DIAG_LOG("CLOSE - chapter %d's %d row(s) go", closingChapter, closedCount);
+	KFCNotifyChapterRowGoes(closingChapter);
+	KFCResultModel::CloseChapter(closingChapter);
+
+	// THE LIST STAYS WHILE IT IS ONE TO KEEP (KFCTierStore::LiveListIsKeepable - the one answer: a row left, or a search
+	// made it): the other documents' rows, or its heading alone - "(0/0)" once its last document is gone, as a search
+	// that found nothing reads. The heading and the book row read the counts left (RefreshRows repaints them).
+	if (KFCTierStore::LiveListIsKeepable())
 	{
-		PMString closedName;
-		int32 closedCount = 0;
-		KFCResultModel::GetChapterDisplay(closingChapter, closedName, closedCount);
-		KFC_DIAG_LOG("CLOSE - All Documents: chapter %d's %d row(s) go, the others stay", closingChapter, closedCount);
-		// Only that row goes, and the others stay as they are (open or closed): the panel draws every row a list
-		// holds (docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md F9), so taking one out
-		// brings no other into view.
-		KFCNotifyChapterRowGoes(closingChapter);
-		KFCResultModel::CloseChapter(closingChapter);
+		KFCNotifyRefreshRows();
 		PMString msg(closedName);
 		msg.SetTranslatable(kFalse);
-		msg.Append(" was closed - its rows are gone. The other documents' rows stay.");
+		msg.Append(KFCResultModel::GetDisplayChapterCount() > 0
+			? " was closed - its rows are gone. The other documents' rows stay." : " was closed - its rows are gone.");
 		KFCNotifyStatus(msg);
 		return;
 	}
 
-	// Back to empty. Rebuild draws the now-empty model, and the status line says why the rows
-	// went - a panel that empties itself without a word reads as a crash.
+	// Back to empty - a list that is no tier any more (no row left, and no search made it: a query run's). Rebuild draws
+	// the now-empty model, and the status line says why the rows went - a panel that empties itself without a word reads
+	// as a crash.
 	//
 	// DropResults, without exception: a document-scope result set has no book behind it, so its
 	// ReleaseSearchedBook finds no book to let go here (a chapter an earlier book run had to keep is tried
 	// again, as at every DropResults) - it is one rule with no exceptions to remember.
-	KFC_DIAG_LOG("CLOSE - chapter %d was the list's last: the results are dropped", closingChapter);
+	KFC_DIAG_LOG("CLOSE - chapter %d was the list's last, and the list is no tier: the results are dropped", closingChapter);
 	KFCSearchEngine::DropResults();
 	KFCNotifyRebuild();
 

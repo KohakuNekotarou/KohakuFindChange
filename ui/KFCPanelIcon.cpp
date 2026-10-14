@@ -53,7 +53,8 @@ WidgetID Choose()
 	// message on that line ("Results cleared - the document was closed.") while throwing the
 	// results away, so an empty-or-not test on the text would leave the panel showing the wrong
 	// picture after a close. HasRun is cleared by Clear(), which is exactly what those responders
-	// call.
+	// call when they throw a list away. (A list that is a tier keeps its heading when its last
+	// document closes - and the searching cat with it, its search having run: KFCCloseDocResponder.)
 	return KFCResults()->HasRun() ? kKFCIconFoundWidgetID : kKFCIconWidgetID;
 }
 

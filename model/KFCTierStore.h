@@ -38,6 +38,13 @@ namespace KFCTierStore
 	/** The kept tiers' result sets, in search order - the oldest first. */
 	void GetTierSets(std::vector<uint32>& out);
 
+	/** KEPT OR NOT - the one answer, asked of the live list: is it a tier - a list with a row, or one a search made (its
+	    query was copied: a search that found nothing is a tier too)? A query run's list or Change All's is neither, nor a
+	    list the tiers were let go over (DropAll). Asked by a search's commit point (ParkCurrent), by the switch (the list
+	    it puts aside) and by the close responder (a list whose last document closed keeps its heading while it is one -
+	    the author, 10-14 night). The stacked results' ROW-41, the model's side of it. */
+	bool LiveListIsKeepable();
+
 	/** Every tier let go (fresh storage, not Clear()) - and the live list's query copy with them, so a list the tiers were
 	    let go over is no tier-to-be (a list that found nothing, which Clear Results leaves as it is, became a nameless
 	    "Results (0/0)" tier at the next search - the author's live test, 10-14). */
@@ -52,7 +59,10 @@ namespace KFCTierStore
 	    file as every door of KFC finds a chapter's document (KFCBookScope::FindOpenChapterDoc), while the document is still
 	    open (the close responder's kBeforeCloseDoc). A chapter keeps its place, so the rows of a write kept for that tier
 	    stay numbered right. A BOOK'S tier keeps its chapters - book results survive a chapter closing, as the live book
-	    list's do (KFC opens and hands back a book's chapters on every book search). */
+	    list's do (KFC opens and hands back a book's chapters on every book search). Each chapter emptied is told to the
+	    panel (KFCNotifyKeptChapterGone): the tier's grey copy lets that document's rows go and its heading reads the
+	    counts left - the tier stays, its heading with it (the author, 10-14 night: "only the closed document's part
+	    goes"). */
 	void ForgetDocument(IDataBase* db);
 
 	/** The chapters of kept tier `set`'s list that are the document `db` - by file first, as ForgetDocument finds them (the

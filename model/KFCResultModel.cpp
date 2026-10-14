@@ -316,7 +316,7 @@ void KFCResultModel::CloseChapter(int32 chapterIdx)
 	Chapter* c = ChapterAt(chapterIdx);
 	if (c == nil)
 		return;
-	// Its rows' text foci go first - their document is still open here (All Documents' close responder).
+	// Its rows' text foci go first - their document is still open here (the close responder's kBeforeCloseDoc).
 	KFCRowFoci::DetachChapter(chapterIdx);
 	// Emptied and unbound, in place (see the header for why the place is kept).
 	EmptyChapter(*c);
@@ -1303,6 +1303,21 @@ void KFCResultModel::ApplyRowStepTo(ModelSnapshot& list, const RowStep& step, bo
 			recorded[v.story] = v.version;
 		else
 			recorded.erase(v.story);
+	}
+}
+
+void KFCResultModel::GetListCounts(const ModelSnapshot& list, int32& outReplaced, int32& outHits)
+{
+	// GetTotalHitCount's and GetTotalReplacedCount's count (GetChapterReplacedCount), over the list's own chapters.
+	outReplaced = 0;
+	outHits = 0;
+	for (size_t c = 0; c < list.chapters.size(); ++c)
+	{
+		const std::vector<Hit>& hits = list.chapters[c].hits;
+		outHits += static_cast<int32>(hits.size());
+		for (size_t i = 0; i < hits.size(); ++i)
+			if (hits[i].replaced)
+				++outReplaced;
 	}
 }
 

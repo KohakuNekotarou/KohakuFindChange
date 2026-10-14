@@ -174,6 +174,13 @@ namespace KFCResultHistory
 	    says "Cleared: <name>". False = nothing let go (a tier not there, a run of ours under way - the model refuses). */
 	bool ClearTier(int32 tier);
 
+	/** A CLOSED DOCUMENT'S ROWS OUT OF A GREY TIER (the author, 2026-10-14 night: "the title part stays - only the closed
+	    document's part goes"; the model emptied the chapter - KFCTierStore::ForgetDocument): kept tier `set`'s copy lets
+	    go of chapter `chapterIdx`'s document row and the rows under it - the tree told first, where the last rebuild drew
+	    that tier - and its heading reads `replaced` of `hits`, the kept list's counts now. The tier stays. Nothing but
+	    the counts when the copy has no such row; nothing at all when no copy has that result set. */
+	void KeptChapterGone(uint32 set, int32 chapterIdx, int32 replaced, int32 hits);
+
 	/** The controlled shutdown (KFCUIStartupShutdown): every static here holding storage emptied by a fresh value
 	    (KFCResultTree::ShutdownCleanup's rule - Clear() keeps a container's storage), and the switch's timer stopped and let
 	    go (its callback is a raw pointer into this .pln). */

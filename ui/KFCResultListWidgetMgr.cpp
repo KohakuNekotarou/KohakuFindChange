@@ -147,17 +147,6 @@ namespace
 			tcd->SetString(display, kTrue /*invalidate*/, kFalse /*don't notify*/);
 	}
 
-	// A branch row's count: "  (R/N)" - R of its N hits replaced by this list (the author's call: the search's
-	// count with the replaced one beside it, "1/3"). One shape for the book, document and story rows, so they read alike.
-	void AppendCounts(PMString& label, int32 replaced, int32 hits)
-	{
-		label.Append("  (");
-		label.AppendNumber(replaced);
-		label.Append("/");
-		label.AppendNumber(hits);
-		label.Append(")");
-	}
-
 	// A DOCUMENT WITH NO WINDOW: the chapter's document is open and no window shows it. The one question the document
 	// row's "(no window)" and the status line after a Replace ("still hidden") both ask.
 	bool ChapterHasNoWindow(int32 chapterIdx)
@@ -447,6 +436,15 @@ private:
 };
 
 CREATE_PMINTERFACE(KFCResultListWidgetMgr, kKFCResultListWidgetMgrImpl)
+
+void KFCResultTree::AppendCounts(PMString& label, int32 replaced, int32 hits)
+{
+	label.Append("  (");
+	label.AppendNumber(replaced);
+	label.Append("/");
+	label.AppendNumber(hits);
+	label.Append(")");
+}
 
 bool KFCResultTree::GetRowLook(const NodeID& node, RowLook& out)
 {
