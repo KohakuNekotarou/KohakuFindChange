@@ -33,6 +33,7 @@
 #include "KFCPanelTitle.h"			// Update - the tab's scope written before the search
 #include "KFCResultNodeID.h"
 #include "KFCTextCut.h"				// KFCSafeCut - where the tier name's words may be cut
+#include "FileUtils.h"				// IsEqual - the query the dialog's Find searched last, by its file
 
 namespace
 {
@@ -84,7 +85,8 @@ namespace
 
 	std::vector<KeptTier> gKept;		// the copies, in the model's order - the oldest first (FollowModelTiers)
 	LiveTier gLive;
-	int32 gNextQuery = 0;				// the query dialog's Find: the run order's query it searches next
+	IDFile gLastFound;					// the query dialog's Find: the query it searched last (QueryJustFound)
+	uint32 gLastFoundSet = 0;			// ...and the list that search made (0 = none)
 	std::vector<uint32> gDrawnSets;		// the kept tiers the last rebuild drew, by result set, in the tree's order:
 										// NoteOpenTiers finds each where it stands now (a tier gone since is passed over)
 
@@ -507,7 +509,8 @@ bool KFCResultHistory::DropStack()
 	// Fresh values, not Clear(): the storage goes with them.
 	gKept = std::vector<KeptTier>();
 	gLive = LiveTier();
-	gNextQuery = 0;
+	gLastFound = IDFile();
+	gLastFoundSet = 0;
 	gDrawnSets = std::vector<uint32>();
 	KFC_DIAG_LOG("STACK drop was=%d", was ? 1 : 0);
 	return was;
@@ -523,19 +526,15 @@ bool KFCResultHistory::HasLiveList()
 	return KFCResults()->HasRun() || KFCResults()->IsFromBook() || KFCResults()->GetDisplayChapterCount() > 0;
 }
 
-int32 KFCResultHistory::NextQueryIndex()
+bool KFCResultHistory::QueryJustFound(const IDFile& file)
 {
-	return gNextQuery;
+	return gLastFoundSet != 0 && gLastFoundSet == KFCResults()->GetResultSetId() && FileUtils::IsEqual(file, gLastFound) != kFalse;
 }
 
-void KFCResultHistory::StepQueryIndex()
+void KFCResultHistory::NoteQueryFound(const IDFile& file)
 {
-	++gNextQuery;
-}
-
-void KFCResultHistory::RestartQueryFind()
-{
-	gNextQuery = 0;
+	gLastFound = file;
+	gLastFoundSet = KFCResults()->GetResultSetId();
 }
 
 int32 KFCResultHistory::KeptTierCount()
@@ -979,7 +978,8 @@ void KFCResultHistory::ShutdownCleanup()
 	gBookedOn = 0;
 	gKept = std::vector<KeptTier>();
 	gLive = LiveTier();
-	gNextQuery = 0;
+	gLastFound = IDFile();
+	gLastFoundSet = 0;
 	gDrawnSets = std::vector<uint32>();
 	gLiveOpen = LiveOpen();
 	gDrawnLive = 0;

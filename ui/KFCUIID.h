@@ -402,8 +402,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryMessageTextWidgetID, kKFCUIPrefix + 42)
 DECLARE_PMID(kWidgetIDSpace, kKFCQuerySaveOrderButtonWidgetID, kKFCUIPrefix + 43)
 DECLARE_PMID(kWidgetIDSpace, kKFCQueryLoadOrderButtonWidgetID, kKFCUIPrefix + 44)
 // ...and Find beside Run (docs/superpowers/specs/2026-10-14-kfc-stacked-results-design.md section 2-1 - the author's call
-// (a)): the run order's next query searched, its list a new tier on the panel (KFCResultHistory). + 45: never used at
-// either prefix.
+// (a)): the run order's selected query searched (the author's call, 10-14 night), its list a new tier on the panel
+// (KFCResultHistory), and the selection moved down one. + 45: never used at either prefix.
 DECLARE_PMID(kWidgetIDSpace, kKFCQueryFindButtonWidgetID, kKFCUIPrefix + 45)
 
 

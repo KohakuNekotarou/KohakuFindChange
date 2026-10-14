@@ -54,7 +54,7 @@
 #include "KFCQueryList.h"
 #include "KFCQueryOrder.h"
 #include "KFCQueryOrderFile.h"		// KFCChooseOrderFile - Save Order... / Load Order...'s file
-#include "KFCResultHistory.h"		// Find - a query searched as a new tier; where Find is in the run order; a Run's drop
+#include "KFCResultHistory.h"		// Find - a query searched as a new tier; the same query twice in a row; a Run's drop
 #include "KFCResultTree.h"			// Rebuild / ShowStatus - the panel, told of a run as Find tells it
 #include "KFCUIID.h"
 
@@ -186,11 +186,10 @@ namespace
 #ifdef KFC_DIAG
 		// TEST BUILDS ONLY: the fault switch qd-order-reset (KFCDiag.h) - a test case starts from an empty order, as a
 		// fresh session does (the order outlives a case otherwise: it is the session's). One-shot: taken away here, so the
-		// case's later opens keep the order it made. Find starts again from the first query, as after any change of order.
+		// case's later opens keep the order it made.
 		if (KFC_DIAG_FAULT("qd-order-reset"))
 		{
 			KFCQueryOrder::Clear();
-			KFCResultHistory::RestartQueryFind();
 			KFCDiagFaultOff("qd-order-reset");
 		}
 #endif
@@ -202,12 +201,26 @@ namespace
 		ShowRunScope(panel);
 	}
 
-	/** Find (docs/superpowers/specs/2026-10-14-kfc-stacked-results-design.md section 2-1 - the author's call (a)): the run
-	    order's next query loaded into Find/Change and searched with the panel's own search, its list put on the panel as a
-	    new tier above the one before (KFCResultHistory::Find, keeping). Run's rules for a query that cannot go: one whose
-	    file is gone stops the press (Run does not run at all then); one that cannot be read, or has nothing to find, is
-	    stepped over (Run skips them). The query stays in Find/Change - the new tier's rows are replaced against it. Where the
-	    press is in the run order is KFCResultHistory's: back to the first when the order changes, or the tiers are cleared. */
+	/** THE ROW BELOW `index` PICKED in the run order (the author's call: Find moves the selection down one) - the last row
+	    stays picked. Picked before the press's own words are written: a pick says what its query does on the dialog's line
+	    (ShowPickedQuery), and the press's words go over it. */
+	void PickNextOrderRow(IPanelControlData* panel, int32 index)
+	{
+		const int32 rows = static_cast<int32>(KFCQueryOrder::Order().size());
+		const int32 next = (index + 1 < rows) ? index + 1 : index;
+		KFCQueryListSelect(panel, kKFCQueryOrderListWidgetID, next);
+		UpdateButtons(panel);
+	}
+
+	/** Find (docs/superpowers/specs/2026-10-14-kfc-stacked-results-design.md section 2-1 - the author's call (a); the row
+	    searched, the author's call of 10-14 night): the RUN ORDER'S SELECTED query - the first when none is selected -
+	    loaded into Find/Change and searched with the panel's own search, its list put on the panel as a new tier
+	    (KFCResultHistory::Find, keeping); then the selection moves down one (PickNextOrderRow - the last row stays), so
+	    pressing Find again searches the next. Run's rules for a query that cannot go: one whose file is gone stops the press
+	    (Run does not run at all then) and the selection stays; one that cannot be read, or has nothing to find, is stepped
+	    over (Run skips them) - the selection moves on. THE SAME QUERY TWICE IN A ROW is refused (the author's call) while
+	    the list its last Find made is the panel's live list (KFCResultHistory::QueryJustFound) - said, not greyed, as Find
+	    and Run say why they cannot go. The query stays in Find/Change - the new tier's rows are replaced against it. */
 	void PressFind(IPanelControlData* panel)
 	{
 		KFC_DIAG_HIDDEN_DOCS_CHECK("query-find");	// (test builds only - a document left with no window when the find is over)
@@ -228,16 +241,8 @@ namespace
 			SayOnBoth(panel, PMString("Find: the run order is empty."));
 			return;
 		}
-		const int32 next = KFCResultHistory::NextQueryIndex();
-		if (next >= count)
-		{
-			PMString done("Find: all ");
-			done.SetTranslatable(kFalse);
-			done.AppendNumber(count);
-			done.Append(" queries of the run order have been searched - Clear Results or change the run order to search them again.");
-			SayOnBoth(panel, done);
-			return;
-		}
+		const int32 picked = KFCQueryListSelectedIndex(panel, kKFCQueryOrderListWidgetID);
+		const int32 next = (picked >= 0 && picked < count) ? picked : 0;
 		const KFCSavedQuery& query = order[static_cast<size_t>(next)];
 		// "Find 2 of 3: Text  name" - the head of every line this press says.
 		PMString say("Find ");
@@ -253,9 +258,17 @@ namespace
 			SayOnBoth(panel, say);
 			return;
 		}
+		// THE SAME QUERY AS THE LAST FIND, ITS LIST STILL THE ONE ON THE PANEL: nothing loaded, nothing searched - pick another
+		// (the selection stays, so the press can be made again once another is picked).
+		if (KFCResultHistory::QueryJustFound(query.file))
+		{
+			say.Append(" was searched just now - its results are on the panel. Pick another query of the run order.");
+			SayOnBoth(panel, say);
+			return;
+		}
 		if (!KFCRuns()->LoadSavedQuery(query.file))
 		{
-			KFCResultHistory::StepQueryIndex();
+			PickNextOrderRow(panel, next);
 			say.Append(" skipped: the file could not be read.");
 			SayOnBoth(panel, say);
 			return;
@@ -265,7 +278,7 @@ namespace
 		const int32 mode = KFCRuns()->CurrentSearchMode();
 		if (!KFCRuns()->CanSearchTab(mode) || (mode != IFindChangeOptions::kObjectSearch && !KFCRuns()->HasFindQueryNow()))
 		{
-			KFCResultHistory::StepQueryIndex();
+			PickNextOrderRow(panel, next);
 			say.Append(" skipped: nothing to find.");
 			SayOnBoth(panel, say);
 			return;
@@ -281,8 +294,12 @@ namespace
 		bool committed = false;
 		(void)KFCResultHistory::Find(label, summary, &committed);
 		if (committed)
-			KFCResultHistory::StepQueryIndex();
-		KFC_DIAG_LOG("QDFIND query=%d of=%d went=%d", static_cast<int>(next + 1), static_cast<int>(count), committed ? 1 : 0);
+		{
+			KFCResultHistory::NoteQueryFound(query.file);
+			PickNextOrderRow(panel, next);
+		}
+		KFC_DIAG_LOG("QDFIND query=%d of=%d picked=%d went=%d", static_cast<int>(next + 1), static_cast<int>(count),
+			static_cast<int>(picked), committed ? 1 : 0);
 		// The panel's line has the search's own words (Find set it); the dialog's says which query they are about.
 		say.Append(committed ? " - " : " - nothing was searched: ");
 		say.Append(summary);
@@ -360,8 +377,7 @@ namespace
 		else
 			return;
 
-		// The order changed: Find starts again from its first query (the stacked results' spec, section 2-1).
-		KFCResultHistory::RestartQueryFind();
+		// (Find searches the row picked - the one the change leaves the eye on.)
 		KFCQueryListRebuild(panel, kKFCQueryOrderListWidgetID);
 		KFCQueryListSelect(panel, kKFCQueryOrderListWidgetID, pick);
 		UpdateButtons(panel);
@@ -415,7 +431,6 @@ namespace
 			SayOnBoth(panel, say);
 			return;
 		}
-		KFCResultHistory::RestartQueryFind();	// another order: Find starts again from its first query
 		KFCQueryListRebuild(panel, kKFCQuerySavedListWidgetID);		// read again on the way (LoadOrderFrom)
 		KFCQueryListRebuild(panel, kKFCQueryOrderListWidgetID);
 		UpdateButtons(panel);

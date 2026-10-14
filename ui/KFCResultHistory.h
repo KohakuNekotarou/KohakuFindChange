@@ -20,7 +20,8 @@
 //  Kept here: the grey copies (each its tier's name, its row's text and a copy of its rows, made with the rows' own look -
 //  KFCResultTree::GetRowLook - so a kept row reads as the row it was), each under its list's result set; the live tier's
 //  name and the list it names (IKFCResults::GetResultSetId - a new number with every list made anew, which is also how a
-//  search that went through is told from one turned away); and where the query dialog's Find is in the run order.
+//  search that went through is told from one turned away); and the query the query dialog's Find searched last, with
+//  the list it made (the same query is not searched twice in a row - QueryJustFound).
 //  THE TIERS THEMSELVES - which lists are kept, their order, the cap - are the MODEL's (KFCTierStore, read through
 //  IKFCRuns::GetKeptTierSets): the copies follow them. UI half only, main thread only.
 //
@@ -30,6 +31,7 @@
 #define __KFCResultHistory_h__
 
 #include "PMString.h"
+#include "IDFile.h"				// QueryJustFound / NoteQueryFound - a saved query, by its file
 
 #include "KFCResultTree.h"		// RowLook - what a kept row looks like
 
@@ -72,14 +74,15 @@ namespace KFCResultHistory
 	/** Is there a live list to put under the kept tiers - a search's (HasRun), a book row, a document row? */
 	bool HasLiveList();
 
-	// ----- the query dialog's Find (the spec's section 2-1) -----
+	// ----- the query dialog's Find (the author's call, 10-14 night: the Run Order's selected row) -----
 
-	/** The run order's query the next Find searches (0 = the first). */
-	int32 NextQueryIndex();
-	/** ...moved on by one: the query searched, or stepped over. */
-	void StepQueryIndex();
-	/** ...back to the first: the run order changed (KFCQueryDialog.cpp), or the tiers went (DropStack). */
-	void RestartQueryFind();
+	/** THE SAME QUERY TWICE IN A ROW (the author's call): did the query dialog's last Find search `file` (FileUtils::IsEqual
+	    - a saved query is its file), and is the list it made the panel's live list still? True = the Find is refused - its
+	    list would be the one on the panel again. A search since (the panel's, another query's), a Run, Clear Results or a
+	    switch to another tier makes another list live, and the query can be searched again. */
+	bool QueryJustFound(const IDFile& file);
+	/** ...noted after a Find of `file` that went through: the query, and the list it made (the live list's set). */
+	void NoteQueryFound(const IDFile& file);
 
 	// ----- what the list draws (KFCResultListAdapter, KFCResultListWidgetMgr) -----
 
