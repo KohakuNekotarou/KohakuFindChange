@@ -234,6 +234,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCDiagCommands.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCDiagWrittenDocs.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCSearchEngine.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCFindChangeCmds.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCQuerySequence.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCChangeAll.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCSavedQueries.cpp"/>
@@ -276,6 +277,7 @@
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCRowFoci.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCRunGuard.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCSearchEngine.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCFindChangeCmds.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCQuerySequence.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCChangeAll.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCSavedQueries.h"/>
