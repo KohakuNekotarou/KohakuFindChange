@@ -919,10 +919,14 @@ namespace
 		if (controller == nil || adapter == nil || treeMgr == nil)
 			return IIdleTask::kEndOfTime;
 		// SWITCHED WITH NO ROW TO LAND ON - the tier's own row was clicked (v2 R5), or the row's chapter went while it was
-		// grey: nothing of the list before stays selected (its rows' numbers name other rows of this list).
+		// grey: nothing of the list before stays selected (its rows' numbers name other rows of this list), and the tier's own
+		// row is - the one row of a tier that can be (the author's call, 10-14 night) - with the keyboard on the list.
 		if (!liveRow.IsValid())
 		{
 			controller->DeselectAll(kFalse /*notifyOfChange*/, kTrue /*changeHilite*/);
+			(void)controller->Select(KFCResultNodeID::CreateLiveTier(), kTrue /*notifyOfChange*/, kTrue /*changeHilite*/);
+			KFCResultTree::DropRowPreview();
+			(void)KFCResultTree::TakeKeyboard();
 			return IIdleTask::kEndOfTime;
 		}
 		std::vector<NodeID> above;

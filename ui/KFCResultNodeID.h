@@ -178,8 +178,14 @@ public:
 	/** Is this a KEPT row - a row of a kept tier's copy? */
 	bool16 IsKeptRow() const { return fChapter == kKeptRowMark && fHit >= 0; }
 
-	/** A row that is never selected and never acts (the stacked results' spec, section 2-2): a tier's row, or a kept row. */
+	/** A row that never acts (the stacked results' spec, section 2-2): a tier's row, or a kept row - and is never selected,
+	    but for the live tier's own row (IsLiveTierRow). */
 	bool16 IsInert() const { return IsTierRow() || IsKeptRow(); }
+
+	/** THE LIVE TIER'S OWN ROW - the one inert row that can be selected (the author's call, 10-14 night: "a heading row can
+	    be selected"): alone, as a story row is, and acting on nothing - it names no document (no jump), and Return writes
+	    nothing for it (KFCResultTree::GetSelectedHitRows takes no row that is not a hit). */
+	bool16 IsLiveTierRow() const { return IsTierRow() && fFont < 0; }
 
 	/** The tier of a tier's row or a kept row: 0 = the oldest kept tier, -1 = the live one (a tier's row only). -1 for every
 	    other row. */

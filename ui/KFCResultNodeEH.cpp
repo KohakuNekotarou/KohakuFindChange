@@ -142,8 +142,17 @@ bool16 KFCResultNodeEH::LButtonUp(IEvent* e)
 		KFCResultHistory::SwitchToKeptRowLater(nodeID->GetTier(), -1);
 		return result;
 	}
+	// THE LIVE TIER'S OWN ROW (the author's call, 10-14 night: a heading row can be selected): the press selected it - alone,
+	// as a story row is - and it acts on nothing (it names no document; Return writes nothing for it). The keyboard to the
+	// list, so the arrows walk on from it, and the row's after-text left by the row before taken off the message line.
+	if (nodeID != nil && nodeID->IsLiveTierRow())
+	{
+		KFCResultTree::DropRowPreview();
+		(void)KFCResultTree::TakeKeyboard();
+		return result;
+	}
 	if (nodeID == nil || nodeID->IsRoot() || nodeID->IsInert())
-		return result;		// the hidden root has nowhere to go; a tier's own row only opens and closes (never selected)
+		return result;		// the hidden root has nowhere to go (a grey tier's rows switched above)
 
 	// The selection lives on the tree, not on the row, so ask upwards for it.
 	InterfacePtr<const IWidgetParent> widgetParent(this, UseDefaultIID());

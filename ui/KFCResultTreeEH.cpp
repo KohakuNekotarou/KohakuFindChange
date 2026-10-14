@@ -662,6 +662,13 @@ bool16 KFCResultTreeEH::StockMoveThenLand(IEvent* e, const VirtualKey& key)
 		return handled;		// the selection did not move (a PageUp / PageDown's scroll, Home on the first row)
 
 	TreeNodePtr<KFCResultNodeID> node(selected[0]);
+	// THE LIVE TIER'S OWN ROW, reached by an arrow (it can be selected - the author's call, 10-14 night): nothing to land on
+	// (it names no document), and the after-text the row before left on the message line taken off.
+	if (node != nil && node->IsLiveTierRow())
+	{
+		KFCResultTree::DropRowPreview();
+		return handled;
+	}
 	if (node == nil || node->IsRoot() || node->IsInert())
 		return handled;
 

@@ -149,7 +149,8 @@ namespace KFCResultHistory
 	    row not there. Switched: the copies follow the model's tiers (the list before goes in as a grey tier at its place in
 	    search order, when the model kept it), the list is drawn again with every row open or closed as it was and the view
 	    where it was, and the status line says "Switched to: <name>". `row` -1 = the tier's own row was clicked: nothing to
-	    land on. `outLiveRow` = the row of the list now that the copy's row `row` was copied from (a kept row carries it),
+	    land on (the booked switch selects the tier's own row then). `outLiveRow` = the row of the list now that the copy's
+	    row `row` was copied from (a kept row carries it),
 	    or an invalid NodeID when there is none (its chapter emptied while it was grey - a document closed - or the tier's
 	    own row). False = refused; the status line says why (nothing for a landing - dropped, as a second click is). */
 	bool SwitchToKeptRow(int32 tier, int32 row, NodeID& outLiveRow);
