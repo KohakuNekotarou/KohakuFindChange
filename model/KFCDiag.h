@@ -167,6 +167,9 @@
 //    run-leave-no-flag  KFCChangeAll::LeaveRunDocuments leaves a document not written as the walk left it, the query
 //                run's old way: with run-dirty-unwritten, a chapter not written stays open with no window and named, and a
 //                document of the user's stays "unsaved" (xq-book-dirty-unwritten-armed, xq-doc-dirty-unwritten-armed)
+//    query-scope-refuse  KFCQueryScope (a row operation under its list's query - the tier switch v2) refuses once every
+//                check has passed: the refusal's whole path - the sequence aborted, Find/Change put back, nothing done -
+//                tried on demand (the v2 spec's section 5, item 7). One-shot.
 //
 //  AND TIMERS: KFC_CLOCK / KFC_SPENT add up the milliseconds a stretch of code takes, and KFCDiagPhase
 //  writes "PHASE <name> begin" and "PHASE <name> end <ms>" around a scope - all of it nothing without KFC_DIAG.
