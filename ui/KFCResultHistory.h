@@ -47,7 +47,8 @@ namespace KFCResultHistory
 	    the search went through. */
 	int32 Find(const PMString& label, PMString& outSummary, bool* outCommitted = nil);
 
-	/** A tier's name - the query Find/Change holds now, in the author's words (10-14): "[<tab>] Find:"<find>" Change:"<change>"",
+	/** A tier's name - the query Find/Change holds now, in the author's words (10-14; F and C rather than Find and Change,
+	    the same night): "[<tab>] F:"<find>" C:"<change>"",
 	    each side as the Application Bar's field would show it (KFCFindChangeQueryWords / KFCFindChangeChangeWords) and cut
 	    at 200 characters; "[<tab>]" alone for a tab with nothing to say in words (Object). The panel's Find names its tier
 	    by it; the query dialog's Find puts the query's place in the run order in front. */

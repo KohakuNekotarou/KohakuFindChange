@@ -271,7 +271,7 @@ namespace
 			return;
 		}
 		// The tier's name: the query's place in the run order, then the query as Find/Change holds it now - loaded above -
-		// in the words every tier is named by (the author's call, 10-14): "<n>  [<tab>] Find:"<find>" Change:"<change>"".
+		// in the words every tier is named by (the author's call, 10-14): "<n>  [<tab>] F:"<find>" C:"<change>"".
 		PMString label;
 		label.SetTranslatable(kFalse);
 		label.AppendNumber(next + 1);

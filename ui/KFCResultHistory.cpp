@@ -325,11 +325,12 @@ PMString KFCResultHistory::QueryLabel()
 	PMString findWords, changeWords;
 	if (KFCFindChangeQueryWords(findWords))
 	{
-		label.Append(" Find:\"");
+		// F and C, not Find and Change (the author's call, 10-14 night): the row has the panel's width to fill.
+		label.Append(" F:\"");
 		AppendQueryWords(label, findWords);
 		label.Append("\"");
 		(void)KFCFindChangeChangeWords(changeWords);		// the same tab, so it answers as the find side did
-		label.Append(" Change:\"");
+		label.Append(" C:\"");
 		AppendQueryWords(label, changeWords);
 		label.Append("\"");
 	}
