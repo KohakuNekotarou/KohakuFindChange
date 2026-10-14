@@ -38,6 +38,7 @@
 class ITextWalker;			// AcquireWalker
 class ITextWalkerScope;		// ScopeHasNothingToWalk
 class ITextWalkerSelectionUtils;
+struct KFCQueryCopy;			// RememberFindFormatOf - a list's own copy of its query (KFCQueryCopy.h)
 namespace KFCBookScope { struct ChapterDoc; }					// FileChapter
 namespace KFCResultModel { struct Hit; struct SearchedRange; }	// FileChapter
 
@@ -344,11 +345,12 @@ namespace KFCSearchEngine
 	            walk signature follows). */
 	bool FindFormatHasChanged();
 
-	/** Keep the Find Format Find/Change holds NOW as the one the rows were searched with - the search's own copy
-	    (RememberFindFormat, in the .cpp), taken again. For the tier switch (KFCTierStore::SwitchTo): a kept list made the
-	    live one, its query stated back and checked, takes the format it was searched with back with it - so the replace's
-	    door (FindFormatHasChanged) compares against that list's, not the one before. */
-	void RememberFindFormatNow();
+	/** Keep THIS LIST's Find Format as the one the rows were searched with - read off its query copy (KFCQueryCopy:
+	    the list and its database), not off Find/Change. For the tier switch (KFCTierStore::SwitchTo), which leaves
+	    Find/Change alone (v2 R1): a kept list made the live one takes the format it was searched with back with it, so the
+	    replace's door (FindFormatHasChanged) compares against that list's, not the one before. nil, an invalid copy or
+	    one with no list = nothing remembered (the door then cannot tell, and does not refuse - RememberFindFormat's rule). */
+	void RememberFindFormatOf(const KFCQueryCopy* copy);
 
 	/** Drop the Find Format the search kept. It goes with EVERY KFCResultModel::Clear(), exactly as
 	    KFCBookScope::ReleaseSearchedBook does - the remembered format describes the rows that are

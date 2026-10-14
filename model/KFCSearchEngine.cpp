@@ -1879,9 +1879,16 @@ void RememberFindFormat()
 }
 }	// anonymous namespace
 
-void KFCSearchEngine::RememberFindFormatNow()
+void KFCSearchEngine::RememberFindFormatOf(const KFCQueryCopy* copy)
 {
-	RememberFindFormat();
+	// RememberFindFormat's rule, read off the list's own copy instead of Find/Change (the tier switch leaves Find/Change
+	// alone - v2 R1): no copy, no list or no database = nothing remembered, and FindFormatHasChanged says "cannot tell".
+	KFCSearchEngine::ForgetSearchedFindFormat();
+	if (copy == nil || !copy->valid || copy->findAttrs.get() == nil || copy->attrDB == nil)
+		return;
+	gSearchedFindAttrs.reset(copy->findAttrs->Duplicate());
+	gSearchedFindAttrDB = copy->attrDB;
+	KFC_DIAG_LOG("FINDFORMAT remembered from a list's copy attrDB=%p", (void*)copy->attrDB);
 }
 
 bool KFCSearchEngine::FindFormatHasChanged()

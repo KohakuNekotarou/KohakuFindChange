@@ -141,6 +141,7 @@ namespace
 		virtual bool SwitchToTier(uint32, PMString& outSummary) { SayWhy(outSummary); return false; }
 		virtual void GetKeptTierSets(std::vector<uint32>& out) { out.clear(); }
 		virtual void DropKeptTiers() {}
+		virtual void DropKeptTier(uint32) {}
 	};
 
 	class KFCChaptersStandInImpl : public IKFCChapters
