@@ -68,8 +68,10 @@ namespace KFCTierStore
 	    (IKFCUIServices::QueryReadsAsTier). The live list before it goes in as the newest tier (when it is one to keep).
 	    REFUSED - nothing changes: a run of ours under way; no such tier; no query kept with it; a book's tier whose book is
 	    not open; or the query not reading back as the copy - then the live list, its result set and the query Find/Change
-	    held before are all put back (section 3-3-1: all or nothing). False = refused; outSummary says why. True = switched
-	    (outSummary empty: the UI half names the tier it switched to). */
+	    held before are all put back (section 3-3-1: all or nothing): the query is stated back inside an abortable command
+	    sequence, aborted on a refusal so InDesign rolls back every tab's settings (the spike, 10-14), with the copy taken
+	    before stated back behind it when the abort does not read so. False = refused; outSummary says why. True =
+	    switched (outSummary empty: the UI half names the tier it switched to). */
 	bool SwitchTo(uint32 set, PMString& outSummary);
 
 	/** The controlled shutdown: the tiers let go - their lists hold PMStrings, and their query copies hold attribute lists

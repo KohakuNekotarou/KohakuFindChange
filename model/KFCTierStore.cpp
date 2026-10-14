@@ -10,7 +10,12 @@
 
 #include "VCPlugInHeaders.h"
 
+// Interface includes:
+#include "ICommandSequence.h"	// IAbortableCmdSeq - the switch's commands, rolled back on a refusal
+
 // General includes:
+#include "CmdUtils.h"		// BeginAbortableCmdSeq / EndCommandSequence / AbortCommandSequence
+#include "ErrorUtils.h"		// the error a refusal's abort leaves, cleared before any command
 #include <utility>			// std::move - a kept list is handed over, not copied
 
 // Project includes:
@@ -203,9 +208,21 @@ bool KFCTierStore::SwitchTo(uint32 set, PMString& outSummary)
 	KFCResultModel::ReturnToResultSet(wanted.set);
 
 	// 4. ITS QUERY STATED BACK, AND CHECKED THREE TIMES (section 3-3-1: field by field - the change side too, which the
-	// signature does not carry -, by the walk signature the list was searched with, and in the person's words below).
+	// signature does not carry -, by the walk signature the list was searched with, and in the person's words below) -
+	// INSIDE AN ABORTABLE COMMAND SEQUENCE: a refusal aborts it, and InDesign rolls every command of it back - Find/Change's
+	// every tab, not only the tab the query was copied from, which is all the copy taken before knows (section 3-3-1 item 1,
+	// "if it can be rolled back, use it"; the spike, 10-14: aborted, the query read back as before - rolledback=1 -
+	// docs/ai-notes/kfc-query-restore-spike-2026-10-14.md).
+	IAbortableCmdSeq* seq = CmdUtils::BeginAbortableCmdSeq("KFC tier switch");
 	PMString what;
-	bool good = KFCQueryCopier::Apply(*wanted.list.header.query, what);
+	bool good = (seq != nil);
+	if (!good)
+	{
+		what = PMString("a command sequence could not be begun");
+		what.SetTranslatable(kFalse);
+	}
+	if (good)
+		good = KFCQueryCopier::Apply(*wanted.list.header.query, what);
 	if (good)
 		good = KFCQueryCopier::Matches(*wanted.list.header.query, what);
 	if (good)
@@ -241,17 +258,66 @@ bool KFCTierStore::SwitchTo(uint32 set, PMString& outSummary)
 			what.SetTranslatable(kFalse);
 		}
 	}
+#ifdef KFC_DIAG
+	// (Test builds only) Fault switch tier-switch-refuse: refused AFTER every check went through - the refusal's road (the
+	// abort, the put-back, the words) walked on a switch that would have been kept. One-shot.
+	if (good && KFC_DIAG_FAULT("tier-switch-refuse"))
+	{
+		KFCDiagFaultOff("tier-switch-refuse");
+		good = false;
+		what = PMString("the test build's fault switch tier-switch-refuse");
+		what.SetTranslatable(kFalse);
+	}
+#endif
+	// A STANDING ERROR is a failure nothing reported (Change All in Book's rule, and the query run's): refused.
+	if (good && ErrorUtils::PMGetGlobalErrorCode() != kSuccess)
+	{
+		good = false;
+		what = ErrorUtils::PMGetGlobalErrorString();
+		what.SetTranslatable(kFalse);
+	}
+	if (good)
+	{
+		// KEPT: the sequence ended - and the query read back once more after it (an end that did not keep the commands would
+		// leave Find/Change as it was while the list is the tier's).
+		const ErrorCode ended = CmdUtils::EndCommandSequence(seq);
+		seq = nil;
+		if (ended != kSuccess)
+		{
+			good = false;
+			what = PMString("the command sequence did not end");
+			what.SetTranslatable(kFalse);
+		}
+		else if (!KFCQueryCopier::Matches(*wanted.list.header.query, what))
+			good = false;
+	}
 	if (!good)
 	{
-		// 5. REFUSED - EVERYTHING PUT BACK AS IT WAS: the live list, its result set, and Find/Change's query before. If that
-		// query does not come back either, say so plainly: Find/Change is not what the person left, and a replace reads it.
+		// 5. REFUSED - EVERYTHING PUT BACK AS IT WAS: the sequence aborted (InDesign rolls its commands back), the error it
+		// leaves CLEARED BEFORE ANY COMMAND (one processed while an error stands brings on InDesign's protective shutdown -
+		// KFCQuerySequence.cpp's note on its own abort), the live list and its result set back, and Find/Change checked
+		// against the copy taken before - put back by that copy when it does not read so (the road a sequence that could not
+		// be begun, or one ended already, takes). If the query does not come back either, say so plainly: Find/Change is
+		// not what the person left, and a replace reads it.
+		if (seq != nil)
+		{
+			CmdUtils::AbortCommandSequence(seq);
+			seq = nil;
+		}
+		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 		KFCResultModel::RestoreModelSnapshot(live.list);
 		KFCResultModel::ReturnToResultSet(live.set);
 		PMString whatBack;
-		bool back = KFCQueryCopier::Apply(before, whatBack);
-		if (back)
-			back = KFCQueryCopier::Matches(before, whatBack);
-		KFC_DIAG_LOG("TIER switch REFUSED set=%u what=%s back=%d", set, what.GetUTF8String().c_str(), back ? 1 : 0);
+		bool back = KFCQueryCopier::Matches(before, whatBack);
+		const bool rolledBack = back;
+		if (!back)
+		{
+			back = KFCQueryCopier::Apply(before, whatBack);
+			if (back)
+				back = KFCQueryCopier::Matches(before, whatBack);
+		}
+		KFC_DIAG_LOG("TIER switch REFUSED set=%u what=%s rolledback=%d back=%d", set, what.GetUTF8String().c_str(),
+			rolledBack ? 1 : 0, back ? 1 : 0);
 		if (!back)
 		{
 			outSummary.Append("Could not switch, and Find/Change could not be put back as it was (");
