@@ -590,10 +590,11 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCSeparator3MenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// --- Block 3: the check-mark toggles (their positions are in KFCUIID.h) ---
+		// --- Block 3: the check-mark toggles, in alphabetical order (the author's arrangement, 2026-10-14 - the
+		// positions and the reason Book Scope comes first are in KFCUIID.h) ---
 
 		// Book Scope: toggle (check mark). ON = the whole book, OFF = what Edit > Find/Change's Search:
-		// names. Leads the block because it is what the commands in block 1 run on.
+		// names. What the commands in block 1 run on.
 		kKFCScopeBookActionID,
 		kKFCTargetMenuPath
 		kKFCBookScopeMenuItemPosition,
@@ -606,25 +607,39 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCSelectedDocumentsMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// Keep Previous Results: toggle (check mark). ON = the panel's Find keeps the list it replaces, as a tier above the
-		// new one (KFCResultHistory); OFF = the list replaced, as it always was. Under the two that say what a Find runs on.
-		kKFCKeepPreviousResultsActionID,
-		kKFCTargetMenuPath
-		kKFCKeepPreviousResultsMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
 		// Hide Previous Chapter: toggle (check mark). Closes the previous chapter window on jump.
 		kKFCHidePrevChapterActionID,
 		kKFCTargetMenuPath
 		kKFCHidePrevChapterMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// Keep Previous Results: toggle (check mark). ON = the panel's Find keeps the list it replaces, as a tier above the
+		// new one (KFCResultHistory); OFF = the list replaced, as it always was.
+		kKFCKeepPreviousResultsActionID,
+		kKFCTargetMenuPath
+		kKFCKeepPreviousResultsMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 		// Link the Application Bar's Search Field to This Panel: toggle (check mark). Return in the search
 		// field of InDesign's application bar searches with this panel. *Windows only. KFCAppBarSearchEnter.h.
-		// A search toggle, so it comes before the window ones below.
 		kKFCAppBarSearchEnterActionID,
 		kKFCTargetMenuPath
 		kKFCAppBarSearchEnterMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		// Minimizable Find/Change: toggle (check mark). Puts a minimize box on InDesign's OWN
+		// Find/Change dialog, so it can be sent to the taskbar instead of closed - the window Translucent
+		// Find/Change acts on. *Windows only.
+		kKFCMinimizableFindChangeActionID,
+		kKFCTargetMenuPath
+		kKFCMinimizableFindChangeMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		// Remember Book Panel Placement: toggle (check mark). InDesign's own Book panel comes back
+		// where it was closed.
+		kKFCRememberBookPanelActionID,
+		kKFCTargetMenuPath
+		kKFCRememberBookPanelMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// Translucent Find/Change: toggle (check mark) for InDesign's OWN Find/Change dialog.
@@ -634,27 +649,11 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCTranslucentFindChangeMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// Minimizable Find/Change: toggle (check mark). Puts a minimize box on InDesign's OWN
-		// Find/Change dialog, so it can be sent to the taskbar instead of closed. Directly under
-		// the translucency toggle - the two act on the same window. *Windows only.
-		kKFCMinimizableFindChangeActionID,
-		kKFCTargetMenuPath
-		kKFCMinimizableFindChangeMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
 		// Translucent Panel: Translucent Find/Change's idea applied to this panel - drawn faint while it
-		// floats, and back to solid while the pointer is on it. Under the two that act on InDesign's
-		// dialog. *Windows only.
+		// floats, and back to solid while the pointer is on it. *Windows only.
 		kKFCTranslucentPanelActionID,
 		kKFCTargetMenuPath
 		kKFCTranslucentPanelMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
-		// Remember Book Panel Placement: toggle (check mark). InDesign's own Book panel comes back
-		// where it was closed. Last in the block - it is about a window, like the three above.
-		kKFCRememberBookPanelActionID,
-		kKFCTargetMenuPath
-		kKFCRememberBookPanelMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// Separator between the toggles and the command that writes a file.

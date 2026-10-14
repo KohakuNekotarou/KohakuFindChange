@@ -19,13 +19,13 @@
   ──────────
   Book Scope
   Find/Change Selected Documents (Book)
-  Keep Previous Results
   Hide Previous Chapter
+  Keep Previous Results
   Link the Application Bar's Search Field to This Panel
-  Translucent Find/Change
   Minimizable Find/Change
-  Translucent Panel
   Remember Book Panel Placement
+  Translucent Find/Change
+  Translucent Panel
   ──────────
   Save Panel Settings
   ──────────
@@ -34,8 +34,8 @@
   ```
 
   2行目の名前は範囲で変わる（`Find in Book`／`Find in Document`／`Find in Story` など＝SET-03。上の絵は Book Scope OFF・検索: ドキュメントのとき）。
-  `Book Scope` から `Remember Book Panel Placement` までの9つはトグルで、ON のとき左にチェックの印が付く（最初は `Hide Previous Chapter` だけ ON＝SET-23）。
-  （`Change Checked` と `Show Changes by KohakuFindChange` は 2026-10-06 に外した。`Run Saved Queries...` と `Find/Change Selected Documents (Book)` は 2026-10-07 に足した＝第16章・SCOPE-26〜。`Run Saved Queries...` は同じ日の夜に `Clear Results` の下へ1つ下げた＝作者の依頼。）
+  `Book Scope` から `Translucent Panel` までの9つはトグルで、ON のとき左にチェックの印が付く（最初は `Hide Previous Chapter` だけ ON＝SET-23）。トグルの並びは ABC 順（2026-10-14 の作者の並べ替え）。
+  （`Change Checked` と `Show Changes by KohakuFindChange` は 2026-10-06 に外した。`Run Saved Queries...` と `Find/Change Selected Documents (Book)` は 2026-10-07 に足した＝第16章・SCOPE-26〜。`Run Saved Queries...` は同じ日の夜に `Clear Results` の下へ1つ下げた＝作者の依頼。2026-10-14 に作者がトグルの区画を並べ替えた＝それまでは `Keep Previous Results` が `Hide Previous Chapter` の上・窓のトグルは `Translucent Find/Change`・`Minimizable Find/Change`・`Translucent Panel`・`Remember Book Panel Placement` の順。）
   - 訂正: 2026-10-08＝最後の項目は、それまで SDK 共通の文字列で `About this plug-in...` と出ていた（この地図の表記と食い違っていた）。作者「英語として正しい方で」→ほかの項目と同じく語頭を大文字にし、ハイフンの後ろも大文字の `About This Plug-In...`（InDesign のメニューバーの `Plug-Ins`・このパネルのまとまり `Kohaku Plug-Ins` と同じ）。KFC 専用のキー `kKFCAboutThisPlugInMenuKey`（SDK のキーは自作のプラグイン全部が共有するので値を変えない）。
 
 - **SET-02** ★`Find in …`・`Change All in Book (No List)`・`Clear Results`・`Run Saved Queries...` の間に区切り線は無い（探すことと、一覧を使わない置換と、その前の片付けが1つのまとまり）。
@@ -47,7 +47,7 @@
   灰色のときも、範囲つきの名前は出る。
   - 訂正:
 
-- **SET-24** ★**Keep Previous Results**（トグル・2026-10-14 作者の判断 (e)＝`Find/Change Selected Documents (Book)` の下）＝ON のとき、パネルの Find（メニュー・ショートカット・アプリケーションバーの Return）が、それまでの一覧を消さずに**段として残し**、新しい一覧をその下に積む（ROW-39）。OFF（既定）は今までどおり一覧を入れ替え、段も消す（ROW-41）。OFF にしただけでは段は消えない（次に通った検索から）。いつでも押せる（設定なので灰色にならない）。Save Panel Settings で保存（キー `keepPreviousResults`＝SET-16）。クエリのダイアログの Find は、この切り替えに関わらずいつも積む（QRY-29）。
+- **SET-24** ★**Keep Previous Results**（トグル・2026-10-14 作者の判断 (e)＝`Hide Previous Chapter` の下＝同じ日の作者の並べ替えで。足したときは `Find/Change Selected Documents (Book)` の下）＝ON のとき、パネルの Find（メニュー・ショートカット・アプリケーションバーの Return）が、それまでの一覧を消さずに**段として残し**、新しい一覧をその下に積む（ROW-39）。OFF（既定）は今までどおり一覧を入れ替え、段も消す（ROW-41）。OFF にしただけでは段は消えない（次に通った検索から）。いつでも押せる（設定なので灰色にならない）。Save Panel Settings で保存（キー `keepPreviousResults`＝SET-16）。クエリのダイアログの Find は、この切り替えに関わらずいつも積む（QRY-29）。
   - 訂正:
 
 ---

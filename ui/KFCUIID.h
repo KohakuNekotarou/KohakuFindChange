@@ -544,24 +544,20 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryFindButtonWidgetID, kKFCUIPrefix + 45)
 // (Block 2 - the two scans - is gone.)
 #define kKFCSeparator3MenuItemPosition		2.0
 
-// Block 3 - the check-mark toggles, 2.2 to 2.9. Book Scope leads: it is the one that decides what the
-// commands in block 1 run on, and Find/Change Selected Documents (Book) follows it - it narrows Book Scope, and works
-// only with it on. Keep Previous Results follows the two - what a Find does with the list it replaces. Then Hide Previous
-// Chapter; then Link the Application Bar's Search Field,
-// which is about the search as Book Scope is, so it stands before the window ones. The
-// next three are window appearance: the two that act on InDesign's OWN Find/Change dialog first
-// (translucency, then the minimize box), and this panel's own translucency. Remember Book Panel
-// Placement closes the block: it is about InDesign's own Book panel, the other window the plug-in looks
-// after.
+// Block 3 - the check-mark toggles, 2.2 to 2.9, in alphabetical order (the author's arrangement, 2026-10-14). That
+// keeps Book Scope first - it is the one that decides what the commands in block 1 run on - and Find/Change Selected
+// Documents (Book) right under it: it narrows Book Scope, and works only with it on. Then Hide Previous Chapter, Keep
+// Previous Results, Link the Application Bar's Search Field to This Panel, Minimizable Find/Change, Remember Book Panel
+// Placement, Translucent Find/Change and Translucent Panel.
 #define kKFCBookScopeMenuItemPosition		2.2
 #define kKFCSelectedDocumentsMenuItemPosition	2.3
-#define kKFCKeepPreviousResultsMenuItemPosition	2.35	// what a Find does with the list it replaces
 #define kKFCHidePrevChapterMenuItemPosition	2.4
-#define kKFCAppBarSearchEnterMenuItemPosition	2.5		// a search toggle, before the window toggles
-#define kKFCTranslucentFindChangeMenuItemPosition	2.6
-#define kKFCMinimizableFindChangeMenuItemPosition	2.7
-#define kKFCTranslucentPanelMenuItemPosition	2.8
-#define kKFCRememberBookPanelMenuItemPosition	2.9
+#define kKFCKeepPreviousResultsMenuItemPosition	2.45
+#define kKFCAppBarSearchEnterMenuItemPosition	2.5
+#define kKFCMinimizableFindChangeMenuItemPosition	2.6
+#define kKFCRememberBookPanelMenuItemPosition	2.7
+#define kKFCTranslucentFindChangeMenuItemPosition	2.8
+#define kKFCTranslucentPanelMenuItemPosition	2.9
 #define kKFCSeparator4MenuItemPosition		3.0
 
 // Block 4 - the command that writes a file of our own and touches no document: the toggles above
