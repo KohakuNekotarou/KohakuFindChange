@@ -94,6 +94,7 @@
 #include "KFCObjectSearch.h"	// the Object tab's listing, its Search: and its query
 #include "KFCTextCut.h"			// KFCSafeCut - where a row's line may be cut (the rule the panel's own cuts follow)
 #include "KFCFindChangeCmds.h"	// the find/change settings' commands, one at a time
+#include "KFCQueryCopy.h"		// the query copied in memory - the test build's spike at SearchBook's head (DiagProbe)
 
 namespace
 {
@@ -2851,6 +2852,11 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 	// - ahead of the re-entry stop below, because the run asks the same doors itself and sets its own flag.
 	if (KFC_DIAG_FAULT("queries-run"))
 		return KFCQuerySequence::RunFromDiagSwitch(outSummary);
+	// THE TIER SWITCH'S SPIKE (docs/superpowers/plans/2026-10-14-kfc-tier-switch.md Task 3): while one of the fault switches
+	// qcopy-roundtrip / qcopy-armed / qcopy-abort is on, the Find copies Find/Change's query in memory, states it back and
+	// says what came back (KFCQueryCopier::DiagProbe) - and searches nothing.
+	if (KFCQueryCopier::DiagProbe(outSummary))
+		return 0;
 #endif
 
 	// Last-resort re-entry stop. The panel's actions grey themselves out while a search runs, but
