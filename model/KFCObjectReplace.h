@@ -12,6 +12,9 @@
 //    first and can be asked alone (CheckRowNow), so the UI half refuses before it brings a window forward.
 //    SEVERAL ROWS' REPLACE - the rows selected together: the same doors row by row, then one walk replacing each
 //    row's item as the walk stands on it, in one undo step (ReplaceRows / CheckRowsNow).
+//    TWO DOORS, ONE WRITE - the text rows' shape (KFCReplaceEngine's ReplaceHit and ReplaceHits): a row's Replace and
+//    several rows' differ in their doors and their words alone; the walk, the undo step, the rows marked Changed and what
+//    each document is left as (KFCReplaceEngine::DocsAfterWrite) are one (WriteObjectRows, in the .cpp).
 //    A DOCUMENT'S CHANGE ALL - ReplaceAllObject over the document (it selects nothing - measured).
 //
 //========================================================================================

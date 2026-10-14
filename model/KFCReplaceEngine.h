@@ -141,8 +141,8 @@ namespace KFCReplaceEngine
 	void EndWriteStep(WriteStep& step, bool ok);
 
 	/** WHAT EACH DOCUMENT OF A WRITE FROM THE LIST IS LEFT AS (the author's calls), once the write is over, whichever way
-	    it went - the one rule for the text rows (ReplaceHit, ReplaceHits) and the object rows selected together
-	    (KFCObjectReplace::ReplaceRows). A closed chapter was reopened windowless and is held
+	    it went - the one rule for the text rows (ReplaceHit, ReplaceHits) and the object rows, one row's and rows selected
+	    together (KFCObjectReplace's one write behind its two doors). A closed chapter was reopened windowless and is held
 	    (KFCBookScope::ReopenChapterDoc).
 	      - WRITTEN: a chapter of ours gets its window, so the write can be seen and saved
 	        (KFCBookScope::ShowChapterWindow); a document that is not ours is left as it is - one the user keeps WITHOUT a
