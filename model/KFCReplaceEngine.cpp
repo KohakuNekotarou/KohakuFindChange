@@ -757,6 +757,13 @@ bool RowStillStands(int32 chapterIdx, int32 hitIdx, IDataBase* db)
 // version on record again and the rows stand where their text does. The example above ("catcatcatcat",
 // Ctrl+Z) is such an Undo and is followed;
 // typing, an Undo of anything else, the Track Changes panel and a script still stop the write.
+// OVERTURNED FOR ROWS THAT FOLLOW THEIR FOCI (the author's call of 2026-10-14 night -
+// docs/superpowers/plans/2026-10-14-kfc-row-focus-undo.md): a row's text focus is of KFC's own class now, and the
+// user's Undo and Redo put it back (KFCRowFocus.h). Before every write the rows of each story take their foci's places
+// and the story its version as it stands (KFCSearchEngine::FollowStoryFoci, in ReplaceRowsNow), so typing, an Undo of
+// anything, the Track Changes panel, a script and InDesign's own Change All no longer stop it; a row whose own text
+// was edited is Missing. This version rule still decides for a story whose rows have no foci - and a story with a
+// focus that could not follow (an Undo of an edit older than the search) is refused whatever its version says.
 // ======================================================================================================
 
 // Is the story at the version KFC last recorded for it? Nothing recorded, or unreadable, answers no.
@@ -975,7 +982,9 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 // followed, KFCUndoFollow: the rows go back to where the text is, and rows 2 and 3 are written where they
 // stand. The three questions stand for every other edit.) So, for every row:
 //   1. its STORY is at the version KFC last recorded for it (StoryAsKFCLeftIt - ITextModel::GetChangeCount,
-//      which Undo moves back): any change KFC did not make, anywhere in the story, stops the write;
+//      which Undo moves back): any change KFC did not make, anywhere in the story, stops the write - unless the
+//      rows followed their foci first (ReplaceRowsNow - KFCSearchEngine::FollowStoryFoci records the version as it
+//      stands for a story it followed);
 //   2. the row still READS as it was found - the whole match AND the line around it
 //      (KFCSearchEngine::RowReadsAsFound), for a version that has come back to the same number;
 //   3. the walk meets a match with the row's start AND its length.
@@ -1478,14 +1487,34 @@ static bool ReplaceRowsNow(std::vector<ChapterWrite>& chapters,
 	// (ChapterMovedUnderRows). Not the match's hash alone: a row an Undo has left on the next occurrence of
 	// its own text passes that, and would be written there.
 	// Forward, like the search - the scope at the head of this function.
-#ifdef KFC_DIAG
-	// TEST BUILDS ONLY - THE EXPERIMENT replace-by-focus (KFCDiag.h; the author's call, 10-14 night): while its switch
-	// stands, the rows of a story not at the version on record take their foci's places, and the story its version as it
-	// stands, before the doors below - so the doors and the write go by the foci.
-	if (KFC_DIAG_FAULT("replace-by-focus"))
-		for (size_t k = 0; k < chapters.size(); ++k)
-			KFCSearchEngine::DiagAdoptFoci(chapters[k].chapterIdx, chapters[k].docRef, chapters[k].rows);
-#endif
+	// THE ROWS FOLLOW THEIR FOCI FIRST (KFCSearchEngine::FollowStoryFoci - the author's call of 2026-10-14 night). For
+	// each story of the rows to write: a story whose foci all followed every edit and every Undo takes their places and
+	// its version as it stands, so the doors below go by where the text is now; a story with a focus that could not
+	// follow (an Undo of an edit older than the search) is refused here - its version can have come back to the number
+	// on record with other text in it; a story with no foci is left to the version rule, as before.
+	for (size_t k = 0; k < chapters.size(); ++k)
+	{
+		const ChapterWrite& c = chapters[k];
+		std::set<UID> stories;
+		for (std::set<int32>::const_iterator row = c.rows.begin(); row != c.rows.end(); ++row)
+		{
+			UID story = kInvalidUID;
+			TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
+			uint64 hash = 0;
+			if (KFCResultModel::GetHitMatchIdentity(c.chapterIdx, *row, story, start, end, hash) && story != kInvalidUID)
+				stories.insert(story);
+		}
+		for (std::set<UID>::const_iterator s = stories.begin(); s != stories.end(); ++s)
+		{
+			if (KFCSearchEngine::FollowStoryFoci(c.chapterIdx, c.docRef.GetDataBase(), *s) == KFCSearchEngine::kFollowBroken)
+			{
+				StartStatus(outStatus);
+				outStatus.Append(several ? "a selected row's story has changed since the search - right-click the story row: Search This Story Again."
+					: "the story of this row has changed since the search - right-click the story row: Search This Story Again.");
+				return false;
+			}
+		}
+	}
 	for (size_t k = 0; k < chapters.size(); ++k)
 	{
 		const ChapterWrite& c = chapters[k];
@@ -1574,6 +1603,13 @@ static bool ReplaceRowsNow(std::vector<ChapterWrite>& chapters,
 		if (ok)
 			for (size_t k = 0; k < chapters.size(); ++k)
 				KFCUndoFollow::MarkWrite(chapters[k].docRef.GetDataBase());	// in this step, so its Undo / Redo is heard
+		// THE WRITTEN STORIES' FOCI ON THE ROWS, IN THIS STEP (the row-focus plan's D7): InDesign moved them with the write,
+		// and a replaced row's own focus goes on what it wrote. Marked first (inStep), so this step's Undo and Redo hold them
+		// too - a move made after the step would be read back over by the next Undo (KFCRowFoci::MoveTo).
+		if (ok)
+			for (size_t k = 0; k < chapters.size(); ++k)
+				for (std::set<UID>::const_iterator ws = chapters[k].writtenStories.begin(); ws != chapters[k].writtenStories.end(); ++ws)
+					KFCRowFoci::ReanchorStory(chapters[k].chapterIdx, *ws, true);
 		// Kept, or taken back whole with nothing left standing - the line below says why; the "unsaved" flags are
 		// DocsAfterWrite's.
 		KFCReplaceEngine::EndWriteStep(step, ok);
@@ -1625,9 +1661,7 @@ static bool ReplaceRowsNow(std::vector<ChapterWrite>& chapters,
 	{
 		const ChapterWrite& c = chapters[k];
 		NoteStoryVersions(c.chapterIdx, c.docRef.GetDataBase(), c.writtenStories);	// the next Replace finds it as KFC left it
-		// The written stories' foci on the rows' places now (spec T13 - InDesign moved them with the write; this states it).
-		for (std::set<UID>::const_iterator ws = c.writtenStories.begin(); ws != c.writtenStories.end(); ++ws)
-			KFCRowFoci::ReanchorStory(c.chapterIdx, *ws);
+		// (The written stories' foci were put on the rows' places inside the step, above.)
 	}
 	// Kept AFTER the versions are noted - they are the "after" an Undo's "before" is put back over.
 	recorder.Keep();
@@ -1848,7 +1882,12 @@ bool KFCReplaceEngine::PreviewHit(int32 chapterIdx, int32 hitIdx, PMString& outA
 	UID story = kInvalidUID;
 	TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
 	uint64 hash = 0;
-	if (db == nil || !KFCResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, story, start, end, hash)
+	if (db == nil || !KFCResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, story, start, end, hash))
+		return false;
+	// The rows follow their foci first, as the Replace's do (KFCSearchEngine::FollowStoryFoci): a story they cannot follow
+	// has no preview, and a row the follow found edited (Missing) has none either.
+	if (KFCSearchEngine::FollowStoryFoci(chapterIdx, db, story) == KFCSearchEngine::kFollowBroken
+		|| !CanReplaceHit(chapterIdx, hitIdx)
 		|| !StoryAsKFCLeftIt(chapterIdx, db, story))
 		return false;
 
