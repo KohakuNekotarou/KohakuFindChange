@@ -27,6 +27,8 @@
 #include "KFCBookWatch.h"
 #include "KFCResultModel.h"
 #include "KFCSearchEngine.h"	// the remembered Find Format: an attribute list and a raw IDataBase*
+#include "KFCTierStore.h"		// the kept tiers: whole lists, and their query copies (attribute lists)
+#include "KFCQueryCopy.h"		// the copier (holds nothing static - here for the pattern)
 #include "KFCUndoFollow.h"		// the writes kept for the panel's following of Undo
 
 /** Implements IStartupShutdownService for the model half. */
@@ -59,6 +61,10 @@ public:
 		// ...and the writes kept so that the panel can follow an Undo: each holds rows, and a query
 		// run's the whole result set (KFCUndoFollow::RunRecorder) - PMStrings, the kind this list exists for.
 		KFCUndoFollow::ShutdownCleanup();
+		// ...and the kept tiers (the tier switch): whole lists, each with the query it was searched with - attribute lists,
+		// so letting them go is database work, as the search engine's own copy is (below).
+		KFCTierStore::ShutdownCleanup();
+		KFCQueryCopier::ShutdownCleanup();
 		// (Every clean-up is a line of its own here, never nested inside another one: a nested one
 		//  cannot be found by READING this list, which is the only way anyone ever checks.)
 		// (The line the panel last reported - KFCResultTree::ShutdownCleanup - is the UI half's:

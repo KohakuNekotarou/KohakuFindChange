@@ -391,6 +391,16 @@ PMString KFCResultModel::GetWalkSignature()
 	return signature;
 }
 
+void KFCResultModel::SetQueryCopy(const std::shared_ptr<const KFCQueryCopy>& copy)
+{
+	gHeader.query = copy;
+}
+
+std::shared_ptr<const KFCQueryCopy> KFCResultModel::GetQueryCopy()
+{
+	return gHeader.query;
+}
+
 void KFCResultModel::SetBookName(const PMString& name)
 {
 	gHeader.bookName = name;
@@ -1266,6 +1276,34 @@ void KFCResultModel::RestoreModelSnapshot(const ModelSnapshot& snapshot)
 	ForgetRowBackup();
 	// The list put back - its rows' foci where KFC knows the stories as they stand (the text-focus spec's T7).
 	KFCRowFoci::AttachOpenChapters();
+}
+
+void KFCResultModel::ApplyRowStepTo(ModelSnapshot& list, const RowStep& step, bool after)
+{
+	// ApplyRowStep's rows and versions, onto a list that is not the model's: indexes checked here, as ChapterAt / HitAt
+	// check them for the model's own; PutVersionBack's rule for a version (recorded again, or taken off).
+	const std::vector<RowCopy>& rows = after ? step.after : step.before;
+	for (size_t i = 0; i < rows.size(); ++i)
+	{
+		const RowCopy& r = rows[i];
+		if (r.chapter < 0 || r.chapter >= static_cast<int32>(list.chapters.size()))
+			continue;
+		std::vector<Hit>& hits = list.chapters[static_cast<size_t>(r.chapter)].hits;
+		if (r.hit >= 0 && r.hit < static_cast<int32>(hits.size()))
+			hits[static_cast<size_t>(r.hit)] = r.row;
+	}
+	const std::vector<VersionCopy>& versions = after ? step.versionsAfter : step.versionsBefore;
+	for (size_t i = 0; i < versions.size(); ++i)
+	{
+		const VersionCopy& v = versions[i];
+		if (v.chapter < 0 || v.chapter >= static_cast<int32>(list.chapters.size()))
+			continue;
+		std::map<UID, uint32>& recorded = list.chapters[static_cast<size_t>(v.chapter)].storyVersions;
+		if (v.had)
+			recorded[v.story] = v.version;
+		else
+			recorded.erase(v.story);
+	}
 }
 
 UID KFCResultModel::GetHitItem(int32 chapterIdx, int32 hitIdx)

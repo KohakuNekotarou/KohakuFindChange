@@ -71,6 +71,7 @@
 #include "KFCModelNotify.h"		// the panel is told, never called (the model/UI split)
 #include "KFCRunGuard.h"		// never retire results out from under a run of ours
 #include "KFCSearchEngine.h"	// DropResults - the rows, the searched book and the find format, together; ForgetSearchedFindFormatOf
+#include "KFCTierStore.h"		// ForgetDocument - a closing document's chapters emptied in the kept tiers
 #include "KFCUndoFollow.h"		// DocumentClosing, ForgetBookChapter, ForgetClosingDocument - a closing document let go
 
 /** Retires a document-scope result set when its document is closed.
@@ -116,6 +117,10 @@ static void LetGoOfClosingDocument(const UIDRef& closingDocRef)
 	// The Undo follow takes its observer off the closing document (KFCUndoFollow::DocumentClosing): what was attached is
 	// detached.
 	KFCUndoFollow::DocumentClosing(closingDocRef);
+
+	// The kept tiers' chapters of the closing document are emptied - found by file while the document is still open here
+	// (KFCTierStore::ForgetDocument), as a kept query run's list has them emptied (KFCUndoFollow).
+	KFCTierStore::ForgetDocument(closingDocRef.GetDataBase());
 
 	// The Find Format the rows were searched with lets go of the closing database if its UIDs are in it:
 	// FindFormatHasChanged tells databases apart by address, and this one's can be handed to the next document opened

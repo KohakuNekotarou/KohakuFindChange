@@ -344,6 +344,12 @@ namespace KFCSearchEngine
 	            walk signature follows). */
 	bool FindFormatHasChanged();
 
+	/** Keep the Find Format Find/Change holds NOW as the one the rows were searched with - the search's own copy
+	    (RememberFindFormat, in the .cpp), taken again. For the tier switch (KFCTierStore::SwitchTo): a kept list made the
+	    live one, its query stated back and checked, takes the format it was searched with back with it - so the replace's
+	    door (FindFormatHasChanged) compares against that list's, not the one before. */
+	void RememberFindFormatNow();
+
 	/** Drop the Find Format the search kept. It goes with EVERY KFCResultModel::Clear(), exactly as
 	    KFCBookScope::ReleaseSearchedBook does - the remembered format describes the rows that are
 	    being thrown away, so it has no business outliving them. DropResults does all three. */

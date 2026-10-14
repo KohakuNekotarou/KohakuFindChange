@@ -1,0 +1,65 @@
+//========================================================================================
+//
+//  Owner: KohakuNekotarou
+//
+//  KohakuFindChange (KFC)
+//
+//  THE KEPT TIERS - THE MODEL'S SIDE (docs/superpowers/specs/2026-10-14-kfc-tier-switch-design.md section 3-1). A search
+//  that goes through keeps the list it replaces as a TIER: the whole list (KFCResultModel::ModelSnapshot), its result set
+//  (the tier's name - the UI half's grey copy of it carries the same number) and the book it was searched in; its query
+//  copy rides in the list's header (ListHeader::query). The order and the cap are kept HERE, and only here - the UI half
+//  reads them. Clear Results, a query run and Change All in Book (No List) that go through let every tier go (the UI half
+//  asks); a closing document leaves its chapters empty in every tier, as a kept query run's list does
+//  (KFCUndoFollow::ForgetDocument). The main thread only.
+//
+//========================================================================================
+
+#ifndef __KFCTierStore_h__
+#define __KFCTierStore_h__
+
+#include "KFCResultModel.h"		// ModelSnapshot, RowStep
+
+#include <vector>
+
+class IDataBase;
+
+namespace KFCTierStore
+{
+	/** The most tiers kept (the author's call, 10-14 - 50 being too many searches to keep): past it the oldest goes. */
+	enum { kMaxTiers = 10 };
+
+	/** AT A SEARCH'S COMMIT POINT, BEFORE THE LIST IS THROWN AWAY (KFCSearchEngine::SearchBook): the list kept as the newest
+	    tier - when it has a row, or a search made it (its query was copied: a search that found nothing is kept too) - with
+	    its result set and the book it was searched in. Past kMaxTiers the oldest goes. */
+	void ParkCurrent();
+
+	/** The kept tiers' result sets, oldest first. */
+	void GetTierSets(std::vector<uint32>& out);
+
+	/** Every tier let go (fresh storage, not Clear()). */
+	void DropAll();
+
+	/** A CLOSING DOCUMENT: in every tier, its chapters emptied (KFCResultModel::EmptyChapter) - found by their file as every
+	    door of KFC finds a chapter's document (KFCBookScope::FindOpenChapterDoc), while the document is still open (the
+	    close responder's kBeforeCloseDoc). A chapter keeps its place, so the rows of a write kept for that tier stay
+	    numbered right. */
+	void ForgetDocument(IDataBase* db);
+
+	/** Is `set` a kept tier's result set? (KFCUndoFollow: the writes kept for it are not let go.) */
+	bool HoldsSet(uint32 set);
+
+	/** The layout generation the kept tier's rows are numbered in - 0 when there is no such tier. */
+	uint32 LayoutOf(uint32 set);
+
+	/** An Undo or a Redo of a write made while that tier was the live list, followed while it is kept: its rows put onto the
+	    kept copy (KFCResultModel::ApplyRowStepTo). False = no such tier. */
+	bool ApplyRowStep(uint32 set, const KFCResultModel::RowStep& step, bool after);
+
+	/** The controlled shutdown: the tiers let go - their lists hold PMStrings, and their query copies hold attribute lists
+	    (database work - KFCSearchEngine::ShutdownCleanup's reason). */
+	void ShutdownCleanup();
+}
+
+#endif // __KFCTierStore_h__
+
+// End, KFCTierStore.h.

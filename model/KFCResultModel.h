@@ -29,8 +29,11 @@
 #include "KFCModelTypes.h"	// the types shared with the UI half (RowDisplay, ChangeOutcome, ...)
 
 #include <map>
+#include <memory>		// std::shared_ptr - the list's query copy (ListHeader::query)
 #include <set>			// GetChapterStories
 #include <vector>
+
+struct KFCQueryCopy;	// KFCQueryCopy.h - Find/Change's query, copied in memory (the tier switch)
 
 namespace KFCResultModel
 {
@@ -338,6 +341,13 @@ namespace KFCResultModel
 	    results it describes. */
 	void SetWalkSignature(const PMString& signature);
 	PMString GetWalkSignature();
+
+	/** THE QUERY THE LIST WAS SEARCHED WITH, COPIED (KFCQueryCopy - docs/superpowers/specs/2026-10-14-kfc-tier-switch-design.md
+	    3-3): set by the search after its commit point, beside the walk signature; null for a list no search made (a query
+	    run's, Change All's) and after Clear(). Shared, not copied, by every snapshot of the list (an immutable copy) - what
+	    the tier switch states back into Find/Change when the list is switched to (KFCTierStore::SwitchTo). */
+	void SetQueryCopy(const std::shared_ptr<const KFCQueryCopy>& copy);
+	std::shared_ptr<const KFCQueryCopy> GetQueryCopy();
 
 	/** The name of the book these results came from - shown on the tree's BOOK row, which is how
 	    the panel says which book was searched. Set beside SetFromBook; the file NAME only, because
@@ -766,6 +776,7 @@ namespace KFCResultModel
 		PMString		walkSignature;	// SetWalkSignature
 		bool			hasRun;			// NoteRun
 		bool			changeAllWrote;	// NoteChangeAllWrote
+		std::shared_ptr<const KFCQueryCopy>	query;	// SetQueryCopy - the search's query, copied (null = not a search's list)
 		ListHeader() : fromBook(false), searchScope(kScopeDocument), searchMode(-1), hasRun(false),
 			changeAllWrote(false) {}
 	};
@@ -783,6 +794,12 @@ namespace KFCResultModel
 	/** Puts it back whole, its layout generation with it; the row backup is let go (it indexes the rows
 	    that went). */
 	void RestoreModelSnapshot(const ModelSnapshot& snapshot);
+
+	/** ApplyRowStep's work on a list that is NOT in the model - a kept tier's (KFCTierStore - the tier switch): an Undo or a
+	    Redo of a write made while that list was the live one, followed while it is kept. Its rows and recorded versions
+	    put back on `list`; no text focus is touched (a kept list has none - the switch attaches them). A row whose index
+	    is out of range is passed over, as ApplyRowStep does. */
+	void ApplyRowStepTo(ModelSnapshot& list, const RowStep& step, bool after);
 
 	/** Which result set the rows are: a new number with every Clear (a search, a query run, Clear Results, a close) -
 	    a write kept for an Undo belongs to one, and means nothing to the next unless a kept query run leads back to it

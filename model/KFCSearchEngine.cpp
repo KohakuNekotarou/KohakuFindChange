@@ -94,7 +94,8 @@
 #include "KFCObjectSearch.h"	// the Object tab's listing, its Search: and its query
 #include "KFCTextCut.h"			// KFCSafeCut - where a row's line may be cut (the rule the panel's own cuts follow)
 #include "KFCFindChangeCmds.h"	// the find/change settings' commands, one at a time
-#include "KFCQueryCopy.h"		// the query copied in memory - the test build's spike at SearchBook's head (DiagProbe)
+#include "KFCQueryCopy.h"		// the query copied in memory - onto each new list (the tier switch); the spike (DiagProbe)
+#include "KFCTierStore.h"		// ParkCurrent - the list a search replaces, kept as a tier
 
 namespace
 {
@@ -1878,6 +1879,11 @@ void RememberFindFormat()
 }
 }	// anonymous namespace
 
+void KFCSearchEngine::RememberFindFormatNow()
+{
+	RememberFindFormat();
+}
+
 bool KFCSearchEngine::FindFormatHasChanged()
 {
 	if (gSearchedFindAttrs == nil)
@@ -3003,6 +3009,11 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 	// search when the close went through. Closed here, before anything is listed, in the context the book
 	// loop below closes its own chapters in. A chapter with unsaved work, or one with a window, is not
 	// closed - ReleaseHeldDoc's verdicts, unchanged.
+	//
+	// THE LIST GOES ON AS A TIER, NOT AWAY (the tier switch - docs/superpowers/specs/2026-10-14-kfc-tier-switch-design.md
+	// 3-1): kept whole before anything below lets it go - its rows, its result set, its book, the query it was searched with
+	// (KFCTierStore::ParkCurrent decides whether it is one to keep).
+	KFCTierStore::ParkCurrent();
 	KFCBookScope::ReleaseHeldDocs(true /*close now*/);
 	KFCSearchEngine::DropResults();
 
@@ -3124,6 +3135,16 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 	// of a mode commit and compared against one read on the other could differ with nothing having
 	// changed. See RememberFindFormat.
 	RememberFindFormat();
+
+	// ...and the QUERY ITSELF, copied in memory (the tier switch - KFCQueryCopy): what is stated back into Find/Change when
+	// this list, kept as a tier by a later search, is switched to. Read here, beside the signature and the format, for their
+	// reason: on this side of CommitSearchMode. A copy that cannot be read is not put on - that tier then refuses a switch.
+	{
+		KFCQueryCopy copy;
+		KFCQueryCopier::Capture(copy);
+		if (copy.valid)
+			KFCResultModel::SetQueryCopy(std::make_shared<KFCQueryCopy>(copy));
+	}
 
 	CollectTally tally;
 	if (objectTab)		// THE OBJECT TAB: page items, walked by InDesign's own object search one document at a time.
