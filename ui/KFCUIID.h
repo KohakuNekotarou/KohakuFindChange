@@ -445,8 +445,11 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryFindButtonWidgetID, kKFCUIPrefix + 45)
 #define kKFCSearchDocumentAgainMenuKey	kKFCStringPrefix "kKFCSearchDocumentAgainMenuKey"
 // The book, document and story rows' menus.
 #define kKFCSelectAllRowsMenuKey		kKFCStringPrefix "kKFCSelectAllRowsMenuKey"
-// A tier's own row's menu.
-#define kKFCClearTheseResultsMenuKey	kKFCStringPrefix "kKFCClearTheseResultsMenuKey"
+// A tier's own row's menu. NOT "kKFCClearTheseResultsMenuKey" (measured, 10-14 night): that key has the length and the
+// character sum of kKFCInternalPopupMenuNameKey (24 characters, 2448 each after the prefix), and the menu drew the
+// internal popup's key in its place - InDesign's string lookup took the one for the other. A new key is checked against
+// the untranslated table's (work/note-scripts/2026-10-14-kfc-tier-switch/key_collisions.py).
+#define kKFCClearTierResultsMenuKey	kKFCStringPrefix "kKFCClearTierResultsMenuKey"
 // "How to Use...": the operating reference. English in every UI language, like the rest of the
 // flyout - there is one string table, and the one thing switched to Japanese at run time is this page's
 // body (KFCLoc::JapaneseUI).

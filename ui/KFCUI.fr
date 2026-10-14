@@ -992,7 +992,7 @@ resource ActionDef (kSDKDefActionResourceID)
 		// kCustomEnabling: UpdateActionStates greys it when it comes with no tier row (pressed by ID) or while a run is up.
 		kKFCActionComponentBoss,
 		kKFCClearTheseResultsActionID,
-		kKFCClearTheseResultsMenuKey,	// "Clear These Results"
+		kKFCClearTierResultsMenuKey,	// "Clear These Results"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
