@@ -261,6 +261,19 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 		}
 	},
 
+	/** A result row's text focus of KFC's own class (KFCRowFocus.cpp): kTextFocusBoss with IID_ITEXTFOCUS replaced
+	 *  and nothing else - the shape of InDesign's own selection and walker foci (kTextSelectionFocusBoss ...). Made by
+	 *  ITextFocusManager::NewFocus(range, kKFCRowFocusBoss) - KFCRowFoci.cpp.
+	 */
+	Class
+	{
+		kKFCRowFocusBoss,
+		kTextFocusBoss,
+		{
+			IID_ITEXTFOCUS, kKFCRowFocusImpl,
+		}
+	},
+
 }}};
 
 /*  

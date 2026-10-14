@@ -43,3 +43,5 @@ REGISTER_PMINTERFACE(KFCResultsSession, kKFCResultsImpl)
 REGISTER_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)
 REGISTER_PMINTERFACE(KFCChaptersSession, kKFCChaptersImpl)
 REGISTER_PMINTERFACE(KFCBoundarySession, kKFCBoundaryImpl)
+// A result row's text focus of KFC's own class - a snapshot view interface (KFCRowFocus.cpp).
+REGISTER_PMINTERFACE(KFCRowFocusImpl, kKFCRowFocusImpl)

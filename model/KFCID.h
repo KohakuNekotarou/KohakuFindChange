@@ -94,6 +94,11 @@ DECLARE_PMID(kClassIDSpace, kKFCOpenDocResponderBoss, kKFCPrefix + 24)
 // take the document's new name (the author's call - the spec map's LIFE-14). + 25: the next after the
 // highest spent.
 DECLARE_PMID(kClassIDSpace, kKFCSaveAsDocResponderBoss, kKFCPrefix + 25)
+// A result row's text focus of KFC's own class (KFCRowFocus.cpp): kTextFocusBoss with IID_ITEXTFOCUS replaced by a
+// snapshot view interface, so the user's Undo and Redo put the focus back
+// (docs/superpowers/plans/2026-10-14-kfc-row-focus-undo.md D1). Never persisted: a focus lives in memory only.
+// + 26: the next after the highest spent.
+DECLARE_PMID(kClassIDSpace, kKFCRowFocusBoss, kKFCPrefix + 26)
 
 
 // InterfaceIDs:
@@ -165,6 +170,8 @@ DECLARE_PMID(kImplementationIDSpace, kKFCSaveAsDocResponderImpl, kKFCPrefix + 44
 // The boundary stamp the UI half checks before it calls a door (IKFCBoundary.h, KFCModelServices.cpp). + 45: the next
 // after the highest spent.
 DECLARE_PMID(kImplementationIDSpace, kKFCBoundaryImpl, kKFCPrefix + 45)
+// The row focus's IID_ITEXTFOCUS (KFCRowFocus.cpp). + 46: the next after the highest spent.
+DECLARE_PMID(kImplementationIDSpace, kKFCRowFocusImpl, kKFCPrefix + 46)
 
 
 // StringKeys - the model half's (KFC_enUS.fr): what Edit > Undo calls a KFC write. Every other key is the UI

@@ -237,6 +237,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCFindChangeCmds.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCQueryCopy.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCQueryScope.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCRowFocus.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCTierStore.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCQuerySequence.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCChangeAll.cpp"/>
@@ -283,6 +284,7 @@
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCFindChangeCmds.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCQueryCopy.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCQueryScope.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCRowFocus.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCTierStore.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCQuerySequence.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCChangeAll.h"/>
