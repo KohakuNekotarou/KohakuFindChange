@@ -3740,6 +3740,68 @@ bool PickByOrder(int32 chapterIdx, int32 hitIdx, const Places& places, TextIndex
 }
 }	// anonymous namespace
 
+#ifdef KFC_DIAG
+void KFCSearchEngine::DiagAdoptFoci(int32 chapterIdx, const UIDRef& docRef, const std::set<int32>& rows)
+{
+	IDataBase* const db = docRef.GetDataBase();
+	if (db == nil)
+		return;
+	// The stories of the rows asked for.
+	std::set<UID> stories;
+	for (std::set<int32>::const_iterator r = rows.begin(); r != rows.end(); ++r)
+	{
+		UID story = kInvalidUID;
+		TextIndex a = kInvalidTextIndex, b = kInvalidTextIndex;
+		uint64 hash = 0;
+		if (KFCResultModel::GetHitMatchIdentity(chapterIdx, *r, story, a, b, hash) && story != kInvalidUID)
+			stories.insert(story);
+	}
+	for (std::set<UID>::const_iterator s = stories.begin(); s != stories.end(); ++s)
+	{
+		uint32 recorded = 0, now = 0;
+		const bool had = KFCResultModel::GetStoryVersion(chapterIdx, *s, recorded);
+		if (!db->IsValidUID(*s) || !KFCSearchEngine::ReadStoryVersion(db, *s, now))
+			continue;
+		if (had && recorded == now)
+		{
+			KFC_DIAG_LOG("QFOCUS story=%u as on record (%u) - nothing adopted", s->Get(), now);
+			continue;
+		}
+		// EVERY ROW OF THE CHAPTER IN THAT STORY - not only the ones written: the write recognises its rows by their places.
+		const int32 n = KFCResultModel::GetHitCount(chapterIdx);
+		for (int32 i = 0; i < n; ++i)
+		{
+			UID story = kInvalidUID;
+			TextIndex a = kInvalidTextIndex, b = kInvalidTextIndex;
+			uint64 hash = 0;
+			bool replaced = false, locked = false;
+			if (!KFCResultModel::GetHitMatchIdentity(chapterIdx, i, story, a, b, hash) || story != *s
+				|| !KFCResultModel::GetHitFlags(chapterIdx, i, replaced, locked) || replaced)
+				continue;
+			TextIndex fs = kInvalidTextIndex, fe = kInvalidTextIndex;
+			if (!KFCRowFoci::Current(chapterIdx, i, db, fs, fe))
+			{
+				KFC_DIAG_LOG("QFOCUS row=%d [%d,%d) has no focus - left", (int)i, (int)a, (int)b);
+				continue;
+			}
+			KFCResultModel::Hit there;
+			ReadHitText(UIDRef(db, *s), fs, fe, there);
+			if (fe - fs != b - a || there.matchHash != hash)
+			{
+				KFC_DIAG_LOG("QFOCUS row=%d [%d,%d) focus [%d,%d) reads another text - left", (int)i, (int)a, (int)b,
+					(int)fs, (int)fe);
+				continue;
+			}
+			KFC_DIAG_LOG("QFOCUS row=%d [%d,%d) -> focus [%d,%d)", (int)i, (int)a, (int)b, (int)fs, (int)fe);
+			if (fs != a || fe != b)
+				MoveRowTo(chapterIdx, i, UIDRef(db, *s), fs, fe);
+		}
+		KFCResultModel::SetStoryVersion(chapterIdx, *s, now);
+		KFC_DIAG_LOG("QFOCUS story=%u version %s%u -> %u adopted", s->Get(), had ? "" : "none:", recorded, now);
+	}
+}
+#endif
+
 // WHERE IS THIS ROW NOW? (spec T2) One question for the jump and the selection a click makes - HERE, NOT IN THE JUMP
 // (KFCJump.cpp): walking a story and putting a row right is the model half's work; the jump asks it through IKFCRuns.
 // The row's stored place and its text focus's place are both read against the row (RowReadsAsFoundAt). One of them:

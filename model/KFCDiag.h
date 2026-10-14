@@ -167,6 +167,11 @@
 //    run-leave-no-flag  KFCChangeAll::LeaveRunDocuments leaves a document not written as the walk left it, the query
 //                run's old way: with run-dirty-unwritten, a chapter not written stays open with no window and named, and a
 //                document of the user's stays "unsaved" (xq-book-dirty-unwritten-armed, xq-doc-dirty-unwritten-armed)
+//    replace-by-focus  THE EXPERIMENT (the author's call, 10-14 night: "rely on the focus once, and try it"): a row's
+//                Replace whose story is not at the version on record takes each row's text focus's place (its match read
+//                there) and the story's version as it stands, before the doors (KFCSearchEngine::DiagAdoptFoci) - the
+//                Replace rides on the foci. Stays on while its file stands. NOT A WAY TO SHIP: a focus does not follow
+//                an Undo or a Redo (docs/ai-notes/kfc-text-focus-spike-2026-10-08.md).
 //    query-scope-refuse  KFCQueryScope (a row operation under its list's query - the tier switch v2) refuses once every
 //                check has passed: the refusal's whole path - the sequence aborted, Find/Change put back, nothing done -
 //                tried on demand (the v2 spec's section 5, item 7). One-shot.

@@ -17,6 +17,7 @@
 #include "KFCTierStore.h"
 #include "KFCBookScope.h"	// GetSearchedBookPath - the book a list was searched in; FindOpenChapterDoc - a chapter, by its file
 #include "KFCDiag.h"		// the TIER lines - test builds only
+#include "KFCRowFoci.h"	// a tier's rows keep their text foci while it is grey (HandOver / TakeBack)
 #include "KFCRunGuard.h"	// no switch while a run of ours is under way
 #include "KFCSearchEngine.h"	// RememberFindFormatOf - the switched list's own Find Format, for the replace's door
 
@@ -28,6 +29,8 @@ namespace
 		KFCResultModel::ModelSnapshot	list;
 		uint32							set;
 		PMString						bookPath;	// empty = not a book's list
+		KFCRowFoci::HeldPtr				foci;		// its rows' text foci, still moved by InDesign while it is grey (shared:
+													// a copy of the record shares them - the last holder lets them go)
 		TierRecord() : set(0) {}
 	};
 
@@ -58,6 +61,9 @@ namespace
 		out.bookPath = PMString();
 		out.bookPath.SetTranslatable(kFalse);
 		(void)KFCBookScope::GetSearchedBookPath(out.bookPath);
+		// ITS ROWS' TEXT FOCI GO WITH IT (the author's call, 10-14 night): handed over, not let go, so they go on following
+		// the edits made while the list is grey - another tier's replace among them (KFCRowFoci::HandOver).
+		out.foci = KFCRowFoci::HandOver();
 	}
 
 	// A TIER PUT INTO THE STORE IN SEARCH ORDER - by its result set, which every list made anew numbers upward
@@ -135,6 +141,9 @@ void KFCTierStore::ForgetDocument(IDataBase* db)
 		return;
 	for (size_t t = 0; t < gTiers.size(); ++t)
 	{
+		// ITS FOCI ON THAT DOCUMENT GO FIRST, every tier's - a book's too: no focus outlives its document (KFCRowFoci's rule
+		// for the live list - DetachDocument).
+		KFCRowFoci::LetDocumentOf(gTiers[t].foci, db);
 		// A BOOK'S TIER KEEPS ITS CHAPTERS, as the live book list does (KFCCloseDocResponder: "book results survive a chapter
 		// closing") - its chapters are reached by their files, and KFC itself opens and hands back a book's chapters on every
 		// book search: emptied here, a kept book tier would lose its rows to the next search.
@@ -219,13 +228,16 @@ bool KFCTierStore::SwitchTo(uint32 set, PMString& outSummary)
 	const bool liveKeepable = LiveListIsKeepable();
 	TierRecord live;
 	TakeLive(live);
-	const TierRecord wanted = *target;
+	TierRecord wanted = *target;
 
 	// 3. THE TIER'S LIST BACK, AS ITS OWN RESULT SET (the writes kept for it are followed again - KFCUndoFollow).
 	// RestoreModelSnapshot lets the live list's text foci go and attaches the tier's where its stories are as kept.
 	// FIND/CHANGE IS LEFT AS IT IS (v2 R1 - the author: "there is no need to change it when a row is selected"): a row
 	// operation states this list's query only when Find/Change is on another one, and puts it back after (KFCQueryScope).
 	KFCResultModel::RestoreModelSnapshot(wanted.list);
+	// ITS ROWS' FOCI BACK - the ones held while it was grey, which followed the edits since (the list put back attached
+	// new ones only where its stories are as kept - KFCRowFoci::TakeBack lets those go for the held).
+	KFCRowFoci::TakeBack(wanted.foci);
 	KFCResultModel::ReturnToResultSet(wanted.set);
 	// The Find Format this list was searched with is the one the replace's door compares against (FindFormatHasChanged) -
 	// read off the list's own copy, as Find/Change does not hold it.

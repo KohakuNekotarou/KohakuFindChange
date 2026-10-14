@@ -1478,6 +1478,14 @@ static bool ReplaceRowsNow(std::vector<ChapterWrite>& chapters,
 	// (ChapterMovedUnderRows). Not the match's hash alone: a row an Undo has left on the next occurrence of
 	// its own text passes that, and would be written there.
 	// Forward, like the search - the scope at the head of this function.
+#ifdef KFC_DIAG
+	// TEST BUILDS ONLY - THE EXPERIMENT replace-by-focus (KFCDiag.h; the author's call, 10-14 night): while its switch
+	// stands, the rows of a story not at the version on record take their foci's places, and the story its version as it
+	// stands, before the doors below - so the doors and the write go by the foci.
+	if (KFC_DIAG_FAULT("replace-by-focus"))
+		for (size_t k = 0; k < chapters.size(); ++k)
+			KFCSearchEngine::DiagAdoptFoci(chapters[k].chapterIdx, chapters[k].docRef, chapters[k].rows);
+#endif
 	for (size_t k = 0; k < chapters.size(); ++k)
 	{
 		const ChapterWrite& c = chapters[k];

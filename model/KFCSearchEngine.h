@@ -33,6 +33,7 @@
 #include "KFCModelTypes.h"	// KFCResultModel::RowLocation - LocateRow's answer
 
 #include <map>
+#include <set>			// DiagAdoptFoci's rows (test builds)
 #include <vector>
 
 class ITextWalker;			// AcquireWalker
@@ -517,6 +518,16 @@ namespace KFCSearchEngine
 	    (unchanged for kRowAtPlace / kRowNotFound). */
 	KFCResultModel::RowLocation LocateRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, TextIndex& ioStart,
 		TextIndex& ioEnd);
+
+#ifdef KFC_DIAG
+	/** TEST BUILDS ONLY - THE EXPERIMENT replace-by-focus (KFCDiag.h; the author's call, 10-14 night: "rely on the focus
+	    once, and try it"). For each story of `rows` that is not at the version on record: every row of the chapter in that
+	    story whose text focus reads its match (its hash and length) is moved there - its place, its line read again, the
+	    focus with it (MoveRowTo) - and the story's version is recorded as it stands, so the replace's doors go by the
+	    foci. A row with no usable focus, or whose focus reads another text, is left (the doors turn it away). Replaced rows
+	    are left. Each step is traced (QFOCUS). */
+	void DiagAdoptFoci(int32 chapterIdx, const UIDRef& docRef, const std::set<int32>& rows);
+#endif
 
 	/** Search This Story Again (a story row's right-click menu): that story alone walked again with the search's query,
 	    its rows put back as the walk finds them and its version recorded (KFCResultModel::ReplaceStoryRows). False =

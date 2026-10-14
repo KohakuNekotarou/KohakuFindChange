@@ -20,6 +20,7 @@
 #include "RangeData.h"
 
 #include <map>
+#include <new>			// std::nothrow - a held set's allocation
 #include <utility>
 #include <vector>
 
@@ -379,6 +380,88 @@ void KFCRowFoci::DetachAll()
 		Let(it->second);
 	gKept.clear();
 	LetParts(-1, nil, true);
+}
+
+// A TIER'S FOCI, HELD (KFCRowFoci.h): the two maps the live list keeps, as they were when it was put aside - keyed by its
+// own chapter and hit numbers, which its list keeps while it is grey (KFCTierStore - the list is a snapshot).
+struct KFCRowFoci::Held
+{
+	std::map<RowKey, Kept>	rows;
+	std::map<PartKey, Kept>	parts;
+
+	~Held()
+	{
+		// The last holder gone: every focus let go - Let's own rule (only from a manager that still lists it; a leak
+		// beats a call into a closed document). Never off the main thread (a leak then, as Let would refuse anyway).
+		if (!IDThreading::IsMainThreadDomain())
+			return;
+		for (std::map<RowKey, Kept>::iterator it = rows.begin(); it != rows.end(); ++it)
+			Let(it->second);
+		for (std::map<PartKey, Kept>::iterator it = parts.begin(); it != parts.end(); ++it)
+			Let(it->second);
+	}
+};
+
+KFCRowFoci::HeldPtr KFCRowFoci::HandOver()
+{
+	if (!IDThreading::IsMainThreadDomain() || (gKept.empty() && gParts.empty()))
+		return HeldPtr();
+	HeldPtr held(new (std::nothrow) Held());
+	if (held == nullptr)
+		return HeldPtr();		// (no memory: the live list keeps them, and lets them go as it always has)
+	held->rows.swap(gKept);
+	held->parts.swap(gParts);
+	return held;
+}
+
+void KFCRowFoci::TakeBack(HeldPtr& held)
+{
+	if (!IDThreading::IsMainThreadDomain() || held == nullptr)
+		return;
+	for (std::map<RowKey, Kept>::iterator it = held->rows.begin(); it != held->rows.end(); ++it)
+	{
+		std::map<RowKey, Kept>::iterator live = gKept.find(it->first);
+		if (live != gKept.end())
+			Let(live->second);		// one attached on the stored place when the list came back - the held one follows the edits
+		gKept[it->first] = it->second;
+	}
+	for (std::map<PartKey, Kept>::iterator it = held->parts.begin(); it != held->parts.end(); ++it)
+	{
+		std::map<PartKey, Kept>::iterator live = gParts.find(it->first);
+		if (live != gParts.end())
+			Let(live->second);
+		gParts[it->first] = it->second;
+	}
+	// The foci are the live list's now: emptied, so no holder lets them go.
+	held->rows.clear();
+	held->parts.clear();
+	held.reset();
+}
+
+void KFCRowFoci::LetDocumentOf(const HeldPtr& held, IDataBase* db)
+{
+	if (!IDThreading::IsMainThreadDomain() || held == nullptr || db == nil)
+		return;
+	for (std::map<RowKey, Kept>::iterator it = held->rows.begin(); it != held->rows.end(); )
+	{
+		if (it->second.db == db)
+		{
+			Let(it->second);
+			it = held->rows.erase(it);
+		}
+		else
+			++it;
+	}
+	for (std::map<PartKey, Kept>::iterator it = held->parts.begin(); it != held->parts.end(); )
+	{
+		if (it->second.db == db)
+		{
+			Let(it->second);
+			it = held->parts.erase(it);
+		}
+		else
+			++it;
+	}
 }
 
 // End, KFCRowFoci.cpp.

@@ -22,6 +22,8 @@
 #include "TextID.h"		// TextIndex
 #include "UIDRef.h"		// UID
 
+#include <memory>		// std::shared_ptr - a tier's held foci
+
 class IDataBase;
 
 namespace KFCRowFoci
@@ -66,6 +68,25 @@ namespace KFCRowFoci
 
 	/** Every focus let go (the rows are gone). */
 	void DetachAll();
+
+	// THE FOCI OF A LIST PUT ASIDE AS A TIER (the author's call, 10-14 night: "a grey tier's rows keep their foci too"):
+	// held while the list is grey, so InDesign goes on moving them with every edit - KFC's own writes from another tier
+	// among them - and given back when the tier is switched to (KFCTierStore). Let go when the last holder goes (the cap,
+	// Clear Results, Clear These Results, the shutdown) and, for a closing document, before it closes (LetDocumentOf).
+	// The same hint as the live list's: they do not follow an Undo or a Redo either.
+	struct Held;
+	typedef std::shared_ptr<Held> HeldPtr;
+
+	/** The live list's foci - its rows' and its searched parts' - moved into a held set: nothing let go, and the live list
+	    holds none after it. nil when it held none. */
+	HeldPtr HandOver();
+
+	/** A held set made the live list's again (the list itself put back first - KFCResultModel::RestoreModelSnapshot): each
+	    held focus takes its row's place, one the live list attached for the same row let go first; `held` is emptied. */
+	void TakeBack(HeldPtr& held);
+
+	/** A closing document's foci in a held set let go - while the document still stands (the close responder). */
+	void LetDocumentOf(const HeldPtr& held, IDataBase* db);
 }
 
 #endif // __KFCRowFoci_h__
