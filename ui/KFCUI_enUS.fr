@@ -40,6 +40,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCSearchBookMenuKey,			"Search",
                 kKFCBookScopeMenuKey,			"Book Scope",
                 kKFCSelectedDocumentsMenuKey,	"Find/Change Selected Documents (Book)",
+                kKFCKeepPreviousResultsMenuKey,	"Keep Previous Results",
                 kKFCHidePrevChapterMenuKey,		"Hide Previous Chapter",
                 kKFCTranslucentPanelMenuKey,	"Translucent Panel",
                 kKFCTranslucentFindChangeMenuKey,	"Translucent Find/Change",
@@ -65,7 +66,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCPanelTitleKey,				kKFCDisplayName,
                 // The query dialog (Run Saved Queries...): its title (the name its design gave it - D11 of
                 // docs/superpowers/specs/_done/2026-10-07-kfc-query-dialog-and-selected-documents-design.md),
-                // the lists' headings, the buttons between them, Run and Close.
+                // the lists' headings, the buttons between them, Find, Run and Close.
                 kKFCQueryDialogTitleKey,		"Kohaku Find/Change Queries",
                 kKFCQuerySavedLabelKey,			"Saved Queries:",
                 kKFCQueryOrderLabelKey,			"Run Order:",
@@ -74,6 +75,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCQueryUpKey,					"Move Up",
                 kKFCQueryDownKey,				"Move Down",
                 kKFCQueryClearKey,				"Clear",
+                kKFCQueryFindKey,				"Find",
                 kKFCQueryRunKey,				"Run",
                 kKFCQueryCloseKey,				"Close",
                 // Save Order... / Load Order...: the buttons, InDesign's Save / Open dialogs' titles,

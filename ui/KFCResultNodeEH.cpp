@@ -124,8 +124,8 @@ bool16 KFCResultNodeEH::LButtonUp(IEvent* e)
 		return result;
 	const NodeID& node = nodeData->Get();
 	TreeNodePtr<KFCResultNodeID> nodeID(node);
-	if (nodeID == nil || nodeID->IsRoot())
-		return result;		// the hidden root has nowhere to go
+	if (nodeID == nil || nodeID->IsRoot() || nodeID->IsInert())
+		return result;		// the hidden root has nowhere to go; a tier's row and a kept row go nowhere (never selected)
 
 	// The selection lives on the tree, not on the row, so ask upwards for it.
 	InterfacePtr<const IWidgetParent> widgetParent(this, UseDefaultIID());
@@ -221,7 +221,8 @@ bool16 KFCResultNodeEH::RButtonDn(IEvent* e)
 	if (nodeID == nil || nodeID->IsRoot())
 		return TreeNodeEventHandler::RButtonDn(e);
 
-	// Every row's right-click is consumed - no stock handling, so the row is not selected and nothing jumps.
+	// Every row's right-click is consumed - no stock handling, so the row is not selected and nothing jumps. A tier's row
+	// and a kept row have no menu: none of the shapes below is theirs (the stacked results' spec, section 3-5).
 	if (nodeID->IsHitRow())
 		PopRowMenu(kKFCResultHitMenuName, e, this);
 	else if (nodeID->IsFontRow() && KFCResults()->IsStoryGroup(nodeID->GetChapter(), nodeID->GetFont()))

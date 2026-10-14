@@ -16,7 +16,8 @@
 //  together in one undo step, KFCResultTree::ReplaceRows).
 //  THE PAGE SHOWS THE ROW SELECTED LAST, as a click does - its match, or its item, selected alone (FollowModifiedClick,
 //  ExtendSelection): the rows selected together are the list's, not the page's.
-//  A story, document or book row is always selected alone. A row closed over selected rows takes them out of the
+//  A story, document or book row is always selected alone; a tier's row and a kept row - the results kept in tiers,
+//  KFCResultHistory - never are. A row closed over selected rows takes them out of the
 //  selection - a selected row is a drawn row (DeselectRowsUnder, asked by the row's observer, KFCResultNodeObserver.cpp).
 //  The shape is Adobe's: the Layers panel's controller runs the stock rules and then takes rows of the other kind out
 //  (open/components/layerpanel/LayersPanelTreeViewController.cpp), and the Multi-State Object panel's changes the stock
@@ -216,6 +217,11 @@ void KFCResultTreeController::ProcessSelectionRules(IEvent* event, UID nodeWidge
 	if (underWay)
 		return;
 	const NodeID node(data->Get());
+	// A PRESS ON A TIER'S ROW OR A KEPT ROW leaves the selection as it is: the stock rules would take the rows selected away
+	// for a row that Select then turns away (below).
+	TreeNodePtr<KFCResultNodeID> pressed(node);
+	if (pressed != nil && pressed->IsInert())
+		return;
 	const bool modified = (event->GetType() == IEvent::kLButtonDn) && (event->ShiftKeyDown() || event->CmdKeyDown());
 	if (modified && !IsSelected(node) && !fSelectedNodes.empty())
 	{
@@ -236,6 +242,11 @@ void KFCResultTreeController::ProcessSelectionRules(IEvent* event, UID nodeWidge
 ITreeViewController::SelectCode KFCResultTreeController::Select(const NodeID& node, bool16 notifyOfChange,
 	bool16 changeHilite)
 {
+	// A TIER'S ROW OR A KEPT ROW IS NEVER SELECTED (docs/superpowers/specs/2026-10-14-kfc-stacked-results-design.md section
+	// 3-5) - whoever asks: a click, a run of rows, a key. A kept row is a record, and a tier's row only folds the rows under it.
+	TreeNodePtr<KFCResultNodeID> nodeID(node);
+	if (nodeID != nil && nodeID->IsInert())
+		return eNoSelectionAllowed;
 	// NOT WITH THESE ROWS: a row that cannot join the selection is turned away whoever asks - a click, a run of
 	// rows, a key. The stock answer for "not with the selection" (eSingleParentOnly) - nothing of KFC's reads it.
 	if (!IsSelected(node) && !fSelectedNodes.empty() && !Joins(fSelectedNodes[0], node))

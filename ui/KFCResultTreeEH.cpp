@@ -617,10 +617,11 @@ bool16 KFCResultTreeEH::StockMoveThenLand(IEvent* e, const VirtualKey& key)
 	InterfacePtr<ITreeViewMgr> treeMgr(this, UseDefaultIID());
 
 	// Home / End / PageUp / PageDown land only where they moved the selection (see HandleHomeKey): the selection before.
-	// The arrows land wherever they leave one row selected, as they always have.
+	// The arrows land wherever they leave one row selected, as they always have. Every key puts the selection back when
+	// its move met a row that is never selected (below).
 	const bool arrow = key == kVirtualDownArrowKey || key == kVirtualUpArrowKey;
 	NodeIDList before;
-	if (controller != nil && !arrow)
+	if (controller != nil)
 		controller->GetSelectedItems(before);
 
 	// The stock handler owns the movement: it knows which rows are on screen, how the selection
@@ -647,13 +648,21 @@ bool16 KFCResultTreeEH::StockMoveThenLand(IEvent* e, const VirtualKey& key)
 	// happen (an empty list, or already at the end) and there is nothing to open or run.
 	NodeIDList selected;
 	controller->GetSelectedItems(selected);
+	if (selected.empty() && before.size() == 1)
+	{
+		// THE MOVE MET A ROW THAT IS NEVER SELECTED - a tier's row or a kept row (the stacked results' spec, section 3-5):
+		// KFCResultTreeController::Select turned it away, and the selection went with it. Put back as it was; the page stays
+		// where the row's last landing left it.
+		(void)controller->Select(before[0], kTrue /*notifyOfChange*/, kTrue /*changeHilite*/);
+		return handled;
+	}
 	if (selected.size() != 1)
 		return handled;
 	if (!arrow && before.size() == 1 && before[0] == selected[0])
 		return handled;		// the selection did not move (a PageUp / PageDown's scroll, Home on the first row)
 
 	TreeNodePtr<KFCResultNodeID> node(selected[0]);
-	if (node == nil || node->IsRoot())
+	if (node == nil || node->IsRoot() || node->IsInert())
 		return handled;
 
 	// A branch row opens on arrival, so the NEXT press steps inside it rather than over it. Hit

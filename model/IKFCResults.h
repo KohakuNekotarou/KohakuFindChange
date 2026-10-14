@@ -106,6 +106,10 @@ public:
 	virtual int32 GetTotalReplacedCount() = 0;
 	/** = KFCResultModel::GetHitItem (appended) - the page item an object row stands for, kInvalidUID for a text row. */
 	virtual UID GetHitItem(int32 chapterIdx, int32 hitIdx) = 0;
+	/** = KFCResultModel::GetResultSetId (appended) - a new number every time the list is made anew (a search past its commit
+	    point, Clear Results, a run): what tells the panel a search went through (KFCResultHistory - the results kept in
+	    tiers). */
+	virtual uint32 GetResultSetId() = 0;
 };
 
 #endif // __IKFCResults_h__

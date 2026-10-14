@@ -606,6 +606,13 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCSelectedDocumentsMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// Keep Previous Results: toggle (check mark). ON = the panel's Find keeps the list it replaces, as a tier above the
+		// new one (KFCResultHistory); OFF = the list replaced, as it always was. Under the two that say what a Find runs on.
+		kKFCKeepPreviousResultsActionID,
+		kKFCTargetMenuPath
+		kKFCKeepPreviousResultsMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 		// Hide Previous Chapter: toggle (check mark). Closes the previous chapter window on jump.
 		kKFCHidePrevChapterActionID,
 		kKFCTargetMenuPath
@@ -807,6 +814,17 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKFCActionComponentBoss,
 		kKFCSelectedDocumentsActionID,
 		kKFCSelectedDocumentsMenuKey,	// "Find/Change Selected Documents (Book)" (toggle, check mark)
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// Keep Previous Results. kCustomEnabling for the check mark (ActionDefs.h:40), like the toggles beside it; never
+		// greyed - it is a setting.
+		kKFCActionComponentBoss,
+		kKFCKeepPreviousResultsActionID,
+		kKFCKeepPreviousResultsMenuKey,	// "Keep Previous Results" (toggle, check mark)
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
@@ -1470,7 +1488,7 @@ resource KFCQueryRowWidget(kKFCQueryRowRsrcID + index_enUS)
 
 /*
  * The dialog: [ Saved Queries: + list | Add >, < Remove, Move Up, Move Down, Clear | Run Order: + list, and under it
- * Save Order... and Load Order... ], the "Runs on:" line, the dialog's message line, then Run and Close at the right.
+ * Save Order... and Load Order... ], the "Runs on:" line, the dialog's message line, then Find, Run and Close at the right.
  * Modeless, with a minimize box (KFCQueryDialog.cpp). EVE lays it out; the root frame is NOT the
  * window's size - EVE sizes the window from the children's frames (KCM's book dialog measured this over eight builds).
  * Run is the dialog's default button (Enter) and Close its cancel button (Escape) - the framework's own OK and Cancel ids.
@@ -1713,15 +1731,27 @@ resource KFCQueryDialogWidget (kKFCQueryDialogRsrcID + index_enUS)
 			kEVEAlignFill | kEVERegularSpaceAfter,
 		),
 
-		// ----- Run and Close, at the right -----
+		// ----- Find, Run and Close, at the right -----
 		EVEGenericPanelWidget
 		(
 			kInvalidWidgetID, kPMRsrcID_None,
 			kBindNone,
-			Frame(0, 0, 200, 24)
+			Frame(0, 0, 300, 24)
 			kTrue, kTrue,
 			kEVEAlignRight | kEVENoSpaceAfter | kEVEArrangeChildrenInRow,
 			{
+				// Find (docs/superpowers/specs/2026-10-14-kfc-stacked-results-design.md section 2-1): the run order's next
+				// query searched, as a new tier on the panel. Not the default button - Enter stays Run's.
+				EVEButtonWidget
+				(
+					kKFCQueryFindButtonWidgetID,	// WidgetID
+					kSysButtonPMRsrcId,		// RsrcID
+					kBindNone,				// Binding
+					Frame(0, 0, 90, 20)		// Frame (l,t,r,b)
+					kTrue, kTrue,			// Visible, Enabled
+					kKFCQueryFindKey,		// "Find"
+					kEVERegularSpaceAfter,
+				),
 				EVEDefaultButtonWidget
 				(
 					kOKButtonWidgetID,		// WidgetID - the dialog's default button: Enter

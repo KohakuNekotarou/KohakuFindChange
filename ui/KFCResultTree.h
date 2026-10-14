@@ -7,7 +7,8 @@
 //  The result list's doors for the rest of the UI half: the tree reloaded from KFCResultModel after a search or an
 //  Undo (Rebuild) or its rows repainted, the panel's message area written, the rows' Replace and Search ... Again, the
 //  rows selected together, and the keyboard the list keeps. Defined where each lives: KFCResultListWidgetMgr.cpp (the
-//  tree, its rows, the message area, the rows' Replace and Search ... Again, the keyboard handed to the list),
+//  tree, its rows - what a row looks like among them -, the message area, the rows' Replace and Search ... Again, the
+//  keyboard handed to the list), KFCResultListAdapter.cpp (the live list's shape),
 //  KFCResultTreeController.cpp (the rows selected together), KFCResultTreeEH.cpp (the Return filter and the keyboard
 //  frame).
 //
@@ -26,13 +27,50 @@
 class IControlView;
 class ITreeViewController;
 class NodeID;
+class NodeID_rv;
 
 namespace KFCResultTree
 {
+	/** WHAT A ROW OF THE LIST SAYS AND WHERE IT SITS (GetRowLook) - one answer for the rows the list draws
+	    (KFCResultListWidgetMgr) and for the copies a kept tier holds of them (KFCResultHistory), so a kept row reads exactly
+	    as the row it was. */
+	struct RowLook
+	{
+		bool		hit;		// a hit row - the colour cell - rather than an expander and a label
+		PMReal		shift;		// how far right of the list's outermost level; a tier's own level is not counted
+		PMString	label;		// a book, document, story or tier row's "<name>  (R/N)"
+		PMString	locator;	// a hit row's five parts, as IKFCRowData::SetSegments takes them ("Changed " at the head of
+		PMString	flag;		//   the locator of a row this list has replaced)
+		PMString	pre;
+		PMString	match;
+		PMString	post;
+
+		RowLook() : hit(false), shift(0.0) {}
+	};
+
+	/** The look of a row of the LIVE list - a book, document, story or hit row, or the live tier's row - read off the
+	    model. false for a row it cannot resolve, and for a kept tier's rows (KFCResultHistory::GetKeptLook answers those).
+	    Defined in KFCResultListWidgetMgr.cpp, beside the drawing. */
+	bool GetRowLook(const NodeID& node, RowLook& out);
+
+	/** Does a rebuild bring this row of the live list up OPEN? A book row and a story row always do; a document row while the
+	    results came from neither a book nor All Documents (Rebuild says why each). The one place the rule is kept: Rebuild
+	    asks it, and so does a tier's copy made while the panel is closed (KFCResultHistory). Defined in
+	    KFCResultListWidgetMgr.cpp. */
+	bool OpensWhenDrawn(const NodeID& node);
+
+	/** THE LIVE LIST'S SHAPE, as the list draws it (KFCResultListAdapter.cpp): how many rows hang under `node` - the hidden
+	    root or the live tier's row for the list's top (its book row, or its documents), a book row's documents, a document
+	    row's story rows (or its hits, an object search's), a story row's hits - and the nth of them. The adapter's answer for
+	    the live rows, and what a tier's copy walks (KFCResultHistory). */
+	int32 LiveRowCount(const NodeID& node);
+	NodeID_rv LiveRow(const NodeID& node, int32 nth);
+
 	/** (Re)load the panel's result tree from KFCResultModel. A book result comes up with the book
 	    row open and its chapters closed; an All Documents result with its document rows closed; a
-	    document result with its one chapter open. Story rows come up open in every case. Safe
-	    to call when the panel is closed (does nothing then). */
+	    document result with its one chapter open. Story rows come up open in every case. While the results are kept in
+	    tiers (KFCResultHistory), the kept tiers come up as they were left, and the live one open and scrolled to the top.
+	    Safe to call when the panel is closed (does nothing then). */
 	void Rebuild();
 
 	/** Repaint the existing rows from the model WITHOUT rebuilding the tree. For changes that touch

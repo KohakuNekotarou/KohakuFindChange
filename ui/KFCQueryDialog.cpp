@@ -29,6 +29,7 @@
 #include "IWindow.h"				// GetSysWindow - the platform window behind the dialog (the minimize box)
 #include "IDropDownListController.h"	// Select - a loaded query chosen in Find/Change's own Query menu
 #include "IStringListControlData.h"		// GetIndex - that menu's entries, found by name
+#include "IFindChangeOptions.h"			// kObjectSearch - the tab Find searches with no format (PressFind)
 #include "FindChangeID.h"				// kFindQueryDropDownWidgetID - the Query menu
 #include "widgetid.h"				// kTrueStateMessage / kListSelectionChangedMessage
 
@@ -53,6 +54,7 @@
 #include "KFCQueryList.h"
 #include "KFCQueryOrder.h"
 #include "KFCQueryOrderFile.h"		// KFCChooseOrderFile - Save Order... / Load Order...'s file
+#include "KFCResultHistory.h"		// Find - a query searched as a new tier; where Find is in the run order; a Run's drop
 #include "KFCResultTree.h"			// Rebuild / ShowStatus - the panel, told of a run as Find tells it
 #include "KFCUIID.h"
 
@@ -88,7 +90,8 @@ namespace
 
 	/** Grey the buttons that have nothing to act on (the spec's section 2-2): Add with no saved query picked; Remove with
 	    no row of the order picked; Move Up on the first row, Move Down on the last; Clear and Save Order... with an empty
-	    order. Load Order... and Run are never grey (G5 as changed: a run that cannot go says why on the panel). */
+	    order. Load Order..., Find and Run are never grey (G5 as changed: a run that cannot go says why on the panel - and
+	    Find the same, the stacked results' spec section 2-1). */
 	void UpdateButtons(IPanelControlData* panel)
 	{
 		if (panel == nil)
@@ -183,10 +186,11 @@ namespace
 #ifdef KFC_DIAG
 		// TEST BUILDS ONLY: the fault switch qd-order-reset (KFCDiag.h) - a test case starts from an empty order, as a
 		// fresh session does (the order outlives a case otherwise: it is the session's). One-shot: taken away here, so the
-		// case's later opens keep the order it made.
+		// case's later opens keep the order it made. Find starts again from the first query, as after any change of order.
 		if (KFC_DIAG_FAULT("qd-order-reset"))
 		{
 			KFCQueryOrder::Clear();
+			KFCResultHistory::RestartQueryFind();
 			KFCDiagFaultOff("qd-order-reset");
 		}
 #endif
@@ -196,6 +200,93 @@ namespace
 		KFCQueryListRebuild(panel, kKFCQueryOrderListWidgetID);
 		UpdateButtons(panel);
 		ShowRunScope(panel);
+	}
+
+	/** Find (docs/superpowers/specs/2026-10-14-kfc-stacked-results-design.md section 2-1 - the author's call (a)): the run
+	    order's next query loaded into Find/Change and searched with the panel's own search, its list put on the panel as a
+	    new tier above the one before (KFCResultHistory::Find, keeping). Run's rules for a query that cannot go: one whose
+	    file is gone stops the press (Run does not run at all then); one that cannot be read, or has nothing to find, is
+	    stepped over (Run skips them). The query stays in Find/Change - the new tier's rows are replaced against it. Where the
+	    press is in the run order is KFCResultHistory's: back to the first when the order changes, or the tiers are cleared. */
+	void PressFind(IPanelControlData* panel)
+	{
+		KFC_DIAG_HIDDEN_DOCS_CHECK("query-find");	// (test builds only - a document left with no window when the find is over)
+		// Not while a landing is under way (KFCJump::IsLanding - Run's door, and the panel's Find's).
+		if (KFCJump::IsLanding())
+			return;
+		// NOR WHILE A RUN IS UP: its modal bar pumps events, so the press can arrive in the middle of one - and loading a query
+		// into Find/Change is what a query run does to its own (KFCQueryDialogShowInFindChange's rule).
+		if (KFCRuns()->IsAnyRunning())
+		{
+			SayOnBoth(panel, PMString(KFCRuns()->BusyMessage()));
+			return;
+		}
+		const std::vector<KFCSavedQuery>& order = KFCQueryOrder::Order();
+		const int32 count = static_cast<int32>(order.size());
+		if (count == 0)
+		{
+			SayOnBoth(panel, PMString("Find: the run order is empty."));
+			return;
+		}
+		const int32 next = KFCResultHistory::NextQueryIndex();
+		if (next >= count)
+		{
+			PMString done("Find: all ");
+			done.SetTranslatable(kFalse);
+			done.AppendNumber(count);
+			done.Append(" queries of the run order have been searched - Clear Results or change the run order to search them again.");
+			SayOnBoth(panel, done);
+			return;
+		}
+		const KFCSavedQuery& query = order[static_cast<size_t>(next)];
+		// "Find 2 of 3: Text  name" - the head of every line this press says.
+		PMString say("Find ");
+		say.SetTranslatable(kFalse);
+		say.AppendNumber(next + 1);
+		say.Append(" of ");
+		say.AppendNumber(count);
+		say.Append(": ");
+		say.Append(KFCQueryOrder::KindAndName(query));
+		if (!FileUtils::DoesFileExist(query.file))
+		{
+			say.Append(" cannot be found - nothing was searched.");
+			SayOnBoth(panel, say);
+			return;
+		}
+		if (!KFCRuns()->LoadSavedQuery(query.file))
+		{
+			KFCResultHistory::StepQueryIndex();
+			say.Append(" skipped: the file could not be read.");
+			SayOnBoth(panel, say);
+			return;
+		}
+		// NOTHING TO FIND: a tab this panel does not search (Colour), or - but on the Object tab, whose search lists every
+		// frame of its type with no format set - nothing set to find (the query run's own question - KFCQuerySequence).
+		const int32 mode = KFCRuns()->CurrentSearchMode();
+		if (!KFCRuns()->CanSearchTab(mode) || (mode != IFindChangeOptions::kObjectSearch && !KFCRuns()->HasFindQueryNow()))
+		{
+			KFCResultHistory::StepQueryIndex();
+			say.Append(" skipped: nothing to find.");
+			SayOnBoth(panel, say);
+			return;
+		}
+		// The tier's name: the query as the run order's row names it, "<n>  <kind>  <name>".
+		PMString label;
+		label.SetTranslatable(kFalse);
+		label.AppendNumber(next + 1);
+		label.Append("  ");
+		label.Append(KFCQueryOrder::KindAndName(query));
+		PMString summary;
+		bool committed = false;
+		(void)KFCResultHistory::Find(true /*keep*/, label, summary, &committed);
+		if (committed)
+			KFCResultHistory::StepQueryIndex();
+		KFC_DIAG_LOG("QDFIND query=%d of=%d went=%d", static_cast<int>(next + 1), static_cast<int>(count), committed ? 1 : 0);
+		// The panel's line has the search's own words (Find set it); the dialog's says which query they are about.
+		say.Append(committed ? " - " : " - nothing was searched: ");
+		say.Append(summary);
+		ShowDialogMessage(panel, say);
+		ShowRunScope(panel);		// a search can close what it opened, and a book can go: asked again, as after a Run
 	}
 
 	/** Run (G5 as changed by the author: "Run can always be pressed - with results on the panel too, pressing it runs"):
@@ -212,7 +303,11 @@ namespace
 			return;
 		KFCPanelTitle::Update();	// the tab's scope written before the run, as Find writes it (this line with it)
 		PMString summary;
+		const uint32 setBefore = KFCResults()->GetResultSetId();
 		(void)KFCRuns()->RunQueries(KFCQueryOrder::OrderFiles(), summary);
+		// A run that went through made the list anew (its commit point - KFCQuerySequence): the tiers kept on the panel go
+		// with it (the stacked results' spec, section 2-4).
+		KFCResultHistory::DropStackIfRemade(setBefore);
 		KFCResultTree::Rebuild();
 		SayOnBoth(panel, summary);	// the panel's line and the dialog's: the panel may be closed
 		ShowRunScope(panel);		// a run can close what it opened, and a book can go: asked again
@@ -264,6 +359,8 @@ namespace
 		else
 			return;
 
+		// The order changed: Find starts again from its first query (the stacked results' spec, section 2-1).
+		KFCResultHistory::RestartQueryFind();
 		KFCQueryListRebuild(panel, kKFCQueryOrderListWidgetID);
 		KFCQueryListSelect(panel, kKFCQueryOrderListWidgetID, pick);
 		UpdateButtons(panel);
@@ -317,6 +414,7 @@ namespace
 			SayOnBoth(panel, say);
 			return;
 		}
+		KFCResultHistory::RestartQueryFind();	// another order: Find starts again from its first query
 		KFCQueryListRebuild(panel, kKFCQuerySavedListWidgetID);		// read again on the way (LoadOrderFrom)
 		KFCQueryListRebuild(panel, kKFCQueryOrderListWidgetID);
 		UpdateButtons(panel);
@@ -374,7 +472,7 @@ CREATE_PMINTERFACE(KFCQueryDialogController, kKFCQueryDialogControllerImpl)
     for Run (the OK button, Enter), which it takes itself and does not hand on: the base's OK closes the dialog, and
     runs ApplyDialog inside a command sequence of its own (CDialogObserver.cpp) that the query run's abortable sequence
     would nest in. It hears
-    the five buttons that change the run order, Save Order... and Load Order... (a PUSH button's press: kTrueStateMessage on IID_IBOOLEANCONTROLDATA - how
+    the five buttons that change the run order, Save Order..., Load Order... and Find (a PUSH button's press: kTrueStateMessage on IID_IBOOLEANCONTROLDATA - how
     CDialogObserver.cpp itself hears OK and Cancel, and the product's ProblemLinksDialogObserver its Fix Links button;
     MEASURED: attached on IID_ITRISTATECONTROLDATA - basicdialog's ICON button's - the presses never arrived)
     and the two lists' selection (kListSelectionChangedMessage on IID_ITREEVIEWCONTROLLER -
@@ -397,6 +495,7 @@ public:
 			this->AttachToWidget(kOrderButtons[i], IID_IBOOLEANCONTROLDATA, panel);
 		for (size_t i = 0; i < sizeof(kFileButtons) / sizeof(kFileButtons[0]); ++i)
 			this->AttachToWidget(kFileButtons[i], IID_IBOOLEANCONTROLDATA, panel);
+		this->AttachToWidget(kKFCQueryFindButtonWidgetID, IID_IBOOLEANCONTROLDATA, panel);
 		for (size_t i = 0; i < sizeof(kLists) / sizeof(kLists[0]); ++i)
 			this->AttachToWidget(kLists[i], IID_ITREEVIEWCONTROLLER, panel);
 	}
@@ -411,6 +510,7 @@ public:
 				this->DetachFromWidget(kOrderButtons[i], IID_IBOOLEANCONTROLDATA, panel);
 			for (size_t i = 0; i < sizeof(kFileButtons) / sizeof(kFileButtons[0]); ++i)
 				this->DetachFromWidget(kFileButtons[i], IID_IBOOLEANCONTROLDATA, panel);
+			this->DetachFromWidget(kKFCQueryFindButtonWidgetID, IID_IBOOLEANCONTROLDATA, panel);
 			for (size_t i = 0; i < sizeof(kLists) / sizeof(kLists[0]); ++i)
 				this->DetachFromWidget(kLists[i], IID_ITREEVIEWCONTROLLER, panel);
 		}
@@ -458,6 +558,8 @@ public:
 			PressSaveOrder(panel);
 		else if (id == kKFCQueryLoadOrderButtonWidgetID)
 			PressLoadOrder(panel);
+		else if (id == kKFCQueryFindButtonWidgetID)
+			PressFind(panel);
 	}
 };
 

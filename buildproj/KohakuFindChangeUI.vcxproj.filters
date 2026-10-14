@@ -93,6 +93,9 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultListWidgetMgr.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultHistory.cpp">
+         <Filter>Source Files</Filter>
+      </ClCompile>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultNodeEH.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
@@ -213,6 +216,9 @@
          <Filter>Header Files</Filter>
       </ClInclude>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCResultTree.h">
+         <Filter>Header Files</Filter>
+      </ClInclude>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCResultHistory.h">
          <Filter>Header Files</Filter>
       </ClInclude>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCUIFactoryList.h">

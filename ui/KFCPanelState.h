@@ -35,6 +35,8 @@
 //    - Find/Change Selected Documents (Book) (key "selectedDocuments" - the author's call: kept). The flag
 //      alone, the model half's (KFCBookScope): it narrows only a Book Scope run, and Book Scope is not kept, so a
 //      restored ON shows ticked and grey until Book Scope is turned on.
+//    - Keep Previous Results (key "keepPreviousResults" - the stacked results' spec, section 2-3). The flag alone
+//      (KFCResultHistory): the next Find keeps the list it replaces. The tiers themselves are work state, never saved.
 //    - Remember Book Panel Placement, and the placement itself - where InDesign's OWN
 //      Book panel was when it was last closed (floating: place, size, icon state and width; docked:
 //      its neighbours). The keys are named in KFCBookPanelPlacement.cpp and ONLY there - this file

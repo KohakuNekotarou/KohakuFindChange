@@ -328,6 +328,10 @@ DECLARE_PMID(kActionIDSpace, kKFCSearchDocumentAgainActionID, kKFCUIPrefix + 51)
 // under that row selected - for Return to replace them all together. One action in the three menus: the row
 // right-clicked is the menu's widget (KFCActionComponent's RightClickedRow). + 52: the next after the highest spent.
 DECLARE_PMID(kActionIDSpace, kKFCSelectAllRowsActionID, kKFCUIPrefix + 52)
+// "Keep Previous Results" on the flyout (docs/superpowers/specs/2026-10-14-kfc-stacked-results-design.md section 2-3 - the
+// author's call (e)): a check-mark toggle - ON = the panel's Find keeps the list it replaces, as a tier above the new one
+// (KFCResultHistory). OFF by default. + 53: the next after the highest spent.
+DECLARE_PMID(kActionIDSpace, kKFCKeepPreviousResultsActionID, kKFCUIPrefix + 53)
 
 
 // WidgetIDs:
@@ -393,6 +397,10 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryMessageTextWidgetID, kKFCUIPrefix + 42)
 // and kept as a file of its own - KFCQueryOrderFile.h).
 DECLARE_PMID(kWidgetIDSpace, kKFCQuerySaveOrderButtonWidgetID, kKFCUIPrefix + 43)
 DECLARE_PMID(kWidgetIDSpace, kKFCQueryLoadOrderButtonWidgetID, kKFCUIPrefix + 44)
+// ...and Find beside Run (docs/superpowers/specs/2026-10-14-kfc-stacked-results-design.md section 2-1 - the author's call
+// (a)): the run order's next query searched, its list a new tier on the panel (KFCResultHistory). + 45: never used at
+// either prefix.
+DECLARE_PMID(kWidgetIDSpace, kKFCQueryFindButtonWidgetID, kKFCUIPrefix + 45)
 
 
 // "About Plug-ins" sub-menu:
@@ -442,7 +450,7 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryLoadOrderButtonWidgetID, kKFCUIPrefix + 44
 // "Open Find/Change...".
 #define kKFCOpenFindChangeMenuKey		kKFCStringPrefix "kKFCOpenFindChangeMenuKey"
 // "Run Saved Queries..." - and the query dialog's own words: its title, the two lists' headings, the four
-// buttons between them, Run and Close. English in every UI language, like the rest of the flyout.
+// buttons between them, Find, Run and Close. English in every UI language, like the rest of the flyout.
 #define kKFCRunSavedQueriesMenuKey		kKFCStringPrefix "kKFCRunSavedQueriesMenuKey"
 #define kKFCQueryDialogTitleKey			kKFCStringPrefix "kKFCQueryDialogTitleKey"
 #define kKFCQuerySavedLabelKey			kKFCStringPrefix "kKFCQuerySavedLabelKey"
@@ -452,6 +460,7 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryLoadOrderButtonWidgetID, kKFCUIPrefix + 44
 #define kKFCQueryUpKey					kKFCStringPrefix "kKFCQueryUpKey"
 #define kKFCQueryDownKey				kKFCStringPrefix "kKFCQueryDownKey"
 #define kKFCQueryClearKey				kKFCStringPrefix "kKFCQueryClearKey"
+#define kKFCQueryFindKey				kKFCStringPrefix "kKFCQueryFindKey"
 #define kKFCQueryRunKey					kKFCStringPrefix "kKFCQueryRunKey"
 #define kKFCQueryCloseKey				kKFCStringPrefix "kKFCQueryCloseKey"
 // Save Order... / Load Order..., the titles of InDesign's Save / Open dialogs they bring up, and the
@@ -463,6 +472,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryLoadOrderButtonWidgetID, kKFCUIPrefix + 44
 #define kKFCQueryOrderFileTypeKey		kKFCStringPrefix "kKFCQueryOrderFileTypeKey"
 // "Find/Change Selected Documents (Book)" - the toggle under Book Scope.
 #define kKFCSelectedDocumentsMenuKey	kKFCStringPrefix "kKFCSelectedDocumentsMenuKey"
+// "Keep Previous Results" - the toggle under Find/Change Selected Documents (Book).
+#define kKFCKeepPreviousResultsMenuKey	kKFCStringPrefix "kKFCKeepPreviousResultsMenuKey"
 
 // Other StringKeys:
 #define kKFCAboutBoxStringKey	kKFCStringPrefix "kKFCAboutBoxStringKey"
@@ -535,7 +546,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryLoadOrderButtonWidgetID, kKFCUIPrefix + 44
 
 // Block 3 - the check-mark toggles, 2.2 to 2.9. Book Scope leads: it is the one that decides what the
 // commands in block 1 run on, and Find/Change Selected Documents (Book) follows it - it narrows Book Scope, and works
-// only with it on. Then Hide Previous Chapter; then Link the Application Bar's Search Field,
+// only with it on. Keep Previous Results follows the two - what a Find does with the list it replaces. Then Hide Previous
+// Chapter; then Link the Application Bar's Search Field,
 // which is about the search as Book Scope is, so it stands before the window ones. The
 // next three are window appearance: the two that act on InDesign's OWN Find/Change dialog first
 // (translucency, then the minimize box), and this panel's own translucency. Remember Book Panel
@@ -543,6 +555,7 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryLoadOrderButtonWidgetID, kKFCUIPrefix + 44
 // after.
 #define kKFCBookScopeMenuItemPosition		2.2
 #define kKFCSelectedDocumentsMenuItemPosition	2.3
+#define kKFCKeepPreviousResultsMenuItemPosition	2.35	// what a Find does with the list it replaces
 #define kKFCHidePrevChapterMenuItemPosition	2.4
 #define kKFCAppBarSearchEnterMenuItemPosition	2.5		// a search toggle, before the window toggles
 #define kKFCTranslucentFindChangeMenuItemPosition	2.6

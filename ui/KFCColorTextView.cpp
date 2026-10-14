@@ -251,6 +251,14 @@ void KFCColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 		colors->GetRealAGMColor(isHilited ? kInterfaceHighLight : kInterfacePaletteFill, bg);
 		colors->GetRealAGMColor(isHilited ? kInterfaceHighLightText : kInterfaceTextColor, fg);
 	}
+	// A KEPT ROW (a tier of the stacked results - KFCResultHistory): the widget manager disables the cell, and the whole row
+	// is drawn one step fainter - the theme's text colour faded once toward the background where a live row has it at full
+	// strength, its context faded once more, no accent. A kept row is never selected, so never hilited.
+	// The cell's OWN flag (GetEnableState): IsEnabled answers for its ancestors too, and a panel disabled as a whole would
+	// then draw every live row faint.
+	const bool kept = !this->GetEnableState();
+	if (kept)
+		fg = KFCBlendColor(bg, fg, PMReal(kKFCContextTextWeight));
 	const RealAGMColor kFullColor = fg;									// the theme's text colour
 	const RealAGMColor kContextColor = KFCBlendColor(bg, fg, PMReal(kKFCContextTextWeight));	// faded toward bg
 
@@ -271,7 +279,7 @@ void KFCColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	// is a WORD, and the colour only ever emphasised it. It is also the row
 	// the user is already looking at.
 	RealAGMColor accent = fg;
-	if (colors != nil && !isHilited)
+	if (colors != nil && !isHilited && !kept)
 		colors->GetRealAGMColor(kInterfaceItemHighLight, accent);
 	const RealAGMColor kAccentColor = accent;
 

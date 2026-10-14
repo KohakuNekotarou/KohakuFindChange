@@ -32,6 +32,7 @@
 #include "KFCBookPanelPlacement.h"	// "Remember Book Panel Placement": stop following at the end
 #include "KFCResultTree.h"		// the status line's static PMString
 #include "KFCQueryOrder.h"		// the query dialog's two lists - static vectors
+#include "KFCResultHistory.h"	// the results kept in tiers - static vectors of copied rows
 #include "KFCModelObserver.h"	// the UI half's ear on the model half
 
 /** Implements IStartupShutdownService for the UI half. */
@@ -101,6 +102,8 @@ public:
 		// ...and the query dialog's two lists: static vectors of PMStrings and IDFiles (a review found them left for
 		// the unload).
 		KFCQueryOrder::ShutdownCleanup();
+		// ...and the results kept in tiers: their copies of the rows are PMStrings in static vectors (KFCResultHistory).
+		KFCResultHistory::ShutdownCleanup();
 	}
 };
 

@@ -242,6 +242,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCPanelView.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultListAdapter.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultListWidgetMgr.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultHistory.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultNodeEH.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultNodeObserver.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCQueryRowEH.cpp"/>
@@ -291,6 +292,7 @@
       <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCResultNodeID.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCDiagHiddenDocs.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCResultTree.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCResultHistory.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCUIFactoryList.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCUIID.h"/>
    </ItemGroup>

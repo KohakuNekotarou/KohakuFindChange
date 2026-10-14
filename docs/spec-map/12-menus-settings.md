@@ -19,6 +19,7 @@
   ──────────
   Book Scope
   Find/Change Selected Documents (Book)
+  Keep Previous Results
   Hide Previous Chapter
   Link the Application Bar's Search Field to This Panel
   Translucent Find/Change
@@ -33,7 +34,7 @@
   ```
 
   2行目の名前は範囲で変わる（`Find in Book`／`Find in Document`／`Find in Story` など＝SET-03。上の絵は Book Scope OFF・検索: ドキュメントのとき）。
-  `Book Scope` から `Remember Book Panel Placement` までの8つはトグルで、ON のとき左にチェックの印が付く（最初は `Hide Previous Chapter` だけ ON＝SET-23）。
+  `Book Scope` から `Remember Book Panel Placement` までの9つはトグルで、ON のとき左にチェックの印が付く（最初は `Hide Previous Chapter` だけ ON＝SET-23）。
   （`Change Checked` と `Show Changes by KohakuFindChange` は 2026-10-06 に外した。`Run Saved Queries...` と `Find/Change Selected Documents (Book)` は 2026-10-07 に足した＝第16章・SCOPE-26〜。`Run Saved Queries...` は同じ日の夜に `Clear Results` の下へ1つ下げた＝作者の依頼。）
   - 訂正: 2026-10-08＝最後の項目は、それまで SDK 共通の文字列で `About this plug-in...` と出ていた（この地図の表記と食い違っていた）。作者「英語として正しい方で」→ほかの項目と同じく語頭を大文字にし、ハイフンの後ろも大文字の `About This Plug-In...`（InDesign のメニューバーの `Plug-Ins`・このパネルのまとまり `Kohaku Plug-Ins` と同じ）。KFC 専用のキー `kKFCAboutThisPlugInMenuKey`（SDK のキーは自作のプラグイン全部が共有するので値を変えない）。
 
@@ -44,6 +45,9 @@
 - **SET-03** 項目の名前は**どの UI 言語でも英語**（GEN-35）。名前が変わるのは2つ ―― `Find in …`（範囲によって `Find in Book`／`Find in Document`／`Find in Story` など＝GEN-28）と、
   Find/Change Selected Documents (Book) でブックの一部を選んでいる間の `Find in Selected Documents`／`Change All in Selected Documents (No List)`（SCOPE-31・2026-10-07）。
   灰色のときも、範囲つきの名前は出る。
+  - 訂正:
+
+- **SET-24** ★**Keep Previous Results**（トグル・2026-10-14 作者の判断 (e)＝`Find/Change Selected Documents (Book)` の下）＝ON のとき、パネルの Find（メニュー・ショートカット・アプリケーションバーの Return）が、それまでの一覧を消さずに**段として残し**、新しい一覧をその下に積む（ROW-39）。OFF（既定）は今までどおり一覧を入れ替え、段も消す（ROW-41）。OFF にしただけでは段は消えない（次に通った検索から）。いつでも押せる（設定なので灰色にならない）。Save Panel Settings で保存（キー `keepPreviousResults`＝SET-16）。クエリのダイアログの Find は、この切り替えに関わらずいつも積む（QRY-29）。
   - 訂正:
 
 ---
@@ -60,7 +64,7 @@
 - **SET-05** `Find in …` ＝範囲に対象が無い（Book Scope ON でブックが無い・章の無いブック／OFF で文書が無い）か、検索と置換のタブが Colour のとき灰色（FIND-17）。
   `Change All in Book (No List)` ＝Book Scope が OFF・対象のブックが無い・パネルにヒットの行がある・タブが Colour・検索する文字も形式も無い（Object タブでは Find Object Format も検索のオブジェクトスタイルも空）とき灰色（REP-33・OBJ-13）。
   （1.4.0・17-objects.md＝1.3 までは、どちらも Object のタブでも灰色だった。）
-  `Clear Results` ＝ヒットの行が無いとき灰色（0件のブックの行だけのときも・REP-34）。
+  `Clear Results` ＝ヒットの行が無いとき灰色（0件のブックの行だけのときも・REP-34）。ただし段を積んでいる間（ROW-39）は、ヒットの行が無くても押せる（2026-10-14）。
   置換の文字は見ない（空でも「一致を消す」としてやれる）。
   `Run Saved Queries...` ＝走っている間（SET-04）のほかは灰色にならない（文書が無くても・結果が出ていても押せる＝QRY-02）。
   - 訂正:
@@ -142,7 +146,7 @@
   - 訂正:
 
 - **SET-16** 保存するもの ―― Translucent Panel／Translucent Find/Change／Minimizable Find/Change／Link the Application Bar's Search Field／
-  Hide Previous Chapter／Find/Change Selected Documents (Book)（2026-10-07・キー `selectedDocuments`＝SCOPE-34）／Remember Book Panel Placement と、ブックパネルの位置（開いていれば今の位置、無ければ最後に覚えた位置）。
+  Hide Previous Chapter／Find/Change Selected Documents (Book)（2026-10-07・キー `selectedDocuments`＝SCOPE-34）／Keep Previous Results（2026-10-14・キー `keepPreviousResults`＝SET-24）／Remember Book Panel Placement と、ブックパネルの位置（開いていれば今の位置、無ければ最後に覚えた位置）。
   （保存したクエリの並びは、このファイルに入れない ―― InDesign を起動している間だけ覚え、ファイルにするのは `Save Order...` で利用者が選んだ場所＝QRY-14〜16・QRY-26。2026-10-07 の昼の版が書いていた `KFCQueryOrder.txt` はもう使わない。）
   - 訂正:
 
@@ -185,4 +189,5 @@
 - SET-13：`Find in …` が設定の画面で `Search` と出るのは、リソースの名前から読んだもので、実機の設定の画面では見ていない。
 - SET-13：1.0.0 から更新するとショートカットが外れる（README）。1.2.0 の中で版を上げても外れないかは確かめていない（ActionID は変えない約束）。
 - SET-04：走っている間に、`Open Find/Change...` のショートカット（灰色の確かめを受けない）を押したらどうなるかは測っていない（進捗バーがモーダルなので届かない見込み）。
+- ⬜（2026-10-14 の実装・作りとコンパイルだけ）SET-24：メニューの位置・チェックの印・Save Panel Settings で残るか。全件の回で。
 - SET-18：`<言語>` のフォルダー名（例 `ja_JP`）と `Version XX.0` の数は、この章のためには実機のパスを見ていない。

@@ -42,6 +42,8 @@
 
 #include "BaseType.h"
 
+class PMString;
+
 // The toggle's current state (*OFF by default).
 bool16	KFCGetAppBarSearchEnter();
 
@@ -62,5 +64,11 @@ bool16	KFCApplyAppBarSearchEnter();
 // Called from the UI half's shutdown. *A hook's procedure and ICallbackTimer's callback are raw pointers into this
 // .pln - neither may outlive it.
 void	KFCShutdownAppBarSearchEnter();
+
+// THE QUERY OF THE TAB FIND/CHANGE IS ON, AS WORDS - what the field shows while the link is on (Text / GREP: the find
+// string; Glyph: the glyph, its id and its font; Transliterate: the character type, in InDesign's own words) and the name
+// a kept tier of the panel's Find carries (KFCResultHistory::PanelFindLabel). false for a tab with nothing to say in words
+// (Object, Colour) - and on Mac, where none of this is built. Whether the link is on or not.
+bool	KFCFindChangeQueryWords(PMString& outWords);
 
 #endif // __KFCAppBarSearchEnter_h__

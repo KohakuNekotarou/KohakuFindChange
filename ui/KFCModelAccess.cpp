@@ -93,6 +93,7 @@ namespace
 		virtual int32 GetFontReplacedCount(int32, int32) { return 0; }
 		virtual int32 GetTotalReplacedCount() { return 0; }
 		virtual UID GetHitItem(int32, int32) { return kInvalidUID; }
+		virtual uint32 GetResultSetId() { return 0; }
 	};
 
 	class KFCRunsStandInImpl : public IKFCRuns

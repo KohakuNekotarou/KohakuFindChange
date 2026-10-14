@@ -38,6 +38,7 @@
 #include "KFCUIID.h"
 #include "KFCModelAccess.h"		// the model half, through its session interfaces (the model/UI split)
 #include "KFCResultTree.h"		// rebuild the result tree after a search
+#include "KFCResultHistory.h"	// the search's one door, Keep Previous Results and the tiers it keeps
 #include "KFCResultNodeID.h"		// the row right-clicked - a hit, story, document or book row
 #include "KFCJump.h"			// the Hide Previous Chapter toggle lives with the jump logic
 #include "KFCPanelTitle.h"		// the panel's tab name carries the current scope
@@ -48,7 +49,6 @@
 #include "KFCPanelState.h"		// "Save Panel Settings" - write the settings toggles to our own file
 #include "KFCBookPanelPlacement.h"	// "Remember Book Panel Placement" - InDesign's own Book panel
 #include "KFCQueryDialog.h"		// "Run Saved Queries..." - the query dialog
-#include "KFCDiag.h"				// a test build's UIOBS line (KFCDiagCounter)
 #include "KFCDiagHiddenDocs.h"		// the hidden-document check after an action - test builds only
 
 /** Implements IActionComponent; performs the actions that are executed when the plug-in's
@@ -250,24 +250,11 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			if (KFCJump::IsLanding())
 				break;
 
-			// Before the search rather than after: the progress bar is modal, and the tab stays in
-			// view behind it. This is also what puts the name back when the panel has been closed
-			// and reopened since the last toggle.
-			KFCPanelTitle::Update();
-
+			// The search through the one door a search into the panel takes (KFCResultHistory::Find): the tab's scope
+			// written first, the list drawn once it returns, the status line set - and, while Keep Previous Results is on,
+			// the list it replaces kept as a tier above it (the stacked results' spec, section 2-3).
 			PMString summary;
-#ifdef KFC_DIAG
-			// how often the UI half's observers ran while the search did (guide vol2-15: not per match, one hopes)
-			const int titleBefore = KFCDiagCounter(kKFCDiagTitleRecomputes);
-			const int mirrorBefore = KFCDiagCounter(kKFCDiagFieldMirrors);
-#endif
-			KFCRuns()->SearchBook(summary);
-#ifdef KFC_DIAG
-			KFC_DIAG_LOG("UIOBS search title=%d mirror=%d", KFCDiagCounter(kKFCDiagTitleRecomputes) - titleBefore,
-				KFCDiagCounter(kKFCDiagFieldMirrors) - mirrorBefore);
-#endif
-			KFCResultTree::Rebuild();
-			KFCResultTree::ShowStatus(summary);
+			(void)KFCResultHistory::Find(KFCResultHistory::IsKeepOn(), KFCResultHistory::PanelFindLabel(), summary);
 			break;
 		}
 
@@ -280,7 +267,11 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 				break;
 			KFCPanelTitle::Update();
 			PMString summary;
+			const uint32 setBefore = KFCResults()->GetResultSetId();
 			(void)KFCRuns()->ChangeAll(summary);
+			// A run that went through made the list anew (its commit point): the tiers kept above it go with it (the stacked
+			// results' spec, section 2-4).
+			KFCResultHistory::DropStackIfRemade(setBefore);
 			// Drawn again: a run that got past its doors threw the results away (a search's book row that found nothing -
 			// KFCChangeAll::Run's commit point), and a refusal left them as they were, which a rebuild draws the same.
 			KFCResultTree::Rebuild();
@@ -304,7 +295,17 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			if (KFCJump::IsLanding() || KFCResultTree::RefusedWhileRunning())
 				break;
 			PMString status;
-			(void)KFCRuns()->ClearResults(status);
+			// The tiers kept above the list go (the stacked results' spec, section 2-4 - Clear Results is how the stack starts
+			// again), and the list through the model's door, which clears a list with a match in it and says so. A stack over a
+			// list with none (a query that found nothing) goes alone - the model keeps a list of none as it is.
+			const bool stacked = KFCResultHistory::DropStack();
+			if (KFCResults()->GetTotalHitCount() > 0 || !stacked)
+				(void)KFCRuns()->ClearResults(status);
+			else
+			{
+				status = PMString("Results cleared.");
+				status.SetTranslatable(kFalse);
+			}
 			KFCResultTree::Rebuild();
 			KFCResultTree::ShowStatus(status);
 			break;
@@ -333,6 +334,15 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			// through KFCPanelTitle::Update.
 			KFCChapters()->SetSelectedDocumentsOn(!KFCChapters()->IsSelectedDocumentsOn());
 			KFCPanelTitle::Update();
+			break;
+		}
+
+		case kKFCKeepPreviousResultsActionID:
+		{
+			// Keep Previous Results (the stacked results' spec, section 2-3): the flag alone - the next Find keeps the list it
+			// replaces as a tier, or (off) replaces it and the tiers with it; the tiers on the panel now stay. Its check mark
+			// is drawn in UpdateActionStates.
+			KFCResultHistory::SetKeepOn(!KFCResultHistory::IsKeepOn());
 			break;
 		}
 
@@ -571,8 +581,10 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			}
 			case kKFCClearResultsActionID:
 			{
-				// Clear Results: while the panel holds a list.
-				listToUpdate->SetNthActionState(i, (KFCResults()->GetTotalHitCount() > 0) ? kEnabledAction : kDisabled_Unselected);
+				// Clear Results: while the panel holds a list - or tiers kept above one (the stacked results' spec, section
+				// 2-4: a query that found nothing leaves a list of none, and the stack must still be clearable).
+				const bool something = KFCResults()->GetTotalHitCount() > 0 || KFCResultHistory::IsStacking();
+				listToUpdate->SetNthActionState(i, something ? kEnabledAction : kDisabled_Unselected);
 				break;
 			}
 			case kKFCScopeBookActionID:
@@ -590,6 +602,15 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 				// Chapter's does, so a setting kept for the next book run is not hidden.
 				int16 actionState = KFCChapters()->IsBookScopeOn() ? kEnabledAction : kDisabled_Unselected;
 				if (KFCChapters()->IsSelectedDocumentsOn())
+					actionState |= kSelectedAction;
+				listToUpdate->SetNthActionState(i, actionState);
+				break;
+			}
+			case kKFCKeepPreviousResultsActionID:
+			{
+				// Always offered - it is a setting (the stacked results' spec, section 2-3); the check mark while on.
+				int16 actionState = kEnabledAction;
+				if (KFCResultHistory::IsKeepOn())
 					actionState |= kSelectedAction;
 				listToUpdate->SetNthActionState(i, actionState);
 				break;

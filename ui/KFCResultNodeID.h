@@ -11,6 +11,10 @@
 //    (chap, -1, -1)      a document row     -> index into KFCResultModel's chapters
 //    (chap, font, -1)    a STORY row        -> 'font' indexes the chapter's fontGroups (one per story)
 //    (chap, font, hit)   a hit row          -> hit indexes that CHAPTER's hits
+//    (-3, tier, -1)      a TIER row         -> while the results are kept in tiers (KFCResultHistory): 'tier' = a kept
+//                                              tier's place, the oldest 0; -1 = the LIVE tier, the list the model holds
+//    (-4, tier, row)     a KEPT row         -> row 'row' of kept tier 'tier' - a copy of a row as it was, drawn and
+//                                              nothing else
 //
 //  The book row is what tells the user WHICH book was searched, permanently and in the panel
 //  itself rather than in a status line that the next message overwrites. A document-scope search
@@ -30,6 +34,12 @@
 //  "the root" must go through CreateRoot(). A place still saying Create(-1) would now be naming
 //  the book row, and a parent that is its own child is an infinite descent.
 //
+//  THE TIERS' TWO SHAPES ARE STILL THREE NUMBERS (docs/superpowers/specs/2026-10-14-kfc-stacked-results-design.md section
+//  3-2): the stock controller writes the selected rows' nodes into the panel's saved data (CTreeViewController::ReadWrite,
+//  through Write below), so a fourth number would have the next build read a panel saved by this one wrong - and this one
+//  read an older one's. Neither shape is ever selected (KFCResultTreeController::Select turns them away), so neither is
+//  written there either. Every question below that names a row of the live list answers no for both.
+//
 //  The node's data (book name, chapter name / count, font name, hit text segments) is looked up
 //  from KFCResultModel by these indices when needed, so nodes stay tiny and a rebuild after a new
 //  search is just ClearTree + ChangeRoot (+ re-expanding). Ported from KESCL's KESCLResultNodeID -
@@ -47,7 +57,7 @@
 #include "KFCModelAccess.h"		// the model half, through its session interfaces
 
 /** One node of the result tree: (chapter index, font group, hit index). See the file comment for
-    the five shapes a node can take. */
+    the seven shapes a node can take. */
 class KFCResultNodeID : public NodeIDClass
 {
 public:
@@ -67,6 +77,15 @@ public:
 
 	/** A FONT row under chapter 'chapter' ('font' indexes that chapter's fontGroups). */
 	static NodeID_rv CreateFont(int32 chapter, int32 font) { return new KFCResultNodeID(chapter, font, -1); }
+
+	/** A TIER'S row: kept tier 'tier' (0 = the oldest - KFCResultHistory). The live tier's is CreateLiveTier. */
+	static NodeID_rv CreateTier(int32 tier) { return new KFCResultNodeID(kTierRowMark, tier, -1); }
+
+	/** The LIVE tier's row - over the list the model holds, under the kept tiers. */
+	static NodeID_rv CreateLiveTier() { return new KFCResultNodeID(kTierRowMark, -1, -1); }
+
+	/** Row 'row' of kept tier 'tier' - KFCResultHistory's copy of a row as it was. */
+	static NodeID_rv CreateKept(int32 tier, int32 row) { return new KFCResultNodeID(kKeptRowMark, tier, row); }
 
 	/** A hit row under chapter 'chapter' ('hit' is the index into that CHAPTER's hits).
 
@@ -128,7 +147,7 @@ public:
 		stream->XferInt32(const_cast<KFCResultNodeID*>(this)->fHit);
 	}
 
-	/** The chapter's 0-based index into KFCResultModel (negative = root or book row). */
+	/** The chapter's 0-based index into KFCResultModel (negative = root, book row, or a tier's or kept row). */
 	int32 GetChapter() const { return fChapter; }
 
 	/** The font (story) group this row belongs to, or -1 on a row above the story level (and on a hit
@@ -138,8 +157,8 @@ public:
 	/** The hit index within that chapter (-1 = this is NOT a hit row). */
 	int32 GetHit() const { return fHit; }
 
-	/** Is this a hit row (a leaf)? */
-	bool16 IsHitRow() const { return fHit >= 0; }
+	/** Is this a hit row (a leaf)? (A kept row's copy of one is not: IsKeptRow.) */
+	bool16 IsHitRow() const { return fChapter >= 0 && fHit >= 0; }
 
 	/** Is this a FONT row - the STORY row (the level's old name - see the file comment)? */
 	bool16 IsFontRow() const { return fChapter >= 0 && fFont >= 0 && fHit < 0; }
@@ -151,11 +170,39 @@ public:
 	bool16 IsDocumentRow() const { return fChapter >= 0 && fFont < 0 && fHit < 0; }
 
 	/** Is this the hidden root? */
-	bool16 IsRoot() const { return fChapter <= -2; }
+	bool16 IsRoot() const { return fChapter == -2; }
+
+	/** Is this a TIER's row - the live tier's (GetTier -1) or a kept tier's? */
+	bool16 IsTierRow() const { return fChapter == kTierRowMark; }
+
+	/** Is this a KEPT row - a row of a kept tier's copy? */
+	bool16 IsKeptRow() const { return fChapter == kKeptRowMark && fHit >= 0; }
+
+	/** A row that is never selected and never acts (the stacked results' spec, section 2-2): a tier's row, or a kept row. */
+	bool16 IsInert() const { return IsTierRow() || IsKeptRow(); }
+
+	/** The tier of a tier's row or a kept row: 0 = the oldest kept tier, -1 = the live one (a tier's row only). -1 for every
+	    other row. */
+	int32 GetTier() const { return IsInert() ? fFont : -1; }
+
+	/** A kept row's place in its tier's copy; -1 for every other row. */
+	int32 GetKeptRow() const { return IsKeptRow() ? fHit : -1; }
 
 	/** Debug aid, like the samples: makes tree-view asserts name the node. */
 	virtual PMString GetDescription() const
 	{
+		if (IsInert())
+		{
+			PMString t(IsTierRow() ? "KFCResultTier " : "KFCResultKept ");
+			t.AppendNumber(fFont);
+			if (IsKeptRow())
+			{
+				t.Append(":");
+				t.AppendNumber(fHit);
+			}
+			t.SetTranslatable(kFalse);
+			return t;
+		}
 		PMString s("KFCResultRow ");
 		s.AppendNumber(fChapter);
 		if (fFont >= 0)
@@ -173,6 +220,10 @@ public:
 	}
 
 private:
+	// The chapter of the two shapes the stacked results add (the file comment's table) - below the root's -2, which is why
+	// IsRoot asks for -2 exactly.
+	enum { kTierRowMark = -3, kKeptRowMark = -4 };
+
 	// Private constructors force the factory methods, PnlTrvFileNodeID-style.
 	KFCResultNodeID() : fChapter(-2), fFont(-1), fHit(-1) {}
 	KFCResultNodeID(int32 chapter, int32 font, int32 hit)

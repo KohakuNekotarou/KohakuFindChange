@@ -293,19 +293,9 @@ static bool MirrorFindChangeIntoField()
 {
 	if (sShutdown || !sAppBarSearchEnter)
 		return false;
-	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
-	if (opts == nil)
-		return false;
 	PMString query;
-	const IFindChangeOptions::SearchMode mode = opts->GetSearchMode();
-	switch (mode)
-	{
-		case IFindChangeOptions::kTextSearch:
-		case IFindChangeOptions::kGrepSearch:			query = PMString(opts->GetFindString(mode)); break;
-		case IFindChangeOptions::kGlyphSearch:			query = GlyphDescription(opts); break;
-		case IFindChangeOptions::kTransliterateSearch:	query = CharacterTypeName(opts->GetFindCharacterType()); break;
-		default:										return false;	// Object, Colour: not this panel's
-	}
+	if (!KFCFindChangeQueryWords(query))
+		return false;	// Object, Colour: not this panel's
 	const std::wstring text = WideOf(query);
 	const HWND field = AppBarField();
 	if (field == nullptr || FieldText(field) == text)
@@ -467,6 +457,30 @@ static void UnhookAppBar()
 
 #endif	// WINDOWS
 
+bool KFCFindChangeQueryWords(PMString& outWords)
+{
+	outWords.Clear();
+	outWords.SetTranslatable(kFalse);
+#ifdef WINDOWS
+	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
+	if (opts == nil)
+		return false;
+	const IFindChangeOptions::SearchMode mode = opts->GetSearchMode();
+	switch (mode)
+	{
+		case IFindChangeOptions::kTextSearch:
+		case IFindChangeOptions::kGrepSearch:			outWords = PMString(opts->GetFindString(mode)); break;
+		case IFindChangeOptions::kGlyphSearch:			outWords = GlyphDescription(opts); break;
+		case IFindChangeOptions::kTransliterateSearch:	outWords = CharacterTypeName(opts->GetFindCharacterType()); break;
+		default:										return false;	// Object, Colour: nothing in words
+	}
+	outWords.SetTranslatable(kFalse);
+	return true;
+#else
+	return false;
+#endif
+}
+
 // The observer that keeps the field following the dialog. An AddIn onto kActiveContextBoss under its own IID
 // (KFCUI.fr), as the panel-visibility and Book-panel observers are: that boss carries observers that are not
 // ours, and it is there for the whole session - this one is attached while the toggle is ON, panel or no panel.
@@ -482,7 +496,7 @@ public:
 		if (protocol == IID_IFINDCHANGEOPTIONS)
 		{
 #ifdef KFC_DIAG
-			++KFCDiagCounter(kKFCDiagFieldMirrors);	// how often this runs during a search (UIOBS, KFCActionComponent)
+			++KFCDiagCounter(kKFCDiagFieldMirrors);	// how often this runs during a search (UIOBS, KFCResultHistory::Find)
 #endif
 			sRemirrorHeld = false;		// the dialog changed: writing back over InDesign's own text is allowed again
 			MirrorFindChangeIntoField();

@@ -18,6 +18,11 @@
 //      colour cell (KFCColorTextView) with the matched part highlighted. No expander (a leaf);
 //      indented past its branch row.
 //
+//  WHILE THE RESULTS ARE KEPT IN TIERS (KFCResultHistory - docs/superpowers/specs/2026-10-14-kfc-stacked-results-design.md
+//  section 3-4) a tier's own row is a branch row at the left edge, the live list's rows sit one step right of it, and a kept
+//  tier's rows are drawn from its copy in the same two shapes - disabled, which greys them. What every row says, live or
+//  copied, is worked out in one place (KFCResultTree::GetRowLook), so a kept row reads as the row it was.
+//
 //  The STORY rows group each chapter's hits by story. (The code calls them FONT rows: the level once
 //  held the fonts of the Find Missing Glyphs scan, since removed.)
 //
@@ -60,6 +65,7 @@
 #include "KFCResultNodeID.h"
 #include "KFCModelAccess.h"		// the model half, through its session interfaces
 #include "KFCResultTree.h"
+#include "KFCResultHistory.h"	// the tiers kept above the live list - their rows' copies, and whether there are any
 #include "KFCJump.h"			// ReplaceObjectRows - object rows' Replace
 #include "KFCColorTextView.h"	// IKFCRowData (the hit cell)
 #include "IKFCStatusTextData.h"	// the message area's pieces
@@ -161,6 +167,45 @@ namespace
 		return KFCResults()->GetChapterLocation(chapterIdx, docRef, file) && KFCChapters()->IsDocStillOpen(docRef)
 			&& !KFCChapters()->HasWindow(docRef);
 	}
+
+	// How far right of the outermost level this list's document and hit rows sit: one book-level step when there is a book
+	// row above them, nothing when there is not. (A tier's own level is added where a row is drawn - TierShift.)
+	PMReal LevelShift()
+	{
+		return KFCResults()->IsFromBook() ? kBookLevelIndent : PMReal(0.0);
+	}
+
+	// How far right this chapter's HIT rows sit because of the levels above them: one step for the story row every TEXT
+	// hit sits under; none for an OBJECT chapter, whose rows hang off the document row directly.
+	PMReal FontShift(int32 chapterIdx)
+	{
+		return (KFCResults()->GetDisplayFontCount(chapterIdx) > 0) ? kFontLevelIndent : PMReal(0.0);
+	}
+
+	// THE TIERS' OWN LEVEL (the stacked results' spec, section 2-2): while the results are kept in tiers, the live list's
+	// rows sit one step right of the tier's row above them - and a kept tier's rows of theirs. The book level's 8px.
+	const PMReal kTierLevelIndent = 8.0;
+	PMReal TierShift()
+	{
+		return KFCResultHistory::IsStacking() ? kTierLevelIndent : PMReal(0.0);
+	}
+
+	// A DOCUMENT ROW COMES UP OPEN when the results came from neither a book nor All Documents: one document, its rows at
+	// once (Rebuild says why each). Asked by Rebuild and by OpensWhenDrawn - one rule.
+	bool DocumentRowsOpen()
+	{
+		return !KFCResults()->IsFromBook() && KFCResults()->GetSearchScope() != KFCResultModel::kScopeAllDocuments;
+	}
+
+	// A ROW DRAWN IN THE COLOUR CELL: a live hit row, or a kept tier's copy of one (KFCResultHistory).
+	bool DrawsAsHit(const KFCResultNodeID* nodeID)
+	{
+		if (nodeID == nil)
+			return false;
+		if (nodeID->IsHitRow())
+			return true;
+		return nodeID->IsKeptRow() && KFCResultHistory::IsKeptHit(nodeID->GetTier(), nodeID->GetKeptRow());
+	}
 }
 
 /** Builds and fills the result tree's row widgets (chapter rows and hit rows). */
@@ -175,7 +220,7 @@ public:
 	{
 		TreeNodePtr<KFCResultNodeID> nodeID(node);
 		RsrcID rsrcID = kKFCResultChapterNodeWidgetRsrcID;
-		if (nodeID != nil && nodeID->IsHitRow())
+		if (DrawsAsHit(nodeID))
 			rsrcID = kKFCResultHitNodeWidgetRsrcID;
 
 		// Built the way the layer panel builds its rows (LayerPanelTreeViewWidgetMgr.cpp:403-416), in
@@ -211,7 +256,7 @@ public:
 	virtual WidgetID GetWidgetTypeForNode(const NodeID& node) const
 	{
 		TreeNodePtr<KFCResultNodeID> nodeID(node);
-		if (nodeID != nil && nodeID->IsHitRow())
+		if (DrawsAsHit(nodeID))
 			return kKFCResultHitNodeWidgetID;
 		return kKFCResultChapterNodeWidgetID;
 	}
@@ -253,17 +298,33 @@ public:
 	{
 		TreeNodePtr<KFCResultNodeID> nodeID(node);
 		InterfacePtr<IControlView> widget(rowData, UseDefaultIID());	// the row itself (the base queried rowData from it)
-		if (nodeID != nil && widget != nil)
+		if (nodeID == nil || widget == nil)
+			return kTrue;
+		// WHAT THE ROW SAYS - KFCResultTree::GetRowLook for the live list's rows and the live tier's, KFCResultHistory's copy
+		// for a kept tier's - and HOW FAR RIGHT: a kept row one tier level in, the live list's rows one tier level in while the
+		// results are kept in tiers (TierShift), a tier's own row at the left edge.
+		KFCResultTree::RowLook look;
+		const bool kept = nodeID->IsInert() && nodeID->GetTier() >= 0;
+		bool known = false;
+		PMReal levelIn(0.0);
+		if (kept)
 		{
-			if (nodeID->IsHitRow())
-				this->ApplyHitRow(nodeID, widget, rowData);
-			else if (nodeID->IsBookRow())
-				this->ApplyBookRow(node, widget, rowData);
-			else if (nodeID->IsFontRow())
-				this->ApplyFontRow(nodeID, node, widget, rowData);
-			else
-				this->ApplyChapterRow(nodeID, node, widget, rowData);
+			known = KFCResultHistory::GetKeptLook(nodeID->GetTier(), nodeID->GetKeptRow(), look);
+			if (nodeID->IsKeptRow())
+				levelIn = kTierLevelIndent;
 		}
+		else
+		{
+			known = KFCResultTree::GetRowLook(node, look);
+			if (!nodeID->IsTierRow())
+				levelIn = TierShift();
+		}
+		if (!known)
+			return kTrue;
+		if (look.hit)
+			this->LayOutHitRow(widget, rowData, look.shift + levelIn, look, kept);
+		else
+			this->LayOutBranchRow(node, widget, rowData, look.shift + levelIn, look.label, kept);
 		return kTrue;
 	}
 
@@ -296,28 +357,17 @@ public:
 	}
 
 private:
-	// How far right of the outermost level this tree's document and hit rows sit: one book-level
-	// step when there is a book row above them, nothing when there is not.
-	PMReal LevelShift() const
-	{
-		return KFCResults()->IsFromBook() ? kBookLevelIndent : PMReal(0.0);
-	}
-
-	// How far right this chapter's HIT rows sit because of the levels above them: one step for the story row every TEXT
-	// hit sits under; none for an OBJECT chapter, whose rows hang off the document row directly.
-	PMReal FontShift(int32 chapterIdx) const
-	{
-		return (KFCResults()->GetDisplayFontCount(chapterIdx) > 0) ? kFontLevelIndent : PMReal(0.0);
-	}
-
-	// The shared shape of the two BRANCH rows (book and document): an expander arrow and a label
+	// The shared shape of the BRANCH rows (book, document, story, and a tier's own row): an expander arrow and a label
 	// after it. The frames are set here rather than left to the resource, so ONE code path decides
 	// every level's indent - the same reason the hit row has always drawn its own.
 	//
 	// The arrow is visible exactly when the row has children. Hiding it alone would leave a click
 	// target behind (the stacked-widget lesson), so a hidden arrow is disabled too.
+	//
+	// A KEPT ROW'S LABEL IS DISABLED - grey (the stacked results' spec, section 2-2) - and every other row's enabled: set on
+	// every apply, a row widget being recycled between the two. (The arrow keeps working on a kept row: it is what opens it.)
 	void LayOutBranchRow(const NodeID& node, IControlView* widget,
-		IPanelControlData* rowData, const PMReal& shift, const PMString& label) const
+		IPanelControlData* rowData, const PMReal& shift, const PMString& label, bool kept) const
 	{
 		const PMReal xExpander = kRowInset + shift;
 		const PMReal xLabel = kRowInset + kExpanderZone + shift;
@@ -353,127 +403,160 @@ private:
 			f.Left(xLabel);
 			f.Right(rowRight);
 			cell->SetFrame(f);
+			if (kept)
+				cell->Disable();
+			else
+				cell->Enable();
 		}
 		SetColumnText(rowData, kKFCResultChapterLabelWidgetID, label);
 	}
 
-	// The BOOK row: which book these results came from. Only ever built for a book search, where it
-	// is the root's single child - so it is the panel's standing answer to which book is the target,
-	// which a status line cannot be (one line, truncated, overwritten by the next message).
-	void ApplyBookRow(const NodeID& node, IControlView* widget,
-		IPanelControlData* rowData) const
+	// A hit row - a live one, or a kept tier's copy: the match's line into the custom colour cell (IKFCRowData's parts), no
+	// expander, indented one zone deeper than its story row. `kept`: the cell disabled, which it draws one step fainter
+	// (KFCColorTextView).
+	void LayOutHitRow(IControlView* widget, IPanelControlData* rowData, const PMReal& shift,
+		const KFCResultTree::RowLook& look, bool kept) const
 	{
-		// "<book>  (R/N)" - how many of the hits the book's search holds this list has replaced, of how many (every one
-		// drawn - the search's limit is the only one; the R - AppendCounts). Drawn even when the search found
-		// nothing - the hierarchy adapter gives the root one child whenever the results came from a book, which is how
-		// the panel goes on naming the book it just searched - and then it reads "(0/0)", which is also how KFCBookWatch
-		// describes it (the user's own measurement, of the "(0)" before the R); keep the two together.
-		PMString label(KFCResults()->GetBookName());
-		label.SetTranslatable(kFalse);
-		AppendCounts(label, KFCResults()->GetTotalReplacedCount(), KFCResults()->GetTotalHitCount());
-		// No shift: the book row IS the outermost level.
-		this->LayOutBranchRow(node, widget, rowData, PMReal(0.0), label);
-	}
-
-	// A document row: its expander and "<name>  (R/N)" after the zone.
-	void ApplyChapterRow(const TreeNodePtr<KFCResultNodeID>& nodeID, const NodeID& node,
-		IControlView* widget, IPanelControlData* rowData) const
-	{
-		PMString name;
-		int32 fullCount = 0;
-		if (!KFCResults()->GetChapterDisplay(nodeID->GetChapter(), name, fullCount))
-			return;
-
-		// "<name>  (R/N)" - of the chapter's hits, how many this list has replaced, the same read-out the book row
-		// carries (AppendCounts). About the work, not the drawing - never "(shown / total)".
-		PMString label(name);
-		label.SetTranslatable(kFalse);
-		// A DOCUMENT WITH NO WINDOW. Search: = All Documents searches those too, as
-		// InDesign's own does; a replace there leaves it hidden (the user may hide a heavy one on purpose) and
-		// only a jump opens a window - so its row says so. Asked as the row is drawn: a jump that opens one
-		// takes the note away at the next repaint.
-		if (KFCResults()->GetSearchScope() == KFCResultModel::kScopeAllDocuments && ChapterHasNoWindow(nodeID->GetChapter()))
-			label.Append(" (no window)");
-		AppendCounts(label, KFCResults()->GetChapterReplacedCount(nodeID->GetChapter()), fullCount);
-
-		this->LayOutBranchRow(node, widget, rowData, this->LevelShift(), label);
-	}
-
-	// A STORY row (the code calls the level FONT - see the head of the file): the story's first words and how
-	// many rows sit under it. The same shape as a document row - an expander and a label - so it shares the
-	// branch layout and the chapter row's resource, one step further right.
-	void ApplyFontRow(const TreeNodePtr<KFCResultNodeID>& nodeID, const NodeID& node,
-		IControlView* widget, IPanelControlData* rowData) const
-	{
-		PMString name;
-		int32 fullCount = 0;
-		if (!KFCResults()->GetFontDisplay(nodeID->GetChapter(), nodeID->GetFont(), name, fullCount))
-			return;
-
-		// "ID260: first words...  (R/N)", the way a document row reads out its count, like the rows
-		// above it: what the row holds, not what the panel drew of it. (A group that answered
-		// GetFontDisplay is in range - no further test needed.)
-		PMString label(name);
-		label.SetTranslatable(kFalse);
-		AppendCounts(label, KFCResults()->GetFontReplacedCount(nodeID->GetChapter(), nodeID->GetFont()), fullCount);
-		this->LayOutBranchRow(node, widget, rowData,
-			this->LevelShift() + kFontLevelIndent, label);
-	}
-
-	// A hit row: the match's line into the custom colour cell (IKFCRowData's parts), no expander,
-	// indented one zone deeper than its story row.
-	void ApplyHitRow(const TreeNodePtr<KFCResultNodeID>& nodeID, IControlView* widget,
-		IPanelControlData* rowData) const
-	{
-		// One question, not four: the strings, the flags, the outcome and the accent word all come
-		// from the same hit, and the row wants all of them.
-		KFCResultModel::RowDisplay row;
-		if (!KFCResults()->GetHitRow(nodeID->GetChapter(), nodeID->GetHit(), row))
-			return;
-
 		// Draw our own indent: the row's content starts one expander zone right of the chapter row's text,
 		// and the colour cell follows it to the row's edge.
 		const PMReal rowRight = widget->GetFrame().Width() - kRowInset;
-		const PMReal xStart = kRowInset + kExpanderZone + kHitExtraIndent
-			+ this->LevelShift() + this->FontShift(nodeID->GetChapter());
+		const PMReal xStart = kRowInset + kExpanderZone + kHitExtraIndent + shift;
 
 		IControlView* cell = rowData->FindWidget(kKFCResultTextWidgetID);
-		if (cell != nil)
-		{
-			PMRect frame = cell->GetFrame();
-			// One step right of the row above (kHitCellStep) - the staircase the levels make.
-			frame.Left(xStart + kHitCellStep);
-			frame.Right(rowRight);
-			cell->SetFrame(frame);
+		if (cell == nil)
+			return;
+		PMRect frame = cell->GetFrame();
+		// One step right of the row above (kHitCellStep) - the staircase the levels make.
+		frame.Left(xStart + kHitCellStep);
+		frame.Right(rowRight);
+		cell->SetFrame(frame);
 
-			// Hand the row's parts to the colour cell, and invalidate it HERE: the cell's data holder
-			// does not ask for a redraw (a stock cell's ITextControlData::SetString does - its invalidate
-			// defaults to kTrue), and a recycled row would keep the picture of the row it used to be.
-			InterfacePtr<IKFCRowData> data(cell, UseDefaultIID());
-			if (data != nil)
-			{
-				// "Changed" FIRST ON A ROW THIS LIST HAS REPLACED (the author's call: nothing else on the row tells a
-				// written row from one still as the search found it - without it a replaced row looks like the rest).
-				// Part of the locator run - its colour, and the label a reader walks starts with it. An Undo of the
-				// replace puts the row back as it was (UNDO-03, the row's copy has replaced == false), and the word goes.
-				// (A row whose text is gone starts with "Missing" in the same place - the model's BuildHitLocator puts
-				// that one on the locator itself; the two never meet.)
-				PMString locator(row.locator);
-				if (row.replaced)
-				{
-					PMString changed("Changed ");
-					changed.SetTranslatable(kFalse);
-					changed.Append(locator);
-					locator = changed;
-				}
-				data->SetSegments(locator, row.accentFlag, row.preText, row.matchText, row.postText);
-			}
-			cell->Invalidate();
-		}
+		// Hand the row's parts to the colour cell, and invalidate it HERE: the cell's data holder
+		// does not ask for a redraw (a stock cell's ITextControlData::SetString does - its invalidate
+		// defaults to kTrue), and a recycled row would keep the picture of the row it used to be.
+		InterfacePtr<IKFCRowData> data(cell, UseDefaultIID());
+		if (data != nil)
+			data->SetSegments(look.locator, look.flag, look.pre, look.match, look.post);
+		// Disabled for a kept row, enabled for every other - set on every apply, as the label's is (LayOutBranchRow).
+		if (kept)
+			cell->Disable();
+		else
+			cell->Enable();
+		cell->Invalidate();
 	}
 };
 
 CREATE_PMINTERFACE(KFCResultListWidgetMgr, kKFCResultListWidgetMgrImpl)
+
+bool KFCResultTree::GetRowLook(const NodeID& node, RowLook& out)
+{
+	out = RowLook();
+	TreeNodePtr<KFCResultNodeID> nodeID(node);
+	if (nodeID == nil || nodeID->IsRoot() || nodeID->IsKeptRow())
+		return false;
+	if (nodeID->IsTierRow())
+	{
+		if (nodeID->GetTier() >= 0)
+			return false;		// a kept tier's own row: KFCResultHistory::GetKeptLook
+		// THE LIVE TIER'S ROW (the stacked results' spec, section 2-2): the search that made the list, and the list's
+		// counts as the book row reads them. At the left edge.
+		out.label = KFCResultHistory::LiveTierLabel();
+		out.label.SetTranslatable(kFalse);
+		AppendCounts(out.label, KFCResults()->GetTotalReplacedCount(), KFCResults()->GetTotalHitCount());
+		return true;
+	}
+	if (nodeID->IsHitRow())
+	{
+		// A HIT row: the match's line, its five parts for the colour cell. One question, not four: the strings, the
+		// flags, the outcome and the accent word all come from the same hit, and the row wants all of them.
+		KFCResultModel::RowDisplay row;
+		if (!KFCResults()->GetHitRow(nodeID->GetChapter(), nodeID->GetHit(), row))
+			return false;
+		out.hit = true;
+		out.shift = LevelShift() + FontShift(nodeID->GetChapter());
+		// "Changed" FIRST ON A ROW THIS LIST HAS REPLACED (the author's call: nothing else on the row tells a
+		// written row from one still as the search found it - without it a replaced row looks like the rest).
+		// Part of the locator run - its colour, and the label a reader walks starts with it. An Undo of the
+		// replace puts the row back as it was (UNDO-03, the row's copy has replaced == false), and the word goes.
+		// (A row whose text is gone starts with "Missing" in the same place - the model's BuildHitLocator puts
+		// that one on the locator itself; the two never meet.)
+		out.locator = row.locator;
+		if (row.replaced)
+		{
+			PMString changed("Changed ");
+			changed.SetTranslatable(kFalse);
+			changed.Append(row.locator);
+			out.locator = changed;
+		}
+		out.flag = row.accentFlag;
+		out.pre = row.preText;
+		out.match = row.matchText;
+		out.post = row.postText;
+		return true;
+	}
+	if (nodeID->IsBookRow())
+	{
+		// The BOOK row: which book these results came from. Only ever built for a book search, where it
+		// is the top's single child - so it is the panel's standing answer to which book is the target,
+		// which a status line cannot be (one line, truncated, overwritten by the next message).
+		// "<book>  (R/N)" - how many of the hits the book's search holds this list has replaced, of how many (every one
+		// drawn - the search's limit is the only one; the R - AppendCounts). Drawn even when the search found
+		// nothing - the hierarchy adapter gives the top one child whenever the results came from a book, which is how
+		// the panel goes on naming the book it just searched - and then it reads "(0/0)", which is also how KFCBookWatch
+		// describes it (the user's own measurement, of the "(0)" before the R); keep the two together.
+		// No shift: the book row IS the outermost level of the list.
+		out.label = KFCResults()->GetBookName();
+		out.label.SetTranslatable(kFalse);
+		AppendCounts(out.label, KFCResults()->GetTotalReplacedCount(), KFCResults()->GetTotalHitCount());
+		return true;
+	}
+	PMString name;
+	int32 fullCount = 0;
+	if (nodeID->IsFontRow())
+	{
+		// A STORY row (the code calls the level FONT - see the head of the file): the story's first words and how
+		// many rows sit under it. The same shape as a document row - an expander and a label - so it shares the
+		// branch layout and the chapter row's resource, one step further right.
+		if (!KFCResults()->GetFontDisplay(nodeID->GetChapter(), nodeID->GetFont(), name, fullCount))
+			return false;
+		// "ID260: first words...  (R/N)", the way a document row reads out its count, like the rows
+		// above it: what the row holds, not what the panel drew of it. (A group that answered
+		// GetFontDisplay is in range - no further test needed.)
+		out.label = name;
+		out.label.SetTranslatable(kFalse);
+		AppendCounts(out.label, KFCResults()->GetFontReplacedCount(nodeID->GetChapter(), nodeID->GetFont()), fullCount);
+		out.shift = LevelShift() + kFontLevelIndent;
+		return true;
+	}
+	// A document row: its expander and "<name>  (R/N)" after the zone.
+	if (!KFCResults()->GetChapterDisplay(nodeID->GetChapter(), name, fullCount))
+		return false;
+	// "<name>  (R/N)" - of the chapter's hits, how many this list has replaced, the same read-out the book row
+	// carries (AppendCounts). About the work, not the drawing - never "(shown / total)".
+	out.label = name;
+	out.label.SetTranslatable(kFalse);
+	// A DOCUMENT WITH NO WINDOW. Search: = All Documents searches those too, as
+	// InDesign's own does; a replace there leaves it hidden (the user may hide a heavy one on purpose) and
+	// only a jump opens a window - so its row says so. Asked as the row is drawn: a jump that opens one
+	// takes the note away at the next repaint. (A kept tier's copy keeps the note as it was then.)
+	if (KFCResults()->GetSearchScope() == KFCResultModel::kScopeAllDocuments && ChapterHasNoWindow(nodeID->GetChapter()))
+		out.label.Append(" (no window)");
+	AppendCounts(out.label, KFCResults()->GetChapterReplacedCount(nodeID->GetChapter()), fullCount);
+	out.shift = LevelShift();
+	return true;
+}
+
+bool KFCResultTree::OpensWhenDrawn(const NodeID& node)
+{
+	TreeNodePtr<KFCResultNodeID> nodeID(node);
+	if (nodeID == nil)
+		return false;
+	if (nodeID->IsBookRow() || nodeID->IsFontRow())
+		return true;		// Rebuild opens the book row and every story row (it says why)
+	if (nodeID->IsDocumentRow())
+		return DocumentRowsOpen();
+	return false;
+}
 
 IControlView* KFCResultTree::ResultListView()
 {
@@ -523,6 +606,10 @@ void KFCResultTree::Rebuild()
 		treeMgr->ExpandNode(node, allDescendants);
 	};
 
+	// THE KEPT TIERS THE PERSON HAS OPEN, noted before ClearTree forgets them (KFCResultHistory - the stacked results'
+	// spec, section 3-4).
+	KFCResultHistory::NoteOpenTiers(treeMgr);
+
 	// ClearTree(kTrue) forgets the old expansion state (rebuilt by the priming below);
 	// ChangeRoot(kTrue) says every row widget has the same height, which they do - both row
 	// resources are kKFCResultRowHeight tall and GetNodeWidgetHeight answers that for every node.
@@ -543,6 +630,20 @@ void KFCResultTree::Rebuild()
 	// reports children, which does not depend on the node ever having been expanded). The
 	// "expand to make the arrow appear" rule is the tree framework's own default, and this widget
 	// manager overrides it.
+	//
+	// THE TIERS, while the results are kept in tiers: the kept ones as they were left - those the person had open opened,
+	// and in each the rows that were open when it was kept (KFCResultHistory::OpenKeptRows) - and the live one open, its
+	// rows then opened by the rules below exactly as a list with no tiers.
+	const int32 keptOpened = KFCResultHistory::OpenKeptRows(treeMgr);
+#ifdef KFC_DIAG
+	expandCalls += keptOpened;
+#else
+	(void)keptOpened;
+#endif
+	const bool liveTier = KFCResultHistory::IsStacking() && KFCResultHistory::HasLiveList();
+	if (liveTier)
+		expand(KFCResultNodeID::CreateLiveTier(), kFalse);
+
 	const int32 chapters = KFCResults()->GetDisplayChapterCount();
 	// (A test build's tree-expand mode 1 opens such a document row with everything under it in one call, and the
 	// loop below then leaves its rows alone.)
@@ -553,7 +654,7 @@ void KFCResultTree::Rebuild()
 		// line on it and nothing else. Open it; the chapters underneath stay closed.
 		expand(KFCResultNodeID::CreateBook(), kFalse);
 	}
-	else if (KFCResults()->GetSearchScope() != KFCResultModel::kScopeAllDocuments)
+	else if (DocumentRowsOpen())		// (no book here - so: not All Documents)
 	{
 		// A single document has just the one chapter, so open it - otherwise the result is one closed
 		// row and the hits take an extra click to reach.
@@ -587,6 +688,12 @@ void KFCResultTree::Rebuild()
 			(int)chapters, (int)expandCalls, expandMode, tTree, counters);
 	}
 #endif
+
+	// THE NEW RESULTS IN VIEW: a rebuild leaves the list at its top, which is the OLDEST tier while there are tiers - so the
+	// live tier's row goes to the top instead, its rows under it, the kept tiers a scroll above (the stacked results' spec,
+	// section 3-4).
+	if (liveTier)
+		treeMgr->ScrollToNode(KFCResultNodeID::CreateLiveTier(), ITreeViewMgr::eScrollToTop);
 }
 
 //----------------------------------------------------------------------------------------
@@ -610,6 +717,9 @@ void KFCResultTree::RefreshRows()
 	// count, so it goes stale the moment a row is replaced or taken out - which is what this function is
 	// called for. Only drawn on a book search; NodeChanged
 	// on a node the tree does not hold is harmless.
+	// The LIVE TIER's row the same, while the results are kept in tiers: it carries the list's counts, as the book row does.
+	if (KFCResultHistory::IsStacking() && KFCResultHistory::HasLiveList())
+		treeMgr->NodeChanged(KFCResultNodeID::CreateLiveTier(), kFalse /*children handled below*/);
 	if (KFCResults()->IsFromBook())
 		treeMgr->NodeChanged(KFCResultNodeID::CreateBook(), kFalse /*children handled below*/);
 

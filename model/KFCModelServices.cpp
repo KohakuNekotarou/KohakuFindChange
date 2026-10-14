@@ -69,6 +69,7 @@ public:
 	virtual int32 GetFontReplacedCount(int32 chapterIdx, int32 fontIdx) { return KFCResultModel::GetFontReplacedCount(chapterIdx, fontIdx); }
 	virtual int32 GetTotalReplacedCount() { return KFCResultModel::GetTotalReplacedCount(); }
 	virtual UID GetHitItem(int32 chapterIdx, int32 hitIdx) { return KFCResultModel::GetHitItem(chapterIdx, hitIdx); }
+	virtual uint32 GetResultSetId() { return KFCResultModel::GetResultSetId(); }
 };
 
 CREATE_PMINTERFACE(KFCResultsSession, kKFCResultsImpl)
