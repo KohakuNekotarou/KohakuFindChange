@@ -170,6 +170,10 @@ void KFCQueryListSelect(IPanelControlData* dialogPanel, const WidgetID& tree, in
 		return;
 	}
 	const NodeID node = ListIndexNodeID::Create(index);
+	// MOVED, not added to: the official re-selection - DeselectAll, then Select (docs/ai-notes/api-official-examples.md;
+	// Select alone leaves a picked row picked - found live when the query dialog's Find picked the next row). Told once,
+	// by the Select (the dialog's observer says what the row's query does).
+	controller->DeselectAll(kFalse /*notifyOfChange*/, kTrue /*changeHilite*/);
 	controller->Select(node);
 	InterfacePtr<ITreeViewMgr> treeMgr(treeView, UseDefaultIID());
 	if (treeMgr != nil)
