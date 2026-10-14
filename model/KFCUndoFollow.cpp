@@ -42,6 +42,7 @@
 #include "KFCRunGuard.h"		// IsAnyRunning - nothing is followed while any run of ours (the replace among them) is up
 #include "KFCSearchEngine.h"	// ReadStoryVersion - a story's version
 #include "KFCObjectSearch.h"	// Fingerprint - an object row's item, before and after a write
+#include "KFCTierStore.h"		// the kept tiers: their writes are kept, and followed onto their copies (the tier switch)
 #include "KFCUndoFollow.h"
 
 namespace
@@ -227,6 +228,14 @@ void DropOtherResultSets(const Step* incoming = nil)
 {
 	std::set<uint32> reached;
 	reached.insert(KFCResultModel::GetResultSetId());
+	// ...and every kept tier's (the tier switch - KFCTierStore): a tier is a list that can be switched back to, so the writes
+	// made on it while it was the live list stay its Undo's to follow - onto its copy while it is kept, onto the list when it
+	// comes back (Follow).
+	{
+		std::vector<uint32> tiers;
+		KFCTierStore::GetTierSets(tiers);
+		reached.insert(tiers.begin(), tiers.end());
+	}
 	if (incoming != nil && incoming->whole)
 		reached.insert(incoming->resultSetBefore);
 	for (bool grew = true; grew; )
@@ -265,6 +274,8 @@ void ChaptersOfDocInKeptSet(uint32 set, IDataBase* db, std::vector<int32>& out)
 				out.push_back(static_cast<int32>(c));
 		return;		// one copy of a set is as good as another
 	}
+	// ...or a kept tier's copy (the tier switch - KFCTierStore), found the same way.
+	KFCTierStore::ChaptersOfDoc(set, db, out);
 }
 
 // A CLOSING CHAPTER'S ROWS OFF A KEPT WRITE OF ROWS. A write of rows can be several documents' (rows selected together,
@@ -862,6 +873,28 @@ static void Follow()
 		if (pick == gSteps.size())
 			break;
 		Step& step = gSteps[pick];
+		// A WRITE MADE ON A KEPT TIER'S LIST (the tier switch - KFCTierStore): its rows are numbered in that tier's copy, not
+		// in the live list, so they go onto the copy - checked against the copy's layout as the live list's writes are checked
+		// against the live one below - and the list on the panel does not change (the tier is grey: it shows the copy as it
+		// was kept). (A query run's whole step never names a kept tier: a run that goes through lets the tiers go.)
+		if (!step.whole && step.resultSet != KFCResultModel::GetResultSetId() && KFCTierStore::HoldsSet(step.resultSet))
+		{
+			if (KFCTierStore::LayoutOf(step.resultSet) != (undo ? step.layoutAfter : step.layoutBefore))
+			{
+				KFC_DIAG_LOG("  kept tier's layout mismatch - dropped %u", (unsigned)pick);
+				gSteps.erase(gSteps.begin() + static_cast<std::ptrdiff_t>(pick));
+				continue;
+			}
+			(void)KFCTierStore::ApplyRowStep(step.resultSet, step.rows, !undo);
+			step.done = !undo;
+			if (undo)
+				++undone;
+			else
+				++redone;
+			lastName = WriteName(step);
+			KFC_DIAG_LOG("  onto kept tier set=%u", step.resultSet);
+			continue;
+		}
 		// THE ROWS ARE NUMBERED IN ONE LAYOUT. A write's rows are put back only onto the layout they
 		// were taken from; any other (which the order above should never leave) means the write can no
 		// longer be followed, and it is dropped rather than written onto the wrong rows.
@@ -1000,6 +1033,16 @@ void KFCUndoFollow::ForgetDocument(const UIDRef& docRef)
 			gSteps.erase(gSteps.begin() + static_cast<std::ptrdiff_t>(i));
 		else if (!step.whole && closing >= 0 && step.resultSet == current)	// (row indices name the current list's rows only)
 			DropChapterRows(step, closing);
+		else if (!step.whole && step.resultSet != current && KFCTierStore::HoldsSet(step.resultSet))
+		{
+			// A write of a kept tier's list (the tier switch): its rows are numbered in the tier's copy - the closing chapter
+			// is looked for there (a tier's chapter already emptied by KFCTierStore::ForgetDocument is not found, and its
+			// rows are out of range for an Undo's put-back anyway).
+			std::vector<int32> inTier;
+			KFCTierStore::ChaptersOfDoc(step.resultSet, docRef.GetDataBase(), inTier);
+			for (size_t c = 0; c < inTier.size(); ++c)
+				DropChapterRows(step, inTier[c]);
+		}
 	}
 }
 

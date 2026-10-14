@@ -103,6 +103,11 @@ void KFCTierStore::ForgetDocument(IDataBase* db)
 		return;
 	for (size_t t = 0; t < gTiers.size(); ++t)
 	{
+		// A BOOK'S TIER KEEPS ITS CHAPTERS, as the live book list does (KFCCloseDocResponder: "book results survive a chapter
+		// closing") - its chapters are reached by their files, and KFC itself opens and hands back a book's chapters on every
+		// book search: emptied here, a kept book tier would lose its rows to the next search.
+		if (gTiers[t].list.header.fromBook)
+			continue;
 		std::vector<KFCResultModel::Chapter>& chapters = gTiers[t].list.chapters;
 		for (size_t c = 0; c < chapters.size(); ++c)
 		{
@@ -115,6 +120,20 @@ void KFCTierStore::ForgetDocument(IDataBase* db)
 				KFC_DIAG_LOG("TIER forget chapter=%d of set=%u", static_cast<int>(c), gTiers[t].set);
 			}
 		}
+	}
+}
+
+void KFCTierStore::ChaptersOfDoc(uint32 set, IDataBase* db, std::vector<int32>& out)
+{
+	const TierRecord* const tier = TierOf(set);
+	if (tier == nil || db == nil)
+		return;
+	for (size_t c = 0; c < tier->list.chapters.size(); ++c)
+	{
+		// ForgetDocument's lookup - by file first, then by docRef.
+		UIDRef found = tier->list.chapters[c].docRef;
+		if (KFCBookScope::FindOpenChapterDoc(tier->list.chapters[c].file, found) && found.GetDataBase() == db)
+			out.push_back(static_cast<int32>(c));
 	}
 }
 

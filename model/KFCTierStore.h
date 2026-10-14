@@ -39,11 +39,17 @@ namespace KFCTierStore
 	/** Every tier let go (fresh storage, not Clear()). */
 	void DropAll();
 
-	/** A CLOSING DOCUMENT: in every tier, its chapters emptied (KFCResultModel::EmptyChapter) - found by their file as every
-	    door of KFC finds a chapter's document (KFCBookScope::FindOpenChapterDoc), while the document is still open (the
-	    close responder's kBeforeCloseDoc). A chapter keeps its place, so the rows of a write kept for that tier stay
-	    numbered right. */
+	/** A CLOSING DOCUMENT: in every tier but a book's, its chapters emptied (KFCResultModel::EmptyChapter) - found by their
+	    file as every door of KFC finds a chapter's document (KFCBookScope::FindOpenChapterDoc), while the document is still
+	    open (the close responder's kBeforeCloseDoc). A chapter keeps its place, so the rows of a write kept for that tier
+	    stay numbered right. A BOOK'S tier keeps its chapters - book results survive a chapter closing, as the live book
+	    list's do (KFC opens and hands back a book's chapters on every book search). */
 	void ForgetDocument(IDataBase* db);
+
+	/** The chapters of kept tier `set`'s list that are the document `db` - by file first, as ForgetDocument finds them (the
+	    document is still open at the close signal). Appended to `out`; nothing when there is no such tier. For the Undo
+	    follow: a write of rows kept for that tier names its rows in the tier's list (KFCUndoFollow's closing chapter). */
+	void ChaptersOfDoc(uint32 set, IDataBase* db, std::vector<int32>& out);
 
 	/** Is `set` a kept tier's result set? (KFCUndoFollow: the writes kept for it are not let go.) */
 	bool HoldsSet(uint32 set);
