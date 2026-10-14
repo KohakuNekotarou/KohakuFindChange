@@ -18,6 +18,14 @@
 //      the insert point goes with the text it leans on (forward = the text after it).
 //    - a delete: each end clipped to the deleted part (an end inside it goes to the part's start).
 //
+//  THE MODEL IS HELD (AddRef at Initialize, Release in the destructor), as InDesign's own focus holds it. InDesign
+//  purges a story nobody holds - on a switch between documents among other times - and tells its foci nothing
+//  (no DeRegisterFromModel): measured in KT after KFC crashed with a raw pointer here (2026-10-14 21:46:58, heap
+//  corruption in KFCRowFoci's StillUsable, which asked this focus for its model) - work/note-scripts/2026-10-14-focus-undo/
+//  focus-purge-probe-out.txt: the raw focus's story was gone and back as another instance before any purge was asked
+//  for, while InDesign's own focus and a holding one kept theirs through two purges. Held, the story stays in memory
+//  with its focus manager, so the focus also goes on following the edits.
+//
 //========================================================================================
 
 #include "VCPlugInHeaders.h"
@@ -43,7 +51,7 @@ class KFCRowFocusImpl : public CViewInterface<ITextFocus>
 {
 public:
 	KFCRowFocusImpl(IPMUnknown* boss);
-	virtual ~KFCRowFocusImpl() {}
+	virtual ~KFCRowFocusImpl() { LetModelGo(); }
 
 	virtual void		Initialize(ITextModel* model, const RangeData& range);
 	virtual ITextModel*	QueryModel() const;
@@ -72,26 +80,35 @@ public:
 
 private:
 	void Take(const RangeData& range);
+	void LetModelGo() { if (fHeld && fModel != nil) fModel->Release(); fHeld = false; }
 	void ApplyInsert(TextIndex at, int32 count);
 	void ApplyDelete(TextIndex at, int32 count);
 
-	ITextModel*	fModel;		// not AddRef'd: the model's focus manager holds this focus, not the other way round
+	ITextModel*	fModel;		// AddRef'd while fHeld (Initialize) - see the file's head
 	TextIndex	fStart;
 	TextIndex	fEnd;
 	int32		fLean;		// a RangeData::Lean
 	bool		fLost;		// ResetView came - outside the snapshot
+	bool		fHeld;		// fModel holds a reference of ours
 };
 
 CREATE_VIEW_PMINTERFACE(KFCRowFocusImpl, kKFCRowFocusImpl)
 
 KFCRowFocusImpl::KFCRowFocusImpl(IPMUnknown* boss)
-	: CViewInterface<ITextFocus>(boss), fModel(nil), fStart(0), fEnd(0), fLean(RangeData::kLeanForward), fLost(false)
+	: CViewInterface<ITextFocus>(boss), fModel(nil), fStart(0), fEnd(0), fLean(RangeData::kLeanForward), fLost(false), fHeld(false)
 {
 }
 
 void KFCRowFocusImpl::Initialize(ITextModel* model, const RangeData& range)
 {
+	// Held (the file's head): a story nobody holds is purged with no word to its foci.
+	LetModelGo();
 	fModel = model;
+	if (fModel != nil)
+	{
+		fModel->AddRef();
+		fHeld = true;
+	}
 	Take(range);
 }
 
@@ -171,7 +188,10 @@ void KFCRowFocusImpl::NotifyChanged(bool16 /*excludeCacheEnd*/)
 
 void KFCRowFocusImpl::DeRegisterFromModel(void)
 {
+	// Forgotten, not released: this can come while the model is being taken down, and a Release into it then would be
+	// the very crash the hold is there to prevent - a count left unreleased is the lesser harm.
 	fModel = nil;
+	fHeld = false;
 }
 
 void KFCRowFocusImpl::SnapshotReadWrite(IPMStream* s, ImplementationID /*prop*/)
