@@ -164,6 +164,12 @@ namespace KFCResultHistory
 	    that is not the live list's, or a live list no search here named. */
 	void RenameLiveFromQuery(uint32 set);
 
+	/** CLEAR THESE RESULTS (v2 R9 - a tier's own row's right-click menu): tier `tier` alone let go - a grey one (its copy and
+	    the model's tier: IKFCRuns::DropTier), or -1, the live list (the model drops it as Clear Results drops a list; the
+	    grey tiers stay, to be switched to). The list drawn again, the rest open or closed as they were, and the status line
+	    says "Cleared: <name>". False = nothing let go (a tier not there, a run of ours under way - the model refuses). */
+	bool ClearTier(int32 tier);
+
 	/** The controlled shutdown (KFCUIStartupShutdown): every static here holding storage emptied by a fresh value
 	    (KFCResultTree::ShutdownCleanup's rule - Clear() keeps a container's storage), and the switch's timer stopped and let
 	    go (its callback is a raw pointer into this .pln). */

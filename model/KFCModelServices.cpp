@@ -118,7 +118,7 @@ public:
 	virtual bool SwitchToTier(uint32 resultSet, PMString& outSummary) { return KFCTierStore::SwitchTo(resultSet, outSummary); }
 	virtual void GetKeptTierSets(std::vector<uint32>& out) { KFCTierStore::GetTierSets(out); }
 	virtual void DropKeptTiers() { KFCTierStore::DropAll(); }
-	virtual void DropKeptTier(uint32 resultSet) { KFCTierStore::DropTier(resultSet); }
+	virtual bool DropTier(uint32 resultSet) { return KFCTierStore::DropTier(resultSet); }
 };
 
 CREATE_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)

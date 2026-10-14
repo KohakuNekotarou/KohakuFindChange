@@ -729,6 +729,14 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCSelectAllRowsMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// ----- A tier's own row's right-click menu (v2 R9 - the author's call) -----
+		// Popped by KFCResultNodeEH::RButtonDn over a tier's row: Clear These Results lets that tier alone go - a grey one, or
+		// the live list (KFCResultHistory::ClearTier).
+		kKFCClearTheseResultsActionID,
+		kKFCResultTierMenuName
+		kKFCClearTheseResultsMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 	}
 };
 
@@ -974,6 +982,17 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKFCActionComponentBoss,
 		kKFCSelectAllRowsActionID,
 		kKFCSelectAllRowsMenuKey,		// "Select All Rows"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// Clear These Results - a tier's own row's right-click menu (v2 R9 - the author's call).
+		// kCustomEnabling: UpdateActionStates greys it when it comes with no tier row (pressed by ID) or while a run is up.
+		kKFCActionComponentBoss,
+		kKFCClearTheseResultsActionID,
+		kKFCClearTheseResultsMenuKey,	// "Clear These Results"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,

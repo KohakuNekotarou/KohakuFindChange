@@ -122,8 +122,9 @@ public:
 	virtual void GetKeptTierSets(std::vector<uint32>& out) = 0;
 	/** = KFCTierStore::DropAll (appended) - every kept tier let go, and the live list's query copy with them. */
 	virtual void DropKeptTiers() = 0;
-	/** = KFCTierStore::DropTier (appended) - one kept tier let go (a tier heading's Clear These Results). */
-	virtual void DropKeptTier(uint32 resultSet) = 0;
+	/** = KFCTierStore::DropTier (appended) - one tier let go, a kept one or the live list (a tier heading's Clear These
+	    Results). False = nothing let go. */
+	virtual bool DropTier(uint32 resultSet) = 0;
 };
 
 #endif // __IKFCRuns_h__

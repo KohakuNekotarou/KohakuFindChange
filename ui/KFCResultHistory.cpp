@@ -738,6 +738,45 @@ bool KFCResultHistory::QueryReadsAsTier(uint32 set, PMString& outName)
 	return false;
 }
 
+bool KFCResultHistory::ClearTier(int32 tier)
+{
+	// The tier and its name, before anything goes.
+	uint32 set = 0;
+	PMString name;
+	if (tier >= 0)
+	{
+		if (tier >= KeptTierCount())
+			return false;
+		set = gKept[static_cast<size_t>(tier)].set;
+		name = gKept[static_cast<size_t>(tier)].name;
+		if (name.IsEmpty())
+			name = PMString("Results");
+	}
+	else
+	{
+		if (!HasLiveList())
+			return false;
+		set = KFCResults()->GetResultSetId();
+		name = LiveTierLabel();
+	}
+	name.SetTranslatable(kFalse);
+	if (!KFCRuns()->DropTier(set))
+		return false;
+	// Its copy goes with it - or, for the live list, its name (the list it named is gone; a later search names its own).
+	if (tier >= 0)
+		gKept.erase(gKept.begin() + tier);
+	else
+		gLive = LiveTier();
+	(void)FollowModelTiers();
+	KFCResultTree::Rebuild();
+	PMString status("Cleared: ");
+	status.SetTranslatable(kFalse);
+	status.Append(name);
+	KFCResultTree::ShowStatus(status);
+	KFC_DIAG_LOG("STACK clear tier=%d set=%u tiers=%d", static_cast<int>(tier), set, static_cast<int>(gKept.size()));
+	return true;
+}
+
 void KFCResultHistory::RenameLiveFromQuery(uint32 set)
 {
 	if (set == 0 || set != gLive.set || gLive.set != KFCResults()->GetResultSetId() || gLive.label.IsEmpty())

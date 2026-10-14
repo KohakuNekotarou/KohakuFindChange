@@ -43,8 +43,10 @@ namespace KFCTierStore
 	    "Results (0/0)" tier at the next search - the author's live test, 10-14). */
 	void DropAll();
 
-	/** One kept tier let go (a tier heading's Clear These Results - v2 R9). Nothing when there is no such tier. */
-	void DropTier(uint32 set);
+	/** ONE TIER LET GO (a tier heading's Clear These Results - v2 R9): a kept tier leaves the store; the live list's set
+	    drops the live list as Clear Results drops it (KFCSearchEngine::DropResults) - the kept tiers stay. False = nothing
+	    let go: a run of ours under way, or no tier of that set. */
+	bool DropTier(uint32 set);
 
 	/** A CLOSING DOCUMENT: in every tier but a book's, its chapters emptied (KFCResultModel::EmptyChapter) - found by their
 	    file as every door of KFC finds a chapter's document (KFCBookScope::FindOpenChapterDoc), while the document is still

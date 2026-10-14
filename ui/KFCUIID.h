@@ -332,6 +332,10 @@ DECLARE_PMID(kActionIDSpace, kKFCSelectAllRowsActionID, kKFCUIPrefix + 52)
 // toggle for the panel's Find keeping the list it replaced as a tier (the stacked results' spec, section 2-3). The same
 // day (10-14) the author made keeping the default and dropped the toggle, so every Find keeps (KFCResultHistory).
 //DECLARE_PMID(kActionIDSpace, kKFCKeepPreviousResultsActionID, kKFCUIPrefix + 53)
+// "Clear These Results" on a TIER's own row's right-click menu (docs/superpowers/specs/2026-10-14-kfc-tier-switch-v2-design.md
+// R9 - the author's call): that tier alone let go - a grey one, or the live list (the grey tiers stay). The flyout's Clear
+// Results still lets every tier go. + 54: the next after the highest spent (+ 53 is retired).
+DECLARE_PMID(kActionIDSpace, kKFCClearTheseResultsActionID, kKFCUIPrefix + 54)
 
 
 // WidgetIDs:
@@ -441,6 +445,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryFindButtonWidgetID, kKFCUIPrefix + 45)
 #define kKFCSearchDocumentAgainMenuKey	kKFCStringPrefix "kKFCSearchDocumentAgainMenuKey"
 // The book, document and story rows' menus.
 #define kKFCSelectAllRowsMenuKey		kKFCStringPrefix "kKFCSelectAllRowsMenuKey"
+// A tier's own row's menu.
+#define kKFCClearTheseResultsMenuKey	kKFCStringPrefix "kKFCClearTheseResultsMenuKey"
 // "How to Use...": the operating reference. English in every UI language, like the rest of the
 // flyout - there is one string table, and the one thing switched to Japanese at run time is this page's
 // body (KFCLoc::JapaneseUI).
@@ -512,6 +518,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryFindButtonWidgetID, kKFCUIPrefix + 45)
 #define kKFCResultDocumentMenuName			"KFCRtMenuResultDocument"
 // The BOOK row's right-click menu (Select All Rows), popped the same way.
 #define kKFCResultBookMenuName				"KFCRtMenuResultBook"
+// A TIER's own row's right-click menu (Clear These Results - v2 R9), popped the same way - a grey tier's and the live one's.
+#define kKFCResultTierMenuName				"KFCRtMenuResultTier"
 
 // Menu item positions:
 //
@@ -575,6 +583,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryFindButtonWidgetID, kKFCUIPrefix + 45)
 #define kKFCSearchDocumentAgainMenuItemPosition	0.5
 // Select All Rows: after the row's own Search ... Again on a story or document row; alone on the book row's menu.
 #define kKFCSelectAllRowsMenuItemPosition		1.0
+// A tier's own row's menu: Clear These Results, alone.
+#define kKFCClearTheseResultsMenuItemPosition	1.0
 
 
 // View (kViewRsrcType) resource IDs for the result tree's row widgets. Offset from the panel's own

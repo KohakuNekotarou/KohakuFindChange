@@ -108,15 +108,25 @@ void KFCTierStore::DropAll()
 	KFCResultModel::SetQueryCopy(nullptr);
 }
 
-void KFCTierStore::DropTier(uint32 set)
+bool KFCTierStore::DropTier(uint32 set)
 {
+	if (KFCRunGuard::IsAnyRunning() || set == 0)
+		return false;
+	// THE LIVE LIST'S OWN TIER: the list dropped as Clear Results drops it - the kept tiers stay, to be switched to.
+	if (set == KFCResultModel::GetResultSetId())
+	{
+		KFCSearchEngine::DropResults();
+		KFC_DIAG_LOG("TIER drop live set=%u tiers=%d", set, static_cast<int>(gTiers.size()));
+		return true;
+	}
 	for (size_t i = 0; i < gTiers.size(); ++i)
 		if (gTiers[i].set == set)
 		{
 			gTiers.erase(gTiers.begin() + static_cast<std::ptrdiff_t>(i));
 			KFC_DIAG_LOG("TIER drop set=%u tiers=%d", set, static_cast<int>(gTiers.size()));
-			return;
+			return true;
 		}
+	return false;
 }
 
 void KFCTierStore::ForgetDocument(IDataBase* db)

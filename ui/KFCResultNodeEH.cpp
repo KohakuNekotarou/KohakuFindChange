@@ -239,9 +239,12 @@ bool16 KFCResultNodeEH::RButtonDn(IEvent* e)
 	if (nodeID == nil || nodeID->IsRoot())
 		return TreeNodeEventHandler::RButtonDn(e);
 
-	// Every row's right-click is consumed - no stock handling, so the row is not selected and nothing jumps. A tier's row
-	// and a kept row have no menu: none of the shapes below is theirs (the stacked results' spec, section 3-5).
-	if (nodeID->IsHitRow())
+	// Every row's right-click is consumed - no stock handling, so the row is not selected and nothing jumps. A kept row has
+	// no menu (the stacked results' spec, section 3-5); a TIER's own row has Clear These Results (v2 R9) - a grey tier's
+	// and the live one's.
+	if (nodeID->IsTierRow())
+		PopRowMenu(kKFCResultTierMenuName, e, this);
+	else if (nodeID->IsHitRow())
 		PopRowMenu(kKFCResultHitMenuName, e, this);
 	else if (nodeID->IsFontRow() && KFCResults()->IsStoryGroup(nodeID->GetChapter(), nodeID->GetFont()))
 		PopRowMenu(kKFCResultStoryMenuName, e, this);		// a STORY row: Search This Story Again; Select All Rows

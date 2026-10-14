@@ -178,6 +178,21 @@ NodeID SelectAllRowsTarget(IPMUnknown* widget)
 		return KFCResultNodeID::CreateBook();
 	return NodeID();
 }
+
+// The TIER whose own row was right-clicked (v2 R9) - a grey one's number, or -1 for the live tier - while the list still
+// has it. false for any other row, and for none.
+bool RightClickedTier(IPMUnknown* widget, int32& outTier)
+{
+	const NodeID node(RightClickedRow(widget));
+	TreeNodePtr<KFCResultNodeID> row(node);
+	if (row == nil || !row->IsTierRow())
+		return false;
+	const int32 tier = row->GetTier();
+	if (tier >= 0 ? tier >= KFCResultHistory::KeptTierCount() : !KFCResultHistory::HasLiveList())
+		return false;
+	outTier = tier;
+	return true;
+}
 }
 
 /* KFCActionComponent Constructor
@@ -450,6 +465,17 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			break;
 		}
 
+		case kKFCClearTheseResultsActionID:
+		{
+			// A tier's own row's right-click menu (v2 R9) - the tier it was popped over, alone: a grey tier, or the live list
+			// (the grey tiers stay). Not under a landing or a run, as Clear Results.
+			int32 tier = -1;
+			if (KFCJump::IsLanding() || KFCResultTree::RefusedWhileRunning() || !RightClickedTier(widget, tier))
+				break;
+			(void)KFCResultHistory::ClearTier(tier);
+			break;
+		}
+
 		default:
 		{
 			break;
@@ -704,6 +730,14 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 				// found nothing) rather than doing nothing: the author's call.
 				const NodeID row(SelectAllRowsTarget(widget));
 				const bool enable = row.IsValid() && KFCResultTree::CanSelectAllRows(row);
+				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
+				break;
+			}
+			case kKFCClearTheseResultsActionID:
+			{
+				// A tier's own row's menu: Clear These Results over a tier's row (a run standing greys everything, above).
+				int32 tier = -1;
+				const bool enable = RightClickedTier(widget, tier);
 				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 				break;
 			}
