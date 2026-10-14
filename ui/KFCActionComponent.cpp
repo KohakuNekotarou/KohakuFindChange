@@ -38,7 +38,7 @@
 #include "KFCUIID.h"
 #include "KFCModelAccess.h"		// the model half, through its session interfaces (the model/UI split)
 #include "KFCResultTree.h"		// rebuild the result tree after a search
-#include "KFCResultHistory.h"	// the search's one door, Keep Previous Results and the tiers it keeps
+#include "KFCResultHistory.h"	// the search's one door and the tiers it keeps
 #include "KFCResultNodeID.h"		// the row right-clicked - a hit, story, document or book row
 #include "KFCJump.h"			// the Hide Previous Chapter toggle lives with the jump logic
 #include "KFCPanelTitle.h"		// the panel's tab name carries the current scope
@@ -251,10 +251,10 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 				break;
 
 			// The search through the one door a search into the panel takes (KFCResultHistory::Find): the tab's scope
-			// written first, the list drawn once it returns, the status line set - and, while Keep Previous Results is on,
-			// the list it replaces kept as a tier above it (the stacked results' spec, section 2-3).
+			// written first, the list drawn once it returns, the status line set - and the list it replaces kept as a tier
+			// above it, named after the query (the author's calls, 10-14: always kept, no toggle).
 			PMString summary;
-			(void)KFCResultHistory::Find(KFCResultHistory::IsKeepOn(), KFCResultHistory::PanelFindLabel(), summary);
+			(void)KFCResultHistory::Find(KFCResultHistory::QueryLabel(), summary);
 			break;
 		}
 
@@ -334,15 +334,6 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			// through KFCPanelTitle::Update.
 			KFCChapters()->SetSelectedDocumentsOn(!KFCChapters()->IsSelectedDocumentsOn());
 			KFCPanelTitle::Update();
-			break;
-		}
-
-		case kKFCKeepPreviousResultsActionID:
-		{
-			// Keep Previous Results (the stacked results' spec, section 2-3): the flag alone - the next Find keeps the list it
-			// replaces as a tier, or (off) replaces it and the tiers with it; the tiers on the panel now stay. Its check mark
-			// is drawn in UpdateActionStates.
-			KFCResultHistory::SetKeepOn(!KFCResultHistory::IsKeepOn());
 			break;
 		}
 
@@ -602,15 +593,6 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 				// Chapter's does, so a setting kept for the next book run is not hidden.
 				int16 actionState = KFCChapters()->IsBookScopeOn() ? kEnabledAction : kDisabled_Unselected;
 				if (KFCChapters()->IsSelectedDocumentsOn())
-					actionState |= kSelectedAction;
-				listToUpdate->SetNthActionState(i, actionState);
-				break;
-			}
-			case kKFCKeepPreviousResultsActionID:
-			{
-				// Always offered - it is a setting (the stacked results' spec, section 2-3); the check mark while on.
-				int16 actionState = kEnabledAction;
-				if (KFCResultHistory::IsKeepOn())
 					actionState |= kSelectedAction;
 				listToUpdate->SetNthActionState(i, actionState);
 				break;

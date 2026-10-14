@@ -5,16 +5,17 @@
 //  KohakuFindChange (KFC)
 //
 //  THE RESULTS KEPT IN TIERS (docs/superpowers/specs/2026-10-14-kfc-stacked-results-design.md - the author's calls (a) to
-//  (e)). A search that KEEPS - the query dialog's Find, and the panel's Find while Keep Previous Results is on - puts the
-//  list it replaces above the new one as a TIER: a copy of its rows as they were, drawn grey and nothing more (never
-//  selected, no jump, no menu, not followed by Ctrl+Z). The list the model holds is the LIVE tier, under them, and works
-//  as the list always has. A search that does not keep, Clear Results, a Run of the query dialog and Change All in Book
-//  (No List) take the tiers away when they make a list anew.
+//  (e), and three more the same day: the tiers are always kept - no toggle -, at most 10 of them, each named after its
+//  query). A search into the panel - the panel's Find and the query dialog's Find - puts the list it replaces above the new
+//  one as a TIER: a copy of its rows as they were, drawn grey and nothing more (never selected, no jump, no menu, not
+//  followed by Ctrl+Z). The list the model holds is the LIVE tier, under them, and works as the list always has. Clear
+//  Results, a Run of the query dialog and Change All in Book (No List) take the tiers away when they make a list anew;
+//  past 10 kept tiers the oldest goes, and the status line says so.
 //
-//  Kept here, and only here: the toggle; the kept tiers (each its row's name and a copy of its rows, made with the rows'
-//  own look - KFCResultTree::GetRowLook - so a kept row reads as the row it was); the live tier's name and the list it
-//  names (IKFCResults::GetResultSetId - a new number with every list made anew, which is also how a search that went
-//  through is told from one turned away); and where the query dialog's Find is in the run order.
+//  Kept here, and only here: the kept tiers (each its row's name and a copy of its rows, made with the rows' own look -
+//  KFCResultTree::GetRowLook - so a kept row reads as the row it was); the live tier's name and the list it names
+//  (IKFCResults::GetResultSetId - a new number with every list made anew, which is also how a search that went through is
+//  told from one turned away); and where the query dialog's Find is in the run order.
 //  UI half only, main thread only. Nothing of the model changes: the live tier is the model's list itself.
 //
 //========================================================================================
@@ -30,26 +31,22 @@ class ITreeViewMgr;
 
 namespace KFCResultHistory
 {
-	// ----- Keep Previous Results (the panel menu's toggle - the spec's section 2-3) -----
-
-	/** Is the toggle on? OFF by default; Save Panel Settings keeps it (KFCPanelState). */
-	bool IsKeepOn();
-	void SetKeepOn(bool on);
-
 	// ----- the searches -----
 
 	/** A SEARCH INTO THE PANEL - the one door the panel's Find (KFCActionComponent) and the query dialog's
 	    (KFCQueryDialog.cpp) go through. The panel's tab name written first (KFCPanelTitle::Update), then the search
-	    (KFCRuns()->SearchBook). When it went through - the list made anew - the list it replaced is kept as a tier when
-	    `keep` (as long as it has a row, or was a tier itself), and the tiers go when not; either way `label` names the new
-	    list's tier. Then the list drawn again (KFCResultTree::Rebuild) and the status line set to the search's words.
-	    Returns the search's answer (the matches found); *outCommitted, when given, says whether the search went through. */
-	int32 Find(bool keep, const PMString& label, PMString& outSummary, bool* outCommitted = nil);
+	    (KFCRuns()->SearchBook). When it went through - the list made anew - the list it replaced is kept as a tier (as long
+	    as it has a row, or was a tier itself), the oldest tier let go past the cap, and `label` names the new list's tier.
+	    Then the list drawn again (KFCResultTree::Rebuild) and the status line set to the search's words - with a word on
+	    the tier let go, if one was. Returns the search's answer (the matches found); *outCommitted, when given, says whether
+	    the search went through. */
+	int32 Find(const PMString& label, PMString& outSummary, bool* outCommitted = nil);
 
-	/** The tier name of a list the panel's Find makes: "Find  <tab>: "<what>"" - the tab Find/Change is on and its query as
-	    the Application Bar's field shows it (KFCFindChangeQueryWords), cut at 200 characters - or "Find  <tab>" when the
-	    tab has none (Object). */
-	PMString PanelFindLabel();
+	/** A tier's name - the query Find/Change holds now, in the author's words (10-14): "[<tab>] Find:"<find>" Change:"<change>"",
+	    each side as the Application Bar's field would show it (KFCFindChangeQueryWords / KFCFindChangeChangeWords) and cut
+	    at 200 characters; "[<tab>]" alone for a tab with nothing to say in words (Object). The panel's Find names its tier
+	    by it; the query dialog's Find puts the query's place in the run order in front. */
+	PMString QueryLabel();
 
 	/** A LIST MADE ANEW ELSEWHERE - a Run of the query dialog, Change All in Book (No List): the tiers go when the list the
 	    model holds is not the one it held before (`setBefore` = KFCResults()->GetResultSetId() before it ran). A run turned
@@ -100,7 +97,8 @@ namespace KFCResultHistory
 	bool IsKeptHit(int32 tier, int32 row);
 
 	/** BEFORE THE TREE FORGETS ITS ROWS (KFCResultTree::Rebuild's ClearTree): which kept tiers are open - asked only of the
-	    tiers the last rebuild drew (a tier kept since was the live one then, and comes up closed). */
+	    tiers the last rebuild drew (a tier kept since was the live one then, and comes up closed). The tree still numbers
+	    them as it drew them, so the tiers the cap has let go since are passed over and the rest found where they moved. */
 	void NoteOpenTiers(ITreeViewMgr* treeMgr);
 	/** ...and after the tree is put back: those tiers opened, and in every kept tier the rows that were open when it was
 	    kept. Returns how many rows it opened (a test build's TREETIME counts them). */

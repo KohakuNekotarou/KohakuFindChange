@@ -159,16 +159,21 @@ static std::wstring WideOf(const PMString& s)
 // read the way SnpInsertGlyph.cpp reads them off text (and the way KFCSearchEngine's query signature counts
 // them: "the FONT is two attributes in the list"). Built as a PMString, so a character past U+FFFF becomes its
 // surrogate pair in PMString::AppendW rather than by hand.
-static PMString GlyphDescription(const IFindChangeOptions* opts)
+// `changeSide` = the glyph the tab changes to, its font read off the CHANGE list by the same rule (not measured: a list
+// without the two attributes leaves the font out, as on the find side). That list is asked for with allowCreation kFalse,
+// as KFCObjectSearch asks for its own - reading the dialog's settings must not add to them.
+static PMString GlyphDescription(const IFindChangeOptions* opts, bool changeSide)
 {
 	PMString out;
-	const Text::GlyphID gid = opts->GetFindGlyphID();
+	const Text::GlyphID gid = changeSide ? opts->GetReplaceGlyphID() : opts->GetFindGlyphID();
 	if (gid == kInvalidGlyphID)
 		return out;
 	PMString font;
 	UTF32TextChar character(0);
 	IDataBase* const db = opts->GetUIDAttrDB();
-	const AttributeBossList* list = (db != nil) ? opts->GetFindAttributeBossList(db, IFindChangeOptions::kGlyphSearch) : nil;
+	const AttributeBossList* list = (db == nil) ? nil : changeSide
+		? opts->GetChangeAttributeBossList(db, IFindChangeOptions::kGlyphSearch, kFalse)
+		: opts->GetFindAttributeBossList(db, IFindChangeOptions::kGlyphSearch);
 	if (list != nil)
 	{
 		InterfacePtr<const ITextAttrUID> familyAttr(
@@ -470,8 +475,32 @@ bool KFCFindChangeQueryWords(PMString& outWords)
 	{
 		case IFindChangeOptions::kTextSearch:
 		case IFindChangeOptions::kGrepSearch:			outWords = PMString(opts->GetFindString(mode)); break;
-		case IFindChangeOptions::kGlyphSearch:			outWords = GlyphDescription(opts); break;
+		case IFindChangeOptions::kGlyphSearch:			outWords = GlyphDescription(opts, false); break;
 		case IFindChangeOptions::kTransliterateSearch:	outWords = CharacterTypeName(opts->GetFindCharacterType()); break;
+		default:										return false;	// Object, Colour: nothing in words
+	}
+	outWords.SetTranslatable(kFalse);
+	return true;
+#else
+	return false;
+#endif
+}
+
+bool KFCFindChangeChangeWords(PMString& outWords)
+{
+	outWords.Clear();
+	outWords.SetTranslatable(kFalse);
+#ifdef WINDOWS
+	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
+	if (opts == nil)
+		return false;
+	const IFindChangeOptions::SearchMode mode = opts->GetSearchMode();
+	switch (mode)
+	{
+		case IFindChangeOptions::kTextSearch:
+		case IFindChangeOptions::kGrepSearch:			outWords = PMString(opts->GetReplaceString(mode)); break;
+		case IFindChangeOptions::kGlyphSearch:			outWords = GlyphDescription(opts, true); break;
+		case IFindChangeOptions::kTransliterateSearch:	outWords = CharacterTypeName(opts->GetReplaceCharacterType()); break;
 		default:										return false;	// Object, Colour: nothing in words
 	}
 	outWords.SetTranslatable(kFalse);

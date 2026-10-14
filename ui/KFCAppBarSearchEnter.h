@@ -66,9 +66,14 @@ bool16	KFCApplyAppBarSearchEnter();
 void	KFCShutdownAppBarSearchEnter();
 
 // THE QUERY OF THE TAB FIND/CHANGE IS ON, AS WORDS - what the field shows while the link is on (Text / GREP: the find
-// string; Glyph: the glyph, its id and its font; Transliterate: the character type, in InDesign's own words) and the name
-// a kept tier of the panel's Find carries (KFCResultHistory::PanelFindLabel). false for a tab with nothing to say in words
-// (Object, Colour) - and on Mac, where none of this is built. Whether the link is on or not.
+// string; Glyph: the glyph, its id and its font; Transliterate: the character type, in InDesign's own words) and the Find
+// part of a tier's name (KFCResultHistory::QueryLabel). false for a tab with nothing to say in words (Object, Colour) - and
+// on Mac, where none of this is built. Whether the link is on or not.
 bool	KFCFindChangeQueryWords(PMString& outWords);
+
+// ...AND ITS CHANGE SIDE, the same words for what the tab changes to (Text / GREP: the change string; Glyph: the change
+// glyph; Transliterate: the character type changed to) - the Change part of a tier's name. Empty words for an empty
+// Change box (a change that deletes the match). false where KFCFindChangeQueryWords is false.
+bool	KFCFindChangeChangeWords(PMString& outWords);
 
 #endif // __KFCAppBarSearchEnter_h__

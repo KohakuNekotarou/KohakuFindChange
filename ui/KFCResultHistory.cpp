@@ -20,7 +20,7 @@
 
 // Project includes:
 #include "KFCResultHistory.h"
-#include "KFCAppBarSearchEnter.h"	// KFCFindChangeQueryWords - the panel's Find's tier name
+#include "KFCAppBarSearchEnter.h"	// KFCFindChangeQueryWords / ChangeWords - a tier's name
 #include "KFCDiag.h"				// the STACK line and the UIOBS counters - test builds only
 #include "KFCModelAccess.h"			// the model half, through its session interfaces
 #include "KFCPanelTitle.h"			// Update - the tab's scope written before the search
@@ -29,9 +29,15 @@
 
 namespace
 {
-	// The panel's Find's tier name keeps this many characters of the query: a GREP pattern can run to thousands, and the
-	// row ends in "..." where the panel's width runs out in any case.
+	// A tier's name keeps this many characters of each side of the query: a GREP pattern can run to thousands, and the row
+	// ends in "..." where the panel's width runs out in any case.
 	const int32 kLabelWordsMax = 200;
+
+	// THE MOST TIERS KEPT (the author's calls, 10-14: the oldest let go past a cap, a word on the status line when one goes -
+	// and the cap 10, the 50 first proposed being too many searches to keep). A tier is a copy of one list, and a list holds
+	// at most kKFCCollectHitLimit rows (300) and the rows above them, so the cap bounds what the copies can hold - and the
+	// tiers are kept by every search now, with no toggle.
+	const int32 kKeptTiersMax = 10;
 
 	/** A ROW OF A KEPT TIER: its look as it was drawn, where it hangs, and whether it was open. */
 	struct KeptRow
@@ -67,11 +73,23 @@ namespace
 		LiveTier() : set(0), stacked(false) {}
 	};
 
-	bool gKeepOn = false;
 	std::vector<KeptTier> gKept;
 	LiveTier gLive;
 	int32 gNextQuery = 0;		// the query dialog's Find: the run order's query it searches next
 	int32 gDrawnTiers = 0;		// how many kept tiers the last rebuild drew (NoteOpenTiers asks those alone)
+	int32 gDroppedSinceDrawn = 0;	// how many of those the cap has let go since - the front ones (NoteOpenTiers skips them)
+
+	// PAST THE CAP, THE OLDEST TIERS GO - from the front, where the oldest stand. Counted, because the tree still numbers the
+	// tiers as the last rebuild drew them (NoteOpenTiers). Returns how many went.
+	int32 LetGoOldest()
+	{
+		const int32 over = static_cast<int32>(gKept.size()) - kKeptTiersMax;
+		if (over <= 0)
+			return 0;
+		gKept.erase(gKept.begin(), gKept.begin() + over);
+		gDroppedSinceDrawn += over;
+		return over;
+	}
 
 	// Is the list the model holds now the one a search that keeps made?
 	bool LiveIsStacked()
@@ -156,17 +174,7 @@ namespace
 	}
 }	// anonymous namespace
 
-bool KFCResultHistory::IsKeepOn()
-{
-	return gKeepOn;
-}
-
-void KFCResultHistory::SetKeepOn(bool on)
-{
-	gKeepOn = on;
-}
-
-int32 KFCResultHistory::Find(bool keep, const PMString& label, PMString& outSummary, bool* outCommitted)
+int32 KFCResultHistory::Find(const PMString& label, PMString& outSummary, bool* outCommitted)
 {
 	if (outCommitted != nil)
 		*outCommitted = false;
@@ -178,7 +186,7 @@ int32 KFCResultHistory::Find(bool keep, const PMString& label, PMString& outSumm
 	// KFCSearchEngine::SearchBook) and kept only when the search goes through.
 	const uint32 setBefore = KFCResults()->GetResultSetId();
 	KeptTier pending;
-	const bool havePending = keep && TakeSnapshot(pending);
+	const bool havePending = TakeSnapshot(pending);
 
 #ifdef KFC_DIAG
 	// how often the UI half's observers ran while the search did (guide vol2-15: not per match, one hopes)
@@ -194,41 +202,67 @@ int32 KFCResultHistory::Find(bool keep, const PMString& label, PMString& outSumm
 	// WENT THROUGH = A NEW LIST: past its commit point the search drops the results (KFCSearchEngine::DropResults - a new
 	// result set), and every refusal comes before it and touches nothing (SearchBook's own rule).
 	const bool committed = KFCResults()->GetResultSetId() != setBefore;
+	int32 letGo = 0;
 	if (committed)
 	{
-		if (!keep)
-			(void)DropStack();		// the list replaced as it always was - and the tiers with it
-		else if (havePending)
+		if (havePending)
+		{
 			gKept.push_back(std::move(pending));
+			letGo = LetGoOldest();
+		}
 		gLive.label = label;
 		gLive.label.SetTranslatable(kFalse);
 		gLive.set = KFCResults()->GetResultSetId();
-		gLive.stacked = keep;
+		gLive.stacked = true;
 	}
-	KFC_DIAG_LOG("STACK find keep=%d went=%d kept=%d tiers=%d", keep ? 1 : 0, committed ? 1 : 0,
-		(committed && keep && havePending) ? 1 : 0, static_cast<int>(gKept.size()));
+	KFC_DIAG_LOG("STACK find went=%d kept=%d letgo=%d tiers=%d", committed ? 1 : 0, (committed && havePending) ? 1 : 0,
+		static_cast<int>(letGo), static_cast<int>(gKept.size()));
 	KFCResultTree::Rebuild();
-	KFCResultTree::ShowStatus(outSummary);
+	// The status line: the search's words - and, when the cap let a tier go, a word on it after them (the panel's line
+	// only: outSummary goes back to the caller as the search's own words, which the query dialog quotes).
+	PMString status(outSummary);
+	status.SetTranslatable(kFalse);
+	if (letGo > 0)
+	{
+		status.Append(" The oldest kept results were let go - ");
+		status.AppendNumber(kKeptTiersMax);
+		status.Append(" are kept at most.");
+	}
+	KFCResultTree::ShowStatus(status);
 	if (outCommitted != nil)
 		*outCommitted = committed;
 	return found;
 }
 
-PMString KFCResultHistory::PanelFindLabel()
+namespace
 {
-	PMString label("Find  ");
-	label.SetTranslatable(kFalse);
-	label.Append(KFCRuns()->TabName(KFCRuns()->CurrentSearchMode()));
-	PMString words;
-	if (KFCFindChangeQueryWords(words) && !words.IsEmpty())
+	// One side of a tier's name: the words, cut at kLabelWordsMax where a character may be cut (KFCSafeCut).
+	void AppendQueryWords(PMString& label, PMString words)
 	{
 		if (words.CharCount() > kLabelWordsMax)
 		{
 			words.Truncate(words.CharCount() - KFCSafeCut(words, kLabelWordsMax));	// Truncate takes off that many from the end
 			words.Append("...");
 		}
-		label.Append(": \"");
 		label.Append(words);
+	}
+}
+
+PMString KFCResultHistory::QueryLabel()
+{
+	PMString label("[");
+	label.SetTranslatable(kFalse);
+	label.Append(KFCRuns()->TabName(KFCRuns()->CurrentSearchMode()));
+	label.Append("]");
+	PMString findWords, changeWords;
+	if (KFCFindChangeQueryWords(findWords))
+	{
+		label.Append(" Find:\"");
+		AppendQueryWords(label, findWords);
+		label.Append("\"");
+		(void)KFCFindChangeChangeWords(changeWords);		// the same tab, so it answers as the find side did
+		label.Append(" Change:\"");
+		AppendQueryWords(label, changeWords);
 		label.Append("\"");
 	}
 	return label;
@@ -248,6 +282,7 @@ bool KFCResultHistory::DropStack()
 	gLive = LiveTier();
 	gNextQuery = 0;
 	gDrawnTiers = 0;
+	gDroppedSinceDrawn = 0;
 	KFC_DIAG_LOG("STACK drop was=%d", was ? 1 : 0);
 	return was;
 }
@@ -349,9 +384,13 @@ void KFCResultHistory::NoteOpenTiers(ITreeViewMgr* treeMgr)
 {
 	if (treeMgr == nil)
 		return;
-	const int32 drawn = (gDrawnTiers < KeptTierCount()) ? gDrawnTiers : KeptTierCount();
-	for (int32 t = 0; t < drawn; ++t)
-		gKept[static_cast<size_t>(t)].open = (treeMgr->IsNodeExpanded(KFCResultNodeID::CreateTier(t)) != kFalse);
+	// The tree's tier t is the kept tier t - gDroppedSinceDrawn now: the cap let the front ones go since it was drawn.
+	for (int32 t = 0; t < gDrawnTiers; ++t)
+	{
+		const int32 kept = t - gDroppedSinceDrawn;
+		if (kept >= 0 && kept < KeptTierCount())
+			gKept[static_cast<size_t>(kept)].open = (treeMgr->IsNodeExpanded(KFCResultNodeID::CreateTier(t)) != kFalse);
+	}
 }
 
 int32 KFCResultHistory::OpenKeptRows(ITreeViewMgr* treeMgr)
@@ -377,6 +416,7 @@ int32 KFCResultHistory::OpenKeptRows(ITreeViewMgr* treeMgr)
 		}
 	}
 	gDrawnTiers = KeptTierCount();
+	gDroppedSinceDrawn = 0;
 	return opened;
 }
 
@@ -386,6 +426,7 @@ void KFCResultHistory::ShutdownCleanup()
 	gLive = LiveTier();
 	gNextQuery = 0;
 	gDrawnTiers = 0;
+	gDroppedSinceDrawn = 0;
 }
 
 // End, KFCResultHistory.cpp.

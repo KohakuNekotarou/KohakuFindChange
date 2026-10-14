@@ -20,7 +20,6 @@
   Book Scope
   Find/Change Selected Documents (Book)
   Hide Previous Chapter
-  Keep Previous Results
   Link the Application Bar's Search Field to This Panel
   Minimizable Find/Change
   Remember Book Panel Placement
@@ -34,12 +33,12 @@
   ```
 
   2行目の名前は範囲で変わる（`Find in Book`／`Find in Document`／`Find in Story` など＝SET-03。上の絵は Book Scope OFF・検索: ドキュメントのとき）。
-  `Book Scope` から `Translucent Panel` までの9つはトグルで、ON のとき左にチェックの印が付く（最初は `Hide Previous Chapter` だけ ON＝SET-23）。トグルの並びは ABC 順（2026-10-14 の作者の並べ替え）。
-  （`Change Checked` と `Show Changes by KohakuFindChange` は 2026-10-06 に外した。`Run Saved Queries...` と `Find/Change Selected Documents (Book)` は 2026-10-07 に足した＝第16章・SCOPE-26〜。`Run Saved Queries...` は同じ日の夜に `Clear Results` の下へ1つ下げた＝作者の依頼。2026-10-14 に作者がトグルの区画を並べ替えた＝それまでは `Keep Previous Results` が `Hide Previous Chapter` の上・窓のトグルは `Translucent Find/Change`・`Minimizable Find/Change`・`Translucent Panel`・`Remember Book Panel Placement` の順。）
+  `Book Scope` から `Translucent Panel` までの8つはトグルで、ON のとき左にチェックの印が付く（最初は `Hide Previous Chapter` だけ ON＝SET-23）。トグルの並びは ABC 順（2026-10-14 の作者の並べ替え）。
+  （`Change Checked` と `Show Changes by KohakuFindChange` は 2026-10-06 に外した。`Run Saved Queries...` と `Find/Change Selected Documents (Book)` は 2026-10-07 に足した＝第16章・SCOPE-26〜。`Run Saved Queries...` は同じ日の夜に `Clear Results` の下へ1つ下げた＝作者の依頼。2026-10-14 に作者がトグルの区画を並べ替えた＝それまでは `Keep Previous Results` が `Hide Previous Chapter` の上・窓のトグルは `Translucent Find/Change`・`Minimizable Find/Change`・`Translucent Panel`・`Remember Book Panel Placement` の順。同じ日に `Keep Previous Results` を外した＝パネルの Find はいつも段を積む（SET-24・ROW-39）。）
   - 訂正: 2026-10-08＝最後の項目は、それまで SDK 共通の文字列で `About this plug-in...` と出ていた（この地図の表記と食い違っていた）。作者「英語として正しい方で」→ほかの項目と同じく語頭を大文字にし、ハイフンの後ろも大文字の `About This Plug-In...`（InDesign のメニューバーの `Plug-Ins`・このパネルのまとまり `Kohaku Plug-Ins` と同じ）。KFC 専用のキー `kKFCAboutThisPlugInMenuKey`（SDK のキーは自作のプラグイン全部が共有するので値を変えない）。
 
 - **SET-02** ★`Find in …`・`Change All in Book (No List)`・`Clear Results`・`Run Saved Queries...` の間に区切り線は無い（探すことと、一覧を使わない置換と、その前の片付けが1つのまとまり）。
-  トグルの並びは、検索にかかわるもの（Book Scope・Find/Change Selected Documents (Book)・Hide Previous Chapter・アプリケーションバー）が先、窓の見た目が後。
+  トグルの並びは ABC 順（2026-10-14 の作者の並べ替え＝SET-01。それまでは、検索にかかわるもの〈Book Scope・Find/Change Selected Documents (Book)・Hide Previous Chapter・アプリケーションバー〉が先、窓の見た目が後だった）。
   - 訂正:
 
 - **SET-03** 項目の名前は**どの UI 言語でも英語**（GEN-35）。名前が変わるのは2つ ―― `Find in …`（範囲によって `Find in Book`／`Find in Document`／`Find in Story` など＝GEN-28）と、
@@ -47,7 +46,8 @@
   灰色のときも、範囲つきの名前は出る。
   - 訂正:
 
-- **SET-24** ★**Keep Previous Results**（トグル・2026-10-14 作者の判断 (e)＝`Hide Previous Chapter` の下＝同じ日の作者の並べ替えで。足したときは `Find/Change Selected Documents (Book)` の下）＝ON のとき、パネルの Find（メニュー・ショートカット・アプリケーションバーの Return）が、それまでの一覧を消さずに**段として残し**、新しい一覧をその下に積む（ROW-39）。OFF（既定）は今までどおり一覧を入れ替え、段も消す（ROW-41）。OFF にしただけでは段は消えない（次に通った検索から）。いつでも押せる（設定なので灰色にならない）。Save Panel Settings で保存（キー `keepPreviousResults`＝SET-16）。クエリのダイアログの Find は、この切り替えに関わらずいつも積む（QRY-29）。
+- **SET-24** ★~~Keep Previous Results~~（トグル）は**外した**（2026-10-14・同じ日に足して同じ日に外した＝作者「この機能をディフォルトにしましょうか、Keepでとぐるはやめに」）＝**パネルの Find（メニュー・ショートカット・アプリケーションバーの Return）は、いつもそれまでの一覧を段として残し、新しい一覧をその下に積む**（ROW-39）。クエリのダイアログの Find も同じ（QRY-29）。段を消すのは Clear Results・Run・Change All in Book (No List)（ROW-41）。
+  足していた間は、パネルの Find は ON のときだけ積み・OFF（既定）は一覧を入れ替えて段も消し・Save Panel Settings がキー `keepPreviousResults` で保存した。そのキーは今は読まない（古い設定ファイルにあっても無いのと同じ）。ActionID（`kKFCUIPrefix + 53`）は使い直さない。
   - 訂正:
 
 ---
@@ -146,7 +146,8 @@
   - 訂正:
 
 - **SET-16** 保存するもの ―― Translucent Panel／Translucent Find/Change／Minimizable Find/Change／Link the Application Bar's Search Field／
-  Hide Previous Chapter／Find/Change Selected Documents (Book)（2026-10-07・キー `selectedDocuments`＝SCOPE-34）／Keep Previous Results（2026-10-14・キー `keepPreviousResults`＝SET-24）／Remember Book Panel Placement と、ブックパネルの位置（開いていれば今の位置、無ければ最後に覚えた位置）。
+  Hide Previous Chapter／Find/Change Selected Documents (Book)（2026-10-07・キー `selectedDocuments`＝SCOPE-34）／Remember Book Panel Placement と、ブックパネルの位置（開いていれば今の位置、無ければ最後に覚えた位置）。
+  （2026-10-14 の1日だけ Keep Previous Results もキー `keepPreviousResults` で保存していた＝そのトグルは外した・キーは読まない＝SET-24。段そのものは作業の状態で、保存しない。）
   （保存したクエリの並びは、このファイルに入れない ―― InDesign を起動している間だけ覚え、ファイルにするのは `Save Order...` で利用者が選んだ場所＝QRY-14〜16・QRY-26。2026-10-07 の昼の版が書いていた `KFCQueryOrder.txt` はもう使わない。）
   - 訂正:
 

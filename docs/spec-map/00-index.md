@@ -91,7 +91,7 @@ git log -p -- docs/spec-map/        # コミット済みの書き込み
 | 09 | [Undo/Redo への追従](09-undo.md)（追いかける書き込み・追いかけないもの・知り方・順番・やめるとき・メッセージ欄） | `UNDO-` | 6b | ✅ |
 | 10 | [文書・ブックを閉じたとき](10-lifecycle.md)（文書の結果・All Documents・ブックの結果・復帰・ブックの別名保存・保存・起動と終了） | `LIFE-` | 11・13 | ✅ |
 | 11 | [パネルの見た目](11-panel.md)（開き方・タブ名・3枚の絵・メッセージ欄の高さ・大きさの下限と行の丸め・How to Use・About） | `PNL-` | 4・7・13 | ✅ |
-| 12 | [フライアウトと設定の保存](12-menus-settings.md)（項目の並び・灰色の規則・右クリックメニュー（4種類の行）・ショートカット・保存するもの／しないもの・JSON の置き場・選んだ文書のトグル・Keep Previous Results） | `SET-` | 4・5・3 | ✅ |
+| 12 | [フライアウトと設定の保存](12-menus-settings.md)（項目の並び・灰色の規則・右クリックメニュー（4種類の行）・ショートカット・保存するもの／しないもの・JSON の置き場・選んだ文書のトグル・外した Keep Previous Results） | `SET-` | 4・5・3 | ✅ |
 | 13 | [窓の工夫（Windows）― Translucent Panel・Translucent Find/Change・Minimizable Find/Change](13-windows.md)（薄さと戻り方・効く場所・影・浮いた組・ダイアログの見つけ方・最小化ボタンとタスクバー・後始末） | `WIN-` | 14・15 | ✅ |
 | 14 | [ブックパネルの位置を覚える（Remember Book Panel Placement）](14-book-panel.md)（測る瞬間・戻す瞬間・浮いているとき・ドックの隣で覚える・放り出されたとき・ホーム画面・選択を読む） | `BPP-` | 16・11 | ✅ |
 | 15 | [アプリケーションバーの検索欄（Link the Application Bar's Search Field to This Panel）](15-app-bar.md)（欄に映すもの・書き戻し・Return で検索・テキストと正規表現だけ・見えないとき） | `BAR-` | 17 | ✅ |

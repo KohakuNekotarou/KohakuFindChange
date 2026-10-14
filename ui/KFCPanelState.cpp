@@ -45,7 +45,6 @@
 #include "KFCJump.h"			// IsHidePreviousChapterOn / SetHidePreviousChapter
 #include "KFCBookPanelPlacement.h"	// "Remember Book Panel Placement" and the placement it keeps
 #include "KFCModelAccess.h"		// KFCChapters() - Find/Change Selected Documents (Book) is the model half's flag
-#include "KFCResultHistory.h"	// the get / set of Keep Previous Results
 
 // MoveFileEx - the side file put in place (KFCWriteWholeFile). KFC is Windows alone. After
 // the SDK headers, so its macros cannot collide with SDK names (as KFCPanelAlpha.cpp).
@@ -582,9 +581,6 @@ void KFCSavePanelState()
 		pairs.push_back(KFCJsonPair("selectedDocuments",
 			KFCBoolLiteral((chapters != nil && chapters->IsSelectedDocumentsOn()) ? kTrue : kFalse)));
 	}
-	// Keep Previous Results (docs/superpowers/specs/2026-10-14-kfc-stacked-results-design.md section 2-3: kept, as the other
-	// toggles of the flyout are).
-	pairs.push_back(KFCJsonPair("keepPreviousResults",   KFCBoolLiteral(KFCResultHistory::IsKeepOn() ? kTrue : kFalse)));
 	// "Remember Book Panel Placement" and the placement. Its keys are named in
 	// KFCBookPanelPlacement.cpp and nowhere else: this only writes out what that file hands over -
 	// the book panel as it stands now if one is open, otherwise the placement last known.
@@ -675,10 +671,6 @@ void KFCLoadPanelStateIfPresent()
 		if (chapters != nil)
 			chapters->SetSelectedDocumentsOn(KFCPanelStateReadBool(text, "selectedDocuments", chapters->IsSelectedDocumentsOn()));
 	}
-
-	// Keep Previous Results: the flag alone - the next Find keeps the list it replaces. (The bool reader: KFCResultHistory
-	// speaks bool.)
-	KFCResultHistory::SetKeepOn(KFCPanelStateReadBool(text, "keepPreviousResults", KFCResultHistory::IsKeepOn()));
 
 	// "Remember Book Panel Placement": the toggle and the placement. Read by
 	// KFCBookPanelPlacement, which owns the keys; nothing is moved here - what puts the placement on

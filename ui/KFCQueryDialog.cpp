@@ -270,15 +270,16 @@ namespace
 			SayOnBoth(panel, say);
 			return;
 		}
-		// The tier's name: the query as the run order's row names it, "<n>  <kind>  <name>".
+		// The tier's name: the query's place in the run order, then the query as Find/Change holds it now - loaded above -
+		// in the words every tier is named by (the author's call, 10-14): "<n>  [<tab>] Find:"<find>" Change:"<change>"".
 		PMString label;
 		label.SetTranslatable(kFalse);
 		label.AppendNumber(next + 1);
 		label.Append("  ");
-		label.Append(KFCQueryOrder::KindAndName(query));
+		label.Append(KFCResultHistory::QueryLabel());
 		PMString summary;
 		bool committed = false;
-		(void)KFCResultHistory::Find(true /*keep*/, label, summary, &committed);
+		(void)KFCResultHistory::Find(label, summary, &committed);
 		if (committed)
 			KFCResultHistory::StepQueryIndex();
 		KFC_DIAG_LOG("QDFIND query=%d of=%d went=%d", static_cast<int>(next + 1), static_cast<int>(count), committed ? 1 : 0);

@@ -328,10 +328,10 @@ DECLARE_PMID(kActionIDSpace, kKFCSearchDocumentAgainActionID, kKFCUIPrefix + 51)
 // under that row selected - for Return to replace them all together. One action in the three menus: the row
 // right-clicked is the menu's widget (KFCActionComponent's RightClickedRow). + 52: the next after the highest spent.
 DECLARE_PMID(kActionIDSpace, kKFCSelectAllRowsActionID, kKFCUIPrefix + 52)
-// "Keep Previous Results" on the flyout (docs/superpowers/specs/2026-10-14-kfc-stacked-results-design.md section 2-3 - the
-// author's call (e)): a check-mark toggle - ON = the panel's Find keeps the list it replaces, as a tier above the new one
-// (KFCResultHistory). OFF by default. + 53: the next after the highest spent.
-DECLARE_PMID(kActionIDSpace, kKFCKeepPreviousResultsActionID, kKFCUIPrefix + 53)
+// RETIRED (never reuse - a keyboard shortcut is recorded against the ActionID): "Keep Previous Results", the flyout's
+// toggle for the panel's Find keeping the list it replaced as a tier (the stacked results' spec, section 2-3). The same
+// day (10-14) the author made keeping the default and dropped the toggle, so every Find keeps (KFCResultHistory).
+//DECLARE_PMID(kActionIDSpace, kKFCKeepPreviousResultsActionID, kKFCUIPrefix + 53)
 
 
 // WidgetIDs:
@@ -472,8 +472,6 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryFindButtonWidgetID, kKFCUIPrefix + 45)
 #define kKFCQueryOrderFileTypeKey		kKFCStringPrefix "kKFCQueryOrderFileTypeKey"
 // "Find/Change Selected Documents (Book)" - the toggle under Book Scope.
 #define kKFCSelectedDocumentsMenuKey	kKFCStringPrefix "kKFCSelectedDocumentsMenuKey"
-// "Keep Previous Results" - the toggle under Find/Change Selected Documents (Book).
-#define kKFCKeepPreviousResultsMenuKey	kKFCStringPrefix "kKFCKeepPreviousResultsMenuKey"
 
 // Other StringKeys:
 #define kKFCAboutBoxStringKey	kKFCStringPrefix "kKFCAboutBoxStringKey"
@@ -546,13 +544,12 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryFindButtonWidgetID, kKFCUIPrefix + 45)
 
 // Block 3 - the check-mark toggles, 2.2 to 2.9, in alphabetical order (the author's arrangement, 2026-10-14). That
 // keeps Book Scope first - it is the one that decides what the commands in block 1 run on - and Find/Change Selected
-// Documents (Book) right under it: it narrows Book Scope, and works only with it on. Then Hide Previous Chapter, Keep
-// Previous Results, Link the Application Bar's Search Field to This Panel, Minimizable Find/Change, Remember Book Panel
-// Placement, Translucent Find/Change and Translucent Panel.
+// Documents (Book) right under it: it narrows Book Scope, and works only with it on. Then Hide Previous Chapter, Link the
+// Application Bar's Search Field to This Panel, Minimizable Find/Change, Remember Book Panel Placement, Translucent
+// Find/Change and Translucent Panel. (Keep Previous Results stood at 2.45 for the same day - retired with its ActionID.)
 #define kKFCBookScopeMenuItemPosition		2.2
 #define kKFCSelectedDocumentsMenuItemPosition	2.3
 #define kKFCHidePrevChapterMenuItemPosition	2.4
-#define kKFCKeepPreviousResultsMenuItemPosition	2.45
 #define kKFCAppBarSearchEnterMenuItemPosition	2.5
 #define kKFCMinimizableFindChangeMenuItemPosition	2.6
 #define kKFCRememberBookPanelMenuItemPosition	2.7

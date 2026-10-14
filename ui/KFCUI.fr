@@ -613,12 +613,7 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCHidePrevChapterMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// Keep Previous Results: toggle (check mark). ON = the panel's Find keeps the list it replaces, as a tier above the
-		// new one (KFCResultHistory); OFF = the list replaced, as it always was.
-		kKFCKeepPreviousResultsActionID,
-		kKFCTargetMenuPath
-		kKFCKeepPreviousResultsMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
+		// (Keep Previous Results stood here for a day - retired: every Find keeps its tiers now, KFCUIID.h.)
 
 		// Link the Application Bar's Search Field to This Panel: toggle (check mark). Return in the search
 		// field of InDesign's application bar searches with this panel. *Windows only. KFCAppBarSearchEnter.h.
@@ -813,17 +808,6 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKFCActionComponentBoss,
 		kKFCSelectedDocumentsActionID,
 		kKFCSelectedDocumentsMenuKey,	// "Find/Change Selected Documents (Book)" (toggle, check mark)
-		kOtherActionArea,
-		kNormalAction,
-		kCustomEnabling|kDisableIfLowMem,
-		kInvalidInterfaceID,
-		kSDKDefInvisibleInKBSCEditorFlag,
-
-		// Keep Previous Results. kCustomEnabling for the check mark (ActionDefs.h:40), like the toggles beside it; never
-		// greyed - it is a setting.
-		kKFCActionComponentBoss,
-		kKFCKeepPreviousResultsActionID,
-		kKFCKeepPreviousResultsMenuKey,	// "Keep Previous Results" (toggle, check mark)
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
