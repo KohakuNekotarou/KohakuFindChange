@@ -33,7 +33,6 @@
 #include "KFCModelTypes.h"	// KFCResultModel::RowLocation - LocateRow's answer
 
 #include <map>
-#include <set>			// DiagAdoptFoci's rows (test builds)
 #include <vector>
 
 class ITextWalker;			// AcquireWalker
@@ -511,23 +510,27 @@ namespace KFCSearchEngine
 	    (RowReadsAsFoundAt). */
 	bool RowReadsAsFound(int32 chapterIdx, int32 hitIdx, IDataBase* db);
 
-	/** Where the row is now (docs/superpowers/specs/2026-10-08-kfc-text-focus-jump-design.md T2 / T3 / T14) - its
-	    stored place, its text focus, the story looked through again. The jump asks it through IKFCRuns.
-	    kRowMoved = the row was moved to the one free look-alike (OneFreePlace's rule, in the .cpp); kRowElsewhere =
-	    found for this jump only - the row's stored place is unchanged. ioStart / ioEnd = the place to go to
-	    (unchanged for kRowAtPlace / kRowNotFound). */
+	/** Where the row is now. First the rows of its story follow their foci (FollowStoryFoci); when they did, the row's
+	    stored place is where it is: kRowAtPlace (nothing moved), kRowMoved (rows moved or read again - the list is
+	    repainted) or kRowNotFound (its own text was edited there - Missing), with ioStart / ioEnd = that place, where the
+	    view goes. Otherwise the old way (docs/superpowers/specs/2026-10-08-kfc-text-focus-jump-design.md T2 / T3 / T14) -
+	    its stored place, its focus as a hint, the story looked through again: kRowMoved = moved to the one free
+	    look-alike (OneFreePlace's rule, in the .cpp); kRowElsewhere = found for this jump only - the row's stored place
+	    is unchanged; ioStart / ioEnd = the place to go to (unchanged for kRowAtPlace / kRowNotFound). The jump asks it
+	    through IKFCRuns. */
 	KFCResultModel::RowLocation LocateRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, TextIndex& ioStart,
 		TextIndex& ioEnd);
 
-#ifdef KFC_DIAG
-	/** TEST BUILDS ONLY - THE EXPERIMENT replace-by-focus (KFCDiag.h; the author's call, 10-14 night: "rely on the focus
-	    once, and try it"). For each story of `rows` that is not at the version on record: every row of the chapter in that
-	    story whose text focus reads its match (its hash and length) is moved there - its place, its line read again, the
-	    focus with it (MoveRowTo) - and the story's version is recorded as it stands, so the replace's doors go by the
-	    foci. A row with no usable focus, or whose focus reads another text, is left (the doors turn it away). Replaced rows
-	    are left. Each step is traced (QFOCUS). */
-	void DiagAdoptFoci(int32 chapterIdx, const UIDRef& docRef, const std::set<int32>& rows);
-#endif
+	/** What FollowStoryFoci did. */
+	enum FollowResult { kFollowNone, kFollowed, kFollowBroken };
+
+	/** The rows of `story` in that chapter take their text foci's places (docs/superpowers/plans/
+	    2026-10-14-kfc-row-focus-undo.md D5 - the .cpp says how). kFollowed = they did, or stood there already, and the
+	    story is recorded at its version as it stands; kFollowNone = no row of the story here has a focus (the version
+	    rule decides, as before); kFollowBroken = a focus that could not follow (lost), or a row without one among rows
+	    with one - nothing is moved. outMoved = rows were moved or read again (the list is to be repainted). Asked
+	    before a Replace, a preview and a jump (KFCReplaceEngine, LocateRow). */
+	FollowResult FollowStoryFoci(int32 chapterIdx, IDataBase* db, UID story, bool* outMoved = nil);
 
 	/** Search This Story Again (a story row's right-click menu): that story alone walked again with the search's query,
 	    its rows put back as the walk finds them and its version recorded (KFCResultModel::ReplaceStoryRows). False =

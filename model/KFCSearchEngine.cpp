@@ -77,6 +77,7 @@
 #include <algorithm>				// std::sort, std::equal - a row looked for again (its places, its look-alike rows)
 #include <map>						// the per-frame cache one document's walk keeps (FrameFacts)
 #include <memory>					// std::unique_ptr - a Search: walk's dirty guards, one per open document
+#include <set>						// the rows a write is handed, the stories it meets
 
 // Project includes:
 #include "KFCSearchEngine.h"
@@ -3740,68 +3741,118 @@ bool PickByOrder(int32 chapterIdx, int32 hitIdx, const Places& places, TextIndex
 }
 }	// anonymous namespace
 
-#ifdef KFC_DIAG
-void KFCSearchEngine::DiagAdoptFoci(int32 chapterIdx, const UIDRef& docRef, const std::set<int32>& rows)
+// ROWS FOLLOW THEIR FOCI (docs/superpowers/plans/2026-10-14-kfc-row-focus-undo.md D5 - the author's call of 2026-10-14
+// night). A row's focus is of KFC's own class (KFCRowFocus.h): it has followed every edit of its story and every Undo
+// and Redo since it was made, so while it is not lost it stands where the row's text is - more surely than the row's
+// stored place, which follows KFC's own writes only, and more surely than the story's version, which an Undo takes back
+// to a number a different later edit can reach again (the experiment of 10-14: an Undo, then typing elsewhere). So the
+// rows of the story in this chapter take their foci's places:
+//   - a row not replaced whose focus reads its match (hash and length): moved there, its line read again (MoveRowTo -
+//     a Missing word taken off);
+//   - a row not replaced whose focus reads another text - its own match was edited: its place taken from the focus
+//     (SetHitRange), what it found kept - so it does not read as found and nothing writes it - and Missing put on it.
+//     An Undo of that edit brings the focus back over the match, and the next follow takes Missing off;
+//   - a replaced row: moved where its focus reads what its replace wrote (Hit::replacedText); left where it is
+//     otherwise (its jump then looks for what it wrote - LocateRow's old way);
+// and the story is recorded at its version as it stands. QUICK: at the version on record with every focus on its row's
+// place, nothing is done. kFollowNone = no row of this story here has a focus (a chapter whose story KFC did not know
+// when it opened): the version rule decides, as it always has. kFollowBroken = a row without a usable focus among rows
+// that have one, a lost focus, or a version that cannot be read: nothing is moved - a write is refused, a jump takes
+// the old way.
+KFCSearchEngine::FollowResult KFCSearchEngine::FollowStoryFoci(int32 chapterIdx, IDataBase* db, UID story, bool* outMoved)
 {
-	IDataBase* const db = docRef.GetDataBase();
-	if (db == nil)
-		return;
-	// The stories of the rows asked for.
-	std::set<UID> stories;
-	for (std::set<int32>::const_iterator r = rows.begin(); r != rows.end(); ++r)
+	if (outMoved != nil)
+		*outMoved = false;
+	if (db == nil || story == kInvalidUID || !db->IsValidUID(story))
+		return kFollowBroken;
+	struct Row
 	{
-		UID story = kInvalidUID;
-		TextIndex a = kInvalidTextIndex, b = kInvalidTextIndex;
-		uint64 hash = 0;
-		if (KFCResultModel::GetHitMatchIdentity(chapterIdx, *r, story, a, b, hash) && story != kInvalidUID)
-			stories.insert(story);
-	}
-	for (std::set<UID>::const_iterator s = stories.begin(); s != stories.end(); ++s)
+		int32		hit;
+		TextIndex	a, b;		// its stored place
+		uint64		hash;
+		bool		replaced;
+		TextIndex	fs, fe;		// its focus's place
+	};
+	std::vector<Row> rows;
+	int32 focused = 0, lost = 0, none = 0;
+	const int32 n = KFCResultModel::GetHitCount(chapterIdx);
+	for (int32 i = 0; i < n; ++i)
 	{
-		uint32 recorded = 0, now = 0;
-		const bool had = KFCResultModel::GetStoryVersion(chapterIdx, *s, recorded);
-		if (!db->IsValidUID(*s) || !KFCSearchEngine::ReadStoryVersion(db, *s, now))
+		Row r;
+		UID s = kInvalidUID;
+		bool locked = false;
+		r.hit = i;
+		r.a = r.b = r.fs = r.fe = kInvalidTextIndex;
+		r.hash = 0;
+		r.replaced = false;
+		if (!KFCResultModel::GetHitMatchIdentity(chapterIdx, i, s, r.a, r.b, r.hash) || s != story
+			|| !KFCResultModel::GetHitFlags(chapterIdx, i, r.replaced, locked))
 			continue;
-		if (had && recorded == now)
+		const KFCRowFoci::FocusState state = KFCRowFoci::Where(chapterIdx, i, db, r.fs, r.fe);
+		if (state == KFCRowFoci::kFocused)
+			++focused;
+		else if (state == KFCRowFoci::kLostFocus)
+			++lost;
+		else
+			++none;
+		rows.push_back(r);
+	}
+	if (focused == 0 && lost == 0)
+		return kFollowNone;
+	uint32 recorded = 0, now = 0;
+	const bool had = KFCResultModel::GetStoryVersion(chapterIdx, story, recorded);
+	if (lost > 0 || none > 0 || !ReadStoryVersion(db, story, now))
+	{
+		KFC_DIAG_LOG("FOLLOW chapter=%d story=%u broken: focused=%d lost=%d none=%d", chapterIdx, story.Get(),
+			(int)focused, (int)lost, (int)none);
+		return kFollowBroken;
+	}
+	bool inPlace = true;
+	for (size_t k = 0; k < rows.size() && inPlace; ++k)
+		inPlace = (rows[k].fs == rows[k].a && rows[k].fe == rows[k].b);
+	if (inPlace && had && recorded == now)
+		return kFollowed;
+	const UIDRef storyRef(db, story);
+	int32 moved = 0, edited = 0;
+	for (size_t k = 0; k < rows.size(); ++k)
+	{
+		const Row& r = rows[k];
+		if (r.replaced)
 		{
-			KFC_DIAG_LOG("QFOCUS story=%u as on record (%u) - nothing adopted", s->Get(), now);
+			PMString written;
+			if (KFCResultModel::GetHitWrittenText(chapterIdx, r.hit, written) && ReadText(storyRef, r.fs, r.fe - r.fs) == written)
+			{
+				MoveRowTo(chapterIdx, r.hit, storyRef, r.fs, r.fe);
+				++moved;
+			}
 			continue;
 		}
-		// EVERY ROW OF THE CHAPTER IN THAT STORY - not only the ones written: the write recognises its rows by their places.
-		const int32 n = KFCResultModel::GetHitCount(chapterIdx);
-		for (int32 i = 0; i < n; ++i)
+		KFCResultModel::Hit there;
+		ReadHitText(storyRef, r.fs, r.fe, there);
+		if (r.fe - r.fs == r.b - r.a && there.matchHash == r.hash)
 		{
-			UID story = kInvalidUID;
-			TextIndex a = kInvalidTextIndex, b = kInvalidTextIndex;
-			uint64 hash = 0;
-			bool replaced = false, locked = false;
-			if (!KFCResultModel::GetHitMatchIdentity(chapterIdx, i, story, a, b, hash) || story != *s
-				|| !KFCResultModel::GetHitFlags(chapterIdx, i, replaced, locked) || replaced)
-				continue;
-			TextIndex fs = kInvalidTextIndex, fe = kInvalidTextIndex;
-			if (!KFCRowFoci::Current(chapterIdx, i, db, fs, fe))
-			{
-				KFC_DIAG_LOG("QFOCUS row=%d [%d,%d) has no focus - left", (int)i, (int)a, (int)b);
-				continue;
-			}
-			KFCResultModel::Hit there;
-			ReadHitText(UIDRef(db, *s), fs, fe, there);
-			if (fe - fs != b - a || there.matchHash != hash)
-			{
-				KFC_DIAG_LOG("QFOCUS row=%d [%d,%d) focus [%d,%d) reads another text - left", (int)i, (int)a, (int)b,
-					(int)fs, (int)fe);
-				continue;
-			}
-			KFC_DIAG_LOG("QFOCUS row=%d [%d,%d) -> focus [%d,%d)", (int)i, (int)a, (int)b, (int)fs, (int)fe);
-			if (fs != a || fe != b)
-				MoveRowTo(chapterIdx, i, UIDRef(db, *s), fs, fe);
+			MoveRowTo(chapterIdx, r.hit, storyRef, r.fs, r.fe);
+			++moved;
 		}
-		KFCResultModel::SetStoryVersion(chapterIdx, *s, now);
-		KFC_DIAG_LOG("QFOCUS story=%u version %s%u -> %u adopted", s->Get(), had ? "" : "none:", recorded, now);
+		else
+		{
+			KFCResultModel::SetHitRange(chapterIdx, r.hit, story, r.fs, r.fe);
+			KFCResultModel::SetHitOutcome(chapterIdx, r.hit, KFCResultModel::kOutcomeMissing);
+			++edited;
+		}
 	}
+	KFCResultModel::SetStoryVersion(chapterIdx, story, now);
+	KFC_DIAG_LOG("FOLLOW chapter=%d story=%u version %s%u -> %u rows=%d moved=%d edited=%d", chapterIdx, story.Get(),
+		had ? "" : "none:", recorded, now, (int)rows.size(), (int)moved, (int)edited);
+	if (outMoved != nil)
+		*outMoved = true;
+	return kFollowed;
 }
-#endif
 
+// FIRST, THE ROWS FOLLOW THEIR FOCI (FollowStoryFoci, above - the author's call of 2026-10-14 night): a story whose
+// foci all followed every edit and every Undo is where they say, and nothing below is asked. What follows is the
+// way for a story with no foci, or with one that met an Undo it could not follow - the focus a hint only.
+//
 // WHERE IS THIS ROW NOW? (spec T2) One question for the jump and the selection a click makes - HERE, NOT IN THE JUMP
 // (KFCJump.cpp): walking a story and putting a row right is the model half's work; the jump asks it through IKFCRuns.
 // The row's stored place and its text focus's place are both read against the row (RowReadsAsFoundAt). One of them:
@@ -3835,30 +3886,20 @@ KFCResultModel::RowLocation KFCSearchEngine::LocateRow(int32 chapterIdx, int32 h
 	uint64 hash = 0;
 	if (db == nil || !KFCResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, story, a, b, hash))
 		return KFCResultModel::kRowNotFound;
-#ifdef KFC_DIAG
-	// TEST BUILDS ONLY - THE EXPERIMENT replace-by-focus (KFCDiag.h): the jump rides on the focus too - its place reading the
-	// row's MATCH (the line around it may have changed - another tier's write beside it) makes it the row's place, the line
-	// read again there (MoveRowTo - a Missing word taken off).
-	if (KFC_DIAG_FAULT("replace-by-focus"))
+	// THE ROWS FOLLOW THEIR FOCI FIRST (FollowStoryFoci - the author's call of 2026-10-14 night). A story whose foci
+	// are all kept is where they say: the row reads as found at its place, or its own text was edited there (Missing,
+	// and the view goes there). Only a story with no foci, or with one that could not follow, takes the old way below.
+	bool moved = false;
+	if (FollowStoryFoci(chapterIdx, db, story, &moved) == kFollowed)
 	{
-		TextIndex xs = kInvalidTextIndex, xe = kInvalidTextIndex;
-		KFCResultModel::Hit there;
-		bool replaced = false, locked = false;
-		if (KFCRowFoci::Current(chapterIdx, hitIdx, db, xs, xe) && xe - xs == b - a
-			&& KFCResultModel::GetHitFlags(chapterIdx, hitIdx, replaced, locked) && !replaced)
-		{
-			ReadHitText(UIDRef(db, story), xs, xe, there);
-			if (there.matchHash == hash)
-			{
-				KFC_DIAG_LOG("QFOCUS jump row=%d [%d,%d) -> focus [%d,%d)", (int)hitIdx, (int)a, (int)b, (int)xs, (int)xe);
-				MoveRowTo(chapterIdx, hitIdx, UIDRef(db, story), xs, xe);
-				ioStart = xs;
-				ioEnd = xe;
-				return (xs == a && xe == b) ? KFCResultModel::kRowAtPlace : KFCResultModel::kRowMoved;
-			}
-		}
+		if (!KFCResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, story, a, b, hash))
+			return KFCResultModel::kRowNotFound;
+		ioStart = a;
+		ioEnd = b;
+		if (!RowReadsAsFoundAt(chapterIdx, hitIdx, db, story, a, b))
+			return KFCResultModel::kRowNotFound;
+		return moved ? KFCResultModel::kRowMoved : KFCResultModel::kRowAtPlace;
 	}
-#endif
 	const bool atStored = RowReadsAsFoundAt(chapterIdx, hitIdx, db, story, a, b);
 	TextIndex fs = kInvalidTextIndex, fe = kInvalidTextIndex;
 	const bool atFocus = KFCRowFoci::Current(chapterIdx, hitIdx, db, fs, fe) && !(fs == a && fe == b)
