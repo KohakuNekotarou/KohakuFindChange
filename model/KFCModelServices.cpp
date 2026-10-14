@@ -33,6 +33,7 @@
 #include "KFCRunGuard.h"
 #include "KFCSavedQueries.h"
 #include "KFCSearchEngine.h"
+#include "KFCTierStore.h"
 
 class KFCResultsSession : public CPMUnknown<IKFCResults>
 {
@@ -113,6 +114,9 @@ public:
 	virtual bool CheckObjectReplaceRows(const KFCRowsByChapter& rows, PMString& outStatus) { return KFCObjectReplace::CheckRowsNow(rows, outStatus); }
 	virtual bool ReplaceRows(const KFCRowsByChapter& rows, PMString& outStatus) { return KFCReplaceEngine::ReplaceHits(rows, outStatus); }
 	virtual bool SearchDocumentAgain(int32 chapterIdx, PMString& outStatus) { return KFCSearchEngine::SearchDocumentAgain(chapterIdx, outStatus); }
+	virtual bool SwitchToTier(uint32 resultSet, PMString& outSummary) { return KFCTierStore::SwitchTo(resultSet, outSummary); }
+	virtual void GetKeptTierSets(std::vector<uint32>& out) { KFCTierStore::GetTierSets(out); }
+	virtual void DropKeptTiers() { KFCTierStore::DropAll(); }
 };
 
 CREATE_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)

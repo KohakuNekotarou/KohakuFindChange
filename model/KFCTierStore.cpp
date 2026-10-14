@@ -17,6 +17,9 @@
 #include "KFCTierStore.h"
 #include "KFCBookScope.h"	// GetSearchedBookPath - the book a list was searched in; FindOpenChapterDoc - a chapter, by its file
 #include "KFCDiag.h"		// the TIER lines - test builds only
+#include "KFCQueryCopy.h"	// the query stated back into Find/Change and checked (the switch)
+#include "KFCRunGuard.h"	// no switch while a run of ours is under way
+#include "KFCSearchEngine.h"	// BuildWalkSignature - the switch's second check; RememberFindFormatNow
 
 namespace
 {
@@ -38,28 +41,45 @@ namespace
 				return &gTiers[i];
 		return nil;
 	}
+
+	// KEPT OR NOT - the one answer, asked of the live list by a search's commit point (ParkCurrent) and by the switch (the
+	// list it puts aside) - the stacked results' ROW-41, the model's side of it: a list with a row, or one a search made (its
+	// query was copied - a search that found nothing is a tier too). A query run's list or Change All's is neither.
+	bool LiveListIsKeepable()
+	{
+		return KFCResultModel::GetDisplayChapterCount() > 0 || KFCResultModel::GetQueryCopy() != nullptr;
+	}
+
+	// The live list as a tier record - its rows, its result set, its book.
+	void TakeLive(TierRecord& out)
+	{
+		KFCResultModel::TakeModelSnapshot(out.list);
+		out.set = KFCResultModel::GetResultSetId();
+		out.bookPath = PMString();
+		out.bookPath.SetTranslatable(kFalse);
+		(void)KFCBookScope::GetSearchedBookPath(out.bookPath);
+	}
+
+	// A tier added as the newest; past the cap, the oldest go - from the front, where they stand.
+	void AddNewest(TierRecord&& tier)
+	{
+		gTiers.push_back(std::move(tier));
+		while (gTiers.size() > static_cast<size_t>(KFCTierStore::kMaxTiers))
+			gTiers.erase(gTiers.begin());
+	}
 }	// anonymous namespace
 
 void KFCTierStore::ParkCurrent()
 {
-	// KEPT OR NOT - the one answer (the stacked results' ROW-41, the model's side of it): a list with a row, or one a search
-	// made (its query was copied - a search that found nothing is a tier too). A query run's list or Change All's is
-	// neither, and goes with the commit point as it always has.
-	const bool searched = KFCResultModel::GetQueryCopy() != nullptr;
-	if (KFCResultModel::GetDisplayChapterCount() == 0 && !searched)
+	// (A query run's list or Change All's goes with the commit point as it always has.)
+	if (!LiveListIsKeepable())
 	{
 		KFC_DIAG_LOG("TIER park skipped (no row, no search) set=%u", KFCResultModel::GetResultSetId());
 		return;
 	}
 	TierRecord kept;
-	KFCResultModel::TakeModelSnapshot(kept.list);
-	kept.set = KFCResultModel::GetResultSetId();
-	kept.bookPath.SetTranslatable(kFalse);
-	(void)KFCBookScope::GetSearchedBookPath(kept.bookPath);
-	gTiers.push_back(std::move(kept));
-	// PAST THE CAP, THE OLDEST GO - from the front, where they stand.
-	while (gTiers.size() > static_cast<size_t>(kMaxTiers))
-		gTiers.erase(gTiers.begin());
+	TakeLive(kept);
+	AddNewest(std::move(kept));
 	KFC_DIAG_LOG("TIER park set=%u tiers=%d", KFCResultModel::GetResultSetId(), static_cast<int>(gTiers.size()));
 }
 
@@ -115,6 +135,112 @@ bool KFCTierStore::ApplyRowStep(uint32 set, const KFCResultModel::RowStep& step,
 	if (tier == nil)
 		return false;
 	KFCResultModel::ApplyRowStepTo(tier->list, step, after);
+	return true;
+}
+
+bool KFCTierStore::SwitchTo(uint32 set, PMString& outSummary)
+{
+	outSummary.Clear();
+	outSummary.SetTranslatable(kFalse);
+
+	// 1. THE DOORS - each turns the switch away before anything moves.
+	if (KFCRunGuard::IsAnyRunning())
+	{
+		outSummary.Append(KFCRunGuard::BusyMessage());
+		return false;
+	}
+	const TierRecord* const target = TierOf(set);
+	if (target == nil)
+	{
+		outSummary.Append("Could not switch: that tier is no longer kept - search again.");
+		return false;
+	}
+	if (target->list.header.query == nullptr || !target->list.header.query->valid)
+	{
+		outSummary.Append("Could not switch: the query that tier was searched with was not kept - search it again.");
+		return false;
+	}
+	// A book's tier reaches its rows through the book (the jump brings its tab forward, Hide Previous Chapter closes its
+	// other chapters): its book has to be open.
+	if (target->list.header.fromBook && !KFCBookScope::IsBookStillOpen(target->bookPath))
+	{
+		outSummary.Append("Could not switch: the book that tier was searched in is not open - open it, or search again.");
+		return false;
+	}
+
+	// 2. NOW, KEPT ASIDE: the live list (as a tier - whether it is one to keep is asked of it now) and the query Find/Change
+	// holds now - what a refusal puts back. The tier wanted is copied out of the store before the store changes.
+	const bool liveKeepable = LiveListIsKeepable();
+	TierRecord live;
+	TakeLive(live);
+	KFCQueryCopy before;
+	KFCQueryCopier::Capture(before);
+	const TierRecord wanted = *target;
+
+	// 3. THE TIER'S LIST BACK, AS ITS OWN RESULT SET (the writes kept for it are followed again - KFCUndoFollow).
+	// RestoreModelSnapshot lets the live list's text foci go and attaches the tier's where its stories are as kept.
+	KFCResultModel::RestoreModelSnapshot(wanted.list);
+	KFCResultModel::ReturnToResultSet(wanted.set);
+
+	// 4. ITS QUERY STATED BACK, AND CHECKED TWICE (section 3-3-1: field by field - the change side too, which the signature
+	// does not carry - and by the walk signature the list was searched with).
+	PMString what;
+	bool good = KFCQueryCopier::Apply(*wanted.list.header.query, what);
+	if (good)
+		good = KFCQueryCopier::Matches(*wanted.list.header.query, what);
+	if (good)
+	{
+		PMString signature;
+		KFCSearchEngine::BuildWalkSignature(signature);
+		if (signature.IsEmpty() || signature != wanted.list.header.walkSignature)
+		{
+			good = false;
+			what = PMString("the walk signature");
+			what.SetTranslatable(kFalse);
+		}
+	}
+	if (!good)
+	{
+		// 5. REFUSED - EVERYTHING PUT BACK AS IT WAS: the live list, its result set, and Find/Change's query before. If that
+		// query does not come back either, say so plainly: Find/Change is not what the person left, and a replace reads it.
+		KFCResultModel::RestoreModelSnapshot(live.list);
+		KFCResultModel::ReturnToResultSet(live.set);
+		PMString whatBack;
+		bool back = KFCQueryCopier::Apply(before, whatBack);
+		if (back)
+			back = KFCQueryCopier::Matches(before, whatBack);
+		KFC_DIAG_LOG("TIER switch REFUSED set=%u what=%s back=%d", set, what.GetUTF8String().c_str(), back ? 1 : 0);
+		if (!back)
+		{
+			outSummary.Append("Could not switch, and Find/Change could not be put back as it was (");
+			outSummary.Append(whatBack);
+			outSummary.Append(") - check Edit > Find/Change before replacing.");
+			return false;
+		}
+		outSummary.Append("Could not switch: the query of that tier could not be put back into Find/Change (");
+		outSummary.Append(what);
+		outSummary.Append(").");
+		return false;
+	}
+
+	// 6. SWITCHED. The Find Format the list was searched with is the one the replace's door compares against again; the book
+	// it was searched in is the one the panel shows (the held chapters of the list put aside go - they are reached by
+	// their files when that tier comes back).
+	KFCSearchEngine::RememberFindFormatNow();
+	KFCBookScope::ReleaseSearchedBook();
+	if (wanted.list.header.fromBook)
+		KFCBookScope::SetSearchedBookPath(wanted.bookPath);
+
+	// 7. THE ORDER: the tier switched to leaves the store; the list put aside comes in as the newest (when it is one to keep).
+	for (size_t i = 0; i < gTiers.size(); ++i)
+		if (gTiers[i].set == wanted.set)
+		{
+			gTiers.erase(gTiers.begin() + static_cast<std::ptrdiff_t>(i));
+			break;
+		}
+	if (liveKeepable)
+		AddNewest(std::move(live));
+	KFC_DIAG_LOG("TIER switch set=%u tiers=%d", wanted.set, static_cast<int>(gTiers.size()));
 	return true;
 }
 

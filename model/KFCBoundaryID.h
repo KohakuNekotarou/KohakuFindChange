@@ -84,7 +84,7 @@ DECLARE_PMID(kInterfaceIDSpace, IID_IKFCUIBOUNDARY, kKFCPrefix + 14)
 // find its own in the UI half takes it for no UI half.
 // kKFCBoundaryRevision GOES UP BY ONE whenever a door gains, loses or reorders a method, or a type that crosses changes
 // its layout; kKFCVersion is in the stamp too, so two releases never pass for one.
-#define kKFCBoundaryRevision	"4"
+#define kKFCBoundaryRevision	"5"
 #define kKFCBoundaryStamp		kKFCVersion "/" kKFCBoundaryRevision
 
 #endif // __KFCBoundaryID_h__

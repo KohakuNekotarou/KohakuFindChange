@@ -115,6 +115,13 @@ public:
 	virtual bool ReplaceRows(const KFCRowsByChapter& rows, PMString& outStatus) = 0;
 	/** = KFCSearchEngine::SearchDocumentAgain (appended) - a document row's Search This Document Again. */
 	virtual bool SearchDocumentAgain(int32 chapterIdx, PMString& outStatus) = 0;
+	/** = KFCTierStore::SwitchTo (appended) - a kept tier made the live list: its rows back, its query stated back into
+	    Find/Change and checked. False = refused, nothing changed; outSummary says why. */
+	virtual bool SwitchToTier(uint32 resultSet, PMString& outSummary) = 0;
+	/** = KFCTierStore::GetTierSets (appended) - the kept tiers' result sets, oldest first. */
+	virtual void GetKeptTierSets(std::vector<uint32>& out) = 0;
+	/** = KFCTierStore::DropAll (appended) - every kept tier let go. */
+	virtual void DropKeptTiers() = 0;
 };
 
 #endif // __IKFCRuns_h__

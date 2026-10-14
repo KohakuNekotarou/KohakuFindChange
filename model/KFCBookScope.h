@@ -248,6 +248,11 @@ namespace KFCBookScope
 	    set is still on screen. */
 	bool GetSearchedBookPath(PMString& outPath);
 
+	/** THE BOOK A LIST PUT BACK WAS SEARCHED IN (the tier switch - KFCTierStore::SwitchTo): recorded as a run that resolved
+	    it records it (GetSearchedBookPath), holding nothing - the list's chapters are reached by their files, as ever.
+	    Call ReleaseSearchedBook first, as a run does at its commit point. */
+	void SetSearchedBookPath(const PMString& path);
+
 	/** Let go of the book the results came from: forget the path AND close whatever chapters are
 	    still held for it. It goes with every KFCResultModel::Clear() - KFCSearchEngine::DropResults
 	    does the two together.

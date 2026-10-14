@@ -1144,6 +1144,12 @@ bool KFCBookScope::GetSearchedBookPath(PMString& outPath)
 	return !gSearchedBookPath.IsEmpty();
 }
 
+void KFCBookScope::SetSearchedBookPath(const PMString& path)
+{
+	gSearchedBookPath = path;
+	gSearchedBookPath.SetTranslatable(kFalse);
+}
+
 bool KFCBookScope::IsBookStillOpen(const PMString& bookPath)
 {
 	// The lookup by file, the IsOpen() test and the reasons for both live in FindOpenBookByPath, which

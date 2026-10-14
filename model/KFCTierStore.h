@@ -55,6 +55,16 @@ namespace KFCTierStore
 	    kept copy (KFCResultModel::ApplyRowStepTo). False = no such tier. */
 	bool ApplyRowStep(uint32 set, const KFCResultModel::RowStep& step, bool after);
 
+	/** THE TIER SWITCH (the spec's section 3-2): the kept tier `set` made the live list - its rows back as they were kept
+	    (no search), as its own result set again (the writes kept for it are followed again - KFCUndoFollow), its query
+	    stated back into Find/Change (KFCQueryCopier::Apply) and checked twice: field by field (Matches) and by the walk
+	    signature it was searched with. The live list before it goes in as the newest tier (when it is one to keep).
+	    REFUSED - nothing changes: a run of ours under way; no such tier; no query kept with it; a book's tier whose book is
+	    not open; or the query not reading back as the copy - then the live list, its result set and the query Find/Change
+	    held before are all put back (section 3-3-1: all or nothing). False = refused; outSummary says why. True = switched
+	    (outSummary empty: the UI half names the tier it switched to). */
+	bool SwitchTo(uint32 set, PMString& outSummary);
+
 	/** The controlled shutdown: the tiers let go - their lists hold PMStrings, and their query copies hold attribute lists
 	    (database work - KFCSearchEngine::ShutdownCleanup's reason). */
 	void ShutdownCleanup();

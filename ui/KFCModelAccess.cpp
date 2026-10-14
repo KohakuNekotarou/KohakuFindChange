@@ -138,6 +138,9 @@ namespace
 		virtual bool CheckObjectReplaceRows(const KFCRowsByChapter&, PMString& outStatus) { SayWhy(outStatus); return false; }
 		virtual bool ReplaceRows(const KFCRowsByChapter&, PMString& outStatus) { SayWhy(outStatus); return false; }
 		virtual bool SearchDocumentAgain(int32, PMString& outStatus) { SayWhy(outStatus); return false; }
+		virtual bool SwitchToTier(uint32, PMString& outSummary) { SayWhy(outSummary); return false; }
+		virtual void GetKeptTierSets(std::vector<uint32>& out) { out.clear(); }
+		virtual void DropKeptTiers() {}
 	};
 
 	class KFCChaptersStandInImpl : public IKFCChapters
