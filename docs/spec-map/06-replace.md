@@ -51,12 +51,12 @@
 
 - **REP-09** 検索と置換の**タブが検索したときと違う** → `The Find/Change dialog is on a different tab than when this search ran. Search again.`
   **結果は残す**（タブは1クリックで戻せるので）。
-  - 訂正:
+  - 訂正: ★v2（2026-10-14 夜・設計書 `docs/superpowers/specs/2026-10-14-kfc-tier-switch-v2-design.md` 2-2・2-3）＝**その一覧が検索の条件の写しを持っていれば断らない**＝REP-10 の★のとおり、一覧の条件（タブごと）を一時的に入れて行の操作をし、終わったら「検索と置換」を元に戻す。この断りが残るのは写しの無い一覧（クエリの Run・Change All の一覧）だけ。
 
 - **REP-10** ★**検索文字列・スイッチ**（大文字小文字・単語単位・かな・全角半角・範囲の5項目）・**検索形式**が変わった →
   **結果を消して**断る：`The Find/Change query has changed since this search - the results have been cleared. Search again.`
   （2026-08-03 の決定＝ほかの断りはすべて結果を残すが、これだけは例外。残しても、もう使えない一覧なので）
-  - 訂正:
+  - 訂正: ★v2（2026-10-14 夜・作者が承認＝設計書 `docs/superpowers/specs/2026-10-14-kfc-tier-switch-v2-design.md` 2-3）＝**一覧が検索の条件の写しを持っていれば、消さずにその一覧の条件で行う**。行の Replace・Return・Shift+Return・まとめて選んだ行・物の行の確かめと置換・GREP の Preview Text・Search This Story／Document Again は、入口で「検索と置換」の検索側（タブ・署名・Find Format）が今の一覧と同じかを問い、**同じなら今までどおり**（置換側はダイアログの値＝検索の後で打った Change to が効く）、**違えば**一覧の条件を中断できるまとまりの中で一時的に入れて3重に検算（項目ごと・署名・段の見出しを読み返す）してから行い、終わったら「検索と置換」を元に戻す（一覧のタブが画面のタブと違えば2つのタブとも）。メッセージ欄の末尾＝`With this tier's query: <段の見出し> - Find/Change is as you left it.`。検算が合わない＝**行わず**元に戻す＝`Nothing was done: this tier's query could not be put into Find/Change (<何が>) - Find/Change is as you left it.`（戻せなければ `... Find/Change could not be put back as it was (<何が>) - check Edit > Find/Change before replacing.`）。★R3＝一覧は**最後に置換に使った置換側を覚える**＝「検索と置換」のまま置換が通ったら写しを取り直し、今の段の見出しも `C:"<それ>"` に書き直す。この断り（結果を消す）が残るのは写しの無い一覧だけ。✅ 2026-10-14 夜に実機（ROW-42 の✅）。回帰の期待の書き直しが要る＝`ret-shift-refused`・`sr-query-changed-refused`・`ff-format-changed`・`ff-format-alldocs-close`・`dr-query-changed-refused`・`hd-ff-size-changed`・`hd-sw-case-changed`・`obj-refuse-query-changed`。
 
 - **REP-11** 比べないもの ―― 検索の方向（KFC は前向きだけ＝GEN-22）と、**置換側**の設定（置換文字列など＝何が見つかるかではなく、何を書くかなので）。
   - 訂正:
