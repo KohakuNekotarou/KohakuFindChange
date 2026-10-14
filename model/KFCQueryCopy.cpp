@@ -334,12 +334,20 @@ bool KFCQueryCopier::Apply(const KFCQueryCopy& copy, PMString& outWhat)
 	const bool changeDiffers = !SameList(copy.changeAttrs, copy.attrDB, now.changeAttrs, now.attrDB)
 		|| now.changeParaStyle != copy.changeParaStyle || now.changeCharStyle != copy.changeCharStyle
 		|| now.objectChangeStyle != copy.objectChangeStyle;
+	const bool applyFind = findDiffers && HasFindFormat(copy);
+	const bool applyChange = changeDiffers && HasChangeFormat(copy);
+	// A FORMAT GOES BACK ONLY INTO THE DATABASE IT WAS COPIED FROM - the one Find/Change's lists are in now (GetUIDAttrDB;
+	// measured the session's, which outlives every document - the note over gSearchedFindAttrDB in KFCSearchEngine.cpp).
+	// Another one, its UIDs mean nothing there; and the copy's address is a raw one that may be a closed database's, free
+	// to be handed to the next document opened (memory uidref-reuse-after-close) - so it is compared, never handed to a
+	// command, and the switch is refused before any format is touched (SameList reads a list only when the addresses
+	// agree, for the same reason).
+	if ((applyFind || applyChange) && copy.attrDB != now.attrDB)
+		return Failed(outWhat, "the formats - they were copied from another attribute database");
 	if (findDiffers && !CommitClearFormat(kClearFindFormatCmdBoss, mode))
 		return Failed(outWhat, "Find Format (clearing it)");
 	if (changeDiffers && !CommitClearFormat(kClearChangeFormatCmdBoss, mode))
 		return Failed(outWhat, "Change Format (clearing it)");
-	const bool applyFind = findDiffers && HasFindFormat(copy);
-	const bool applyChange = changeDiffers && HasChangeFormat(copy);
 	if (applyFind || applyChange)
 	{
 		InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kFindChangeFormatCmdBoss));

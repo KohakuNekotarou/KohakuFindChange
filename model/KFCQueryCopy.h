@@ -56,7 +56,8 @@ struct KFCQueryCopy
 	UID			changeCharStyle;
 	UID			objectFindStyle;
 	UID			objectChangeStyle;
-	IDataBase*	attrDB;					// the database the lists' and styles' UIDs are in (GetUIDAttrDB - the session's)
+	IDataBase*	attrDB;					// the database the lists' and styles' UIDs are in (GetUIDAttrDB - the session's); a raw
+										// address, compared only - never handed to a command unless Find/Change's is the same (Apply)
 	// Compared only - no command states them:
 	PMString	changeXMLTag;
 	PMString	changeCaseOption;
