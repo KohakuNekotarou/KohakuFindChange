@@ -244,6 +244,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultListWidgetMgr.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultHistory.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultNodeEH.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultEyeEH.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultNodeObserver.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCQueryRowEH.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultTreeController.cpp"/>

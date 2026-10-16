@@ -68,7 +68,8 @@ namespace KFCObjectSearch
 	    CANCEL IS HEARD INSIDE A DOCUMENT (the author's call): the bar is moved and asked at every item
 	    the walk lists, not only between documents; a Cancel ends the run as one between documents does (out.cancelled). */
 	void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBook, bool allDocuments,
-		int32 selectionScope, std::vector<KFCBookScope::SkippedChapter>& unopenable, KFCSearchEngine::CollectTally& out);
+		int32 selectionScope, std::vector<KFCBookScope::SkippedChapter>& unopenable, KFCSearchEngine::CollectTally& out,
+		int32 reserved);	// rows the list holds before the walk - a search again's kept rows (the row eye); 0 otherwise
 
 	/** SEARCH THIS DOCUMENT AGAIN on the Object tab (KFCSearchEngine::SearchDocumentAgain): ONE open document
 	    walked whole as CollectTargets walks each of its targets, under a bar of its own ("Document 1 / 1 - <name>"), the

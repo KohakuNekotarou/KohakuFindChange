@@ -30,6 +30,7 @@ REGISTER_PMINTERFACE(KFCRowData, kKFCRowDataImpl)
 // The jump marker's countdown and the hit row's click (the jump).
 REGISTER_PMINTERFACE(KFCMarkerExpiryTask, kKFCMarkerExpiryIdleTaskImpl)
 REGISTER_PMINTERFACE(KFCResultNodeEH, kKFCResultNodeEHImpl)
+REGISTER_PMINTERFACE(KFCResultEyeEH, kKFCResultEyeEHImpl)
 // ...and the row's observer: a row closed takes the rows selected under it out of the selection.
 REGISTER_PMINTERFACE(KFCResultNodeObserver, kKFCResultNodeObserverImpl)
 // The result LIST's own handler: up / down arrows that open the row they land on. A boss in the

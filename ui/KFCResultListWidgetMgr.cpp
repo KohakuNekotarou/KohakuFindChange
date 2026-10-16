@@ -59,6 +59,8 @@
 #include "TextChar.h"		// kTextChar_Ellipse - the mark on a cut "Preview Text:"
 #include "Utils.h"
 #include "widgetid.h"		// kTreeNodeExpanderWidgetID
+#include "IconRsrcDefs.h"	// kEyeballIcon, kNoIcon - the row eye
+#include "SysControlIds.h"	// kApplicationRsrcPluginID - the eyeball is the application's
 
 // Project includes:
 #include "KFCUIID.h"
@@ -101,6 +103,9 @@ namespace
 	// levels already use, which makes the whole tree one even staircase (the author's call - "make it a nice
 	// staircase").
 	const PMReal kHitCellStep = 8.0;
+	// THE ROW EYE (docs/superpowers/specs/2026-10-17-kfc-row-eye-keep-design.md): the eye's column at the start of a hit
+	// row's content, the row's text after it (as the check box's was until 10-06).
+	const PMReal kEyeZone = 16.0;
 	// A BOOK row sits above the documents when the results came from a book search, and its
 	// children step right by this much. 8px, not a full expander zone: the horizontal room in this
 	// panel is short, and half a zone is enough to read the hierarchy. A document search has no book row
@@ -411,12 +416,32 @@ private:
 		const PMReal rowRight = widget->GetFrame().Width() - kRowInset;
 		const PMReal xStart = kRowInset + kExpanderZone + kHitExtraIndent + shift;
 
+		// THE ROW EYE (docs/superpowers/specs/2026-10-17-kfc-row-eye-keep-design.md): at the start of the row's content - one
+		// step right of the row above (kHitCellStep), where the staircase puts it - the eyeball while the row is kept and
+		// nothing while it is not. A kept tier's eye is disabled: drawn as it was kept, its clicks the row's (a switch to its
+		// tier - ROW-42).
+		IControlView* eye = rowData->FindWidget(kKFCResultEyeWidgetID);
+		if (eye != nil)
+		{
+			PMRect eyeFrame = eye->GetFrame();
+			eyeFrame.Left(xStart + kHitCellStep);
+			eyeFrame.Right(xStart + kHitCellStep + kEyeZone);
+			eye->SetFrame(eyeFrame);
+			eye->SetRsrcID(look.kept ? kEyeballIcon : kNoIcon);
+			eye->SetRsrcPluginID(kApplicationRsrcPluginID);
+			if (kept)
+				eye->Disable();
+			else
+				eye->Enable();
+			eye->Invalidate();
+		}
+
 		IControlView* cell = rowData->FindWidget(kKFCResultTextWidgetID);
 		if (cell == nil)
 			return;
 		PMRect frame = cell->GetFrame();
-		// One step right of the row above (kHitCellStep) - the staircase the levels make.
-		frame.Left(xStart + kHitCellStep);
+		// One step right of the row above (kHitCellStep) - the staircase the levels make - and past the eye's column.
+		frame.Left(xStart + kHitCellStep + kEyeZone);
 		frame.Right(rowRight);
 		cell->SetFrame(frame);
 
@@ -490,6 +515,7 @@ bool KFCResultTree::GetRowLook(const NodeID& node, RowLook& out)
 		out.pre = row.preText;
 		out.match = row.matchText;
 		out.post = row.postText;
+		out.kept = row.kept;
 		return true;
 	}
 	if (nodeID->IsBookRow())

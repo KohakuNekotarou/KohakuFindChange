@@ -44,8 +44,9 @@ namespace KFCResultTree
 		PMString	pre;
 		PMString	match;
 		PMString	post;
+		bool		kept;		// a hit row's eye (RowDisplay::kept - the row eye): a kept tier's copy draws it as it was
 
-		RowLook() : hit(false), shift(0.0) {}
+		RowLook() : hit(false), shift(0.0), kept(false) {}
 	};
 
 	/** The look of a row of the LIVE list - a book, document, story or hit row, or the live tier's row - read off the

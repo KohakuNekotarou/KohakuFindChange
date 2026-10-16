@@ -110,6 +110,8 @@ public:
 	    point, Clear Results, a run): what tells the panel a search went through (KFCResultHistory - the results kept in
 	    tiers). */
 	virtual uint32 GetResultSetId() = 0;
+	/** = KFCResultModel::SetHitKept (appended) - the row eye's click: a row's eye on or off. false = no such row. */
+	virtual bool SetHitKept(int32 chapterIdx, int32 hitIdx, bool kept) = 0;
 };
 
 #endif // __IKFCResults_h__

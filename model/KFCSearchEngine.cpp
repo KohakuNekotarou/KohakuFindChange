@@ -75,6 +75,7 @@
 #include <vector>
 #include <utility>					// std::move - a finished chapter is handed to the model, not copied
 #include <algorithm>				// std::sort, std::equal - a row looked for again (its places, its look-alike rows)
+#include "FileUtils.h"				// IsEqual - the row eye's carry: a chapter's document by its file
 #include <map>						// the per-frame cache one document's walk keeps (FrameFacts)
 #include <memory>					// std::unique_ptr - a Search: walk's dirty guards, one per open document
 #include <set>						// the rows a write is handed, the stories it meets
@@ -2332,6 +2333,124 @@ const char* SelectionScopeWords(IWalkerScopeFactoryUtils::WalkScopeType selectio
 		default:											return "";
 	}
 }
+
+// THE ROW EYE'S WORDS (docs/superpowers/specs/2026-10-17-kfc-row-eye-keep-design.md 2-2): how many rows with their eye
+// on stayed beside what the search found - " 1 kept row stays." Nothing when none did. (Said by both searches again -
+// SayFoundAgain - and by Search These Results Again - RunSearch.)
+void AppendKeptStay(PMString& io, int32 stayed)
+{
+	if (stayed <= 0)
+		return;
+	io.Append(" ");
+	io.AppendNumber(stayed);
+	io.Append(stayed == 1 ? " kept row stays." : " kept rows stay.");
+}
+
+// ONE DOCUMENT, BY ITS FILE OR BY ITS OPEN DATABASE (the row eye's carry - CarryKeptRowsByDocument): a book's chapters have
+// files - compared as files (FileUtils::IsEqual, as KFCBookScope compares them); a document of All Documents or of Search:
+// Document has none - the same open database. A chapter emptied by a close is unbound, so it matches nothing.
+bool SameDocument(const UIDRef& docRef, const IDFile& file, const KFCBookScope::ChapterDoc& target)
+{
+	const bool hasFile = KFCBookScope::ChapterHasFile(file);
+	const bool targetHasFile = KFCBookScope::ChapterHasFile(target.file);
+	if (hasFile && targetHasFile)
+		return FileUtils::IsEqual(file, target.file) != kFalse;
+	if (hasFile || targetHasFile)
+		return false;
+	return target.docRef.GetDataBase() != nil && docRef.GetDataBase() == target.docRef.GetDataBase();
+}
+
+// THE ROW EYE, SEARCH THESE RESULTS AGAIN (docs/superpowers/specs/2026-10-17-kfc-row-eye-keep-design.md 2-2, 3-1): the rows
+// of the list as it was (`before`) whose eye is on, carried into the new list - into the chapter of their own document beside
+// its found rows (KFCResultModel::CarryKeptRows), or into a chapter of their own where the new list has none for that
+// document (no match now; or not searched now - a book's chapter the Book panel's selection left out) - and the chapters put
+// in the order of `targets` (the new list's own order), a chapter the walk filed outside `targets` after them as it came.
+// A chapter of their own is bound to the document open now (FindOpenChapterDoc - by its file, or its open database), else to
+// nothing (a book's chapter handed back: its file). The answer = how many kept rows stayed beside the found ones.
+int32 CarryKeptRowsByDocument(const KFCResultModel::ModelSnapshot& before,
+	const std::vector<KFCBookScope::ChapterDoc>& targets)
+{
+	int32 stayed = 0;
+	const int32 filed = KFCResultModel::GetChapterCount();
+	std::vector<bool> placed(static_cast<size_t>(filed > 0 ? filed : 0), false);
+	std::vector<bool> carried(before.chapters.size(), false);
+	std::vector<int32> order;
+	// A chapter of kept rows alone, named and bound as its document - appended, and its place in the order taken.
+	auto keptChapter = [&](const PMString& name, const IDFile& file, const UIDRef& boundBefore,
+		std::vector<KFCResultModel::Hit>& rows, const std::map<UID, uint32>& versions)
+	{
+		KFCResultModel::Chapter chapter;
+		chapter.name = name;
+		chapter.name.SetTranslatable(kFalse);
+		chapter.file = file;
+		UIDRef open(boundBefore);
+		if (KFCBookScope::FindOpenChapterDoc(file, open))
+			chapter.docRef = open;
+		for (size_t i = 0; i < rows.size(); ++i)
+		{
+			const std::map<UID, uint32>::const_iterator v = versions.find(rows[i].storyUID);
+			if (v != versions.end())
+				chapter.storyVersions[v->first] = v->second;
+		}
+		stayed += static_cast<int32>(rows.size());
+		KFCResultModel::OrderHitsByPage(rows);
+		chapter.hits.swap(rows);
+		KFCResultModel::AppendChapter(std::move(chapter));
+		order.push_back(KFCResultModel::GetChapterCount() - 1);
+	};
+	for (size_t t = 0; t < targets.size(); ++t)
+	{
+		int32 at = -1;
+		for (int32 c = 0; c < filed && at < 0; ++c)
+		{
+			UIDRef docRef;
+			IDFile file;
+			if (!placed[static_cast<size_t>(c)] && KFCResultModel::GetChapterLocation(c, docRef, file)
+				&& SameDocument(docRef, file, targets[t]))
+				at = c;
+		}
+		std::vector<KFCResultModel::Hit> kept;
+		std::map<UID, uint32> versions;
+		for (size_t o = 0; o < before.chapters.size(); ++o)
+		{
+			const KFCResultModel::Chapter& old = before.chapters[o];
+			if (carried[o] || !SameDocument(old.docRef, old.file, targets[t]))
+				continue;
+			carried[o] = true;
+			for (size_t i = 0; i < old.hits.size(); ++i)
+				if (old.hits[i].kept)
+					kept.push_back(old.hits[i]);
+			versions = old.storyVersions;
+			break;
+		}
+		if (at >= 0)
+		{
+			stayed += KFCResultModel::CarryKeptRows(at, kept, versions);
+			placed[static_cast<size_t>(at)] = true;
+			order.push_back(at);
+		}
+		else if (!kept.empty())
+			keptChapter(targets[t].shortName, targets[t].file, targets[t].docRef, kept, versions);
+	}
+	for (int32 c = 0; c < filed; ++c)
+		if (!placed[static_cast<size_t>(c)])
+			order.push_back(c);
+	for (size_t o = 0; o < before.chapters.size(); ++o)
+	{
+		const KFCResultModel::Chapter& old = before.chapters[o];
+		if (carried[o])
+			continue;
+		std::vector<KFCResultModel::Hit> kept;
+		for (size_t i = 0; i < old.hits.size(); ++i)
+			if (old.hits[i].kept)
+				kept.push_back(old.hits[i]);
+		if (!kept.empty())
+			keptChapter(old.name, old.file, old.docRef, kept, old.storyVersions);
+	}
+	(void)KFCResultModel::OrderChapters(order);
+	return stayed;
+}
+
 // EVERY STORY'S VERSION, WHILE ITS DOCUMENT IS STILL OPEN.
 // ITextModel::GetChangeCount of each story holding a hit (ReadStoryVersion) - what the replace compares
 // before it writes, so a story moved since without KFC (typing, Ctrl+Z of anything but a write of KFC's
@@ -2355,7 +2474,9 @@ void ReadStoryVersions(const UIDRef& docRef, const std::vector<KFCResultModel::H
 // under one bar. (A query run does not come here: it is Change All only - KFCQuerySequence.)
 void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBook, bool allDocuments,
 	IWalkerScopeFactoryUtils::WalkScopeType selectionScope,
-	std::vector<KFCBookScope::SkippedChapter>& unopenable, KFCSearchEngine::CollectTally& out)
+	std::vector<KFCBookScope::SkippedChapter>& unopenable, KFCSearchEngine::CollectTally& out,
+	int32 reserved)		// rows the list holds before anything is walked - a search again's kept rows (the row eye -
+						// RunSearch); 0 for a search. Their room is kept from the walk's.
 {
 	out = KFCSearchEngine::CollectTally();
 
@@ -2470,7 +2591,8 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 		// is the whole search's: CollectHitsInDoc counts what the list already holds.
 		std::vector<KFCResultModel::Hit> hits;
 		std::vector<IDataBase*> hitDBs;
-		const size_t limit = static_cast<size_t>(KFCResultModel::kKFCCollectHitLimit);
+		const int32 room = KFCResultModel::kKFCCollectHitLimit - reserved;
+		const size_t limit = static_cast<size_t>(room > 0 ? room : 0);
 		// A search over part of a story (To End of Story, Selection): the stretches InDesign's scope holds.
 		const bool overPart = !allDocuments && (selectionScope == IWalkerScopeFactoryUtils::kToEndOfStoryScope
 			|| selectionScope == IWalkerScopeFactoryUtils::kSelectionScope);
@@ -2616,7 +2738,7 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 
 		// Room left under the whole-search safety ceiling; once it is gone, stop walking further
 		// chapters too (the result set is full).
-		const int32 remaining = KFCResultModel::kKFCCollectHitLimit - out.total;
+		const int32 remaining = KFCResultModel::kKFCCollectHitLimit - reserved - out.total;
 		if (remaining <= 0)
 		{
 			out.truncated = true;
@@ -3061,6 +3183,7 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	// anew - and copied whole first, its rows on their foci as they stand, to be put back if the search does not go
 	// through (putBack, below).
 	KFCResultModel::ModelSnapshot before;
+	int32 reserved = 0;		// the row eye: the kept rows' room (below)
 	PMString beforeBook;
 	beforeBook.SetTranslatable(kFalse);
 	if (again != nil)
@@ -3069,6 +3192,11 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 			FollowChapterFoci(c);
 		KFCResultModel::TakeModelSnapshot(before);
 		(void)KFCBookScope::GetSearchedBookPath(beforeBook);
+		// THE ROW EYE: the rows with their eye on stay through the search again - their room is kept from the walk's.
+		for (size_t c = 0; c < before.chapters.size(); ++c)
+			for (size_t i = 0; i < before.chapters[c].hits.size(); ++i)
+				if (before.chapters[c].hits[i].kept)
+					++reserved;
 	}
 	else
 		KFCTierStore::ParkCurrent();
@@ -3237,9 +3365,10 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 
 	CollectTally tally;
 	if (objectTab)		// THE OBJECT TAB: page items, walked by InDesign's own object search one document at a time.
-		KFCObjectSearch::CollectTargets(targets, fromBook, allDocuments, static_cast<int32>(selectionScope), unopenable, tally);
+		KFCObjectSearch::CollectTargets(targets, fromBook, allDocuments, static_cast<int32>(selectionScope), unopenable, tally,
+			reserved);
 	else
-		CollectTargets(targets, fromBook, allDocuments, selectionScope, unopenable, tally);
+		CollectTargets(targets, fromBook, allDocuments, selectionScope, unopenable, tally, reserved);
 
 	// Cancelled: throw the half-finished result away rather than leave a partial list looking like a
 	// complete one, and give the chapters back - the results that would have needed them are gone.
@@ -3258,6 +3387,13 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 		outSummary.Append("Search cancelled.");
 		return 0;
 	}
+
+	// THE ROW EYE (docs/superpowers/specs/2026-10-17-kfc-row-eye-keep-design.md 2-2): Search These Results Again carries
+	// the rows of the list as it was whose eye is on into the new one, each to its own document (CarryKeptRowsByDocument)
+	// - ahead of the foci, which attach to them with the rest.
+	int32 keptStay = 0;
+	if (again != nil)
+		keptStay = CarryKeptRowsByDocument(before, targets);
 
 	// THE ROWS' FOCI (spec T6 a): every chapter whose document is still open - the documents of a document-scope search,
 	// a book's chapters the user has open. The chapters a book search opened itself were handed back in the loop.
@@ -3316,6 +3452,7 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 			outSummary.Append("\".");
 			outSummary.Append(fellBackNote);	// a Search: the selection did not offer (empty otherwise)
 		}
+		AppendKeptStay(outSummary, keptStay);	// the row eye: what stayed of the list as it was
 		outSummary.Append(chapterNotes);
 		return 0;
 	}
@@ -3383,6 +3520,7 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 		outSummary.Append(".");
 	}
 
+	AppendKeptStay(outSummary, keptStay);	// the row eye: what stayed of the list as it was
 	outSummary.Append(chapterNotes);
 
 	// How to replace (spec F19): a hit row's Replace - its right-click menu, or Return on a selected row
@@ -4104,8 +4242,9 @@ bool QueryUnchangedForAgain(PMString& outStatus)
 }
 
 // WHAT BOTH SEARCHES AGAIN SAY ONCE THE ROWS ARE BACK: what was searched again ("story", "document"), how many matches
-// it holds now, and whether the list's limit cut it short.
-void SayFoundAgain(PMString& outStatus, const char* what, int32 now, bool capped)
+// it holds now, how many rows with their eye on stayed beside them (the row eye - AppendKeptStay), and whether the list's
+// limit cut it short.
+void SayFoundAgain(PMString& outStatus, const char* what, int32 now, bool capped, int32 stayed)
 {
 	outStatus.Clear();
 	outStatus.Append("Searched this ");
@@ -4113,6 +4252,7 @@ void SayFoundAgain(PMString& outStatus, const char* what, int32 now, bool capped
 	outStatus.Append(" again: ");
 	outStatus.AppendNumber(now > 0 ? now : 0);
 	outStatus.Append(" match(es).");
+	AppendKeptStay(outStatus, stayed);
 	if (capped)
 		outStatus.Append(" The list's limit of rows was reached - its other matches are not listed.");
 }
@@ -4182,6 +4322,9 @@ bool KFCSearchEngine::SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMStrin
 		outStatus.Append("the story is no longer in its document - search again.");
 		return false;
 	}
+	// The rows - the kept ones too (the row eye) - where their foci stand now: a kept row the walk does not find again
+	// stays at that place (MergeKeptRows).
+	(void)FollowStoryFoci(chapterIdx, db, story);
 	// The room the list leaves: its limit less every row that is not this story's.
 	int32 storyRows = 0;
 	const int32 chapterRows = KFCResultModel::GetHitCount(chapterIdx);
@@ -4193,7 +4336,9 @@ bool KFCSearchEngine::SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMStrin
 		if (KFCResultModel::GetHitMatchIdentity(chapterIdx, i, s, a, b, h) && s == story)
 			++storyRows;
 	}
-	const int32 room = KFCResultModel::kKFCCollectHitLimit - (KFCResultModel::GetTotalHitCount() - storyRows);
+	// ...and the room the story's rows with their eye on keep (the row eye - they stay, found or not).
+	const int32 room = KFCResultModel::kKFCCollectHitLimit - (KFCResultModel::GetTotalHitCount() - storyRows)
+		- KFCResultModel::CountKeptRows(chapterIdx, story);
 	// The searched part, where it stands now.
 	TextIndex partStart = kInvalidTextIndex, partEnd = kInvalidTextIndex;
 	if (overPart && !FindSearchedPartAgain(chapterIdx, db, story, scope, part, partStart, partEnd))
@@ -4242,7 +4387,9 @@ bool KFCSearchEngine::SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMStrin
 		part.version = version;
 		KFCResultModel::SetSearchedRange(chapterIdx, story, part);
 	}
-	SayFoundAgain(outStatus, "story", KFCResultModel::ReplaceStoryRows(chapterIdx, story, hits, version), capped);
+	int32 stayed = 0;
+	const int32 rows = KFCResultModel::ReplaceStoryRows(chapterIdx, story, hits, version, &stayed);
+	SayFoundAgain(outStatus, "story", rows - stayed, capped, stayed);
 	return true;
 }
 
@@ -4304,8 +4451,13 @@ bool KFCSearchEngine::SearchDocumentAgain(int32 chapterIdx, PMString& outStatus)
 	}
 	KFCResultModel::RebindChapterDoc(chapterIdx, docRef);
 	const bool ours = KFCBookScope::IsHeldDoc(docRef);
-	// The room the list leaves: its limit less every row of the other documents.
-	const int32 room = KFCResultModel::kKFCCollectHitLimit - (KFCResultModel::GetTotalHitCount() - rowsNow);
+	// The rows - the kept ones too (the row eye) - where their foci stand now: a kept row the walk does not find again
+	// stays at that place (MergeKeptRows).
+	FollowChapterFoci(chapterIdx);
+	// The room the list leaves: its limit less every row of the other documents, and the document's rows with their eye
+	// on (they stay, found or not).
+	const int32 room = KFCResultModel::kKFCCollectHitLimit - (KFCResultModel::GetTotalHitCount() - rowsNow)
+		- KFCResultModel::CountKeptRows(chapterIdx, kInvalidUID);
 	const size_t limit = static_cast<size_t>(room > 0 ? room : 0);
 	std::vector<KFCResultModel::Hit> hits;
 	std::map<UID, uint32> storyVersions;
@@ -4350,7 +4502,9 @@ bool KFCSearchEngine::SearchDocumentAgain(int32 chapterIdx, PMString& outStatus)
 		outStatus.Append("InDesign's search stopped with an error - the document's rows are left as they were.");
 		return false;
 	}
-	SayFoundAgain(outStatus, "document", KFCResultModel::ReplaceChapterRows(chapterIdx, hits, storyVersions), capped);
+	int32 stayed = 0;
+	const int32 rows = KFCResultModel::ReplaceChapterRows(chapterIdx, hits, storyVersions, &stayed);
+	SayFoundAgain(outStatus, "document", rows - stayed, capped, stayed);
 	return true;
 }
 

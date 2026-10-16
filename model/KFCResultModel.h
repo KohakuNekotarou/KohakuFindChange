@@ -103,6 +103,10 @@ namespace KFCResultModel
 		// asks for a match at the row's start (ChapterMovedUnderRows), the writing walk for one at its
 		// thread, offset and length (RowOfMatchAnyOrder).)
 		bool		replaced;	// already replaced in this result set - its Replace is greyed
+		bool		kept;		// THE ROW EYE (docs/superpowers/specs/2026-10-17-kfc-row-eye-keep-design.md): on = the row
+								// stays when its story or document is searched again, found or not (MergeKeptRows). A
+								// replace turns it on (MarkHitReplaced, MarkItemReplaced); the eye's click turns it either
+								// way (SetHitKept). Copied whole with the row - a tier, an Undo step, a backup.
 		ChangeOutcome outcome;	// why this row was NOT replaced (kOutcomeNone = it was, or was never
 								// reached at all). The locator shows it as a word.
 		// (No per-hit change count that lets the replace take an unedited story on trust and skip the
@@ -152,7 +156,7 @@ namespace KFCResultModel
 		Hit() : pageIndex(-1), isOverset(false), isLocked(false), isHidden(false),
 				fontGroup(-1), fontGroupPos(-1), storyUID(kInvalidUID),
 				textStart(kInvalidTextIndex), textEnd(kInvalidTextIndex), matchHash(0),
-				replaced(false), outcome(kOutcomeNone), pageOrdinal(0), storyOrdinal(-1),
+				replaced(false), kept(false), outcome(kOutcomeNone), pageOrdinal(0), storyOrdinal(-1),
 				itemUID(kInvalidUID), onPasteboard(false), isMaster(false), isGrouped(false), isInline(false),
 				isAnchored(false), itemPrint(0), itemPrintLength(0) {}
 	};
@@ -436,6 +440,14 @@ namespace KFCResultModel
 	    @return false for an index out of range, leaving out untouched. */
 	bool GetHitRow(int32 chapterIdx, int32 hitIdx, RowDisplay& out);
 
+	/** THE ROW EYE'S CLICK (KFCResultEyeEH, through IKFCResults::SetHitKept): the row's eye on or off. Not a change to
+	    the document - no Undo step, no backup. false = no such row. */
+	bool SetHitKept(int32 chapterIdx, int32 hitIdx, bool kept);
+
+	/** How many rows of a chapter have their eye on - of one story, or of the whole chapter (story = kInvalidUID): the
+	    room a search again leaves them (SearchStoryAgain, SearchDocumentAgain). */
+	int32 CountKeptRows(int32 chapterIdx, UID story);
+
 	// (No script property hands the result set out as text: the regression suite reads the panel
 	//  through KIDMCP.)
 
@@ -659,7 +671,8 @@ namespace KFCResultModel
 	    generation moves - KFCUndoFollow drops it, UNDO-14), the row backup, the chapter's text foci (attached again,
 	    KFCRowFoci). With no row left in the chapter it is shown empty (Chapter::shownEmpty), as ReplaceChapterRows
 	    leaves one. Returns the story's row count now; -1 = no such chapter. */
-	int32 ReplaceStoryRows(int32 chapterIdx, UID story, std::vector<Hit>& storyHits, uint32 storyVersion);
+	int32 ReplaceStoryRows(int32 chapterIdx, UID story, std::vector<Hit>& storyHits, uint32 storyVersion,
+		int32* outStayed = nil);
 
 	/** SEARCH THIS DOCUMENT AGAIN's change to the list (KFCSearchEngine::SearchDocumentAgain - the author's call):
 	    every row of the chapter replaced by docHits - the document walked again, taken (swapped out) - put in
@@ -667,7 +680,32 @@ namespace KFCResultModel
 	    its searched parts dropped (a document is searched again whole). With no row left the chapter is shown empty
 	    (Chapter::shownEmpty). The rows' places in the list change, so what indexes them is let go, as ReplaceStoryRows
 	    lets it go. Returns the chapter's row count now; -1 = no such chapter. */
-	int32 ReplaceChapterRows(int32 chapterIdx, std::vector<Hit>& docHits, std::map<UID, uint32>& storyVersions);
+	int32 ReplaceChapterRows(int32 chapterIdx, std::vector<Hit>& docHits, std::map<UID, uint32>& storyVersions,
+		int32* outStayed = nil);
+
+	/** THE ROW EYE'S KEEPING (docs/superpowers/specs/2026-10-17-kfc-row-eye-keep-design.md 2-2): `found` = a search
+	    again's rows (the walk's, in its order), `kept` = rows of the list it replaces whose eye is on, at the places their
+	    foci followed them to. On return `found` holds both and `kept` is empty; the answer = how many kept rows stayed
+	    beside the found ones. The caller orders them (OrderHitsByPage) and indexes them.
+	    - a kept REPLACED row stays as it is, and the found rows over what it wrote go (7): in its story, overlapping it;
+	      an object row - the same page item;
+	    - a kept row not replaced that the walk found again - the same story, start and end, or the same page item - is
+	      the found row, its eye on (6);
+	    - every other kept row stays as it is (5): just before its story's first found row that starts after it, else
+	      just after its story's last one, else at the end (OrderHitsByPage then puts it on its recorded page). */
+	int32 MergeKeptRows(std::vector<Hit>& found, std::vector<Hit>& kept);
+
+	/** THE ROW EYE, SEARCH THESE RESULTS AGAIN (KFCSearchEngine::RunSearch): `kept` - rows of the list as it was whose
+	    eye is on, all of one document - carried into chapter chapterIdx of the new list (MergeKeptRows), in page order,
+	    indexed; a story of theirs the walk recorded no version for takes the one in `versions` (the old chapter's - its
+	    foci were followed just before). The answer = how many stayed beside the found rows. No focus is attached here
+	    (the search attaches every open chapter's after). */
+	int32 CarryKeptRows(int32 chapterIdx, std::vector<Hit>& kept, const std::map<UID, uint32>& versions);
+
+	/** The chapters put in this order - `order` names every chapter once by its index now. Only for a list made a moment
+	    ago that nothing names by chapter yet (RunSearch's carry: no focus, no Undo step, no tier). false = `order` is not
+	    such a list - nothing moved. */
+	bool OrderChapters(const std::vector<int32>& order);
 
 	/** Turn the two break characters into the marks InDesign itself draws with Show Hidden
 	    Characters on - a pilcrow for a paragraph end (CR), a return arrow for a forced line break

@@ -828,7 +828,8 @@ void BuildObjectHit(const UIDRef& docRef, UID item, KFCResultModel::Hit& out)
 }	// anonymous namespace
 
 void KFCObjectSearch::CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBook, bool allDocuments,
-	int32 selectionScope, std::vector<KFCBookScope::SkippedChapter>& unopenable, KFCSearchEngine::CollectTally& out)
+	int32 selectionScope, std::vector<KFCBookScope::SkippedChapter>& unopenable, KFCSearchEngine::CollectTally& out,
+	int32 reserved)
 {
 	out = KFCSearchEngine::CollectTally();
 	InterfacePtr<IFindChangeService> svc(CreateFindChangeService());
@@ -863,7 +864,8 @@ void KFCObjectSearch::CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targ
 		const int32 barEnd = static_cast<int32>(targets.size()) * kDocSpan;
 		KFCProgressBar bar(title, 0, barEnd, kTrue, kTrue);
 		bar.DisableChildProgressBars(kTrue);
-		const size_t limit = static_cast<size_t>(KFCResultModel::kKFCCollectHitLimit);
+		const int32 room = KFCResultModel::kKFCCollectHitLimit - reserved;	// the row eye's kept rows keep theirs
+		const size_t limit = static_cast<size_t>(room > 0 ? room : 0);
 		for (size_t i = 0; i < targets.size(); ++i)
 		{
 			KFCSetCountedTask(bar, fromBook ? "Chapter" : "Document", i, targets.size(), targets[i].shortName);

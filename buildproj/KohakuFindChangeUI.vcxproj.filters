@@ -99,6 +99,9 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultNodeEH.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultEyeEH.cpp">
+         <Filter>Source Files</Filter>
+      </ClCompile>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCQueryRowEH.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>

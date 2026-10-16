@@ -36,7 +36,7 @@
 #include "EveInfo.fh"	// EVE widget types and layout flags - the query dialog, laid out by EVE as KCM's book dialog
 #include "DialogLayoutID.h"	// IID_IEVEINFO / kFixedSizeEVEInfoImpl - the query dialog's "Runs on:" line
 #include "TreeViewDefs.h"	// kHideRootNode etc. - the result tree list
-#include "IconRsrcDefs.h"	// kTreeBranchCollapsed/ExpandedRsrcID - the tree's expander arrows
+#include "IconRsrcDefs.h"	// kTreeBranchCollapsed/ExpandedRsrcID - the tree's expander arrows; kEyeballIcon - the row eye
 #include "IconStyleDefs.h"	// kIconNoCentering / kIconRaisedLook - the expander's icon attributes
 #include "TipsID.h"			// IID_ITIP - the tooltips on the panel's illustration and on the query dialog's rows
 #include "XMLParserID.h"	// IID_ISAXCONTENTHANDLER - the query dialog's reading of a saved query's file
@@ -222,6 +222,21 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 		{
 			IID_ICONTROLVIEW, kKFCColorTextViewImpl,
 			IID_IKFCROWDATA, kKFCRowDataImpl,
+		}
+	},
+
+	/*
+	 * A HIT ROW'S EYE (docs/superpowers/specs/2026-10-17-kfc-row-eye-keep-design.md - the row eye, D-13): an icon button
+	 * that draws InDesign's own eyeball while the row is kept and nothing while it is not (KFCResultListWidgetMgr sets
+	 * which, row by row), with a click handler of its own (KFCResultEyeEH) - the SDK's way of a tree row's icon
+	 * (customconditionaltextui: kIconSuiteWidgetBoss and IID_IEVENTHANDLER).
+	 */
+	Class
+	{
+		kKFCResultEyeWidgetBoss,
+		kIconSuiteWidgetBoss,
+		{
+			IID_IEVENTHANDLER, kKFCResultEyeEHImpl,
 		}
 	},
 
@@ -1131,6 +1146,11 @@ type KFCColorTextWidget(kViewRsrcType) : GenericPanelWidget(ClassID = kKFCColorT
 {
 };
 
+// A hit row's eye (the row eye): an icon suite widget whose click is its own (kKFCResultEyeWidgetBoss).
+type KFCResultEyeWidget(kViewRsrcType) : IconSuiteWidget(ClassID = kKFCResultEyeWidgetBoss)
+{
+};
+
 // The panel's message area: drawn by hand for the same reason (see kKFCStatusTextWidgetBoss).
 // ! The field list is GenericPanelWidget's, NOT StaticMultiLineTextWidget's - the line that uses it
 // carries no alignment, ellipsize style, ampersand flag, font, LINE COUNT or initial string. The drawing
@@ -1442,6 +1462,17 @@ resource KFCResultNodeWidget(kKFCResultHitNodeWidgetRsrcID + index_enUS)
 	kTrue, kTrue,						// Visible, Enabled
 	"",									// Panel name
 	{
+		KFCResultEyeWidget
+		(
+			kKFCResultEyeWidgetID,				// WidgetId
+			kEyeballIcon,						// RsrcId: InDesign's own eyeball (IconRsrcDefs.h) - per row, the widget
+			kApplicationRsrcPluginID,			// manager sets it or kNoIcon; the application's icon
+			kBindNone,							// Frame binding (the widget manager places it)
+			Frame(34, 1, 50, 17),				// Frame (left, top, right, bottom)
+			kTrue, kTrue,						// Visible, Enabled
+			kStyledIconSuiteFlushedButtonType,	// flat - no raised look, as a panel row's icon
+			0,									// no associated widget
+		),
 		KFCColorTextWidget
 		(
 			kKFCResultTextWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId

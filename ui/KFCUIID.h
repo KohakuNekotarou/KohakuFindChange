@@ -99,6 +99,9 @@ DECLARE_PMID(kClassIDSpace, kKFCQueryContentsHandlerBoss, kKFCUIPrefix + 27)
 // ...and the text cell of a row of the query dialog's lists: the stock cell with a tooltip of its own - the whole of what
 // the row's query does (KFCQueryRowTip.cpp).
 DECLARE_PMID(kClassIDSpace, kKFCQueryRowTextWidgetBoss, kKFCUIPrefix + 28)
+// THE ROW EYE (docs/superpowers/specs/2026-10-17-kfc-row-eye-keep-design.md): a hit row's eye - an icon button with a
+// click handler of its own (KFCResultEyeEH).
+DECLARE_PMID(kClassIDSpace, kKFCResultEyeWidgetBoss, kKFCUIPrefix + 29)
 
 
 // InterfaceIDs:
@@ -200,6 +203,8 @@ DECLARE_PMID(kImplementationIDSpace, kKFCResultNodeObserverImpl, kKFCUIPrefix + 
 // (KFCQueryRowTip.cpp). + 50 and + 51: the next after the highest spent.
 DECLARE_PMID(kImplementationIDSpace, kKFCQueryContentsHandlerImpl, kKFCUIPrefix + 50)
 DECLARE_PMID(kImplementationIDSpace, kKFCQueryRowTipImpl, kKFCUIPrefix + 51)
+// The row eye's click (KFCResultEyeEH.cpp).
+DECLARE_PMID(kImplementationIDSpace, kKFCResultEyeEHImpl, kKFCUIPrefix + 52)
 
 
 // ActionIDs:
@@ -409,6 +414,9 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryLoadOrderButtonWidgetID, kKFCUIPrefix + 44
 // (a)): the run order's selected query searched (the author's call, 10-14 night), its list a new tier on the panel
 // (KFCResultHistory), and the selection moved down one. + 45: never used at either prefix.
 DECLARE_PMID(kWidgetIDSpace, kKFCQueryFindButtonWidgetID, kKFCUIPrefix + 45)
+// A hit row's eye (the row eye) - found by the widget manager in each hit row (+ 46: the next after the highest spent;
+// the retired check box's + 7 stays unused - the regression runner still reads 0x1ea687).
+DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 
 
 // "About Plug-ins" sub-menu:

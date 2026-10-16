@@ -602,7 +602,29 @@ bool KFCResultModel::GetHitRow(int32 chapterIdx, int32 hitIdx, RowDisplay& out)
 	out.matchText = h.matchText;
 	out.postText = h.postText;
 	out.replaced = h.replaced;
+	out.kept = h.kept;
 	return true;
+}
+
+bool KFCResultModel::SetHitKept(int32 chapterIdx, int32 hitIdx, bool kept)
+{
+	Hit* h = HitAt(chapterIdx, hitIdx);
+	if (h == nil)
+		return false;
+	h->kept = kept;
+	return true;
+}
+
+int32 KFCResultModel::CountKeptRows(int32 chapterIdx, UID story)
+{
+	const Chapter* c = ChapterAt(chapterIdx);
+	if (c == nil)
+		return 0;
+	int32 count = 0;
+	for (size_t i = 0; i < c->hits.size(); ++i)
+		if (c->hits[i].kept && (story == kInvalidUID || c->hits[i].storyUID == story))
+			++count;
+	return count;
 }
 
 // U+21B5 DOWNWARDS ARROW WITH CORNER LEFTWARDS - the mark for a forced line break. TextChar.h names
@@ -918,6 +940,7 @@ void KFCResultModel::MarkHitReplaced(int32 chapterIdx, int32 hitIdx, UID newStor
 	h.textStart = newStart;
 	h.textEnd = newEnd;
 	h.replaced = true;
+	h.kept = true;		// ...and its eye on (the row eye, E2 - the author's call)
 	// (The locator is not built again: nothing it says is changed by a replace - the page, the ordinal, overset,
 	// hidden and locked come from the search, and an outcome is set where the replace sets one.)
 }
@@ -1127,11 +1150,119 @@ void KFCResultModel::OrderHitsByPage(std::vector<Hit>& hits)
 	NumberHitsWithinPages(hits);
 }
 
-int32 KFCResultModel::ReplaceStoryRows(int32 chapterIdx, UID story, std::vector<Hit>& storyHits, uint32 storyVersion)
+int32 KFCResultModel::MergeKeptRows(std::vector<Hit>& found, std::vector<Hit>& kept)
+{
+	int32 stayed = 0;
+	for (size_t k = 0; k < kept.size(); ++k)
+	{
+		Hit& row = kept[k];
+		const bool objectRow = (row.itemUID != kInvalidUID);
+		if (row.replaced)
+		{
+			// (7) WHAT IT WROTE, MATCHED AGAIN: not a second row over the same place - the replaced row is the record.
+			found.erase(std::remove_if(found.begin(), found.end(), [&row, objectRow](const Hit& h)
+				{
+					if (objectRow)
+						return h.itemUID == row.itemUID;
+					return h.storyUID == row.storyUID && h.textStart < row.textEnd && row.textStart < h.textEnd;
+				}), found.end());
+		}
+		else
+		{
+			// (6) FOUND AGAIN: one row - the found one, which the walk has just read - with the eye on.
+			bool again = false;
+			for (size_t f = 0; f < found.size() && !again; ++f)
+			{
+				Hit& h = found[f];
+				if (objectRow ? (h.itemUID == row.itemUID)
+					: (h.storyUID == row.storyUID && h.textStart == row.textStart && h.textEnd == row.textEnd))
+				{
+					h.kept = true;
+					again = true;
+				}
+			}
+			if (again)
+				continue;
+		}
+		// (5) IT STAYS, beside its story's found rows in the order their text stands.
+		size_t at = found.size();
+		size_t afterLast = found.size();
+		for (size_t f = 0; !objectRow && f < found.size(); ++f)
+		{
+			if (found[f].storyUID != row.storyUID)
+				continue;
+			if (found[f].textStart > row.textStart)
+			{
+				at = f;
+				break;
+			}
+			afterLast = f + 1;
+		}
+		if (at == found.size() && afterLast < found.size())
+			at = afterLast;
+		found.insert(found.begin() + static_cast<std::ptrdiff_t>(at), std::move(row));
+		++stayed;
+	}
+	kept.clear();
+	return stayed;
+}
+
+int32 KFCResultModel::CarryKeptRows(int32 chapterIdx, std::vector<Hit>& kept, const std::map<UID, uint32>& versions)
+{
+	Chapter* c = ChapterAt(chapterIdx);
+	if (c == nil || kept.empty())
+	{
+		kept.clear();
+		return 0;
+	}
+	for (size_t i = 0; i < kept.size(); ++i)
+	{
+		const UID s = kept[i].storyUID;
+		const std::map<UID, uint32>::const_iterator v = versions.find(s);
+		if (s != kInvalidUID && c->storyVersions.count(s) == 0 && v != versions.end())
+			c->storyVersions[s] = v->second;
+	}
+	const int32 stayed = MergeKeptRows(c->hits, kept);
+	OrderHitsByPage(c->hits);
+	IndexRows(*c);
+	return stayed;
+}
+
+bool KFCResultModel::OrderChapters(const std::vector<int32>& order)
+{
+	if (order.size() != gChapters.size())
+		return false;
+	std::vector<bool> seen(gChapters.size(), false);
+	for (size_t i = 0; i < order.size(); ++i)
+	{
+		const int32 at = order[i];
+		if (at < 0 || at >= static_cast<int32>(gChapters.size()) || seen[static_cast<size_t>(at)])
+			return false;
+		seen[static_cast<size_t>(at)] = true;
+	}
+	std::vector<Chapter> was;
+	was.swap(gChapters);
+	gChapters.reserve(was.size());
+	for (size_t i = 0; i < order.size(); ++i)
+		gChapters.push_back(std::move(was[static_cast<size_t>(order[i])]));
+	return true;
+}
+
+int32 KFCResultModel::ReplaceStoryRows(int32 chapterIdx, UID story, std::vector<Hit>& storyHits, uint32 storyVersion,
+	int32* outStayed)
 {
 	Chapter* c = ChapterAt(chapterIdx);
 	if (c == nil)
 		return -1;
+	// THE ROW EYE (docs/superpowers/specs/2026-10-17-kfc-row-eye-keep-design.md 2-2): the story's rows whose eye is on,
+	// carried into the walk's rows (MergeKeptRows) - copied before the story's rows go out below.
+	std::vector<Hit> keptRows;
+	for (size_t i = 0; i < c->hits.size(); ++i)
+		if (c->hits[i].storyUID == story && c->hits[i].kept)
+			keptRows.push_back(c->hits[i]);
+	const int32 stayed = MergeKeptRows(storyHits, keptRows);
+	if (outStayed != nil)
+		*outStayed = stayed;
 	// The chapter's foci name its rows by their index, which is about to change (attached again at the foot).
 	KFCRowFoci::DetachChapter(chapterIdx);
 	// The story's rows out and the walk's in, where its first row stood - the other rows keep their order, so a
@@ -1171,11 +1302,28 @@ int32 KFCResultModel::ReplaceStoryRows(int32 chapterIdx, UID story, std::vector<
 	return count;
 }
 
-int32 KFCResultModel::ReplaceChapterRows(int32 chapterIdx, std::vector<Hit>& docHits, std::map<UID, uint32>& storyVersions)
+int32 KFCResultModel::ReplaceChapterRows(int32 chapterIdx, std::vector<Hit>& docHits, std::map<UID, uint32>& storyVersions,
+	int32* outStayed)
 {
 	Chapter* c = ChapterAt(chapterIdx);
 	if (c == nil)
 		return -1;
+	// THE ROW EYE (2-2): the chapter's rows whose eye is on, carried into the walk's rows (MergeKeptRows); a story the
+	// walk found nothing in keeps the version its foci were followed at (Search This Document Again follows them first).
+	std::vector<Hit> keptRows;
+	for (size_t i = 0; i < c->hits.size(); ++i)
+	{
+		if (!c->hits[i].kept)
+			continue;
+		keptRows.push_back(c->hits[i]);
+		const UID s = c->hits[i].storyUID;
+		const std::map<UID, uint32>::const_iterator v = c->storyVersions.find(s);
+		if (s != kInvalidUID && storyVersions.count(s) == 0 && v != c->storyVersions.end())
+			storyVersions[s] = v->second;
+	}
+	const int32 stayed = MergeKeptRows(docHits, keptRows);
+	if (outStayed != nil)
+		*outStayed = stayed;
 	// ReplaceStoryRows' steps over the whole chapter: its foci let go (they name rows by index), the walk's rows in, in
 	// page order, and the end ReplaceStoryRows has (RowsLaidOutAgain - indexed as the search's are, what names the rows
 	// by index let go).
@@ -1357,6 +1505,7 @@ void KFCResultModel::MarkItemReplaced(int32 chapterIdx, int32 hitIdx, uint64 new
 		return;
 	BackUpRow(chapterIdx, hitIdx, *h);
 	h->replaced = true;
+	h->kept = true;		// ...and its eye on (the row eye, E2)
 	h->itemPrint = newPrint;
 	h->itemPrintLength = newLength;
 }

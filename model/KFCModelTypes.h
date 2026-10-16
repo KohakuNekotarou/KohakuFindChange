@@ -74,8 +74,9 @@ namespace KFCResultModel
 		PMString		matchText;
 		PMString		postText;
 		bool			replaced;
+		bool			kept;		// the row eye (Hit::kept - docs/superpowers/specs/2026-10-17-kfc-row-eye-keep-design.md)
 
-		RowDisplay() : replaced(false) {}
+		RowDisplay() : replaced(false), kept(false) {}
 	};
 }
 
