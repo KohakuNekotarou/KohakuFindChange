@@ -345,6 +345,9 @@ DECLARE_PMID(kActionIDSpace, kKFCClearTheseResultsActionID, kKFCUIPrefix + 54)
 // search run once more - a grey one switched to first (KFCResultTree::SearchListAgain). + 55: the next after the highest
 // spent.
 DECLARE_PMID(kActionIDSpace, kKFCSearchTierAgainActionID, kKFCUIPrefix + 55)
+// "Create Outlines" in an OBJECT row's right-click menu, under Special Operations (the author, 2026-10-17 - the rows'
+// objects outlined across spreads: KFCResultTree::OutlineRows, KFCObjectOutline). + 56: the next after the highest spent.
+DECLARE_PMID(kActionIDSpace, kKFCCreateOutlinesActionID, kKFCUIPrefix + 56)
 
 
 // WidgetIDs:
@@ -464,6 +467,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 #define kKFCClearTierResultsMenuKey	kKFCStringPrefix "kKFCClearTierResultsMenuKey"
 // ...and its Search These Results Again (measured against every other key - key_collisions.py: none reads alike).
 #define kKFCSearchTierAgainMenuKey	kKFCStringPrefix "kKFCSearchTierAgainMenuKey"
+// ...and an object row's Create Outlines (measured against every other key - key_collisions.py: none reads alike).
+#define kKFCCreateOutlinesMenuKey	kKFCStringPrefix "kKFCCreateOutlinesMenuKey"
 // "How to Use...": the operating reference. English in every UI language, like the rest of the
 // flyout - there is one string table, and the one thing switched to Japanese at run time is this page's
 // body (KFCLoc::JapaneseUI).
@@ -537,6 +542,13 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 #define kKFCResultBookMenuName				"KFCRtMenuResultBook"
 // A TIER's own row's right-click menu (Clear These Results - v2 R9), popped the same way - a grey tier's and the live one's.
 #define kKFCResultTierMenuName				"KFCRtMenuResultTier"
+// An OBJECT row's right-click menu (the Object tab's rows - the author, 2026-10-17): its Replace, and Special Operations
+// > Create Outlines - a text row keeps kKFCResultHitMenuName (Replace alone). Popped the same way.
+#define kKFCResultObjectMenuName			"KFCRtMenuResultObject"
+// ...its Special Operations submenu (the author's word, 2026-10-17): the parent node is ActionID 0 with the path and a
+// delimiter (KCM's submenus' Adobe idiom), its items take the path. The name is the words shown, as KCM's are.
+#define kKFCSpecialOpsSubmenuName			"Special Operations"
+#define kKFCSpecialOpsSubmenuPath			kKFCResultObjectMenuName kSDKDefDelimitMenuPath kKFCSpecialOpsSubmenuName
 
 // Menu item positions:
 //
@@ -603,6 +615,10 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 // A tier's own row's menu: Search These Results Again, then Clear These Results.
 #define kKFCSearchTierAgainMenuItemPosition	0.5
 #define kKFCClearTheseResultsMenuItemPosition	1.0
+// An object row's menu: Replace, then the Special Operations submenu, Create Outlines in it.
+#define kKFCObjectReplaceMenuItemPosition		1.0
+#define kKFCSpecialOpsSubmenuPosition			2.0
+#define kKFCCreateOutlinesMenuItemPosition		1.0
 
 
 // View (kViewRsrcType) resource IDs for the result tree's row widgets. Offset from the panel's own

@@ -183,6 +183,8 @@ DECLARE_PMID(kImplementationIDSpace, kKFCRowFocusImpl, kKFCPrefix + 46)
 // What Edit > Undo calls a row's Replace ("Replace" - the author's call). See KFCReplaceEngine::BeginWriteStep
 // (KFCReplaceEngine.h, WriteStep).
 #define kKFCReplaceStepKey			kKFCStringPrefix "kKFCReplaceStepKey"
+// The Edit menu's name of an object row's Create Outlines step (KFCObjectOutline - Special Operations).
+#define kKFCCreateOutlinesStepKey	kKFCStringPrefix "kKFCCreateOutlinesStepKey"
 #define kKFCRunQueriesStepKey		kKFCStringPrefix "kKFCRunQueriesStepKey"	// the query run's undo step (KFCQuerySequence)
 #define kKFCChangeAllStepKey		kKFCStringPrefix "kKFCChangeAllStepKey"	// Change All in Book (No List)'s undo step (KFCChangeAll)
 

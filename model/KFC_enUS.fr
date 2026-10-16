@@ -35,6 +35,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 // What Edit > Undo calls KFC's writes: a row's Replace (rows replaced together too), the
                 // query run, and Change All in Book.
                 kKFCReplaceStepKey,				"Replace",
+                kKFCCreateOutlinesStepKey,		"Create Outlines",
                 kKFCRunQueriesStepKey,			"Run Queries",
                 kKFCChangeAllStepKey,			"Change All",
         }

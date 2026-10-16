@@ -120,6 +120,9 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCObjectReplace.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCObjectOutline.cpp">
+         <Filter>Source Files</Filter>
+      </ClCompile>
    </ItemGroup>
    <ItemGroup>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\IKFCBoundary.h">

@@ -12,6 +12,7 @@
 
 // Interface includes:
 #include "ICommand.h"
+#include "IHierarchy.h"				// ItemIsThere - an item a write took away
 #include "IDataBase.h"
 #include "IObserver.h"
 #include "ISubject.h"
@@ -76,7 +77,8 @@ struct ItemMoved
 	uint64		after;
 	uint32		afterLength;
 	IDataBase*	now;
-	ItemMoved() : item(kInvalidUID), before(0), beforeLength(0), after(0), afterLength(0), now(nil) {}
+	bool		afterGone;	// the write took the item away (Create Outlines): no print after it - gone is its "after"
+	ItemMoved() : item(kInvalidUID), before(0), beforeLength(0), after(0), afterLength(0), now(nil), afterGone(false) {}
 };
 
 // One kept write.
@@ -87,6 +89,7 @@ struct Step
 	uint32							resultSetBefore;	// a whole set's: the one it found - its Undo goes back to it
 	bool							whole;			// it reshaped the result set: a query run (RunRecorder); else a row's
 													// Replace (StepRecorder) - the name on the message line too
+	const char*						name;			// a row write's own name (StepRecorder::SetName - Create Outlines); nil = Replace
 	uint32							layoutBefore;	// the layout the row indices named before it...
 	uint32							layoutAfter;	// ...and after it (the same, for a write of rows)
 	std::vector<StoryMoved>			stories;
@@ -97,7 +100,7 @@ struct Step
 	std::vector<size_t>				frozenBefore;	// a whole set's book chapters closed since, as indexes into before's
 	std::vector<size_t>				frozenAfter;	// and after's chapters: kept as the panel has them when that set is
 													// put back (KFCUndoFollow::ForgetBookChapter)
-	Step() : done(true), resultSet(0), resultSetBefore(0), whole(false), layoutBefore(0), layoutAfter(0) {}
+	Step() : done(true), resultSet(0), resultSetBefore(0), whole(false), name(nil), layoutBefore(0), layoutAfter(0) {}
 };
 
 // The kept writes, oldest first.
@@ -121,7 +124,8 @@ struct Recording
 	std::vector<StoryMoved>			stories;	// the stories read, each at its version before the write
 	std::vector<ItemMoved>			items;		// the items RecordItem read
 	KFCResultModel::ModelSnapshot	before;		// a query run's: the whole list before it
-	Recording() : open(false), resultSet(0), layout(0) {}
+	const char*						name;		// the write's name (StepRecorder::SetName)
+	Recording() : open(false), resultSet(0), layout(0), name(nil) {}
 };
 Recording gRecording;
 
@@ -382,14 +386,37 @@ void TakeMovedStories(Step& step)
 }
 
 // The items the recording read that the write changed, each with its fingerprint after it, onto the step.
+// IS THE ITEM IN ITS DOCUMENT - a write that takes an item away (Create Outlines) leaves its UID unused, an Undo puts it
+// back.
+bool ItemIsThere(IDataBase* db, UID item)
+{
+	if (db == nil || item == kInvalidUID || !db->IsValidUID(item))
+		return false;
+	InterfacePtr<IHierarchy> hier(db, item, UseDefaultIID());
+	return hier != nil;
+}
+
 void TakeMovedItems(Step& step)
 {
 	for (size_t k = 0; k < gRecording.items.size(); ++k)
 	{
 		ItemMoved m = gRecording.items[k];
 		m.now = DocOf(m);
-		if (m.now == nil || !KFCObjectSearch::Fingerprint(UIDRef(m.now, m.item), m.after, m.afterLength))
+		if (m.now == nil)
 			continue;
+		if (!KFCObjectSearch::Fingerprint(UIDRef(m.now, m.item), m.after, m.afterLength))
+		{
+			// AN ITEM THE WRITE TOOK AWAY (Create Outlines - the frame replaced by its outlines, KFCObjectOutline): no print to
+			// read after it - its Undo brings the item back at "before", its Redo takes it away again (AllAt).
+			if (!ItemIsThere(m.now, m.item))
+			{
+				m.afterGone = true;
+				m.after = 0;
+				m.afterLength = 0;
+				step.items.push_back(m);
+			}
+			continue;
+		}
 		if (m.after == m.before && m.afterLength == m.beforeLength)
 			continue;
 		step.items.push_back(m);
@@ -418,6 +445,13 @@ bool AllAt(const Step& step, bool after)
 	for (size_t k = 0; k < step.items.size(); ++k)
 	{
 		const ItemMoved& m = step.items[k];
+		// ...or, for an item the write took away (Create Outlines), gone again at "after" (a Redo).
+		if (after && m.afterGone)
+		{
+			if (ItemIsThere(m.now, m.item))
+				return false;
+			continue;
+		}
 		uint64 print = 0;
 		uint32 length = 0;
 		if (!KFCObjectSearch::Fingerprint(UIDRef(m.now, m.item), print, length))
@@ -546,7 +580,7 @@ void WatchDoc(IDataBase* db)
 // list; every other is a row's Replace.
 const char* WriteName(const Step& step)
 {
-	return step.whole ? "Run Queries" : "Replace";
+	return step.whole ? "Run Queries" : (step.name != nil ? step.name : "Replace");
 }
 
 // Keep a write: the documents' histories it cut, and the old ones past the limit, go.
@@ -735,6 +769,7 @@ void KFCUndoFollow::StepRecorder::Keep()
 	step.layoutBefore = gRecording.layout;
 	TakeMovedStories(step);
 	TakeMovedItems(step);
+	step.name = gRecording.name;
 	KFCResultModel::TakeRowBackup(step.rows);
 	step.layoutAfter = step.layoutBefore;
 	CloseRecording();
@@ -746,6 +781,12 @@ void KFCUndoFollow::StepRecorder::Keep()
 	if ((step.stories.empty() && step.items.empty()) || step.resultSet != KFCResultModel::GetResultSetId())
 		return;
 	KeepStep(step);
+}
+
+void KFCUndoFollow::StepRecorder::SetName(const char* name)
+{
+	if (fOpen)
+		gRecording.name = name;
 }
 
 void KFCUndoFollow::StepRecorder::RecordItem(int32 chapterIdx, UID item)

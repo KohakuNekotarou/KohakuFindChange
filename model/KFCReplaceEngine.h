@@ -38,6 +38,7 @@
 #include "PMString.h"
 #include "UIDRef.h"				// DocsAfterWrite
 #include "KFCModelTypes.h"		// KFCRowsByChapter
+#include "KFCID.h"				// kKFCReplaceStepKey - BeginWriteStep's own name by default
 
 #include <vector>				// DocsAfterWrite
 
@@ -137,7 +138,10 @@ namespace KFCReplaceEngine
 		IAbortableCmdSeq*	across;		// several documents'
 		WriteStep() : plain(nil), across(nil) {}
 	};
-	bool BeginWriteStep(bool acrossDocuments, WriteStep& outStep);
+	// (stepKey = the Edit menu's name of the step - Replace, Create Outlines; internalName = the sequence's own, as
+	//  CmdUtils tracks a lost one.)
+	bool BeginWriteStep(bool acrossDocuments, WriteStep& outStep, const char* stepKey = kKFCReplaceStepKey,
+		const char* internalName = "KFC Replace");
 	void EndWriteStep(WriteStep& step, bool ok);
 
 	/** WHAT EACH DOCUMENT OF A WRITE FROM THE LIST IS LEFT AS (the author's calls), once the write is over, whichever way

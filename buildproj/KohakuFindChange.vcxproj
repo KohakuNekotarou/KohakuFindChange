@@ -258,6 +258,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCMemXferBytes.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCObjectSearch.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCObjectReplace.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCObjectOutline.cpp"/>
    </ItemGroup>
    <ItemGroup>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\IKFCBoundary.h"/>

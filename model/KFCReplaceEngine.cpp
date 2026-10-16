@@ -1311,21 +1311,22 @@ static void StartStatus(PMString& out)
 }
 
 // ONE UNDO STEP FOR A WRITE FROM THE LIST - see the header (WriteStep): the rule for one document and for several.
-bool KFCReplaceEngine::BeginWriteStep(bool acrossDocuments, WriteStep& outStep)
+bool KFCReplaceEngine::BeginWriteStep(bool acrossDocuments, WriteStep& outStep, const char* stepKey,
+	const char* internalName)
 {
 	outStep = WriteStep();
 	// The caller's name, as KFC's other sequences pass one (CmdUtils.h: a lost sequence is tracked by it); the name the
 	// Undo menu shows is SetName's.
-	const PMString stepName(kKFCReplaceStepKey);
+	const PMString stepName(stepKey);
 	if (acrossDocuments)
 	{
-		outStep.across = CmdUtils::BeginAbortableCmdSeq("KFC Replace");
+		outStep.across = CmdUtils::BeginAbortableCmdSeq(internalName);
 		if (outStep.across != nil)
 			outStep.across->SetName(stepName);
 	}
 	else
 	{
-		outStep.plain = CmdUtils::BeginCommandSequence("KFC Replace");
+		outStep.plain = CmdUtils::BeginCommandSequence(internalName);
 		if (outStep.plain != nil)
 			outStep.plain->SetName(stepName);
 	}

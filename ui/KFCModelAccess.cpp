@@ -144,6 +144,7 @@ namespace
 		virtual void DropKeptTiers() {}
 		virtual bool DropTier(uint32) { return false; }
 		virtual bool SearchListAgain(PMString& outStatus) { SayWhy(outStatus); return false; }
+		virtual bool OutlineRows(const KFCRowsByChapter&, PMString& outStatus) { SayWhy(outStatus); return false; }
 	};
 
 	class KFCChaptersStandInImpl : public IKFCChapters

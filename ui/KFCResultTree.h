@@ -207,6 +207,11 @@ namespace KFCResultTree
 	    list first, by the caller. True = done. */
 	bool SearchListAgain();
 
+	/** AN OBJECT ROW'S SPECIAL OPERATIONS > CREATE OUTLINES (the author, 2026-10-17): the rows' objects outlined where they
+	    stand - across spreads and documents - by the model (KFCRuns()->OutlineRows, KFCObjectOutline), with no landing:
+	    nothing is brought forward. The rows drawn again, the status line. Not under a landing or a run. True = written. */
+	bool OutlineRows(const KFCRowsByChapter& rows);
+
 	/** The result list's view, reached through its panel - nil while the panel is closed. Not counted (the panel holds
 	    it): use it at once. Asked by whatever outside the panel wants the list alone - the tree's manager, its controller,
 	    the keyboard's questions, the Return filter. (RedrawKeyboardFrame wants the panel's view as well, and asks the

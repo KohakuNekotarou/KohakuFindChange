@@ -254,7 +254,12 @@ bool16 KFCResultNodeEH::RButtonDn(IEvent* e)
 	if (nodeID->IsTierRow())
 		PopRowMenu(kKFCResultTierMenuName, e, this);
 	else if (nodeID->IsHitRow())
-		PopRowMenu(kKFCResultHitMenuName, e, this);
+	{
+		// An OBJECT row (the Object tab's) pops its own menu - Replace, and Special Operations > Create Outlines (the
+		// author, 2026-10-17); a text row its Replace alone.
+		const bool objectRow = KFCResults()->GetHitItem(nodeID->GetChapter(), nodeID->GetHit()) != kInvalidUID;
+		PopRowMenu(objectRow ? kKFCResultObjectMenuName : kKFCResultHitMenuName, e, this);
+	}
 	else if (nodeID->IsFontRow() && KFCResults()->IsStoryGroup(nodeID->GetChapter(), nodeID->GetFont()))
 		PopRowMenu(kKFCResultStoryMenuName, e, this);		// a STORY row: Search This Story Again; Select All Rows
 	else if (nodeID->IsDocumentRow())

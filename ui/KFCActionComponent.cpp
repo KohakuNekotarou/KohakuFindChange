@@ -495,6 +495,17 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			break;
 		}
 
+		case kKFCCreateOutlinesActionID:
+		{
+			// An OBJECT row's Special Operations > Create Outlines (the author, 2026-10-17): the row it was popped over - or the
+			// rows selected together, when it is one of them (RowsOfRightClick, as Replace) - outlined wherever they stand
+			// (KFCResultTree::OutlineRows). No object row (the action pressed by its ActionID): do nothing.
+			int32 chapter = -1, hit = -1;
+			if (RightClickedHit(widget, chapter, hit) && KFCResults()->GetHitItem(chapter, hit) != kInvalidUID)
+				(void)KFCResultTree::OutlineRows(KFCResultTree::RowsOfRightClick(chapter, hit));
+			break;
+		}
+
 		default:
 		{
 			break;
@@ -766,6 +777,15 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 				// document or book not open, a list no search made) said on the status line, as Search This Document Again's.
 				int32 tier = -1;
 				const bool enable = RightClickedTier(widget, tier);
+				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
+				break;
+			}
+			case kKFCCreateOutlinesActionID:
+			{
+				// An object row's menu: Create Outlines over an object row (a run standing greys everything, above). What the
+				// write refuses - not a text frame, locked, already outlined - it says on the status line, row by row counted.
+				int32 chapter = -1, hit = -1;
+				const bool enable = RightClickedHit(widget, chapter, hit) && KFCResults()->GetHitItem(chapter, hit) != kInvalidUID;
 				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 				break;
 			}

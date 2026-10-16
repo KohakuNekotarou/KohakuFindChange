@@ -89,6 +89,10 @@ namespace KFCUndoFollow
 		    story, so its Undo and Redo are told by the item's fingerprint coming back to "before" or "after". */
 		void RecordItem(int32 chapterIdx, UID item);
 
+		/** The write's name on the message line when an Undo or a Redo takes it ("Undo: <name> - ...") - a string that
+		    outlives the step (a literal). Not named: "Replace". */
+		void SetName(const char* name);
+
 	private:
 		void Open(const std::vector<int32>& chapterIdxs);
 		bool fOpen;

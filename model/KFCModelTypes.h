@@ -74,9 +74,10 @@ namespace KFCResultModel
 		PMString		matchText;
 		PMString		postText;
 		bool			replaced;
+		bool			outlined;	// written as outlines (Hit::outlined): the row reads "Outlined" for "Changed"
 		bool			kept;		// the row eye (Hit::kept - docs/superpowers/specs/2026-10-17-kfc-row-eye-keep-design.md)
 
-		RowDisplay() : replaced(false), kept(false) {}
+		RowDisplay() : replaced(false), outlined(false), kept(false) {}
 	};
 }
 

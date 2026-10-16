@@ -128,6 +128,9 @@ public:
 	/** = KFCSearchEngine::SearchListAgain (appended) - a tier's heading's Search These Results Again: the live list's own
 	    search run once more, its rows replaced in place. False = refused or cancelled, the list as it was. */
 	virtual bool SearchListAgain(PMString& outStatus) = 0;
+	/** = KFCObjectOutline::OutlineRows (appended) - an object row's Special Operations > Create Outlines: the rows' frames
+	    outlined, one undo step. False = nothing written; outStatus says why. */
+	virtual bool OutlineRows(const KFCRowsByChapter& rows, PMString& outStatus) = 0;
 };
 
 #endif // __IKFCRuns_h__

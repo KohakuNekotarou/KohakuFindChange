@@ -103,6 +103,9 @@ namespace KFCResultModel
 		// asks for a match at the row's start (ChapterMovedUnderRows), the writing walk for one at its
 		// thread, offset and length (RowOfMatchAnyOrder).)
 		bool		replaced;	// already replaced in this result set - its Replace is greyed
+		bool		outlined;	// written as outlines (an object row's Special Operations > Create Outlines - KFCObjectOutline):
+								// replaced too, and its item the outlines InDesign made (MarkItemOutlined); the row reads
+								// "Outlined" where a replaced one reads "Changed"
 		bool		kept;		// THE ROW EYE (docs/superpowers/specs/2026-10-17-kfc-row-eye-keep-design.md): on = the row
 								// stays when its story or document is searched again, found or not (MergeKeptRows). A
 								// replace turns it on (MarkHitReplaced, MarkItemReplaced); the eye's click turns it either
@@ -156,7 +159,7 @@ namespace KFCResultModel
 		Hit() : pageIndex(-1), isOverset(false), isLocked(false), isHidden(false),
 				fontGroup(-1), fontGroupPos(-1), storyUID(kInvalidUID),
 				textStart(kInvalidTextIndex), textEnd(kInvalidTextIndex), matchHash(0),
-				replaced(false), kept(false), outcome(kOutcomeNone), pageOrdinal(0), storyOrdinal(-1),
+				replaced(false), outlined(false), kept(false), outcome(kOutcomeNone), pageOrdinal(0), storyOrdinal(-1),
 				itemUID(kInvalidUID), onPasteboard(false), isMaster(false), isGrouped(false), isInline(false),
 				isAnchored(false), itemPrint(0), itemPrintLength(0) {}
 	};
@@ -506,6 +509,11 @@ namespace KFCResultModel
 	    item's fingerprint as the write left it. Backed up like every change a write makes (BeginRowBackup), so an Undo
 	    puts the row and its fingerprint back together. */
 	void MarkItemReplaced(int32 chapterIdx, int32 hitIdx, uint64 newPrint, uint32 newLength);
+
+	/** AN OBJECT ROW OUTLINED (KFCObjectOutline - Special Operations > Create Outlines): replaced, outlined, its eye on
+	    (the row eye), and its item the outlines InDesign made with their fingerprint (kInvalidUID when the command named
+	    none). Backed up like every change a write makes (BeginRowBackup), so an Undo puts the row - its frame - back. */
+	void MarkItemOutlined(int32 chapterIdx, int32 hitIdx, UID newItem, uint64 newPrint, uint32 newLength);
 
 	/** An object row a write of KFC's own did NOT replace, but whose item's fingerprint the write moved - the text frame of
 	    the story an inline written hangs in, the group holding an item written (KFCObjectSearch::WriteReach): its fingerprint

@@ -602,6 +602,7 @@ bool KFCResultModel::GetHitRow(int32 chapterIdx, int32 hitIdx, RowDisplay& out)
 	out.matchText = h.matchText;
 	out.postText = h.postText;
 	out.replaced = h.replaced;
+	out.outlined = h.outlined;
 	out.kept = h.kept;
 	return true;
 }
@@ -1506,6 +1507,20 @@ void KFCResultModel::MarkItemReplaced(int32 chapterIdx, int32 hitIdx, uint64 new
 	BackUpRow(chapterIdx, hitIdx, *h);
 	h->replaced = true;
 	h->kept = true;		// ...and its eye on (the row eye, E2)
+	h->itemPrint = newPrint;
+	h->itemPrintLength = newLength;
+}
+
+void KFCResultModel::MarkItemOutlined(int32 chapterIdx, int32 hitIdx, UID newItem, uint64 newPrint, uint32 newLength)
+{
+	Hit* h = HitAt(chapterIdx, hitIdx);
+	if (h == nil || h->itemUID == kInvalidUID)
+		return;
+	BackUpRow(chapterIdx, hitIdx, *h);
+	h->replaced = true;		// written by KFC: its Replace greyed, counted as written
+	h->outlined = true;		// ...as outlines: the row reads "Outlined"
+	h->kept = true;			// ...and its eye on (the row eye - a row KFC wrote stays through a search again)
+	h->itemUID = newItem;	// the outlines InDesign made: the row's jump selects them
 	h->itemPrint = newPrint;
 	h->itemPrintLength = newLength;
 }

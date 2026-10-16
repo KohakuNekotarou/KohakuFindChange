@@ -759,6 +759,26 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCSearchTierAgainMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// ----- An OBJECT row's right-click menu (the author, 2026-10-17) -----
+		// Popped by KFCResultNodeEH::RButtonDn over an object row (the Object tab's): its Replace - the hit rows' own action -
+		// and Special Operations > Create Outlines (KFCObjectOutline): the row's object outlined - or the rows' selected
+		// together, when it is one of them - wherever they stand, across spreads and documents.
+		kKFCReplaceHitActionID,
+		kKFCResultObjectMenuName
+		kKFCObjectReplaceMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		// The submenu's parent node: ActionID 0 and its path ending in the delimiter (KCM's submenus - Adobe's idiom).
+		0,
+		kKFCSpecialOpsSubmenuPath kSDKDefDelimitMenuPath
+		kKFCSpecialOpsSubmenuPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCCreateOutlinesActionID,
+		kKFCSpecialOpsSubmenuPath
+		kKFCCreateOutlinesMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 	}
 };
 
@@ -1026,6 +1046,16 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKFCActionComponentBoss,
 		kKFCSearchTierAgainActionID,
 		kKFCSearchTierAgainMenuKey,	// "Search These Results Again"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// Create Outlines - an object row's Special Operations (the author, 10-17). kCustomEnabling: an object row's alone.
+		kKFCActionComponentBoss,
+		kKFCCreateOutlinesActionID,
+		kKFCCreateOutlinesMenuKey,	// "Create Outlines"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,

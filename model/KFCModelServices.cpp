@@ -26,6 +26,7 @@
 #include "KFCChangeAll.h"
 #include "KFCHitMarker.h"
 #include "KFCObjectReplace.h"
+#include "KFCObjectOutline.h"		// OutlineRows - an object row's Special Operations > Create Outlines
 #include "KFCOversetLocator.h"
 #include "KFCQueryScope.h"		// KFCUnderListQuery - a row operation under its own list's query (v2)
 #include "KFCQuerySequence.h"
@@ -121,6 +122,7 @@ public:
 	virtual void DropKeptTiers() { KFCTierStore::DropAll(); }
 	virtual bool DropTier(uint32 resultSet) { return KFCTierStore::DropTier(resultSet); }
 	virtual bool SearchListAgain(PMString& outStatus) { return KFCUnderListQuery(outStatus, false, [&]() { return KFCSearchEngine::SearchListAgain(outStatus); }); }
+	virtual bool OutlineRows(const KFCRowsByChapter& rows, PMString& outStatus) { return KFCObjectOutline::OutlineRows(rows, outStatus); }
 };
 
 CREATE_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)

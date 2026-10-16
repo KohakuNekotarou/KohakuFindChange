@@ -506,7 +506,8 @@ bool KFCResultTree::GetRowLook(const NodeID& node, RowLook& out)
 		out.locator = row.locator;
 		if (row.replaced)
 		{
-			PMString changed("Changed ");
+			// ("Outlined" for a row written as outlines - an object row's Create Outlines, KFCObjectOutline.)
+			PMString changed(row.outlined ? "Outlined " : "Changed ");
 			changed.SetTranslatable(kFalse);
 			changed.Append(row.locator);
 			out.locator = changed;
@@ -1210,6 +1211,23 @@ bool KFCResultTree::SearchDocumentAgain(int32 chapterIdx)
 bool KFCResultTree::SearchListAgain()
 {
 	return SearchAgain([&](PMString& status) { return KFCRuns()->SearchListAgain(status); });
+}
+
+bool KFCResultTree::OutlineRows(const KFCRowsByChapter& rows)
+{
+	if (KFCJump::IsLanding() || RefusedWhileRunning() || KFCRowCount(rows) == 0)
+		return false;
+	PMString status;
+	const bool wrote = KFCRuns()->OutlineRows(rows, status);
+	// The rows drawn again - each written one reads Outlined and names its outlines (RefreshRows keeps what the person had
+	// opened and closed) - and the status line either way.
+	if (KFCResults()->HasRun())
+		RefreshRows();
+	else
+		Rebuild();
+	if (!status.IsEmpty())
+		ShowStatus(status);
+	return wrote;
 }
 
 // End, KFCResultListWidgetMgr.cpp.
