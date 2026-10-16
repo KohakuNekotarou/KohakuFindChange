@@ -117,7 +117,7 @@
   ストーリー・文書の行のメニューは、実行中のほかは開く（Search This Story Again／Search This Document Again が断るときは、押した後にメッセージ欄で理由を言う）。
   Select All Rows は下にヒットの行が無い行で灰色＝そのときブックの行のメニューは開かない（ROW-38・2026-10-11 作者の決定）。
   理由は出さない（右クリックの理由の層は 2026-10-06 に外した＝ROW-29）。
-  - 訂正:
+  - 訂正: ⚠2026-10-17（ヘッダーの再読）＝「本体の振る舞い」は正確でない。全部灰色だと開かないのは **KFC が渡している引数**（`IMenuManager::HandlePopupMenu(…, removeDisabledItems = kTrue, …)`・SDK の Adobe 側の呼び出し 14 か所も全部 kTrue＝本体の流儀ではある）。`kFalse` なら灰色の項目を並べて開く（実測＝テスト用ビルドの故障スイッチ `menu-keep-grey` で置換済みの行に `Replace (disabled)` が出た）。振る舞いは変えていない＝灰色を見せる形にするかは作者（`docs/ai-notes/hdr-reread-kfc-cannot-2026-10-17.md`）。
 
 - **SET-12** （2026-10-06 に外した＝Check All／Uncheck All。チェックボックスごと＝F16）
   - 訂正:

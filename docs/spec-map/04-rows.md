@@ -216,7 +216,7 @@
   ブックの行なら一覧の全部の行（どの章の行も）。回帰＝`sel-cases.tsv`。
   ★**閉じている行は、その下の分岐の行を1つずつ上から開く**（2026-10-13・ブロック7の不具合の再検査 D7-1）＝ブックの検索の後はブックの行が開いていて章は閉じている（ROW-02）。それまでは「子孫もすべて開く」1手（`ITreeViewMgr::ExpandNode`）で、KIDMCP の実測（もう開いている根に呼んでも子孫は開かない）からは章が閉じたままの見込み＝その下の行は選ばれても描かれず、Return と右クリックの Replace は描かれた順で選択を聞くので**1行も書かない**（メッセージ欄は「Return replaces them all.」と言ったまま）。回帰＝`sel-book-closed-return`（Return は実入力）／`-armed`（テスト用ビルドの故障スイッチ `select-all-expand-once` で前の1手）＝既存の `sel-book-*` は先に expand で全部の行を開いていた＝閉じた章に会っていなかった。⬜実機は全件の回（`-armed` が両方を書いて落ちれば、1手でも開いていた＝D7-1 は不具合ではなかった）。
   ★下にヒットの行が1つも無い行（0件のブックの行・探し直して `(0/0)` の文書の行）では**灰色**（2026-10-11 作者の決定＝それまでは押せて、何も選ばずメッセージ欄も何も言わなかった）。
-  本体は灰色の項目を右クリックのメニューに出さないので、文書の行のメニューには Search This Document Again だけが出て、ブックの行ではメニューが開かない（SET-11 と同じ振る舞い）。回帰＝`sel-zero-row-greyed`・`sel-zero-book-no-menu`。
+  本体の流儀どおり灰色の項目を右クリックのメニューに出さないので（KFC が `removeDisabledItems = kTrue` を渡している＝SET-11 の訂正）、文書の行のメニューには Search This Document Again だけが出て、ブックの行ではメニューが開かない（SET-11 と同じ振る舞い）。回帰＝`sel-zero-row-greyed`・`sel-zero-book-no-menu`。
   ★行の右クリックのメニューの項目（Replace・Search This Story Again・Search This Document Again・Select All Rows）は、**そのメニューを開いた行にだけ**効く＝スクリプトが ActionID で押すと、どの行のメニューでもないので灰色で、何もしない（2026-10-13 作者の決定＝どの行かを本体の行のメニューと同じくメニューの widget から読むようにした。それまでは右クリックのたびに行を控えていて、古い控えの守りが要った＝10-11 午後の C-2：ブックの行を右クリックして何も押さずに閉じ、文書の範囲で検索し直した一覧に、スクリプトが Select All Rows を撃つと全行を選んでいた。回帰＝`ctx-book-stash-docsearch`・`ctx-hit-stash-story-rclick`＝今も「何もしない」を確かめる）。
   - 訂正:
 
