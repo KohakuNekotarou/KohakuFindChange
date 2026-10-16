@@ -124,4 +124,5 @@ git log -p -- docs/spec-map/        # コミット済みの書き込み
 **2026-10-14 夜の追記の基準**: branch `feat/2026-10-14-kfc-tier-switch`（`20821be` の上に、文書を閉じても段の見出しを残し、閉じた文書の行だけをどの段からも消す直し）。版数 `1.4.0`。LIFE-01・LIFE-02・ROW-40・ROW-41・ROW-42 の「見出しが残る」の記述はこの基準で書いた。
 **2026-10-17 の追記の基準**: branch `feat/2026-10-14-kfc-tier-switch`（`83225d0` の上に、段の見出しの右クリック Search These Results Again＝その段の検索をその段の条件でもう一度回す）。版数 `1.4.0`。ROW-44 と、ROW-39・ROW-40・ROW-41・ROW-43・LIFE-01 の Search These Results Again への言及はこの基準で書いた。
 **2026-10-17 の追記の基準（2）**: branch `feat/2026-10-14-kfc-tier-switch`（`ca4bd41` の上に、行の目玉＝`2f4a328`）。版数 `1.4.0`。ROW-45 と、ROW-44・REP-35・REP-37・UNDO-03・LIFE-01 の目玉への言及はこの基準で書いた。
+**2026-10-17 の追記の基準（3）**: branch `feat/2026-10-14-kfc-tier-switch`（`86f1273` の上に、物の行の特殊操作 Create Outlines＝`08ad356`）。版数 `1.4.0`。OBJ-19 と、ROW-32・UNDO-02 の Create Outlines への言及はこの基準で書いた（OBJ-19 の決めどころは作者の不在中に私が決めた＝作者の確認待ち）。
 ソースのクラス名・ファイル名・フォルダー名も **KFC**（2026-10-04 に旧名 KBS から改名・`chore/2026-10-04-kfc-rename`）。古いノート・memory の `KBS` は `KFC` と読み替える。

@@ -194,6 +194,20 @@
 
 ---
 
+## 9. 物の行の特殊操作（2026-10-17）
+
+- **OBJ-19** ★**物の行の `Special Operations ▸ Create Outlines`**（2026-10-17 作者の依頼「オブジェクト検査の検索結果の行に、特殊操作のサブメニューを追加したい／そこのなかに、アウトライン化を、選択された行のオブジェクトに対しておこなう／そうすることによってスプレッドをまたいだオブジェクトにたいして操作をおこなえる」・設計書 `docs/superpowers/specs/2026-10-17-kfc-object-outlines-design.md`＝⚠**作者の不在中に私のおすすめで決めた形**（D1〜D11・作者の確認待ち））――
+  物の行の右クリックのメニューは文字の行と別（ROW-32）＝`Replace` と `Special Operations ▸ Create Outlines`。右クリックした行が、まとめて選んだ行の1つなら選んだ行すべて、そうでなければその1行（Replace と同じ＝REP-36）。
+  本体の「書式＞アウトラインを作成」と同じく**元の枠を消してアウトラインに置き換える**（`ICreateOutlinesUtils::CreateCOFrameCmd`・枠ごとに1つ）。**スプレッドをまたいでも、文書（ブックの章）をまたいでも1回で**（本体のは選択＝1つのスプレッドの中だけ）。
+  書かない行（理由ごとに数える）＝文字の枠でない（本体の振り分け `FilterUIDList`）・ロック・あふれの中・もう無い（Missing）・もうアウトラインにした・文書が見つからない／開けない。**検索の後で物が変わった（指紋）では断らない**（Replace と違う＝アウトラインは検索の条件に関わらず、行が名指す物にかける）。
+  全部で**取り消しの1段**（Edit メニューの名前は `Create Outlines`・文書をまたいでも1段）＝パネルも Ctrl+Z／Redo に付いていく（`Undo: Create Outlines - the rows are back as they were before it.`＝UNDO-02）。KFC が開いた章（閉じていたブックの章）に書いたら窓を出す（保存できるように＝Replace と同じ）。
+  書いた行は頭に `Outlined`・目玉が付く（ROW-45）・`Replace` は灰色（右クリックに出ない）・行の物はできたアウトライン（クリックでそれを選ぶ）。行の言葉（`[ID278:<alpha one>]`）は検索した時の物のまま。
+  文＝`Outlined 2 of 3 objects: ID:278, ID:301. Left as they were: 1 not a text frame.`／`Outlined 1 object: ID:301.`／`Outlined 4 objects in 2 documents: rtoC.indd ID:278, ID:301; rtoD.indd ID:278, ID:301.`／書ける行が無い＝`Create Outlines: none of the 3 selected rows can be outlined - 3 not a text frame.`（1行なら `Create Outlines: <理由の文>`）。
+  ✅ 実機（2026-10-17・テスト用ビルド・KIDMCP）＝2つのスプレッドの文字の枠2つと画像の枠1つを Select All Rows で選び、右クリック→`Special Operations`→`Create Outlines`：2つのスプレッドとも文字の枠が消えてアウトライン（ポリゴン）になり、画像の枠は `not a text frame` で残る・行は `Outlined` と目玉・押すと2ページ目のアウトラインが選ばれる・Ctrl+Z で2つの枠と行が戻り未保存の印も元どおり・Redo でまたアウトライン／選んでいない1行の右クリックはその行だけ／閉じていたブックの2つの章を Select All Rows で→2つの文書に1段で書き、章に窓が出る・Ctrl+Z 1回で両方戻る／文字の行の右クリックは `Replace` だけ。⬜まだ＝鍵の掛かった物・あふれの中の物・アンカー付き／インラインの枠・連結した枠・全件の回。
+  - 訂正:
+
+---
+
 ## ⬜ この章で未確認
 
 この章を書くにあたって**確かめていない**もの。「書いていない＝そういう決まりが無い」ではない。

@@ -15,6 +15,7 @@
 - **UNDO-02** 追いかける書き込み＝ **行の Replace**（右クリック・Return キー）／**クエリ連続実行**（どれも取り消しの1段＝GEN-16）。
   1.4.0 から**オブジェクトの行の Replace** も（物の指紋の前・後で見分ける＝OBJ-11）。オブジェクトのクエリだけのクエリ連続実行は、ストーリーの版が動かないので追いかけない（OBJ-11）。（1.4.0・17-objects.md）
   1.4.0 から**まとめて選んだ行の置換**（REP-36）も ―― 何個の文書にまたがっても1段で、どの文書の Ctrl+Z でも全部の文書の行が戻る（書いた文書ぜんぶのストーリーの版で見分ける）。（1.4.0）
+  2026-10-17 から**物の行の Create Outlines**（OBJ-19）も ―― 元の枠が消える書き込みなので、取り消しは「元の枠が書く前の指紋で戻ったか」、やり直しは「元の枠がまた無くなったか」で見分ける。メッセージ欄は `Undo: Create Outlines - the rows are back as they were before it.`／`Redo: Create Outlines - ...`。
   Change All in Book (No List) は一覧が無いときだけ走り、一覧を作らないので、追いかけるものが無い（文書は Ctrl+Z で戻る）。
   （Change Checked・ストーリーと文書の行の Replace・Replace Again・Reject Change・Accept Change・Accept All Changes by KohakuFindChange は 2026-10-06 に外した。）
   - 訂正:

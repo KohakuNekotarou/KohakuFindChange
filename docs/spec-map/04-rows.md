@@ -156,6 +156,8 @@
 
   ```
   ヒットの行       Replace
+  （物の行）       Replace
+                   Special Operations ▸ Create Outlines（2026-10-17＝OBJ-19）
   ストーリーの行   Search This Story Again
                    Select All Rows
   文書の行         Search This Document Again
