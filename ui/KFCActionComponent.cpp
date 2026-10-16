@@ -476,6 +476,25 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			break;
 		}
 
+		case kKFCSearchTierAgainActionID:
+		{
+			// A tier's own row's right-click menu (the author, 2026-10-14 night): that tier's own search run once more. A grey
+			// tier is switched to first - the live list, as a click on its heading makes it (a refusal says why on the status
+			// line) - then searched again (KFCResultTree::SearchListAgain - the model reads the list's query, scope and
+			// documents). Not under a landing or a run: both doors refuse.
+			int32 tier = -1;
+			if (!RightClickedTier(widget, tier))
+				break;
+			if (tier >= 0)
+			{
+				NodeID liveRow;
+				if (!KFCResultHistory::SwitchToKeptRow(tier, -1, liveRow))
+					break;
+			}
+			(void)KFCResultTree::SearchListAgain();
+			break;
+		}
+
 		default:
 		{
 			break;
@@ -736,6 +755,15 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			case kKFCClearTheseResultsActionID:
 			{
 				// A tier's own row's menu: Clear These Results over a tier's row (a run standing greys everything, above).
+				int32 tier = -1;
+				const bool enable = RightClickedTier(widget, tier);
+				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
+				break;
+			}
+			case kKFCSearchTierAgainActionID:
+			{
+				// A tier's own row's menu: Search These Results Again over a tier's row - its refusals (a part of a document, a
+				// document or book not open, a list no search made) said on the status line, as Search This Document Again's.
 				int32 tier = -1;
 				const bool enable = RightClickedTier(widget, tier);
 				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);

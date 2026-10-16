@@ -1187,7 +1187,8 @@ bool KFCBookScope::MakeBookActive(const PMString& bookPath)
 	return true;
 }
 
-bool KFCBookScope::ListBookChapters(std::vector<ChapterDoc>& outDocs, PMString& outBookName, BookSelection* outSelection)
+bool KFCBookScope::ListBookChapters(std::vector<ChapterDoc>& outDocs, PMString& outBookName, BookSelection* outSelection,
+	const PMString* bookPath)
 {
 	outDocs.clear();
 	outBookName.Clear();
@@ -1207,7 +1208,7 @@ bool KFCBookScope::ListBookChapters(std::vector<ChapterDoc>& outDocs, PMString& 
 	// Both steps - and the closing-book door on each of them - live in ResolveTargetBook, which the
 	// menu's grey state asks as well (GetTargetBook). Non-owning pointer, whichever step answered:
 	// nothing here is released.
-	IBook* book = ResolveTargetBook();
+	IBook* book = (bookPath != nil) ? FindOpenBookByPath(*bookPath) : ResolveTargetBook();	// (a list's own book - by path)
 	if (book == nil)
 		return false;
 

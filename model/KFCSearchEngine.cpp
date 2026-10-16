@@ -2855,8 +2855,36 @@ bool KFCSearchEngine::DescribeRunScope(PMString& outWords)
 	return true;
 }
 
+namespace KFCSearchEngine
+{
+	/** WHAT A LIST SEARCHED AGAIN SEARCHES (SearchListAgain - a tier's heading's Search These Results Again): the scope it
+	    was searched with, read off the list, and what that scope searched - not Search: as it stands now. */
+	struct AgainTarget
+	{
+		bool					fromBook;		// a book's list: its book (bookPath), open
+		bool					allDocuments;	// All Documents: the documents open now
+		KFCBookScope::ChapterDoc	doc;			// Search: Document - the list's document, found open (when hasDoc)
+		bool					hasDoc;			// false = the front document, as Find searches (a search that found nothing)
+		PMString				bookPath;
+		uint32					set;			// the list's result set: kept, so the tier stays where it stands (v2 R4)
+		AgainTarget() : fromBook(false), allDocuments(false), hasDoc(false), set(0) {}
+	};
+
+	/** THE SEARCH'S ONE BODY - SearchBook's (again nil) and SearchListAgain's: the same doors, the same walk, the same
+	    summary. A list searched again is not parked as a tier - it is the same one - and is put back as it was when the
+	    search does not go through. outCommitted = past the commit point, and not put back. */
+	int32 RunSearch(const AgainTarget* again, PMString& outSummary, bool& outCommitted);
+}
+
 int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 {
+	bool committed = false;
+	return RunSearch(nil, outSummary, committed);
+}
+
+int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary, bool& outCommitted)
+{
+	outCommitted = false;
 	outSummary.Clear();
 	outSummary.SetTranslatable(kFalse);
 
@@ -2864,12 +2892,12 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 	// THE TEST BUILD'S WAY INTO THE QUERY RUN WITHOUT ITS DIALOG: while the fault switch queries-run is on, the Find
 	// action runs the queries its file lists (KFCQuerySequence::RunFromDiagSwitch - the regression cases qs-*, xq-*)
 	// - ahead of the re-entry stop below, because the run asks the same doors itself and sets its own flag.
-	if (KFC_DIAG_FAULT("queries-run"))
+	if (again == nil && KFC_DIAG_FAULT("queries-run"))
 		return KFCQuerySequence::RunFromDiagSwitch(outSummary);
 	// THE TIER SWITCH'S SPIKE (docs/superpowers/plans/2026-10-14-kfc-tier-switch.md Task 3): while one of the fault switches
 	// qcopy-roundtrip / qcopy-armed / qcopy-abort is on, the Find copies Find/Change's query in memory, states it back and
 	// says what came back (KFCQueryCopier::DiagProbe) - and searches nothing.
-	if (KFCQueryCopier::DiagProbe(outSummary))
+	if (again == nil && KFCQueryCopier::DiagProbe(outSummary))
 		return 0;
 #endif
 
@@ -2973,7 +3001,15 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 	// The same two questions KFCBookScope::HasScopeTarget asks for the menu's grey state; asked
 	// separately here because each one has its own sentence to say.
 	RunScope runScope;
-	if (!(objectTab ? KFCObjectSearch::ResolveObjectRunScope(runScope, outSummary)
+	if (again != nil)
+	{
+		// SEARCH THESE RESULTS AGAIN: the scope the list was searched with, not Search: as it stands (SearchListAgain
+		// refused a part of a document, and found its document or its book open).
+		runScope.fromBook = again->fromBook;
+		runScope.allDocuments = again->allDocuments;
+		runScope.selectionScope = IWalkerScopeFactoryUtils::kDocumentScope;
+	}
+	else if (!(objectTab ? KFCObjectSearch::ResolveObjectRunScope(runScope, outSummary)
 			: KFCSearchEngine::ResolveRunScope(runScope, outSummary)))
 		return 0;
 	const bool fromBook = runScope.fromBook;
@@ -3021,9 +3057,40 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 	// THE LIST GOES ON AS A TIER, NOT AWAY (the tier switch - docs/superpowers/specs/2026-10-14-kfc-tier-switch-design.md
 	// 3-1): kept whole before anything below lets it go - its rows, its result set, its book, the query it was searched with
 	// (KFCTierStore::ParkCurrent decides whether it is one to keep).
-	KFCTierStore::ParkCurrent();
+	// SEARCH THESE RESULTS AGAIN KEEPS THE LIST WHERE IT IS (SearchListAgain): not parked - it is the same tier, searched
+	// anew - and copied whole first, its rows on their foci as they stand, to be put back if the search does not go
+	// through (putBack, below).
+	KFCResultModel::ModelSnapshot before;
+	PMString beforeBook;
+	beforeBook.SetTranslatable(kFalse);
+	if (again != nil)
+	{
+		for (int32 c = 0; c < KFCResultModel::GetChapterCount(); ++c)
+			FollowChapterFoci(c);
+		KFCResultModel::TakeModelSnapshot(before);
+		(void)KFCBookScope::GetSearchedBookPath(beforeBook);
+	}
+	else
+		KFCTierStore::ParkCurrent();
 	KFCBookScope::ReleaseHeldDocs(true /*close now*/);
 	KFCSearchEngine::DropResults();
+	// ...the same result set again, in a new layout (Clear numbered both anew): the tier keeps its place (v2 R4), and the
+	// writes kept for its old rows are no longer followed (UNDO-14, as after Search This Document Again).
+	if (again != nil)
+		KFCResultModel::ReturnToResultSet(again->set);
+	outCommitted = true;
+	// WHAT A SEARCH AGAIN THAT DOES NOT GO THROUGH OWES THE LIST: its rows, its result set, its book and its Find Format
+	// as they were - the chapters the walk opened handed back first.
+	const auto putBack = [&]()
+	{
+		KFCBookScope::ReleaseSearchedBook();
+		KFCResultModel::RestoreModelSnapshot(before);
+		KFCResultModel::ReturnToResultSet(again->set);
+		if (!beforeBook.IsEmpty())
+			KFCBookScope::SetSearchedBookPath(beforeBook);
+		RememberFindFormatOf(before.header.query.get());
+		outCommitted = false;
+	};
 
 	std::vector<KFCBookScope::ChapterDoc> targets;
 	PMString bookName;
@@ -3040,13 +3107,16 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 		// chapter of its own. Whether a chapter can actually be opened is not known yet - the
 		// summary reports the ones that could not, after the walk. (Only the Book panel's selected
 		// chapters, when the toggle narrows the run - ListBookChapters decides.)
-		if (!KFCBookScope::ListBookChapters(targets, bookName, &selection) || targets.empty())
+		if (!KFCBookScope::ListBookChapters(targets, bookName, &selection, again != nil ? &again->bookPath : nil)
+			|| targets.empty())
 		{
 			// "That book", not "the active book": a run is against the book the BOOK PANEL is showing,
 			// and only falls back to the active one when no panel can be reached
 			// (KFCBookScope::ResolveTargetBook).
 			// (An empty book is refused at the front door. This is the safety net - see the note at the
 			// end of ListBookChapters - and the same sentence.)
+			if (again != nil)
+				putBack();
 			outSummary.Append(kBookHasNoChapters);
 			return 0;
 		}
@@ -3074,10 +3144,14 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 		}
 		if (targets.empty())
 		{
+			if (again != nil)
+				putBack();
 			outSummary.Append(kNoDocumentToSearch);
 			return 0;
 		}
 	}
+	else if (again != nil && again->hasDoc)
+		targets.push_back(again->doc);		// SEARCH THESE RESULTS AGAIN: the list's own document, found open
 	else
 	{
 		// Re-read rather than carried down from the check above: a command has been processed since
@@ -3086,6 +3160,8 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 		IDocument* doc = KFCBookScope::ActiveDocument();
 		if (doc == nil)
 		{
+			if (again != nil)
+				putBack();
 			outSummary.Append(kNoDocumentToSearch);
 			return 0;
 		}
@@ -3147,6 +3223,11 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 	// ...and the QUERY ITSELF, copied in memory (the tier switch - KFCQueryCopy): what is stated back into Find/Change when
 	// this list, kept as a tier by a later search, is switched to. Read here, beside the signature and the format, for their
 	// reason: on this side of CommitSearchMode. A copy that cannot be read is not put on - that tier then refuses a switch.
+	// (SEARCH THESE RESULTS AGAIN keeps the list's own copy: the tier keeps its name, and its query - whatever Change to
+	// the dialog holds.)
+	if (again != nil)
+		KFCResultModel::SetQueryCopy(before.header.query);
+	else
 	{
 		KFCQueryCopy copy;
 		KFCQueryCopier::Capture(copy);
@@ -3165,9 +3246,15 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 	// ReleaseHeldDocs schedules its closes, so it is safe to call from in here.
 	if (tally.cancelled)
 	{
-		KFCSearchEngine::DropResults();		// the rows, the book (its chapters closed) and the format
 		outSummary.Clear();
 		outSummary.SetTranslatable(kFalse);
+		if (again != nil)
+		{
+			putBack();		// SEARCH THESE RESULTS AGAIN: the list as it was
+			outSummary.Append("Search These Results Again: cancelled - the rows are left as they were.");
+			return 0;
+		}
+		KFCSearchEngine::DropResults();		// the rows, the book (its chapters closed) and the format
 		outSummary.Append("Search cancelled.");
 		return 0;
 	}
@@ -3175,6 +3262,9 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 	// THE ROWS' FOCI (spec T6 a): every chapter whose document is still open - the documents of a document-scope search,
 	// a book's chapters the user has open. The chapters a book search opened itself were handed back in the loop.
 	KFCRowFoci::AttachOpenChapters();
+	// (SEARCH THESE RESULTS AGAIN says so ahead of the search's own words.)
+	if (again != nil)
+		outSummary.Append("Searched these results again: ");
 
 	// Every chapter KFC opened has already been handed back inside the loop - a book search leaves
 	// nothing of its own open, and no .indd locked. The rows carry their chapter's file, so a jump
@@ -4262,6 +4352,110 @@ bool KFCSearchEngine::SearchDocumentAgain(int32 chapterIdx, PMString& outStatus)
 	}
 	SayFoundAgain(outStatus, "document", KFCResultModel::ReplaceChapterRows(chapterIdx, hits, storyVersions), capped);
 	return true;
+}
+
+// SEARCH THESE RESULTS AGAIN (a tier's heading's right-click menu - the author, 2026-10-14 night, to the idea of searching a
+// tier again from its heading: "let's try it"). The live list's own search run once more - RunSearch, the search's
+// one body - over what the list searched, with its own query (the door states it when Find/Change holds another one -
+// KFCQueryScope): its document, its book, or the documents open now; its rows replaced in place. See the header.
+bool KFCSearchEngine::SearchListAgain(PMString& outStatus)
+{
+	outStatus.Clear();
+	outStatus.SetTranslatable(kFalse);
+	if (KFCRunGuard::IsAnyRunning())
+	{
+		outStatus.Append(KFCRunGuard::BusyMessage());
+		return false;
+	}
+	PMString lead("Search These Results Again: ");
+	lead.SetTranslatable(kFalse);
+	// ITS OWN QUERY, KEPT AND READABLE: what the door states into Find/Change (KFCQueryScope states only a valid copy, and
+	// lets the operation through on Find/Change as it is otherwise) - so none, or one that could not be read, is refused
+	// here rather than searched with whatever the dialog holds.
+	const std::shared_ptr<const KFCQueryCopy> copy(KFCResultModel::GetQueryCopy());
+	if (copy == nullptr || !copy->valid)
+	{
+		outStatus.Append(lead);
+		outStatus.Append("these results keep no query of their own - search with Find.");
+		return false;
+	}
+	AgainTarget again;
+	again.set = KFCResultModel::GetResultSetId();
+	const char* part = nil;
+	switch (KFCResultModel::GetSearchScope())
+	{
+		case KFCResultModel::kScopeStory:			part = "Story"; break;
+		case KFCResultModel::kScopeToEndOfStory:	part = "To End of Story"; break;
+		case KFCResultModel::kScopeSelection:		part = "Selection"; break;
+		case KFCResultModel::kScopeBook:			again.fromBook = true; break;
+		case KFCResultModel::kScopeAllDocuments:	again.allDocuments = true; break;
+		default:									break;
+	}
+	// A SEARCH OVER PART OF A DOCUMENT: refused, as Search This Document Again refuses it - a story's part is Search This
+	// Story Again's.
+	if (part != nil)
+	{
+		outStatus.Append(lead);
+		outStatus.Append("the search was over part of a document (Search: ");
+		outStatus.Append(part);
+		outStatus.Append(") - use Search This Story Again on a story row.");
+		return false;
+	}
+	if (again.fromBook)
+	{
+		// ITS BOOK, OPEN - the book these rows were searched in (a switch to this tier refused one that was not).
+		if (!KFCBookScope::GetSearchedBookPath(again.bookPath) || !KFCBookScope::IsBookStillOpen(again.bookPath))
+		{
+			outStatus.Append(lead);
+			outStatus.Append("the book these results were searched in is not open - open it, then search again.");
+			return false;
+		}
+	}
+	else if (!again.allDocuments && KFCResultModel::GetChapterCount() > 0)
+	{
+		// ITS DOCUMENT (Search: Document - the searched one, the list's first chapter), FOUND OPEN, NEVER REOPENED (LIFE-01:
+		// KFC does not open again what the person closed): by its binding while its rows stand; its rows gone with a close,
+		// by the file it was closed from (Chapter::closedFile). No chapter at all - a search that found nothing - searches
+		// the front document, as Find does.
+		UIDRef docRef;
+		IDFile file, closed;
+		PMString name;
+		int32 rows = 0;
+		(void)KFCResultModel::GetChapterLocation(0, docRef, file);
+		(void)KFCResultModel::GetChapterClosedFile(0, closed);
+		(void)KFCResultModel::GetChapterDisplay(0, name, rows);
+		UIDRef open(docRef);
+		bool found = (docRef.GetDataBase() != nil || KFCBookScope::ChapterHasFile(file))
+			&& KFCBookScope::FindOpenChapterDoc(file, open);
+		if (!found && KFCBookScope::ChapterHasFile(closed))
+		{
+			open = UIDRef::gNull;
+			found = KFCBookScope::FindOpenChapterDoc(closed, open);
+		}
+		if (found)
+		{
+			InterfacePtr<IDocument> doc(open, UseDefaultIID());
+			if (doc != nil)
+			{
+				again.doc = KFCBookScope::DocAsChapter(doc);
+				again.hasDoc = true;
+			}
+		}
+		if (!again.hasDoc)
+		{
+			outStatus.Append(lead);
+			if (name.IsEmpty())
+				outStatus.Append("its document");
+			else
+				outStatus.Append(name);
+			outStatus.Append(KFCBookScope::ChapterHasFile(closed) ? " is not open - open it, then search again."
+				: " was closed, and its file is not known - search it with Find.");
+			return false;
+		}
+	}
+	bool committed = false;
+	(void)RunSearch(&again, outStatus, committed);
+	return committed;
 }
 
 void KFCSearchEngine::RestoreSearchScope(int32 mode, int32 scope)

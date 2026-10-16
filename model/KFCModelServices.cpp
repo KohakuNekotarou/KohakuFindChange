@@ -119,6 +119,7 @@ public:
 	virtual void GetKeptTierSets(std::vector<uint32>& out) { KFCTierStore::GetTierSets(out); }
 	virtual void DropKeptTiers() { KFCTierStore::DropAll(); }
 	virtual bool DropTier(uint32 resultSet) { return KFCTierStore::DropTier(resultSet); }
+	virtual bool SearchListAgain(PMString& outStatus) { return KFCUnderListQuery(outStatus, false, [&]() { return KFCSearchEngine::SearchListAgain(outStatus); }); }
 };
 
 CREATE_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)

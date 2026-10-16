@@ -737,6 +737,13 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCClearTheseResultsMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// ...and Search These Results Again (the author, 10-14 night): that tier's own search run once more - a grey one
+		// switched to first (KFCResultTree::SearchListAgain).
+		kKFCSearchTierAgainActionID,
+		kKFCResultTierMenuName
+		kKFCSearchTierAgainMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 	}
 };
 
@@ -993,6 +1000,17 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKFCActionComponentBoss,
 		kKFCClearTheseResultsActionID,
 		kKFCClearTierResultsMenuKey,	// "Clear These Results"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// Search These Results Again - a tier's own row's right-click menu (the author, 10-14 night). kCustomEnabling, as
+		// Clear These Results.
+		kKFCActionComponentBoss,
+		kKFCSearchTierAgainActionID,
+		kKFCSearchTierAgainMenuKey,	// "Search These Results Again"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,

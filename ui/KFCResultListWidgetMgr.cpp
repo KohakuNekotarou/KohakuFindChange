@@ -1151,7 +1151,8 @@ bool KFCResultTree::ReplaceRows(const KFCRowsByChapter& rows, PMString* outStatu
 
 namespace
 {
-// SEARCH ... AGAIN, THE STEPS AROUND THE WALK - one place for the story's and the document's. Not while a landing is under
+// SEARCH ... AGAIN, THE STEPS AROUND THE WALK - one place for the story's, the document's and the list's (a tier's
+// heading's). Not while a landing is under
 // way (KFCJump::IsLanding): the walk reopens the chapter and hands it back - closed on the spot - which can be the very
 // document the landing is giving a window; nor while a run of ours is up (RefusedWhileRunning). Then the walk; the tree
 // REBUILT, not repainted, when its rows were put back - every row after them has another place, the document's another
@@ -1178,6 +1179,11 @@ bool KFCResultTree::SearchStoryAgain(int32 chapterIdx, int32 groupIdx)
 bool KFCResultTree::SearchDocumentAgain(int32 chapterIdx)
 {
 	return SearchAgain([&](PMString& status) { return KFCRuns()->SearchDocumentAgain(chapterIdx, status); });
+}
+
+bool KFCResultTree::SearchListAgain()
+{
+	return SearchAgain([&](PMString& status) { return KFCRuns()->SearchListAgain(status); });
 }
 
 // End, KFCResultListWidgetMgr.cpp.

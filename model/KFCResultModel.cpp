@@ -311,7 +311,7 @@ KFCResultModel::SearchScopeKind KFCResultModel::GetSearchScope()
 	return gHeader.searchScope;
 }
 
-void KFCResultModel::CloseChapter(int32 chapterIdx)
+void KFCResultModel::CloseChapter(int32 chapterIdx, const IDFile* closedFile)
 {
 	Chapter* c = ChapterAt(chapterIdx);
 	if (c == nil)
@@ -319,19 +319,23 @@ void KFCResultModel::CloseChapter(int32 chapterIdx)
 	// Its rows' text foci go first - their document is still open here (the close responder's kBeforeCloseDoc).
 	KFCRowFoci::DetachChapter(chapterIdx);
 	// Emptied and unbound, in place (see the header for why the place is kept).
-	EmptyChapter(*c);
+	EmptyChapter(*c, closedFile);
 }
 
-void KFCResultModel::EmptyChapter(Chapter& chapter)
+void KFCResultModel::EmptyChapter(Chapter& chapter, const IDFile* closedFile)
 {
 	// A FRESH CHAPTER IN ITS PLACE, ITS NAME KEPT: rows, story groups, story versions, searched parts, binding (no docRef,
 	// no file) and the "shown empty" mark - a closed document's chapter is not shown - all back to nothing in one
 	// statement, so a field added to Chapter is emptied here without a line of its own. (Emptied field by field, the
 	// searched parts were once left behind, describing rows that had gone.) The old storage goes now, rather than at
 	// the next search.
+	// ...AND THE FILE ITS DOCUMENT WAS CLOSED FROM (Chapter::closedFile - nil keeps what an earlier close left): the
+	// heading's Search These Results Again finds the document open again by it, and nothing else reads it.
 	const PMString name(chapter.name);
+	const IDFile was(closedFile != nil ? *closedFile : chapter.closedFile);
 	chapter = Chapter();
 	chapter.name = name;
+	chapter.closedFile = was;
 }
 
 int32 KFCResultModel::GetShownChapter(int32 nth)
@@ -865,6 +869,15 @@ bool KFCResultModel::GetChapterLocation(int32 chapterIdx, UIDRef& outDocRef, IDF
 		return false;
 	outDocRef = c->docRef;
 	outFile = c->file;
+	return true;
+}
+
+bool KFCResultModel::GetChapterClosedFile(int32 chapterIdx, IDFile& outFile)
+{
+	const Chapter* c = ChapterAt(chapterIdx);
+	if (c == nil)
+		return false;
+	outFile = c->closedFile;
 	return true;
 }
 

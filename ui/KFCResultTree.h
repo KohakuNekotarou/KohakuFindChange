@@ -201,6 +201,11 @@ namespace KFCResultTree
 	    SearchStoryAgain, over the whole document (KFCRuns()->SearchDocumentAgain). True = done. */
 	bool SearchDocumentAgain(int32 chapterIdx);
 
+	/** SEARCH THESE RESULTS AGAIN (a tier's heading's right-click menu - the author, 2026-10-14 night): as
+	    SearchStoryAgain, over the live list's whole search (KFCRuns()->SearchListAgain) - a grey tier switched to the live
+	    list first, by the caller. True = done. */
+	bool SearchListAgain();
+
 	/** The result list's view, reached through its panel - nil while the panel is closed. Not counted (the panel holds
 	    it): use it at once. Asked by whatever outside the panel wants the list alone - the tree's manager, its controller,
 	    the keyboard's questions, the Return filter. (RedrawKeyboardFrame wants the panel's view as well, and asks the
@@ -244,7 +249,8 @@ namespace KFCResultTree
 
 	/** A RUN OF OURS IS UP - its progress bar pumps events, so a key or a menu can arrive in the middle of it: the
 	    status line says so and the caller turns it away. True = refused. The one place this is asked (ReplaceRows -
-	    the rows' Replace and Return -, SearchStoryAgain, SearchDocumentAgain, Clear Results and Save Panel Settings).
+	    the rows' Replace and Return -, SearchStoryAgain, SearchDocumentAgain, SearchListAgain, Clear Results and Save
+	    Panel Settings).
 	    A model half of another build answers here too: its stand-in is "a run standing", its words the reason. */
 	bool RefusedWhileRunning();
 

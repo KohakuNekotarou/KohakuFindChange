@@ -15,6 +15,7 @@
 
 // Project includes:
 #include "KFCTierStore.h"
+#include "IDataBase.h"		// GetSysFile - a closing document's file, kept on a tier's emptied chapter
 #include "KFCBookScope.h"	// GetSearchedBookPath - the book a list was searched in; FindOpenChapterDoc - a chapter, by its file
 #include "KFCDiag.h"		// the TIER lines - test builds only
 #include "KFCModelNotify.h"	// KFCNotifyKeptChapterGone - a grey copy lets a closed document's rows go
@@ -154,7 +155,7 @@ void KFCTierStore::ForgetDocument(IDataBase* db)
 			UIDRef found = chapters[c].docRef;
 			if (KFCBookScope::FindOpenChapterDoc(chapters[c].file, found) && found.GetDataBase() == db)
 			{
-				KFCResultModel::EmptyChapter(chapters[c]);
+				KFCResultModel::EmptyChapter(chapters[c], db->GetSysFile());	// its file kept (Chapter::closedFile)
 				KFC_DIAG_LOG("TIER forget chapter=%d of set=%u", static_cast<int>(c), gTiers[t].set);
 				// THE PANEL'S GREY COPY FOLLOWS (the author, 10-14 night: "only the closed document's part goes"): that
 				// document's rows go from it, and its heading reads the counts the list has now - the tier stays.

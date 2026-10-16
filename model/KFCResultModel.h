@@ -198,6 +198,9 @@ namespace KFCResultModel
 		PMString				name;	// the chapter's display name (its file name)
 		UIDRef					docRef;	// current binding (RebindChapterDoc after a reopen)
 		IDFile					file;	// the chapter's .indd (to reopen a closed chapter)
+		IDFile					closedFile;	// the file its document was closed from (EmptyChapter): read only by the
+										// heading's Search These Results Again, to find the document OPEN again - never
+										// reopened, never rebound by it (LIFE-01; a document-scope chapter has no `file`)
 		std::vector<Hit>		hits;
 		std::vector<FontGroup>	fontGroups;	// its story groups - every text hit is in one (an object row in none)
 		// Each story's version (ITextModel::GetChangeCount) where KFC last knew the rows in it to stand
@@ -264,12 +267,16 @@ namespace KFCResultModel
 	    Its chapter is emptied - rows, groups, story versions - and unbound (no docRef, no file), but
 	    it KEEPS ITS PLACE: KFCUndoFollow names rows by (chapter, row), and closing up the gap would renumber
 	    every chapter after it and cut those off from their Undo. A chapter with no rows is not shown
-	    (GetShownChapter) and holds nothing to count or write, so nothing else has to know it is there. */
-	void CloseChapter(int32 chapterIdx);
+	    (GetShownChapter) and holds nothing to count or write, so nothing else has to know it is there.
+	    `closedFile` = the closing document's file (IDataBase::GetSysFile - nil for one never saved), kept on the
+	    emptied chapter as Chapter::closedFile. */
+	void CloseChapter(int32 chapterIdx, const IDFile* closedFile);
 
 	/** CloseChapter's work on a chapter that is not in the model - one of a kept whole result set
-	    (KFCUndoFollow::ForgetDocument): its rows, groups, versions and searched parts gone, no docRef, no file. */
-	void EmptyChapter(Chapter& chapter);
+	    (KFCUndoFollow::ForgetDocument, KFCTierStore::ForgetDocument): its rows, groups, versions and searched parts
+	    gone, no docRef, no file - and `closedFile` kept as Chapter::closedFile (nil keeps what an earlier close
+	    left). */
+	void EmptyChapter(Chapter& chapter, const IDFile* closedFile = nil);
 
 	/** The nth chapter the tree SHOWS - the chapters with rows, and one searched again with none (Chapter::shownEmpty) -
 	    as a chapter index; -1 = none. With no emptied chapter the nth shown is chapter nth. */
@@ -522,6 +529,10 @@ namespace KFCResultModel
 	/** A chapter's document binding and file. The replace pass works chapter at a time, so it
 	    needs this without going through a hit. false = index out of range. */
 	bool GetChapterLocation(int32 chapterIdx, UIDRef& outDocRef, IDFile& outFile);
+
+	/** The file a chapter's document was closed from (Chapter::closedFile - empty for a chapter never closed, or one
+	    whose document was never saved). false = index out of range. */
+	bool GetChapterClosedFile(int32 chapterIdx, IDFile& outFile);
 
 	/** What the same-occurrence test asks of a row: the story it was found in, where the match
 	    started and ENDED, and the whole of its text as one number.

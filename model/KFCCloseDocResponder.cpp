@@ -57,6 +57,7 @@
 #include "VCPlugInHeaders.h"
 
 // Interface includes:
+#include "IDataBase.h"			// GetSysFile - the file a closing document lives in, kept on its emptied chapter
 #include "IDocumentSignalData.h"
 #include "ISignalMgr.h"
 
@@ -250,7 +251,10 @@ void KFCCloseDocResponder::Respond(ISignalMgr* signalMgr)
 	KFCResultModel::GetChapterDisplay(closingChapter, closedName, closedCount);
 	KFC_DIAG_LOG("CLOSE - chapter %d's %d row(s) go", closingChapter, closedCount);
 	KFCNotifyChapterRowGoes(closingChapter);
-	KFCResultModel::CloseChapter(closingChapter);
+	// ...the file it is closed from kept on its emptied chapter (Chapter::closedFile): the heading's Search These Results
+	// Again finds the document open again by it - it never reopens one (LIFE-01).
+	IDataBase* const closingDB = closingDocRef.GetDataBase();
+	KFCResultModel::CloseChapter(closingChapter, closingDB != nil ? closingDB->GetSysFile() : nil);
 
 	// THE LIST STAYS WHILE IT IS ONE TO KEEP (KFCTierStore::LiveListIsKeepable - the one answer: a row left, or a search
 	// made it): the other documents' rows, or its heading alone - "(0/0)" once its last document is gone, as a search

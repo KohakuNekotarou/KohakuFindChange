@@ -336,6 +336,10 @@ DECLARE_PMID(kActionIDSpace, kKFCSelectAllRowsActionID, kKFCUIPrefix + 52)
 // R9 - the author's call): that tier alone let go - a grey one, or the live list (the grey tiers stay). The flyout's Clear
 // Results still lets every tier go. + 54: the next after the highest spent (+ 53 is retired).
 DECLARE_PMID(kActionIDSpace, kKFCClearTheseResultsActionID, kKFCUIPrefix + 54)
+// "Search These Results Again" on a TIER's own row's right-click menu (the author, 2026-10-14 night): that tier's own
+// search run once more - a grey one switched to first (KFCResultTree::SearchListAgain). + 55: the next after the highest
+// spent.
+DECLARE_PMID(kActionIDSpace, kKFCSearchTierAgainActionID, kKFCUIPrefix + 55)
 
 
 // WidgetIDs:
@@ -450,6 +454,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryFindButtonWidgetID, kKFCUIPrefix + 45)
 // internal popup's key in its place - InDesign's string lookup took the one for the other. A new key is checked against
 // the untranslated table's (work/note-scripts/2026-10-14-kfc-tier-switch/key_collisions.py).
 #define kKFCClearTierResultsMenuKey	kKFCStringPrefix "kKFCClearTierResultsMenuKey"
+// ...and its Search These Results Again (measured against every other key - key_collisions.py: none reads alike).
+#define kKFCSearchTierAgainMenuKey	kKFCStringPrefix "kKFCSearchTierAgainMenuKey"
 // "How to Use...": the operating reference. English in every UI language, like the rest of the
 // flyout - there is one string table, and the one thing switched to Japanese at run time is this page's
 // body (KFCLoc::JapaneseUI).
@@ -586,7 +592,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryFindButtonWidgetID, kKFCUIPrefix + 45)
 #define kKFCSearchDocumentAgainMenuItemPosition	0.5
 // Select All Rows: after the row's own Search ... Again on a story or document row; alone on the book row's menu.
 #define kKFCSelectAllRowsMenuItemPosition		1.0
-// A tier's own row's menu: Clear These Results, alone.
+// A tier's own row's menu: Search These Results Again, then Clear These Results.
+#define kKFCSearchTierAgainMenuItemPosition	0.5
 #define kKFCClearTheseResultsMenuItemPosition	1.0
 
 

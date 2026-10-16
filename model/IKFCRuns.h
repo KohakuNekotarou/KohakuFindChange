@@ -125,6 +125,9 @@ public:
 	/** = KFCTierStore::DropTier (appended) - one tier let go, a kept one or the live list (a tier heading's Clear These
 	    Results). False = nothing let go. */
 	virtual bool DropTier(uint32 resultSet) = 0;
+	/** = KFCSearchEngine::SearchListAgain (appended) - a tier's heading's Search These Results Again: the live list's own
+	    search run once more, its rows replaced in place. False = refused or cancelled, the list as it was. */
+	virtual bool SearchListAgain(PMString& outStatus) = 0;
 };
 
 #endif // __IKFCRuns_h__

@@ -548,6 +548,18 @@ namespace KFCSearchEngine
 	    cancelled, the list unchanged; outStatus says what happened either way. */
 	bool SearchDocumentAgain(int32 chapterIdx, PMString& outStatus);
 
+	/** SEARCH THESE RESULTS AGAIN (a tier's heading's right-click menu - the author, 2026-10-14 night): the live list's
+	    own search run once more - SearchBook's body (RunSearch, in the .cpp) - with the list's query (the door states it
+	    when Find/Change holds another one - KFCQueryScope) over what the list searched: its document (Search: Document -
+	    found OPEN, by its binding or by the file it was closed from, never reopened; none recorded - a search that found
+	    nothing - the front document, as Find), the documents open now (All Documents), or its book (open - the Book
+	    panel's selection of it, as Find takes it). Its rows replaced in place: the same result set - the tier keeps its
+	    place, its name and its query - in a new layout. Refused, the list as it was: a run up, a list no search made, a
+	    search over part of a document (Story, To End of Story, Selection - Search This Story Again's), its document or
+	    book not open. Cancelled: the list put back. True = searched again (no match too); outStatus says what happened
+	    either way. */
+	bool SearchListAgain(PMString& outStatus);
+
 	/** A story's VERSION: ITextModel::GetChangeCount - the counter InDesign moves for every change to the
 	    story's text, attributes, tables and inlines (ITextModel.h, GetChangeCount), and moves BACK on Undo
 	    to exactly the value it had (measured - docs/ai-notes/text-change-counters-2026-08-08.md). The

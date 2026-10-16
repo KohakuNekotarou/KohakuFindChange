@@ -176,10 +176,13 @@ namespace KFCBookScope
 	    NARROWED: with Find/Change Selected Documents (Book) on and a PART of the book selected in the
 	    Book panel that shows it, only those chapters are listed - read now, as the run starts (section 4-2).
 	    outSelection, when given, says how many were taken and of how many (selected 0 = the whole book).
+	    bookPath, when given, names the book instead (a list's own - KFCSearchEngine::SearchListAgain): found open by its
+	    path (nothing listed when it is not) - narrowed by its Book panel's selection the same way.
 
 	    @return true when a book was resolved and it has at least one chapter. Note that this says
 	            nothing about whether those chapters can be OPENED - only OpenChapterDoc knows. */
-	bool ListBookChapters(std::vector<ChapterDoc>& outDocs, PMString& outBookName, BookSelection* outSelection = nil);
+	bool ListBookChapters(std::vector<ChapterDoc>& outDocs, PMString& outBookName, BookSelection* outSelection = nil,
+		const PMString* bookPath = nil);
 
 	/** THE TARGET BOOK, DESCRIBED WITHOUT A TRACE (the same section): its title, how many documents it
 	    holds and how many a run would take (the same narrowing as ListBookChapters, from the same place) - the book

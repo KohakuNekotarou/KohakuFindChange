@@ -1025,7 +1025,8 @@ void KFCUndoFollow::ForgetDocument(const UIDRef& docRef)
 		for (size_t s = 0; s < 2; ++s)
 			for (size_t c = 0; c < sets[s]->chapters.size(); ++c)
 				if (sets[s]->chapters[c].docRef == docRef)
-					KFCResultModel::EmptyChapter(sets[s]->chapters[c]);
+					KFCResultModel::EmptyChapter(sets[s]->chapters[c],
+						docRef.GetDataBase() != nil ? docRef.GetDataBase()->GetSysFile() : nil);	// its file kept
 		// Its stories and items (an object row's Replace). A write of rows of this document alone goes whole (and its rows
 		// with it); one of several documents (rows selected together) keeps the others' and lets this one's rows go
 		// (DropChapterRows); a query run keeps the stories of the documents still open.

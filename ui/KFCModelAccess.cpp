@@ -142,6 +142,7 @@ namespace
 		virtual void GetKeptTierSets(std::vector<uint32>& out) { out.clear(); }
 		virtual void DropKeptTiers() {}
 		virtual bool DropTier(uint32) { return false; }
+		virtual bool SearchListAgain(PMString& outStatus) { SayWhy(outStatus); return false; }
 	};
 
 	class KFCChaptersStandInImpl : public IKFCChapters
