@@ -77,8 +77,15 @@ void PopRowMenu(const char* menuName, IEvent* e, IPMUnknown* widget)
 	InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
 	InterfacePtr<IActionManager> actionMgr(app != nil ? app->QueryActionManager() : nil);
 	InterfacePtr<IMenuManager> menuMgr(actionMgr, UseDefaultIID());
+	bool16 removeDisabledItems = kTrue;		// InDesign's own row menus' form (every caller in source/open passes kTrue)
+#ifdef KFC_DIAG
+	// (Test builds only) Fault switch menu-keep-grey: the grey items kept on the menu (removeDisabledItems kFalse) - the
+	// input the spec map's SET-11 / ROW-38 never tried (the re-read of KFC's headers, 2026-10-17).
+	if (KFC_DIAG_FAULT("menu-keep-grey"))
+		removeDisabledItems = kFalse;
+#endif
 	if (menuMgr != nil)
-		menuMgr->HandlePopupMenu(menuName, e->GlobalWhere(), e->GlobalWhere(), kTrue, widget);
+		menuMgr->HandlePopupMenu(menuName, e->GlobalWhere(), e->GlobalWhere(), removeDisabledItems, widget);
 }
 
 }

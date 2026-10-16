@@ -72,6 +72,8 @@
 //    no-return-filter  (UI half) ui/KFCResultTreeEH.cpp's PushReturnFilter pushes nothing: the result list's
 //                Return filter stays off the dispatcher's stack - what the filter alone changes, told apart from the rest
 //                (a jumped-to replaced row drawn hilited)
+//    menu-keep-grey  (UI half) ui/KFCResultNodeEH.cpp's PopRowMenu passes HandlePopupMenu removeDisabledItems kFalse:
+//                a row menu keeps its grey items on it instead of dropping them (work\note-scripts\2026-10-17-kfc-hdr-reread)
 //    click-acquire-only  (UI half) ui/KFCResultNodeEH.cpp's row click hands the keyboard to the list the old way
 //                - IKeyBoard alone, and only when it names another holder - not through the panel's doors
 //                (KFCResultTree::TakeKeyboard): the case that shows what the doors add after Find/Change's title bar was
