@@ -58,10 +58,9 @@ namespace KFCResultModel
 		kCopyNone = 0,			// no Replace of the list has written the row (or one restored it since)
 		kCopyKept,				// a copy is kept (HitCopy::store / story)
 		kCopyOutsideMainText,	// its match is in a table cell, a footnote or a note - outside the story's primary thread
-		kCopyTouchesHyperlink,	// its match touches a hyperlink or cross-reference source - in it, around it or across its
-								// edge (InDesign's replace keeps a source on what it writes: a copy put back makes a second)
-		kCopyRestHoldsObject,	// the rest of its paragraph, which the copy would run on over, holds an object, a marker or
-								// a hyperlink
+		kCopyTouchesHyperlink,	// its match (or the rest it runs on over) touches a CROSS-REFERENCE source - its text is
+								// made by InDesign (a hyperlink's is copied and put back as one link: HitCopy::links - C15)
+		kCopyRestHoldsObject,	// the rest of its paragraph, which the copy would run on over, holds an object or a marker
 		kCopyFailed				// the copy could not be taken
 		// (kCopyParagraphFormat stood here until the author's call of 2026-10-17 evening - the spec's C16: a Replace that
 		//  sets paragraph formatting keeps its copy now, and the paragraph's own formatting with it - HitCopy::paraStyle.)
@@ -75,6 +74,17 @@ namespace KFCResultModel
 	    overrides - which a paste cannot carry (its first paragraph takes the attributes of the one it is pasted into), put
 	    back on that paragraph after the paste. What Restore Original puts back (KFCReplaceEngine::RestoreHits). Copied with
 	    the row - a tier, an Undo step, a backup - so the copy it names comes back with it. */
+	/** A HYPERLINK TEXT SOURCE THE COPY TOUCHED, and where it stood from the match's start when the copy was taken (the
+	    spec's C15): what Restore from Copy puts back where it stood - the paste makes a second link over a source the
+	    Replace kept (measured live 2026-10-17, H1 and H5), and cuts one the match crossed (H3). */
+	struct HitLink
+	{
+		UID		source;		// the hyperlink text source
+		int32	from;		// its start, from the match's start (negative: it began before the match)
+		int32	to;			// its end, from the match's start (past the copy's length: it ran on after it)
+		HitLink() : source(kInvalidUID), from(0), to(0) {}
+	};
+
 	struct HitCopy
 	{
 		uint32	store;		// the copy store's number (KFCCopyStore - 0 = none)
@@ -84,6 +94,7 @@ namespace KFCResultModel
 		int32	whyNot;		// CopyWhyNot - kCopyKept when the copy is kept
 		UID		paraStyle;	// the starting paragraph's style when the Replace sets paragraph formatting (kInvalidUID = not kept)
 		boost::shared_ptr<AttributeBossList> paraOverrides;	// ...and its own paragraph overrides then (nil = none)
+		std::vector<HitLink> links;	// the hyperlink text sources the copy touched (C15)
 		HitCopy() : store(0), story(kInvalidUID), rest(0), restHash(0), whyNot(kCopyNone), paraStyle(kInvalidUID) {}
 	};
 
