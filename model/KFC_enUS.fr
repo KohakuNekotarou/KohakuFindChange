@@ -36,7 +36,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 // query run, and Change All in Book.
                 kKFCReplaceStepKey,				"Replace",
                 kKFCCreateOutlinesStepKey,		"Create Outlines",
-                kKFCRestoreOriginalStepKey,		"Restore Original",
+                kKFCRestoreOriginalStepKey,		"Restore from Copy",
                 kKFCRunQueriesStepKey,			"Run Queries",
                 kKFCChangeAllStepKey,			"Change All",
         }

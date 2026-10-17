@@ -1073,7 +1073,7 @@ resource ActionDef (kSDKDefActionResourceID)
 		// kCustomEnabling: a text row a Replace wrote (CanRestoreAny); why a copy cannot go back it says on the status line.
 		kKFCActionComponentBoss,
 		kKFCRestoreOriginalActionID,
-		kKFCRestoreOriginalMenuKey,	// "Restore Original"
+		kKFCRestoreOriginalMenuKey,	// "Restore from Copy" (the author's name since 2026-10-17 evening - the IDs keep the first one)
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,

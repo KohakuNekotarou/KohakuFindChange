@@ -122,7 +122,7 @@ namespace KFCReplaceEngine
 
 	/** RESTORE ORIGINAL over text rows - the right-clicked row, or the rows selected together it is one of: the copy each
 	    one's Replace took of the text it wrote over (KFCCopyStore - ReplaceHits takes it) pasted back over what it wrote,
-	    in ONE undo step ("Restore Original" in the Edit menu - WriteStep) that the panel follows (KFCUndoFollow). The doors,
+	    in ONE undo step ("Restore from Copy" in the Edit menu - WriteStep) that the panel follows (KFCUndoFollow). The doors,
 	    row by row (C8): a replaced text row with its copy kept; its document reached (a closed chapter reopened windowless,
 	    as a Replace reaches it); its story followed (its rows take their foci's places - KFCSearchEngine::FollowStoryFoci -
 	    and its own focus stands exactly on its place; a story with no foci as KFC left it); what its Replace wrote still

@@ -2071,7 +2071,7 @@ bool KFCReplaceEngine::ReplaceHits(const KFCRowsByChapter& rowsByChapter, PMStri
 // from the row's right-click menu"; the calls C1 - C14 are mine, for the author to confirm). A text row a Replace of the
 // list wrote gets back the text that Replace wrote over: the copy taken just before it (TakeRowCopy) pasted over what it
 // wrote - and, for a copy run on to its paragraph's return, over the rest of that paragraph too, which the copy holds as
-// it read then (C4). ONE undo step ("Restore Original" - WriteStep), KFC's mark in it: the panel follows its Ctrl+Z and
+// it read then (C4). ONE undo step ("Restore from Copy" - WriteStep), KFC's mark in it: the panel follows its Ctrl+Z and
 // Redo as it follows a Replace's.
 // THE ROW'S OWN PLACE IS WHAT IS TRUSTED, NOT THE STORY'S VERSION (C8): the rows of its story follow their foci first
 // (KFCSearchEngine::FollowStoryFoci), and a row is put back only where its own focus stands exactly on its place and that
@@ -2121,7 +2121,7 @@ const char* RestoreWords(RestoreRefusal why)
 	}
 }
 
-// One row's refusal, after "Restore Original: ". A row with no copy says why it has none (HitCopy::whyNot - C12).
+// One row's refusal, after "Restore from Copy: ". A row with no copy says why it has none (HitCopy::whyNot - C12).
 const char* RestoreSentence(RestoreRefusal why, int32 whyNoCopy)
 {
 	switch (why)
@@ -2559,7 +2559,7 @@ bool KFCReplaceEngine::RestoreHits(const KFCRowsByChapter& rowsByChapter, PMStri
 	}
 	if (toWrite == 0)
 	{
-		outStatus = "Restore Original: ";
+		outStatus = "Restore from Copy: ";
 		if (total == 1)
 			outStatus.Append(RestoreSentence(lastWhy, lastWhyNoCopy));
 		else
@@ -2580,7 +2580,7 @@ bool KFCReplaceEngine::RestoreHits(const KFCRowsByChapter& rowsByChapter, PMStri
 	{
 		if (!KFCBookScope::IsDocStillOpen(chapters[c].docRef))
 		{
-			outStatus = "Restore Original: a document of the selected rows has been closed - nothing was changed.";
+			outStatus = "Restore from Copy: a document of the selected rows has been closed - nothing was changed.";
 			outStatus.SetTranslatable(kFalse);
 			return false;
 		}
@@ -2591,16 +2591,16 @@ bool KFCReplaceEngine::RestoreHits(const KFCRowsByChapter& rowsByChapter, PMStri
 	for (size_t c = 0; c < chapters.size(); ++c)
 		chapterIdxs.push_back(chapters[c].chapterIdx);
 	KFCUndoFollow::StepRecorder recorder(chapterIdxs);
-	recorder.SetName("Restore Original");
+	recorder.SetName("Restore from Copy");
 	bool ok = false;
 	bool pasteFailed = false;
 	int32 restored = 0;
 	{
 		KFCReplaceEngine::WriteStep step;
-		if (!KFCReplaceEngine::BeginWriteStep(acrossDocuments, step, kKFCRestoreOriginalStepKey, "KFC Restore Original"))
+		if (!KFCReplaceEngine::BeginWriteStep(acrossDocuments, step, kKFCRestoreOriginalStepKey, "KFC Restore from Copy"))
 		{
-			outStatus = acrossDocuments ? "Restore Original: InDesign would not start an undoable step - nothing was changed."
-				: "Restore Original: InDesign would not start a command sequence - nothing was changed.";
+			outStatus = acrossDocuments ? "Restore from Copy: InDesign would not start an undoable step - nothing was changed."
+				: "Restore from Copy: InDesign would not start a command sequence - nothing was changed.";
 			outStatus.SetTranslatable(kFalse);
 			return false;
 		}
@@ -2632,7 +2632,7 @@ bool KFCReplaceEngine::RestoreHits(const KFCRowsByChapter& rowsByChapter, PMStri
 		for (size_t c = 0; c < chapters.size(); ++c)
 			for (std::set<UID>::const_iterator s = chapters[c].stories.begin(); s != chapters[c].stories.end(); ++s)
 				KFCRowFoci::ReanchorStory(chapters[c].chapterIdx, *s);
-		outStatus = "Restore Original: ";
+		outStatus = "Restore from Copy: ";
 		if (pasteFailed || restored > 0)
 			outStatus.Append("InDesign would not put a copy back - nothing was changed.");
 		else if (total == 1)

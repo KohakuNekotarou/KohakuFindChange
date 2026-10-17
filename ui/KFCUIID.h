@@ -348,8 +348,9 @@ DECLARE_PMID(kActionIDSpace, kKFCSearchTierAgainActionID, kKFCUIPrefix + 55)
 // "Create Outlines" in an OBJECT row's right-click menu, under Special Operations (the author, 2026-10-17 - the rows'
 // objects outlined across spreads: KFCResultTree::OutlineRows, KFCObjectOutline). + 56: the next after the highest spent.
 DECLARE_PMID(kActionIDSpace, kKFCCreateOutlinesActionID, kKFCUIPrefix + 56)
-// "Restore Original" on a TEXT row's right-click menu, under Replace (docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md
-// C1 - the author, 2026-10-17: "copy back, from the right-click menu"): the copy the row's Replace took put back
+// "Restore from Copy" on a TEXT row's right-click menu, under Replace (docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md
+// C1 - the author, 2026-10-17: "copy back, from the right-click menu"; the name is the author's of the same evening,
+// "put back with the copy" - the IDs and keys keep the first name, Restore Original): the copy the row's Replace took put back
 // (KFCResultTree::RestoreRows, KFCReplaceEngine::RestoreHits). + 57: the next after the highest spent.
 DECLARE_PMID(kActionIDSpace, kKFCRestoreOriginalActionID, kKFCUIPrefix + 57)
 
