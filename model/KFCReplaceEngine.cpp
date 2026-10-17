@@ -1566,13 +1566,14 @@ bool LinksOn(ITextModel* model, const UIDRef& storyRef, TextIndex from, TextInde
 // Replace set; over a return (R13b) the paragraph the match starts in kept it - a paste's first paragraph takes the
 // attributes of the paragraph it is pasted into. (A copy of the whole paragraph, head to return, would carry them, and
 // would collide with every other row replaced in it - each copy holding the others' text from before them.)
-// A HYPERLINK SOURCE THE COPY TOUCHES - in the match, around it, across its edge, in the run-on rest - is kept with where
-// it stood (HitCopy::links), for RestoreInChapter to put the ONE link back (PutLinksBack - the spec's C15, the author's call
-// of 2026-10-17 evening: "delete one of the duplicated links, perhaps"). Measured live the same day with the
-// doors open (switch copy-links, H1-H5): InDesign's replace keeps a source that is the match itself, or stands in the run-on
-// rest, on what it writes, and the copy put back brings a second link over it - two links, the first one's text gone; one
-// the match crossed is cut back to its part outside the match; one around the match, and one inside it (the replace deletes
-// that link outright and the paste brings it back under its own name), come back as they were.
+// A HYPERLINK SOURCE THE COPY TOUCHES - strictly inside the match, around it, across its edge - is kept with where it
+// stood (HitCopy::links), for RestoreInChapter to put the ONE link back (PutLinksBack - the spec's C15, the author's call
+// of 2026-10-17 evening: "delete one of the duplicated links, perhaps"). Measured live the same day with the doors open
+// (switch copy-links, H1-H5): one the match crossed is cut back to its part outside the match (set back where it stood);
+// one around the match, and one strictly inside it (the replace deletes that link outright and the paste brings it back
+// under its own name), come back as they were. One the paste would replace WHOLE - the match itself (InDesign's replace
+// keeps it on what it writes), one in the run-on rest, one at the match's edge - keeps no copy: the paste brings a second
+// link over it and leaves it with no story, and setting it again crashed InDesign (16:34 the same day).
 // NONE is taken - the row says why - for a match outside the story's primary thread (a table cell's, a footnote's or a
 // note's: a copy run across threads crashed InDesign), one that touches a CROSS-REFERENCE source (its text is made by
 // InDesign - unmeasured), and a run-on rest holding an object or a marker (pasted again over itself, such a thing is made
@@ -1671,6 +1672,18 @@ KFCResultModel::HitCopy TakeRowCopy(const UIDRef& storyRef, TextIndex start, Tex
 		{
 			// (Fault switch copy-links, a test build's only - KFCDiag.h: the cross-reference door stands open, to measure.)
 			if (touching[i].xref && !KFC_DIAG_FAULT("copy-links"))
+			{
+				copy.whyNot = KFCResultModel::kCopyTouchesHyperlink;
+				return copy;
+			}
+			// A SOURCE THE PASTE WOULD REPLACE WHOLE keeps no copy (the crash of 2026-10-17 16:34): one inside what the copy
+			// covers that is not strictly inside the match - the match itself (the Replace keeps it on what it writes, H1),
+			// one in the run-on rest (H5), one at the match's edge - is left with no story once the copy is pasted over its
+			// text, and setting it again took InDesign down (HYPERLINKS.RPLN, under IHyperlinkFacade::ChangeTextSource).
+			// Strictly inside the match the Replace deletes it and the paste brings it back (H4); around the match or across
+			// its edge, its part outside stays and it is set back where it stood (H2, H3).
+			if (touching[i].start >= start && touching[i].start + touching[i].length <= copyEnd
+				&& !(touching[i].start > start && touching[i].start + touching[i].length < end))
 			{
 				copy.whyNot = KFCResultModel::kCopyTouchesHyperlink;
 				return copy;
@@ -2219,7 +2232,7 @@ const char* RestoreSentence(RestoreRefusal why, int32 whyNoCopy)
 				case KFCResultModel::kCopyOutsideMainText:
 					return "no copy was kept when this row was replaced - its match is in a table cell, a footnote or a note.";
 				case KFCResultModel::kCopyTouchesHyperlink:
-					return "no copy was kept when this row was replaced - its match touches a cross-reference.";
+					return "no copy was kept when this row was replaced - its match is a hyperlink's whole text or touches a cross-reference, or the rest of its paragraph holds a hyperlink: a copy put back would break the link.";
 				case KFCResultModel::kCopyRestHoldsObject:
 					return "no copy was kept when this row was replaced - the rest of its paragraph holds an object or a marker.";
 				case KFCResultModel::kCopyHoldsAnchoredObject:
@@ -2317,14 +2330,14 @@ bool PutLinksBack(ITextModel* model, const UIDRef& storyRef, TextIndex at, int32
 	InterfacePtr<IHyperlinkTable> table(db, db->GetRootUID(), IID_IHYPERLINKTABLE);
 	if (!facade || table == nil)
 		return false;
-	// Where each kept source still in the document is to stand. ONE WHOSE TEXT THE PASTE REPLACED HAS NO STORY ANY MORE
-	// (measured live 2026-10-17, H1 and H5: its owning story read invalid, its range gone - the DOM's sourceText an error):
-	// it is still the link to keep, and is given this story back with its range. One standing in another story is not ours.
+	// Where each kept source still in this story is to stand. ONE WITH NO STORY IS NEVER TOUCHED: a source whose text the
+	// paste replaced whole reads no owning story (measured live 2026-10-17, H1 and H5 - the DOM's sourceText an error), and
+	// IHyperlinkFacade::ChangeTextSource giving it the story back took InDesign down (HYPERLINKS.RPLN, 16:34) - TakeRowCopy
+	// keeps no copy where that can happen; this is the backstop.
 	struct Wanted
 	{
 		UID			source;
 		TextIndex	start, end;
-		bool		storyLost;
 	};
 	std::vector<Wanted> wanted;
 	for (size_t k = 0; k < kept.size(); ++k)
@@ -2337,11 +2350,10 @@ bool PutLinksBack(ITextModel* model, const UIDRef& storyRef, TextIndex at, int32
 		const UID owner = data->GetOwningStoryUID();
 		KFC_DIAG_LOG("LINK kept source=%u owner=%u (story %u)", (unsigned)kept[k].source.Get(), (unsigned)owner.Get(),
 			(unsigned)storyRef.GetUID().Get());
-		if (owner != storyRef.GetUID() && owner != kInvalidUID)
+		if (owner != storyRef.GetUID())
 			continue;
 		TextIndex nowStart = kInvalidTextIndex;
 		int32 nowLength = 0;
-		if (owner != kInvalidUID)
 		{
 			InterfacePtr<ITextRangeNode> node(data->GetHyperlinkRangeReference().Instantiate());
 			if (node != nil)
@@ -2352,7 +2364,6 @@ bool PutLinksBack(ITextModel* model, const UIDRef& storyRef, TextIndex at, int32
 		}
 		Wanted w;
 		w.source = kept[k].source;
-		w.storyLost = (owner == kInvalidUID);
 		w.start = (kept[k].from < 0 && nowStart != kInvalidTextIndex) ? nowStart : at + kept[k].from;
 		w.end = (kept[k].to > copied && nowStart != kInvalidTextIndex) ? nowStart + nowLength : at + kept[k].to;
 		if (w.start < 0 || w.end < w.start)
@@ -2387,10 +2398,10 @@ bool PutLinksBack(ITextModel* model, const UIDRef& storyRef, TextIndex at, int32
 	// (2) The kept sources where they stood.
 	for (size_t w = 0; w < wanted.size(); ++w)
 	{
-		KFC_DIAG_LOG("LINK kept source=%u set to [%d,%d)%s", (unsigned)wanted[w].source.Get(), (int)wanted[w].start,
-			(int)wanted[w].end, wanted[w].storyLost ? " - its story given back" : "");
-		if (facade->ChangeTextSource(UIDRef(db, wanted[w].source), wanted[w].storyLost ? kTrue : kFalse, storyRef, kTrue,
-									 wanted[w].start, wanted[w].end - wanted[w].start) != kSuccess)
+		KFC_DIAG_LOG("LINK kept source=%u set to [%d,%d)", (unsigned)wanted[w].source.Get(), (int)wanted[w].start,
+			(int)wanted[w].end);
+		if (facade->ChangeTextSource(UIDRef(db, wanted[w].source), kFalse, storyRef, kTrue, wanted[w].start,
+									 wanted[w].end - wanted[w].start) != kSuccess)
 			return false;
 	}
 	// (3) The destinations the paste made that no link names now.

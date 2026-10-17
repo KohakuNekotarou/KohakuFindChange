@@ -58,8 +58,10 @@ namespace KFCResultModel
 		kCopyNone = 0,			// no Replace of the list has written the row (or one restored it since)
 		kCopyKept,				// a copy is kept (HitCopy::store / story)
 		kCopyOutsideMainText,	// its match is in a table cell, a footnote or a note - outside the story's primary thread
-		kCopyTouchesHyperlink,	// its match (or the rest it runs on over) touches a CROSS-REFERENCE source - its text is
-								// made by InDesign (a hyperlink's is copied and put back as one link: HitCopy::links - C15)
+		kCopyTouchesHyperlink,	// what it copies holds a hyperlink source the paste would replace whole - the match itself,
+								// one in the run-on rest, one at the match's edge (setting it again crashed InDesign,
+								// 2026-10-17) - or touches a CROSS-REFERENCE source (its text is made by InDesign). Other
+								// hyperlink sources are copied and put back as one link: HitCopy::links - C15
 		kCopyRestHoldsObject,	// the rest of its paragraph, which the copy would run on over, holds an object or a marker
 		kCopyHoldsAnchoredObject,	// its match holds an anchored or inline object - a copy would put it back under a new
 								// UID (the author's call of 2026-10-17 evening)
