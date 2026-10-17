@@ -219,9 +219,14 @@ namespace KFCResultTree
 	    line. Not under a landing or a run. True = written. */
 	bool RestoreRows(const KFCRowsByChapter& rows);
 
-	/** Can Restore Original be offered on these rows - is any of them a text row a Replace wrote (KFCRuns()->CanRestoreHit)?
-	    The question the row menu greys it by (the spec's C7); why a copy cannot go back now is said by RestoreRows. */
+	/** Can Restore Original be offered on these rows - is any of them a text row a Replace wrote, its copy held
+	    (KFCRuns()->CanRestoreHit)? The question the row menu greys it by (the spec's C7); why a copy cannot go back now is
+	    said by RestoreRows. */
 	bool CanRestoreAny(const KFCRowsByChapter& rows);
+
+	/** Can Create Outlines be offered on these rows - can any of them be outlined (KFCRuns()->CanOutlineHit - its doors,
+	    read only)? The question the object row menu greys it by (the author, 2026-10-17). */
+	bool CanOutlineAny(const KFCRowsByChapter& rows);
 
 	/** The result list's view, reached through its panel - nil while the panel is closed. Not counted (the panel holds
 	    it): use it at once. Asked by whatever outside the panel wants the list alone - the tree's manager, its controller,

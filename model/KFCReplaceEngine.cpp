@@ -23,6 +23,8 @@
 #include "ITextWalkerSelectionUtils.h"	// TextWalkerSelections_CriticalSection
 #include "IWalkerScopeFactoryUtils.h"
 #include "IAttrReport.h"			// IsParagraphAttribute - a Change side that sets paragraph formatting (TakeRowCopy)
+#include "IAttributeStrand.h"		// a paragraph's style and own overrides, kept and put back (TakeRowCopy, PutParagraphBack)
+#include "ITextModelCmds.h"			// ApplyStyleCmd / ApplyCmd - a paragraph's formatting put back (PutParagraphBack)
 #include "IHyperlinkUtils.h"		// hyperlink sources a copy would cut or carry (TakeRowCopy) - source/open/interfaces/layout
 
 // General includes:
@@ -1491,12 +1493,13 @@ bool ChangeSideTouchesParagraphs(IDataBase* db)
 // return, paste up to the return" (measured in KT, docs/ai-notes/private-scrap-store-2026-10-06.md; a return copied or
 // pasted on its own broke the paragraph after it). The paragraph the match starts in keeps the attributes it has - the
 // merged paragraph's, its own first paragraph's when the Change side sets no paragraph formatting.
-// A ROW WHOSE CHANGE SIDE SETS PARAGRAPH FORMATTING (`paragraphChange`) KEEPS NO COPY (measured live, 2026-10-17): inside
-// one paragraph (R13), the copy run on to the return put the text back and left the paragraph style the Replace set - a
-// paragraph's attributes come back only with the whole paragraph in the copy, head to return, and a copy of the whole
-// paragraph would collide with every other row replaced in it (each copy holding the others' text from before them);
-// over a return (R13b), the paragraph the match starts in kept the style - a paste's first paragraph takes the attributes
-// of the paragraph it is pasted into.
+// A ROW WHOSE CHANGE SIDE SETS PARAGRAPH FORMATTING (`paragraphChange`) ALSO KEEPS THE FORMATTING OF THE PARAGRAPH IT
+// STARTS IN - its style and its own overrides (the paragraph strand, SnpManipulateTextStyle.cpp's road) - which
+// RestoreInChapter puts back after the paste (the spec's C16, the author's call of 2026-10-17 evening). Measured live the
+// same day, the copy alone cannot: inside one paragraph (R13) the copy put the text back and left the paragraph style the
+// Replace set; over a return (R13b) the paragraph the match starts in kept it - a paste's first paragraph takes the
+// attributes of the paragraph it is pasted into. (A copy of the whole paragraph, head to return, would carry them, and
+// would collide with every other row replaced in it - each copy holding the others' text from before them.)
 // NONE is taken - the row says why - for a match outside the story's primary thread (a table cell's, a footnote's or a
 // note's: a copy run across threads crashed InDesign), one that touches a hyperlink or cross-reference source in any way,
 // and a run-on rest holding an object, a marker or a hyperlink (pasted again over itself, such a thing is made anew -
@@ -1524,8 +1527,25 @@ KFCResultModel::HitCopy TakeRowCopy(const UIDRef& storyRef, TextIndex start, Tex
 	}
 	if (paragraphChange)
 	{
-		copy.whyNot = KFCResultModel::kCopyParagraphFormat;
-		return copy;
+		// The paragraph the match starts in: its style and its own overrides, as they read before the write.
+		InterfacePtr<IAttributeStrand> paraStrand(static_cast<IAttributeStrand*>(
+			model->QueryStrand(kParaAttrStrandBoss, IID_IATTRIBUTESTRAND)));
+		if (paraStrand == nil)
+		{
+			copy.whyNot = KFCResultModel::kCopyFailed;
+			return copy;
+		}
+		int32 count = 0;
+		copy.paraStyle = paraStrand->GetStyleUID(start, &count);
+		const DataWrapper<AttributeBossList> overrides = paraStrand->GetLocalOverrides(start, &count);
+		const AttributeBossList* const own = overrides.get();		// (DataWrapper has no ->: its get())
+		if (own != nil && own->CountBosses() > 0)
+			copy.paraOverrides.reset(new AttributeBossList(*own));
+		if (copy.paraStyle == kInvalidUID)
+		{
+			copy.whyNot = KFCResultModel::kCopyFailed;
+			return copy;
+		}
 	}
 	TextIndex copyEnd = end;
 	if (holdsReturn)
@@ -1557,7 +1577,9 @@ KFCResultModel::HitCopy TakeRowCopy(const UIDRef& storyRef, TextIndex start, Tex
 	// inside it or across its edge (GetRangeContainedHyperlinks, all of them), one around it (IsRangeContainedByAHyperlink)
 	// - and any in or around the run-on rest. (A zero-width match's copy is empty: nothing of a link goes with it.)
 	Utils<IHyperlinkUtils> links;
-	if (links)
+	// (Fault switch copy-links, a test build's only - KFCDiag.h: these doors stand open, to measure what the replace and
+	//  the paste leave of the links.)
+	if (links && !KFC_DIAG_FAULT("copy-links"))
 	{
 		if (end > start && (links->GetRangeContainedHyperlinks(model, start, end).size() != 0
 			|| links->IsRangeContainedByAHyperlink(model, start, end).GetLogicalID() != kInvalidSBOSID))
@@ -2115,8 +2137,6 @@ const char* RestoreSentence(RestoreRefusal why, int32 whyNoCopy)
 					return "no copy was kept when this row was replaced - its match touches a hyperlink or cross-reference.";
 				case KFCResultModel::kCopyRestHoldsObject:
 					return "no copy was kept when this row was replaced - the rest of its paragraph holds an object, a marker or a hyperlink.";
-				case KFCResultModel::kCopyParagraphFormat:
-					return "no copy was kept when this row was replaced - its replace set paragraph formatting, which a copy of the match alone cannot put back.";
 				case KFCResultModel::kCopyFailed:
 					return "no copy could be kept when this row was replaced.";
 				default:
@@ -2180,6 +2200,52 @@ KFCCopyStore::CopyRef RefOf(const KFCResultModel::HitCopy& copy)
 	ref.store = copy.store;
 	ref.story = copy.story;
 	return ref;
+}
+
+// THE FORMATTING OF THE PARAGRAPH A MATCH STARTS IN, PUT BACK once its copy is pasted (the spec's C16): the style it had,
+// with what the Replace left on it cleared, then its own overrides as they read before the write (TakeRowCopy). The
+// paste cannot - its first paragraph takes the attributes of the paragraph it is pasted into (measured live, R13b). The
+// paragraph is found by its returns, as the run-on rest is: from just after the return before `at` to its own return.
+bool PutParagraphBack(ITextModel* model, TextIndex at, const KFCResultModel::HitCopy& copy)
+{
+	InterfacePtr<ITextModelCmds> cmds(model, UseDefaultIID());
+	if (cmds == nil || at < 0)
+		return false;
+	const int32 primary = model->GetPrimaryStoryThreadSpan() - 1;
+	TextIndex paraStart = 0;
+	for (TextIndex i = at - 1; i >= 0; --i)
+	{
+		TextIterator it(model, i);
+		if (!it.IsNull() && (*it).GetValue() == kTextChar_CR)
+		{
+			paraStart = i + 1;
+			break;
+		}
+	}
+	TextIndex paraEnd = primary;		// the last paragraph's: up to and with the story's own return
+	{
+		TextIterator it(model, at);
+		for (TextIndex i = at; i < primary && !it.IsNull(); ++i, ++it)
+		{
+			if ((*it).GetValue() == kTextChar_CR)
+			{
+				paraEnd = i;
+				break;
+			}
+		}
+	}
+	const int32 length = paraEnd - paraStart + 1;		// the paragraph with its return
+	InterfacePtr<ICommand> style(cmds->ApplyStyleCmd(paraStart, length, copy.paraStyle, kParaAttrStrandBoss,
+		kTrue /*replaceOverrides*/, kFalse /*autoNextStyle*/, kFalse /*keepOldStyleAsOverrides*/));
+	if (style == nil || CmdUtils::ProcessCommand(style) != kSuccess)
+		return false;
+	if (copy.paraOverrides != nil && copy.paraOverrides->CountBosses() > 0)
+	{
+		InterfacePtr<ICommand> overrides(cmds->ApplyCmd(paraStart, length, copy.paraOverrides, kParaAttrStrandBoss));
+		if (overrides == nil || CmdUtils::ProcessCommand(overrides) != kSuccess)
+			return false;
+	}
+	return true;
 }
 
 // THE PASTES OF ONE DOCUMENT, inside the write's step: every row of the chapter that stands taken as "this far into this
@@ -2282,6 +2348,10 @@ bool RestoreInChapter(RestoreChapter& chapter, int32 (&counts)[kRestoreRefusalCo
 			const int32 copied = KFCCopyStore::Length(ref);
 			if (copied < row.copy.rest || !KFCCopyStore::PasteOver(ref, storyRef, at, pasteEnd))
 				return false;
+			// A Replace that set paragraph formatting: the starting paragraph's own put back (the spec's C16) - no length
+			// changes, so the rows' places below hold.
+			if (row.copy.paraStyle != kInvalidUID && !PutParagraphBack(model, at, row.copy))
+				return false;
 			// The paste turned the W characters written into the match (M); the rest was pasted over with itself. Every row
 			// after the written text in this thread moves by M - W (its rest's rows among them); then this row at the match.
 			const int32 match = copied - row.copy.rest;
@@ -2333,11 +2403,15 @@ bool RestoreInChapter(RestoreChapter& chapter, int32 (&counts)[kRestoreRefusalCo
 
 }	// anonymous namespace
 
+// A replaced text row WITH ITS COPY (the spec's C7 - the author, 2026-10-17: a menu item that cannot run is greyed). What
+// only the document can tell - edited since, the rest changed, locked - the doors say when it is pressed.
 bool KFCReplaceEngine::CanRestoreHit(int32 chapterIdx, int32 hitIdx)
 {
 	bool replaced = false, locked = false;
+	KFCResultModel::HitCopy copy;
 	return KFCResultModel::GetHitFlags(chapterIdx, hitIdx, replaced, locked) && replaced
-		&& KFCResultModel::GetHitItem(chapterIdx, hitIdx) == kInvalidUID;
+		&& KFCResultModel::GetHitItem(chapterIdx, hitIdx) == kInvalidUID
+		&& KFCResultModel::GetHitCopy(chapterIdx, hitIdx, copy) && copy.whyNot == KFCResultModel::kCopyKept;
 }
 
 bool KFCReplaceEngine::RestoreHits(const KFCRowsByChapter& rowsByChapter, PMString& outStatus)

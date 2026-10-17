@@ -793,18 +793,22 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			}
 			case kKFCCreateOutlinesActionID:
 			{
-				// An object row's menu: Create Outlines over an object row (a run standing greys everything, above). What the
-				// write refuses - not a text frame, locked, already outlined - it says on the status line, row by row counted.
+				// An object row's menu: Create Outlines while the row - or one of the rows selected together with it - can be
+				// outlined (CanOutlineAny - its doors, read only: greyed when none can, the author's wish of 2026-10-17; a run
+				// standing greys everything, above). A row of a closed chapter counts as one that can: pressing reaches it, and
+				// what the write then refuses it says on the status line, row by row counted.
 				int32 chapter = -1, hit = -1;
-				const bool enable = RightClickedHit(widget, chapter, hit) && KFCResults()->GetHitItem(chapter, hit) != kInvalidUID;
+				const bool enable = RightClickedHit(widget, chapter, hit)
+					&& KFCResultTree::CanOutlineAny(KFCResultTree::RowsOfRightClick(chapter, hit));
 				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 				break;
 			}
 			case kKFCRestoreOriginalActionID:
 			{
 				// A text row's menu: Restore Original while the row - or one of the rows selected together with it - is a text
-				// row a Replace wrote (CanRestoreAny - the spec's C7). Whether its copy can go back now it says on the status
-				// line when pressed (no copy kept, edited since, locked), as Create Outlines says its refusals.
+				// row a Replace wrote and its copy is held (CanRestoreAny - the spec's C7: greyed when none is, the author's
+				// wish of 2026-10-17). What only the document can tell it says on the status line when pressed (edited since,
+				// the rest changed, locked), as Create Outlines says its refusals.
 				int32 chapter = -1, hit = -1;
 				const bool enable = RightClickedHit(widget, chapter, hit)
 					&& KFCResultTree::CanRestoreAny(KFCResultTree::RowsOfRightClick(chapter, hit));

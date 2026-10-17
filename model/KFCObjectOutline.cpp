@@ -180,6 +180,34 @@ struct OutlineChapter
 };
 }	// anonymous namespace
 
+bool KFCObjectOutline::CanOutlineHit(int32 chapterIdx, int32 hitIdx)
+{
+	// CheckItem's doors without what they do: no chapter reached (FindOpenChapterDoc only finds an open one), no row
+	// rebound or marked Missing - the menu asks this every time it opens.
+	const UID item = KFCResultModel::GetHitItem(chapterIdx, hitIdx);
+	if (item == kInvalidUID)
+		return false;
+	KFCResultModel::RowDisplay row;
+	if (KFCResultModel::GetHitRow(chapterIdx, hitIdx, row) && row.outlined)
+		return false;
+	UIDRef docRef;
+	IDFile file;
+	if (!KFCResultModel::GetChapterLocation(chapterIdx, docRef, file))
+		return false;
+	if (!KFCBookScope::FindOpenChapterDoc(file, docRef))
+		return true;		// not open now: pressing reaches it, and its doors say why when it cannot be outlined
+	IDataBase* const db = docRef.GetDataBase();
+	if (db == nil || !db->IsValidUID(item))
+		return false;
+	InterfacePtr<IHierarchy> hier(db, item, UseDefaultIID());
+	if (hier == nil || !KFCObjectSearch::IsOnSpread(UIDRef(db, item)))
+		return false;
+	if (KFCPageItemFacts::IsPageItemLockedForEdit(db, item) || KFCPageItemFacts::IsFrameOnLockedLayer(db, item))
+		return false;
+	Utils<ICreateOutlinesUtils> outlines;
+	return outlines && outlines->FilterUIDList(UIDList(db, item)).Length() > 0;
+}
+
 bool KFCObjectOutline::OutlineRows(const KFCRowsByChapter& rows, PMString& outStatus)
 {
 	KFC_DIAG_WRITTEN_DOCS_CHECK("object-outline-rows");	// (test builds: when it is over - KFCDiagWrittenDocs.h)

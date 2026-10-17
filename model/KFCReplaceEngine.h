@@ -115,8 +115,9 @@ namespace KFCReplaceEngine
 	bool ReplaceHits(const KFCRowsByChapter& rows, PMString& outStatus);
 
 	/** RESTORE ORIGINAL (docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md): is the row one to offer it to -
-	    a text row a Replace of the list wrote (replaced, no item)? Whether its copy can be put back now - kept, its text,
-	    the rest of its paragraph, a lock - is RestoreHits' to say, on the status line (the spec's C7). */
+	    a text row a Replace of the list wrote (replaced, no item) whose copy is held (kCopyKept - the menu greys a row
+	    without one, the author's wish of 2026-10-17)? Whether its copy can be put back now - its text, the rest of its
+	    paragraph, a lock - is RestoreHits' to say, on the status line (the spec's C7). */
 	bool CanRestoreHit(int32 chapterIdx, int32 hitIdx);
 
 	/** RESTORE ORIGINAL over text rows - the right-clicked row, or the rows selected together it is one of: the copy each

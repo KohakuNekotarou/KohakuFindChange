@@ -28,12 +28,14 @@
 #include "UIDRef.h"
 #include "KFCModelTypes.h"	// the types shared with the UI half (RowDisplay, ChangeOutcome, ...)
 
+#include <boost/shared_ptr.hpp>	// HitCopy::paraOverrides - the shape ITextModelCmds::ApplyCmd takes
 #include <map>
 #include <memory>		// std::shared_ptr - the list's query copy (ListHeader::query)
 #include <set>			// GetChapterStories
 #include <vector>
 
 struct KFCQueryCopy;	// KFCQueryCopy.h - Find/Change's query, copied in memory (the tier switch)
+class AttributeBossList;	// AttributeBossList.h - a paragraph's own overrides, kept with a row's copy (HitCopy)
 
 namespace KFCResultModel
 {
@@ -60,17 +62,19 @@ namespace KFCResultModel
 								// edge (InDesign's replace keeps a source on what it writes: a copy put back makes a second)
 		kCopyRestHoldsObject,	// the rest of its paragraph, which the copy would run on over, holds an object, a marker or
 								// a hyperlink
-		kCopyParagraphFormat,	// its Replace set paragraph formatting: a copy of the match does not put a paragraph's
-								// attributes back (measured live, R13 / R13b)
 		kCopyFailed				// the copy could not be taken
+		// (kCopyParagraphFormat stood here until the author's call of 2026-10-17 evening - the spec's C16: a Replace that
+		//  sets paragraph formatting keeps its copy now, and the paragraph's own formatting with it - HitCopy::paraStyle.)
 	};
 
 	/** THE COPY A ROW'S REPLACE TOOK OF THE TEXT IT WROTE OVER (KFCCopyStore - the spec's C4 and C6), taken just before the
 	    write (KFCReplaceEngine's ReplaceRowsNow) and given to the row once the write has gone through (SetHitCopy): the
 	    match, or - a match holding a paragraph return - the match run on to just before the return of the paragraph it
-	    ends in, so a paste puts that paragraph's own attributes back on the return it meets. What Restore Original puts
-	    back (KFCReplaceEngine::RestoreHits). Copied with the row - a tier, an Undo step, a backup - so the copy it names
-	    comes back with it. */
+	    ends in, so a paste puts that paragraph's own attributes back on the return it meets. A Replace that sets paragraph
+	    formatting (the spec's C16) also keeps the formatting of the paragraph the match STARTS in - its style and its own
+	    overrides - which a paste cannot carry (its first paragraph takes the attributes of the one it is pasted into), put
+	    back on that paragraph after the paste. What Restore Original puts back (KFCReplaceEngine::RestoreHits). Copied with
+	    the row - a tier, an Undo step, a backup - so the copy it names comes back with it. */
 	struct HitCopy
 	{
 		uint32	store;		// the copy store's number (KFCCopyStore - 0 = none)
@@ -78,7 +82,9 @@ namespace KFCResultModel
 		int32	rest;		// how far the copy runs on past the match, in text model positions (0 = the match alone)
 		uint64	restHash;	// that run-on text as it read when the copy was taken (KFCReplaceEngine.cpp's TextHash)
 		int32	whyNot;		// CopyWhyNot - kCopyKept when the copy is kept
-		HitCopy() : store(0), story(kInvalidUID), rest(0), restHash(0), whyNot(kCopyNone) {}
+		UID		paraStyle;	// the starting paragraph's style when the Replace sets paragraph formatting (kInvalidUID = not kept)
+		boost::shared_ptr<AttributeBossList> paraOverrides;	// ...and its own paragraph overrides then (nil = none)
+		HitCopy() : store(0), story(kInvalidUID), rest(0), restHash(0), whyNot(kCopyNone), paraStyle(kInvalidUID) {}
 	};
 
 	/** One match on one line of one chapter. The three text segments are the line split around

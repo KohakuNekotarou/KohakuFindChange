@@ -175,6 +175,9 @@
 //                tried on demand (the v2 spec's section 5, item 7). One-shot.
 //    copy-fail  KFCCopyStore::Take keeps no copy: a row's Replace goes through all the same, and that row's Restore
 //                Original says no copy could be kept (docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md C3, R16)
+//    copy-links  TakeRowCopy's hyperlink doors stand open (the match's and the run-on rest's): a row whose match touches
+//                a hyperlink or cross-reference source keeps its copy all the same - to measure what InDesign's replace
+//                and the paste leave of the links (the same spec's C15) before the way to put them back is written
 //
 //  AND TIMERS: KFC_CLOCK / KFC_SPENT add up the milliseconds a stretch of code takes, and KFCDiagPhase
 //  writes "PHASE <name> begin" and "PHASE <name> end <ms>" around a scope - all of it nothing without KFC_DIAG.

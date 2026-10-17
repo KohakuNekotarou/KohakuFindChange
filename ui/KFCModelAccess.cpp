@@ -147,6 +147,7 @@ namespace
 		virtual bool OutlineRows(const KFCRowsByChapter&, PMString& outStatus) { SayWhy(outStatus); return false; }
 		virtual bool CanRestoreHit(int32, int32) { return false; }
 		virtual bool RestoreRows(const KFCRowsByChapter&, PMString& outStatus) { SayWhy(outStatus); return false; }
+		virtual bool CanOutlineHit(int32, int32) { return false; }
 	};
 
 	class KFCChaptersStandInImpl : public IKFCChapters

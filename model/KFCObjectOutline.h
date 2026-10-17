@@ -35,6 +35,13 @@ namespace KFCObjectOutline
 	    text frame." - "Outlined 3 objects in 2 documents: a.indd ID:259, ID:260; b.indd ID:12."; a refusal ("Create
 	    Outlines: ...") when none could be written. True when something was written. Refused while a run of ours is up. */
 	bool OutlineRows(const KFCRowsByChapter& rows, PMString& outStatus);
+
+	/** WHETHER CREATE OUTLINES CAN BE OFFERED FOR A ROW (the menu's grey - the author, 2026-10-17: a menu item that cannot
+	    run is greyed). OutlineRows's doors, READ ONLY: no document is reached or opened and no row is touched. An object
+	    row not outlined yet; when its document is open now, its item there, on a spread, not locked, a text frame
+	    (InDesign's own filter). A row of a document not open now answers true - only reaching it can tell, and pressing
+	    does that (its doors say why when it cannot). */
+	bool CanOutlineHit(int32 chapterIdx, int32 hitIdx);
 }
 
 #endif // __KFCObjectOutline_h__

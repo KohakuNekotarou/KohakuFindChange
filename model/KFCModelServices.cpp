@@ -126,6 +126,7 @@ public:
 	virtual bool CanRestoreHit(int32 chapterIdx, int32 hitIdx) { return KFCReplaceEngine::CanRestoreHit(chapterIdx, hitIdx); }
 	// (Not under the list's query - KFCUnderListQuery: a copy put back walks no story, as Create Outlines walks none.)
 	virtual bool RestoreRows(const KFCRowsByChapter& rows, PMString& outStatus) { return KFCReplaceEngine::RestoreHits(rows, outStatus); }
+	virtual bool CanOutlineHit(int32 chapterIdx, int32 hitIdx) { return KFCObjectOutline::CanOutlineHit(chapterIdx, hitIdx); }
 };
 
 CREATE_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)

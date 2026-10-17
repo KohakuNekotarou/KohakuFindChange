@@ -1257,4 +1257,13 @@ bool KFCResultTree::CanRestoreAny(const KFCRowsByChapter& rows)
 	return false;
 }
 
+bool KFCResultTree::CanOutlineAny(const KFCRowsByChapter& rows)
+{
+	for (size_t c = 0; c < rows.size(); ++c)
+		for (size_t k = 0; k < rows[c].hits.size(); ++k)
+			if (KFCRuns()->CanOutlineHit(rows[c].chapter, rows[c].hits[k]))
+				return true;
+	return false;
+}
+
 // End, KFCResultListWidgetMgr.cpp.
