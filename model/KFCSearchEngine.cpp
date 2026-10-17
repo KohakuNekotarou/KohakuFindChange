@@ -814,6 +814,7 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 	// that follows from the frame comes out of the cache.
 	const UID matchFrameUID = FrameUIDForPosition(storyRef, start);
 	const FrameFacts* facts = &LookUpFrame(docRef, storyRef, matchFrameUID, cache.frames);
+	outHit.matchFrame = matchFrameUID;		// (Frames of These Matches climbs from it - CollectHitsInDoc)
 
 	// No page for the match itself (it is overset - composed but placed nowhere - or its frame sits
 	// on no page). Name the page of the "+" overset indicator instead (the last placed parcel's
@@ -1559,7 +1560,10 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 
 		// Whole-search safety ceiling reached: stop collecting. More matches may exist, but the
 		// result set is capped so a match-everywhere query cannot grow it without bound.
-		if (outHits.size() >= maxHits)
+		// (A FRAMES OF THESE MATCHES list counts its frames, not its matches: its ceiling is asked when a new frame's row
+		// would go in - below.)
+		const bool makesFrames = (gWalkFilter != nil && detail == kHitEverything && gWalkFilter->MakesFrames());
+		if (!makesFrames && outHits.size() >= maxHits)
 		{
 			outCapped = true;
 			break;
@@ -1590,6 +1594,39 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 			if (!gWalkFilter->KeepText(hit, storyDB))
 			{
 				outHits.pop_back();
+				continue;
+			}
+			// FRAMES OF THESE MATCHES (N5): the match makes no row - the frame the person selects holding it does, once (one row
+			// a frame, whatever its matches), an object row as the object search makes one (KFCObjectSearch::BuildRow), asked
+			// the conditions after the Frames step (KeepObject). A match with no frame placed (overset text) is counted for the
+			// status line.
+			if (makesFrames)
+			{
+				const UID frame = hit.isOverset ? kInvalidUID : KFCNarrow::FrameOwner(storyDB, hit.matchFrame);
+				outHits.pop_back();
+				KFC_DIAG_LOG("NARROWFRAME story=%u at=%d matchFrame=%u frame=%u overset=%d", story.GetUID().Get(), (int)start,
+					hit.matchFrame.Get(), frame.Get(), hit.isOverset ? 1 : 0);
+				if (frame == kInvalidUID)
+				{
+					gWalkFilter->NoteNoFrame();
+					continue;
+				}
+				if (!gWalkFilter->FirstFrame(storyDB, frame))
+					continue;
+				if (outHits.size() >= maxHits)
+				{
+					outCapped = true;
+					break;
+				}
+				KFCResultModel::Hit& frameRow = outHits.emplace_back();
+				KFCObjectSearch::BuildRow(hitDocRef, frame, frameRow);
+				if (!gWalkFilter->KeepObject(frameRow, storyDB))
+				{
+					outHits.pop_back();
+					continue;
+				}
+				if (outHitDBs != nil)
+					outHitDBs->push_back(storyDB);
 				continue;
 			}
 		}
@@ -2634,7 +2671,7 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 		// is the whole search's: CollectHitsInDoc counts what the list already holds.
 		std::vector<KFCResultModel::Hit> hits;
 		std::vector<IDataBase*> hitDBs;
-		const int32 room = KFCResultModel::kKFCCollectHitLimit - reserved;
+		const int32 room = KFCResultModel::ListLimit() - reserved;	// (a Frames of These Matches list's: the object lists')
 		const size_t limit = static_cast<size_t>(room > 0 ? room : 0);
 		// A search over part of a story (To End of Story, Selection): the stretches InDesign's scope holds.
 		const bool overPart = !allDocuments && (selectionScope == IWalkerScopeFactoryUtils::kToEndOfStoryScope
@@ -2787,7 +2824,7 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 
 		// Room left under the whole-search safety ceiling; once it is gone, stop walking further
 		// chapters too (the result set is full).
-		const int32 remaining = KFCResultModel::kKFCCollectHitLimit - reserved - out.total;
+		const int32 remaining = KFCResultModel::ListLimit() - reserved - out.total;
 		if (remaining <= 0)
 		{
 			out.truncated = true;
@@ -3537,6 +3574,13 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	// ends - "No matches" is a lie too if a chapter was skipped, or a walk broke off before its end.
 	PMString chapterNotes;
 	chapterNotes.SetTranslatable(kFalse);
+	// (A FRAMES OF THESE MATCHES list: the matches no frame holds - overset text - counted, N5.)
+	if (narrowFilter.MakesFrames() && narrowFilter.NoFrameCount() > 0)
+	{
+		chapterNotes.Append(" ");
+		chapterNotes.AppendNumber(narrowFilter.NoFrameCount());
+		chapterNotes.Append(" match(es) in overset text have no frame.");
+	}
 	AppendUnsearchableNote(chapterNotes, tally.unsearchable);
 	AppendSearchErrorNote(chapterNotes, tally.brokeOff);
 	KFCBookScope::AppendUnopenableNote(chapterNotes, unopenable);
@@ -3591,7 +3635,7 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	// has not already got (the author's call). The "no matches" wording DOES
 	// still name what was searched - there is no tree under it to read.
 	outSummary.AppendNumber(tally.total);
-	outSummary.Append(" hit(s)");
+	outSummary.Append(narrowFilter.MakesFrames() ? " frame(s)" : " hit(s)");	// (a Frames of These Matches list's rows are frames)
 	AppendLayerWords(outSummary, layer);		// Find Objects on Active Layer: " on layer "Images"" (nothing otherwise)
 	if (fromBook && selection.selected > 0)
 	{
@@ -3637,9 +3681,11 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	{
 		// THE LIMIT (F9): the rows are a list to walk and replace one at a time - more than this is a Change All's
 		// work: KFC's own for a book, InDesign's Find/Change dialog's for anything else (F18).
+		// A list of object rows has the object lists' limit, and Narrow Down > Pages... to take it in parts (N7).
+		const bool objects = KFCResultModel::ListHoldsObjects();
 		outSummary.Append(" Stopped at the ");
-		outSummary.AppendNumber(KFCResultModel::kKFCCollectHitLimit);
-		outSummary.Append(" limit - narrow the search, or use ");
+		outSummary.AppendNumber(KFCResultModel::ListLimit());
+		outSummary.Append(objects ? " limit - narrow the search (Narrow Down > Pages...), or use " : " limit - narrow the search, or use ");
 		if (fromBook)
 			outSummary.Append(KFCChangeAll::CommandName());				// Change All in Book (No List) - F18
 		else
@@ -4513,11 +4559,11 @@ bool SearchPartsAgain(const PMString& lead, PMString& outStatus, const KFCSearch
 	}
 	// The room the list leaves: its limit less the rows of the chapters not searched again, and the rows with their eye on.
 	// A Narrow Down's new list has the whole limit (nothing of the list it narrows comes along - N9).
-	int32 room = KFCResultModel::kKFCCollectHitLimit - KFCResultModel::GetTotalHitCount();
+	int32 room = KFCResultModel::ListLimit() - KFCResultModel::GetTotalHitCount();
 	for (size_t k = 0; k < chapters.size(); ++k)
 		room += KFCResultModel::GetShownHitCount(chapters[k].chapter) - KFCResultModel::CountKeptRows(chapters[k].chapter, kInvalidUID);
 	if (again.newTier)
-		room = KFCResultModel::kKFCCollectHitLimit;
+		room = KFCResultModel::kKFCCollectHitLimit;		// (a list over part of a document is a text list - no Frames step yet)
 	bool capped = false, cancelled = false, walked = true;
 	{
 		const SearchingFlagGuard searchingGuard;
@@ -4794,7 +4840,7 @@ bool KFCSearchEngine::SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMStrin
 			++storyRows;
 	}
 	// ...and the room the story's rows with their eye on keep (the row eye - they stay, found or not).
-	const int32 room = KFCResultModel::kKFCCollectHitLimit - (KFCResultModel::GetTotalHitCount() - storyRows)
+	const int32 room = KFCResultModel::ListLimit() - (KFCResultModel::GetTotalHitCount() - storyRows)
 		- KFCResultModel::CountKeptRows(chapterIdx, story);
 	// The searched part, where it stands now.
 	TextIndex partStart = kInvalidTextIndex, partEnd = kInvalidTextIndex;
@@ -4934,7 +4980,7 @@ bool KFCSearchEngine::SearchDocumentAgain(int32 chapterIdx, PMString& outStatus)
 	FollowChapterFoci(chapterIdx);
 	// The room the list leaves: its limit less every row of the other documents, and the document's rows with their eye
 	// on (they stay, found or not).
-	const int32 room = KFCResultModel::kKFCCollectHitLimit - (KFCResultModel::GetTotalHitCount() - rowsNow)
+	const int32 room = KFCResultModel::ListLimit() - (KFCResultModel::GetTotalHitCount() - rowsNow)
 		- KFCResultModel::CountKeptRows(chapterIdx, kInvalidUID);
 	const size_t limit = static_cast<size_t>(room > 0 ? room : 0);
 	std::vector<KFCResultModel::Hit> hits;
@@ -5028,13 +5074,8 @@ bool SearchListOnceMore(const KFCNarrowStep* step, PMString& outStatus)
 			outStatus.Append(" narrows text results - these are objects.");
 			return false;
 		}
-		if (step->kind == kKFCNarrowFrames)
-		{
-			outStatus.Append(lead);
-			outStatus.Append(KFCNarrow::StepWords(*step));
-			outStatus.Append(" is not built yet.");
-			return false;
-		}
+		// FRAMES OF THESE MATCHES: once - a list of frames has no matches to turn into frames (its rows are object rows: the
+		// text-only refusal above answers it).
 		// PAGES...: A RANGE NO DOCUMENT CAN READ IS REFUSED BEFORE ANYTHING IS WALKED (N5) - read in the list's documents open
 		// now (one that reads it is enough: a book's chapter has pages another has not), else in the front document (a list
 		// that found nothing searches it). A list whose documents are all closed (a book's chapters, handed back) is walked,

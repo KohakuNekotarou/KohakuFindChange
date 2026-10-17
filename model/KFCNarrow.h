@@ -43,6 +43,11 @@ namespace KFCNarrow
 	    Pages panel). outPages = the pages named (empty unless kNoError). */
 	ITextDataValidation::RangeError ReadPageRange(IDataBase* db, const PMString& pages, std::set<UID>& outPages);
 
+	/** FRAMES OF THESE MATCHES - THE FRAME THE PERSON SELECTS for a match's own frame (the parcel's frame - a text frame's
+	    column, a frame on a path): the nearest page item from it up its hierarchy that is a graphic frame (IGraphicFrameData -
+	    a text frame's spline, an inline's frame, a path's spline). kInvalidUID for none. */
+	UID FrameOwner(IDataBase* db, UID matchFrame);
+
 	/** THE CONDITIONS OF ONE NARROWED LIST, asked of each row a walk builds. Made of the list's steps; an empty Filter keeps
 	    every row (a list no Narrow Down made walks as it always has). */
 	class Filter
@@ -56,6 +61,12 @@ namespace KFCNarrow
 		bool NeedsTextPlace() const;
 		/** Do the conditions turn the text rows into the frames holding them (Frames of These Matches)? */
 		bool MakesFrames() const;
+		/** FRAMES OF THESE MATCHES' BOOKKEEPING over one search: a frame already made a row (one row a frame, whatever its
+		    matches - N5) - FirstFrame answers true once a frame, in its document; a match that has no frame (overset text) is
+		    counted (NoteNoFrame) for the status line. */
+		bool FirstFrame(IDataBase* db, UID frame) const;
+		void NoteNoFrame() const { ++fNoFrame; }
+		int32 NoFrameCount() const { return fNoFrame; }
 
 		/** A TEXT ROW, built (its page, its flags, its place) in document `db`: does it meet every condition taken before a
 		    Frames step - every condition, when there is none? */
@@ -72,6 +83,8 @@ namespace KFCNarrow
 		std::vector<KFCNarrowStep>	fSteps;
 		size_t						fFramesAt;		// the index of the Frames step - fSteps.size() when there is none
 		mutable std::map<std::pair<size_t, IDataBase*>, std::set<UID> >	fPages;		// PagesOf's reading, by step and document
+		mutable std::set<std::pair<IDataBase*, UID> >	fFrames;	// the frames made rows (FirstFrame)
+		mutable int32									fNoFrame;	// the matches with no frame (NoteNoFrame)
 	};
 
 	/** Is this a condition only a text row can meet (In Tables / In Footnotes / In Endnotes / Frames of These Matches)? */

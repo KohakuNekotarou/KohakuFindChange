@@ -12,6 +12,8 @@
 
 // Interface includes:
 #include "IDataBase.h"
+#include "IGraphicFrameData.h"		// the frame the person selects - FrameOwner
+#include "IHierarchy.h"
 #include "IPageList.h"				// PageRangeStringToUIDList - Pages...' range, read in a document
 #include "ITextModel.h"				// QueryStoryThread - the thread a match stands in
 #include "ITextStoryThread.h"		// GetDictUID - the thread's owner
@@ -80,6 +82,25 @@ ITextDataValidation::RangeError KFCNarrow::ReadPageRange(IDataBase* db, const PM
 	return error;
 }
 
+UID KFCNarrow::FrameOwner(IDataBase* db, UID matchFrame)
+{
+	if (db == nil || matchFrame == kInvalidUID || !db->IsValidUID(matchFrame))
+		return kInvalidUID;
+	// Up from the match's own frame: a text frame's column (kFrameItemBoss) under its multi-column item under the spline the
+	// person selects (SnpManipulateTextFrame.cpp calls that spline "the text frame's kSplineItemBoss"); a frame on a path
+	// under the path's spline. Ten levels at most - a page item is never that deep below its frame.
+	UID at = matchFrame;
+	for (int32 depth = 0; depth < 10 && at != kInvalidUID; ++depth)
+	{
+		InterfacePtr<IGraphicFrameData> frame(db, at, UseDefaultIID());
+		if (frame != nil)
+			return at;
+		InterfacePtr<IHierarchy> hier(db, at, UseDefaultIID());
+		at = (hier != nil) ? hier->GetParentUID() : kInvalidUID;
+	}
+	return kInvalidUID;
+}
+
 bool KFCNarrow::IsTextOnly(int32 kind)
 {
 	return kind == kKFCNarrowInTables || kind == kKFCNarrowInFootnotes || kind == kKFCNarrowInEndnotes
@@ -104,7 +125,7 @@ PMString KFCNarrow::StepWords(const KFCNarrowStep& step)
 }
 
 KFCNarrow::Filter::Filter(const std::vector<KFCNarrowStep>& steps)
-	: fSteps(steps), fFramesAt(steps.size())
+	: fSteps(steps), fFramesAt(steps.size()), fNoFrame(0)
 {
 	for (size_t k = 0; k < fSteps.size(); ++k)
 		if (fSteps[k].kind == kKFCNarrowFrames)
@@ -126,6 +147,11 @@ bool KFCNarrow::Filter::NeedsTextPlace() const
 bool KFCNarrow::Filter::MakesFrames() const
 {
 	return fFramesAt < fSteps.size();
+}
+
+bool KFCNarrow::Filter::FirstFrame(IDataBase* db, UID frame) const
+{
+	return fFrames.insert(std::make_pair(db, frame)).second;
 }
 
 bool KFCNarrow::Filter::KeepText(const KFCResultModel::Hit& hit, IDataBase* db) const

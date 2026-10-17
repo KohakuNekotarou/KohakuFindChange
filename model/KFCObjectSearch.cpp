@@ -848,6 +848,11 @@ void BuildObjectHit(const UIDRef& docRef, UID item, KFCResultModel::Hit& out)
 }
 }	// anonymous namespace
 
+void KFCObjectSearch::BuildRow(const UIDRef& docRef, UID item, KFCResultModel::Hit& out)
+{
+	BuildObjectHit(docRef, item, out);
+}
+
 bool KFCObjectSearch::ReadItemPlace(const UIDRef& docRef, UID item, KFCResultModel::Hit& io)
 {
 	IDataBase* const db = docRef.GetDataBase();
@@ -942,7 +947,7 @@ void KFCObjectSearch::CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targ
 		const int32 barEnd = static_cast<int32>(targets.size()) * kDocSpan;
 		KFCProgressBar bar(title, 0, barEnd, kTrue, kTrue);
 		bar.DisableChildProgressBars(kTrue);
-		int32 objectLimit = KFCResultModel::kKFCCollectHitLimit;
+		int32 objectLimit = KFCResultModel::kKFCCollectObjectLimit;	// the object lists' own (N7)
 #ifdef KFC_DIAG
 		// (Test builds only) Fault value object-limit (%TEMP%\kbs-diag-fault-object-limit holding a number): the list's limit
 		// for this walk set to it - the narrow-down plan's M6, the object lists' new limit measured (300 / 500 / 1000 objects:

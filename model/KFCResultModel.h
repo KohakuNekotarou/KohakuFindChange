@@ -51,6 +51,12 @@ namespace KFCResultModel
 	    never this number. */
 	const int32 kKFCCollectHitLimit = 300;
 
+	/** THE OBJECT LISTS' LIMIT (docs/superpowers/specs/2026-10-18-kfc-narrow-down-design.md N7 - the author's call: the object
+	    search's limit raised; the number measured, M6 - 1000 objects: the search 4.6 s, the heaviest special operation 20 s, each
+	    one Undo): an Object tab search's list and a Frames of These Matches list hold at most this many rows. Text lists keep
+	    kKFCCollectHitLimit. */
+	const int32 kKFCCollectObjectLimit = 1000;
+
 	/** WHY A ROW'S REPLACE KEPT NO COPY (HitCopy::whyNot - docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md
 	    C4): what the row's Restore Original says when it has none to put back. */
 	enum CopyWhyNot
@@ -187,6 +193,8 @@ namespace KFCResultModel
 								// named after - stands on no page (Narrow Down's On Pasteboard; told by the class of the frame's
 								// owner page, never by its "PB" spelling). An object row says so in onPasteboard.
 		PMString	outlinedText;	// a text row written as outlines (RowDisplay::outlinedText): the characters it outlined
+		UID			matchFrame;	// a TEXT row's match's own frame (the parcel's - IParcelList::GetParcelFrameUID), kInvalidUID when
+								// it has none placed: what Frames of These Matches climbs to the frame the person selects
 		UID			pageUID;	// the page the row names (a text row's frame's - the "+" frame's for an overset match -, an object
 								// row's owner page), kInvalidUID for none: Narrow Down's Pages asks it of the range read in the
 								// row's document (a parent page or a spread - the pasteboard - is never in a range read so)
@@ -242,7 +250,7 @@ namespace KFCResultModel
 				fontGroup(-1), fontGroupPos(-1), storyUID(kInvalidUID),
 				textStart(kInvalidTextIndex), textEnd(kInvalidTextIndex), matchHash(0),
 				replaced(false), outlined(false), special(0), kept(false), cleared(false), inTable(false),
-				inFootnote(false), inEndnote(false), frameOnPasteboard(false), pageUID(kInvalidUID), outcome(kOutcomeNone),
+				inFootnote(false), inEndnote(false), frameOnPasteboard(false), matchFrame(kInvalidUID), pageUID(kInvalidUID), outcome(kOutcomeNone),
 				pageOrdinal(0), storyOrdinal(-1),
 				itemUID(kInvalidUID), onPasteboard(false), isMaster(false), isGrouped(false), isInline(false),
 				isAnchored(false), itemPrint(0), itemPrintLength(0) {}
@@ -376,6 +384,9 @@ namespace KFCResultModel
 	/** ARE THE LIST'S ROWS OBJECT ROWS - an Object tab search's, or a Frames of These Matches list's? The heading's menu greys
 	    a condition that only text rows can meet. */
 	bool ListHoldsObjects();
+	/** The list's limit of rows: kKFCCollectObjectLimit for a list of object rows (ListHoldsObjects), kKFCCollectHitLimit for
+	    any other - what a search's walks and its searches again take the room from. */
+	int32 ListLimit();
 
 	/** A DOCUMENT OF THE LIST WAS CLOSED (the author's calls: only its rows go - an All Documents list's, 2026-09-29, and
 	    every list's, its heading staying while it is a tier, 2026-10-14 night - KFCCloseDocResponder).

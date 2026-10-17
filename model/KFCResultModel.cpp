@@ -387,6 +387,11 @@ PMString KFCResultModel::NarrowWords()
 	return words;
 }
 
+int32 KFCResultModel::ListLimit()
+{
+	return ListHoldsObjects() ? kKFCCollectObjectLimit : kKFCCollectHitLimit;
+}
+
 bool KFCResultModel::ListHoldsObjects()
 {
 	// An Object tab search's list - its search mode (SetSearchMode keeps it as a plain int) - or a list a Frames of These

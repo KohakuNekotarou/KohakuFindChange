@@ -86,6 +86,10 @@ namespace KFCObjectSearch
 		UID onLayer,	// the document's layer the rows are kept to (Find Objects on Active Layer); kInvalidUID = all
 		const KFCNarrow::Filter* narrow = nil);	// a narrowed list's conditions (CollectTargets'); nil = all
 
+	/** AN OBJECT ROW FOR AN ITEM (the object search's own BuildObjectHit - its text, its place, its fingerprint): what
+	    Frames of These Matches makes of the frame holding a match (KFCSearchEngine's walk - the narrow-down spec's N5). */
+	void BuildRow(const UIDRef& docRef, UID item, KFCResultModel::Hit& out);
+
 	/** An item's FINGERPRINT (O12): its own persistent data as the database writes it (IPMPersist::SaveAll into memory),
 	    with what it holds - a group's members, a graphic frame's image - its anchored settings when it hangs in text,
 	    and a text frame's (or a path's) story's version (ITextModel::GetChangeCount): one 64-bit hash and a length.
