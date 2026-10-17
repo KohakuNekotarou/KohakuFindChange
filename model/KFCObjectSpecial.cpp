@@ -508,8 +508,8 @@ ErrorCode ClearOverrides(const UIDRef& docRef, const UIDList& items)
 	return kSuccess;
 }
 
-// THE WRITE OF ONE DOCUMENT (E5): InDesign's own Facade over its items - one call over them all, as over a selection of
-// them; a transform one call per item about its own centre. kSuccess, or the error.
+// THE WRITE OF ONE SPREAD'S ITEMS (E5 - SpreadGroups): InDesign's own Facade over them - one call over them all, as over a
+// selection of them; a transform one call per item about its own centre. kSuccess, or the error.
 ErrorCode WriteDocument(const OpInfo& info, const KFCSpecialParams& params, const UIDRef& docRef, const UIDList& items)
 {
 	switch (info.op)
@@ -602,6 +602,29 @@ ErrorCode WriteDocument(const OpInfo& info, const KFCSpecialParams& params, cons
 		}
 		default:
 			return kFailure;
+	}
+}
+
+// THE ITEMS BY THEIR SPREAD, in the order the rows list them - the unit InDesign's own commands take: a selection is one
+// spread's, and a Facade handed items of two spreads at once can act as if they were one's (ILayerFacade::MoveToLayer put
+// the second spread's items on the first - measured live, 2026-10-17).
+void SpreadGroups(IDataBase* db, const std::vector<std::pair<int32, UID> >& todo, std::vector<UIDList>& out)
+{
+	out.clear();
+	std::vector<UID> spreads;
+	for (size_t k = 0; k < todo.size(); ++k)
+	{
+		InterfacePtr<IHierarchy> hier(db, todo[k].second, UseDefaultIID());
+		const UID spread = (hier != nil) ? hier->GetSpreadUID() : kInvalidUID;
+		size_t s = 0;
+		while (s < spreads.size() && spreads[s] != spread)
+			++s;
+		if (s == spreads.size())
+		{
+			spreads.push_back(spread);
+			out.push_back(UIDList(db));
+		}
+		out[s].Append(todo[k].second);
 	}
 }
 
@@ -771,8 +794,9 @@ bool KFCObjectSpecial::SpecialRows(int32 op, const KFCRowsByChapter& rows, const
 		Refuse(outStatus, info, PMString("InDesign would not start a command sequence - nothing was changed."));
 		return false;
 	}
-	// THE WRITE: InDesign's own Facade over each document's items (E5). An error standing ends the step by it: the whole
-	// step goes back, and no row is marked over a write InDesign takes back.
+	// THE WRITE: InDesign's own Facade over each document's items, one call per spread (E5 - a selection's unit:
+	// SpreadGroups). An error standing ends the step by it: the whole step goes back, and no row is marked over a write
+	// InDesign takes back.
 	bool errorStands = false;
 	size_t changedCount = 0;
 	for (size_t c = 0; c < chapters.size() && !errorStands; ++c)
@@ -781,10 +805,15 @@ bool KFCObjectSpecial::SpecialRows(int32 op, const KFCRowsByChapter& rows, const
 		if (chapter.todo.empty())
 			continue;
 		IDataBase* const db = chapter.docRef.GetDataBase();
-		UIDList items(db);
-		for (size_t k = 0; k < chapter.todo.size(); ++k)
-			items.Append(chapter.todo[k].second);
-		const ErrorCode done = WriteDocument(info, params, chapter.docRef, items);
+		std::vector<UIDList> bySpread;
+		SpreadGroups(db, chapter.todo, bySpread);
+		ErrorCode done = kSuccess;
+		for (size_t s = 0; s < bySpread.size() && done == kSuccess; ++s)
+		{
+			done = WriteDocument(info, params, chapter.docRef, bySpread[s]);
+			if (done == kSuccess && ErrorUtils::PMGetGlobalErrorCode() != kSuccess)
+				done = ErrorUtils::PMGetGlobalErrorCode();
+		}
 		if (done != kSuccess || ErrorUtils::PMGetGlobalErrorCode() != kSuccess)
 		{
 			KFC_DIAG_LOG("SPECIAL op=%d chapter=%d err=%d global=%d", info.op, chapter.chapterIdx, (int)done,

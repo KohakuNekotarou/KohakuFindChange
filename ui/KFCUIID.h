@@ -545,6 +545,10 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 #define kKFCMoveToLayerMenuKey				kKFCStringPrefix "kKFCMoveToLayerMenuKey"
 #define kKFCClearStyleOverridesMenuKey		kKFCStringPrefix "kKFCClearStyleOverridesMenuKey"
 #define kKFCDeleteMenuKey					kKFCStringPrefix "kKFCDeleteMenuKey"
+// ...and the names of their submenus (kKFCFittingSubmenuPath below - the plain words are InDesign's own keys).
+#define kKFCFittingSubmenuKey				kKFCStringPrefix "kKFCFittingSubmenuKey"
+#define kKFCArrangeSubmenuKey				kKFCStringPrefix "kKFCArrangeSubmenuKey"
+#define kKFCTransformSubmenuKey				kKFCStringPrefix "kKFCTransformSubmenuKey"
 // "How to Use...": the operating reference. English in every UI language, like the rest of the
 // flyout - there is one string table, and the one thing switched to Japanese at run time is this page's
 // body (KFCLoc::JapaneseUI).
@@ -626,10 +630,12 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 #define kKFCSpecialOpsSubmenuName			"Special Operations"
 #define kKFCSpecialOpsSubmenuPath			kKFCResultObjectMenuName kSDKDefDelimitMenuPath kKFCSpecialOpsSubmenuName
 // ...and the submenus in it, after InDesign's own Object menu (the spec's E2): Fitting, Arrange, Transform - the same idiom
-// one level down.
-#define kKFCFittingSubmenuPath				kKFCSpecialOpsSubmenuPath kSDKDefDelimitMenuPath "Fitting"
-#define kKFCArrangeSubmenuPath				kKFCSpecialOpsSubmenuPath kSDKDefDelimitMenuPath "Arrange"
-#define kKFCTransformSubmenuPath			kKFCSpecialOpsSubmenuPath kSDKDefDelimitMenuPath "Transform"
+// one level down. NAMED BY KFC'S OWN KEYS (basicmenu's idiom - BscMnuID.h, kBscMnuPluginsMenuKey): the plain words are
+// InDesign's own string keys, and the menu showed them in InDesign's language ("Fitting" as Japanese InDesign's
+// Fitting submenu - measured live, 2026-10-17); KFC's words are English in every language (the author's call).
+#define kKFCFittingSubmenuPath				kKFCSpecialOpsSubmenuPath kSDKDefDelimitMenuPath kKFCFittingSubmenuKey
+#define kKFCArrangeSubmenuPath				kKFCSpecialOpsSubmenuPath kSDKDefDelimitMenuPath kKFCArrangeSubmenuKey
+#define kKFCTransformSubmenuPath			kKFCSpecialOpsSubmenuPath kSDKDefDelimitMenuPath kKFCTransformSubmenuKey
 
 // Menu item positions:
 //

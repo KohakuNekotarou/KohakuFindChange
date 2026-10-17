@@ -29,8 +29,9 @@ namespace KFCObjectSpecial
 	    for it); then InDesign's own question for the operation (its Can...). Not the row's fingerprint: a special operation
 	    goes by the item the row names, whatever query found it. The rows that pass are written in ONE step (the operation's
 	    name in the Edit menu, KFC's undo mark in it - one document's a plain sequence, several documents' one abortable
-	    sequence, KFCReplaceEngine::WriteStep): one Facade call over each document's items, a transform one call per item
-	    about its own centre (E5); an error standing takes the whole step back. A row whose item the write CHANGED - its
+	    sequence, KFCReplaceEngine::WriteStep): one Facade call over each spread's items - a selection's unit (a Facade
+	    handed two spreads' items moved the second's onto the first - measured), a transform one call per item about its own
+	    centre (E5); an error standing takes the whole step back. A row whose item the write CHANGED - its
 	    fingerprint, or its place in its stack for Arrange - is marked (KFCResultModel::MarkItemSpecial: its word, its eye,
 	    its place read again, its fingerprint; Delete: gone, its Replace greyed); one it left as it was is counted
 	    "unchanged" (E7); the other rows the write moved take the prints it left (KFCObjectReplace::FollowRowsTheWriteMoved);
