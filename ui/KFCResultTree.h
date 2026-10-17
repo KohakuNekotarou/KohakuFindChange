@@ -116,9 +116,10 @@ namespace KFCResultTree
 	    what its Replace would write at full colour (KFCReplaceEngine::PreviewHit - written in a step thrown away).
 	    false = no preview for this row (not a GREP search, replaced, the query or the story changed, its document
 	    closed...) - then DropRowPreview. Not kept as the last message: a preview is the row's, not a report.
-	    @param notSelectedWhy  a word or two on why the click did not select the row's match ("no width", "overset",
-	           "hidden layer" - the author's call), put in the heading: "Preview Text (not selected - no width):". nil
-	           when it was selected. */
+	    @param notSelectedWhy  a few words on how the click left the row's match, put whole in the heading's brackets:
+	           why it was not selected ("not selected - locked" - the author's call), or what cannot be seen of one it
+	           selected ("Overset Text", "hidden layer" - 2026-10-17): "Preview Text (Overset Text):". nil when there is
+	           nothing to say. */
 	bool ShowRowPreview(int32 chapterIdx, int32 hitIdx, const char* notSelectedWhy = nil);
 
 	/** A ROW'S OWN NOTE on the message area: why a click did not select the row's match or item. Like a preview it is

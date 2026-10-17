@@ -937,32 +937,45 @@ bool PutTypeToolOn()
 	return true;
 }
 
-// WHY A CLICK LEFT ITS ROW'S MATCH UNSELECTED (the author's call: a text row's click says why it cannot select). Said
-// by ActivateNode once the landing is over: on a GREP row whose preview comes up, in the preview's heading ("Preview
-// Text (not selected - no width):" - the author chose both); on any other row as the row's note
-// (KFCResultTree::ShowRowNote - the row's, like a preview: the next row landed on takes it away). The sentences are
-// the ones the double click said until it went. kNotSelectedQuietly: no reason to give - a
-// row whose text is gone (the jump has said "Not found") or a step InDesign refused.
+// HOW A CLICK LEFT ITS ROW'S MATCH (the author's call: a text row's click says why it cannot select - and, since
+// 2026-10-17, what cannot be seen of a match it did select). Said by ActivateNode once the landing is over: on a GREP row
+// whose preview comes up, in the preview's heading ("Preview Text (not selected - locked):" - the author chose both); on
+// any other row as the row's note (KFCResultTree::ShowRowNote - the row's, like a preview: the next row landed on takes
+// it away). kNotSelectedQuietly: no reason to give - a row whose text is gone (the jump has said "Not found") or a step
+// InDesign refused.
+// WHAT FIND/CHANGE ITSELF DOES (measured 2026-10-17 against its dialog's Find Next button - the author's model for the
+//  tree, JMP-29): it selects an OVERSET match (nothing of it on a page; the dialog says "(Overset Text)" beside Find
+//  what), a match on a HIDDEN layer (found only with Include Hidden Layers on, as the tree's rows are), and puts the caret
+//  at a ZERO-WIDTH one (^, $, a lookaround); it warns about a LOCKED one and selects nothing. So do these, the author's
+//  calls of the same night: the caret as InDesign puts it, every zero-width GREP match alike; an overset match selected
+//  with the jump as it was (to the "+"), said as the dialog says it; a hidden layer's selected; a locked one as before
+//  (the menu's Find Next selects a locked match - the dialog's button, the tree's model, does not).
 enum NotSelected
 {
 	kSelected = 0,
 	kNotSelectedLocked,
-	kNotSelectedHidden,
-	kNotSelectedNoWidth,
-	kNotSelectedOverset,
-	kNotSelectedQuietly
+	kNotSelectedQuietly,
+	kSelectedOverset,		// selected - nothing of it on a page (the view went to the frame's "+")
+	kSelectedHidden			// selected - on a hidden layer, nothing of it on screen
 };
 
-// The reason as a sentence - the row's note when no preview carries it. Empty for kSelected / kNotSelectedQuietly.
+// Did the landing leave the row's match selected (a caret, for a zero-width one)? The selection is then the pointer and
+// no marker goes over it (JMP-17's reason - a selection under an inversion cannot be read).
+bool LandedSelected(NotSelected why)
+{
+	return why == kSelected || why == kSelectedOverset || why == kSelectedHidden;
+}
+
+// The sentence for the row's note when no preview carries it - why it was not selected, or what of the selection cannot be
+// seen. Empty for kSelected / kNotSelectedQuietly.
 PMString NotSelectedSentence(NotSelected why)
 {
 	const char* text = "";
 	switch (why)
 	{
 		case kNotSelectedLocked:	text = "That match is locked - it cannot be selected."; break;
-		case kNotSelectedHidden:	text = "That match is on a hidden layer - it cannot be selected."; break;
-		case kNotSelectedNoWidth:	text = "That match has no width (^, $ or a lookaround) - there is nothing to select."; break;
-		case kNotSelectedOverset:	text = "An overset match has no text on the page to select."; break;
+		case kSelectedOverset:		text = "(Overset Text) The match is selected, past the end of its frames - nothing of it shows on the page."; break;
+		case kSelectedHidden:		text = "The match is selected, on a hidden layer - nothing of it shows."; break;
 		default:					break;
 	}
 	PMString sentence(text);
@@ -970,53 +983,40 @@ PMString NotSelectedSentence(NotSelected why)
 	return sentence;
 }
 
-// The reason in a word or two - for a GREP row's preview heading. nil for kSelected / kNotSelectedQuietly.
+// The same in a few words - inside the brackets of a GREP row's preview heading ("Preview Text (Overset Text):"). nil for
+// kSelected / kNotSelectedQuietly.
 const char* NotSelectedWords(NotSelected why)
 {
 	switch (why)
 	{
-		case kNotSelectedLocked:	return "locked";
-		case kNotSelectedHidden:	return "hidden layer";
-		case kNotSelectedNoWidth:	return "no width";
-		case kNotSelectedOverset:	return "overset";
+		case kNotSelectedLocked:	return "not selected - locked";
+		case kSelectedOverset:		return "Overset Text";
+		case kSelectedHidden:		return "hidden layer";
 		default:					return nil;
 	}
 }
 
 // A CLICK'S SELECTION OF A TEXT ROW'S MATCH (the author's call: the tree does what Edit > Find/Change's Find Next
-// does, one result selected after another, so the selection is the pointer and no marker goes
-// over it). Only a match that can be selected - found where the row says, not locked, not hidden, not zero width (an
-// overset one never comes here). One that cannot be is marked by JumpToHit instead, and the answer says why (NotSelected
-// - the reasons the double click gave until it went, said for the click: the author's call). The Type tool is put
-// on, as Find Next does (PutTypeToolOn - the author's call); the keyboard stays on the
-// list - the row's LButtonUp acquires it after the jump, the walk takes it back - so the arrows walk on and Return
-// replaces. The document is in front and composed, inside JumpToHit's dirty guard, its selection cleared. kSelected
-// when the match is selected.
-// OUT OF A CLICK'S REACH whatever the document says: locked, then hidden, then no width - the order the double click asked
-// them in (a locked zero-width match is locked). kSelected = none of the three. Asked of a match found where its row says
-// (SelectMatchOnClick), and of an overset one, which is out of reach for its own reason after these (JumpToHit).
-NotSelected OutOfReach(int32 chapterIdx, int32 hitIdx, TextIndex start, TextIndex end)
-{
-	bool locked = false, hidden = false;
-	KFCResults()->GetHitReach(chapterIdx, hitIdx, locked, hidden);
-	if (locked)
-		return kNotSelectedLocked;
-	if (hidden)
-		return kNotSelectedHidden;
-	if (start >= end)
-		return kNotSelectedNoWidth;
-	return kSelected;
-}
-
+// does, one result selected after another, so the selection is the pointer and no marker goes over it). Every match
+// found where the row says is selected but a LOCKED one, as Find/Change's own button leaves it (NotSelected says what it
+// does with each): a zero-width one gets the caret at its place (start == end), a hidden layer's and an overset one are
+// selected with nothing of them showing - the answer says so (kSelectedHidden here, kSelectedOverset by JumpToHit, whose
+// overset branch comes here too). A locked one is marked by JumpToHit instead, and the answer says why. The Type tool is
+// put on, as Find Next does (PutTypeToolOn - the author's call); the keyboard stays on the list - the row's LButtonUp
+// acquires it after the jump, the walk takes it back - so the arrows walk on and Return replaces. The document is in
+// front and composed, inside JumpToHit's dirty guard, its selection cleared.
 NotSelected SelectMatchOnClick(int32 chapterIdx, int32 hitIdx, const UIDRef& storyRef, TextIndex start, TextIndex end,
 	bool found)
 {
 	// A row whose text is not where it says has its own sentence - the jump's "Not found" - and nothing else to add.
 	if (!found)
 		return kNotSelectedQuietly;
-	const NotSelected outOfReach = OutOfReach(chapterIdx, hitIdx, start, end);
-	if (outOfReach != kSelected)
-		return outOfReach;
+	// OUT OF A CLICK'S REACH: locked, whatever else it is (a locked zero-width match is locked) - Find/Change's button warns
+	// and selects nothing. The two the row records (GetHitReach - the search found them there): locked, and hidden.
+	bool locked = false, hidden = false;
+	KFCResults()->GetHitReach(chapterIdx, hitIdx, locked, hidden);
+	if (locked)
+		return kNotSelectedLocked;
 	InterfacePtr<ITextModel> textModel(storyRef, UseDefaultIID());
 	if (textModel == nil)
 		return kNotSelectedQuietly;
@@ -1038,24 +1038,26 @@ NotSelected SelectMatchOnClick(int32 chapterIdx, int32 hitIdx, const UIDRef& sto
 	if (!PutTypeToolOn())
 		return kNotSelectedQuietly;
 	// ! RangeData's two-argument form is (start, END) - not (start, length). Getting that wrong selects from the match
-	//   to a point measured from the start of the STORY.
-	// kDontScrollSelection: the jump has already centred the match (IPanorama::ScrollContentLocationToFrameCenter);
-	// kScrollIntoView would only promise it is somewhere on screen, and undo that better answer.
-	return (textSelectionSuite->SetTextSelection(storyRef, RangeData(start, end), Selection::kDontScrollSelection, nil)
-		!= kFalse) ? kSelected : kNotSelectedQuietly;
+	//   to a point measured from the start of the STORY. A zero-width match (start == end) is a caret there.
+	// kDontScrollSelection: the jump has already centred the match (IPanorama::ScrollContentLocationToFrameCenter) - or,
+	// overset, gone to the frame's "+" (the author: the jump as it was); kScrollIntoView would undo either.
+	if (textSelectionSuite->SetTextSelection(storyRef, RangeData(start, end), Selection::kDontScrollSelection, nil) == kFalse)
+		return kNotSelectedQuietly;
+	return hidden ? kSelectedHidden : kSelected;
 }
 
 /** Jump to hit 'hitIdx' of chapter 'chapterIdx': front its document, scroll to the match, and select
     it - or raise the marker on one that cannot be selected (SelectMatchOnClick). An unreachable
     chapter (missing / locked file) reports through the status line. An overset match has no on-page
     location of its own, so the view scrolls to the frame's overset "+" instead and NO marker is raised
-    - those pixels belong to the indicator, not to the text.
+    - those pixels belong to the indicator, not to the text; the match is selected all the same (2026-10-17),
+    as Find/Change's Find Next selects it.
     The marker comes up at once, whichever door asked (see the note at the head of KFCJump.h).
 
     Reached only through ActivateNode, where the "one activation at a time" guard lives - which is why
     it is in here.
-    @param outWhy  kSelected, or why the landing left the match unselected (NotSelected - an overset match's
-          too) - for ActivateNode to say once the preview, if any, is up.
+    @param outWhy  kSelected, or how the landing left the match (NotSelected - selected with nothing of it
+          showing, or why it was not selected) - for ActivateNode to say once the preview, if any, is up.
     @return true when the jump LANDED ON THE ROW - its document in front and the text at its place
           still the text the row describes (overset or not). False for every other end: a bad index,
           a row with no place, an unreachable chapter, a window that could not be fronted, a row whose
@@ -1183,13 +1185,12 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx, NotSelected& outWhy)
 		if (loc.found)
 			ScrollViewToPoint(frontView, loc.outportPb);	// scroll only - no marker on the "+" locator
 		KFCHitMarkerView::Hide();
-		// Nothing selected (cleared above), and why - in the double click's order: locked, hidden, no width, then overset.
-		// A row whose text has gone says only the "Not found" below.
-		if (sameOccurrence)
-		{
-			const NotSelected outOfReach = OutOfReach(chapterIdx, hitIdx, start, end);
-			outWhy = (outOfReach != kSelected) ? outOfReach : kNotSelectedOverset;
-		}
+		// SELECTED WHERE NOTHING OF IT SHOWS (2026-10-17, the author: "select it, and the jump as it is") - Find Next's own
+		// way with an overset match, said as its dialog says it ("(Overset Text)"). A locked one stays unselected and says
+		// so; a row whose text has gone says only the "Not found" below.
+		outWhy = SelectMatchOnClick(chapterIdx, hitIdx, storyRef, start, end, sameOccurrence);
+		if (outWhy == kSelected || outWhy == kSelectedHidden)
+			outWhy = kSelectedOverset;
 	}
 	else
 	{
@@ -1211,7 +1212,7 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx, NotSelected& outWhy)
 			// inversion cannot be read (JMP-17's reason). Every other row is marked as above, and the answer says
 			// why it was not selected (ActivateNode says it).
 			outWhy = SelectMatchOnClick(chapterIdx, hitIdx, storyRef, start, end, sameOccurrence);
-			if (outWhy == kSelected)
+			if (LandedSelected(outWhy))
 				KFCHitMarkerView::Hide();
 			else
 				KFCHitMarkerView::Show(db, storyUID, start, end);

@@ -113,11 +113,11 @@
   （Reject／Accept の仲間・Replace Again・Check All／Uncheck All・本／文書／ストーリー／run の行のメニューは 2026-10-06 に外した。）
   - 訂正:
 
-- **SET-11** `Replace` が灰色のとき（置換済み・ロック・検索の一致でない。まとめて選んだ行の1つを右クリックしたときは、選んだ行のどれも置換できないとき＝REP-36）は、メニューが開かない（本体の振る舞い＝項目が全部灰色のメニューは開かない・2026-08-01 実測・作者がこのほうがよいと受け入れた）。
+- **SET-11** ★**灰色の項目もメニューに出す**（2026-10-17 作者の決定「不可能なときは、灰色でいいです」）＝`Replace` が灰色のとき（置換済み・ロック・検索の一致でない。まとめて選んだ行の1つを右クリックしたときは、選んだ行のどれも置換できないとき＝REP-36）も、メニューは開いて `Replace` を灰色で見せる（`HandlePopupMenu` の `removeDisabledItems = kFalse`）。（2026-08-01〜10-17 は灰色の項目を出さず、項目が全部灰色ならメニューは開かなかった＝KFC の引数 kTrue。作者が受け入れていた形。）
   ストーリー・文書の行のメニューは、実行中のほかは開く（Search This Story Again／Search This Document Again が断るときは、押した後にメッセージ欄で理由を言う）。
-  Select All Rows は下にヒットの行が無い行で灰色＝そのときブックの行のメニューは開かない（ROW-38・2026-10-11 作者の決定）。
+  Select All Rows は下にヒットの行が無い行で灰色（ROW-38・2026-10-11 作者の決定）＝そのときもブックの行のメニューは開いて、灰色の Select All Rows を見せる（2026-10-17 から）。
   理由は出さない（右クリックの理由の層は 2026-10-06 に外した＝ROW-29）。
-  - 訂正: ⚠2026-10-17（ヘッダーの再読）＝「本体の振る舞い」は正確でない。全部灰色だと開かないのは **KFC が渡している引数**（`IMenuManager::HandlePopupMenu(…, removeDisabledItems = kTrue, …)`・SDK の Adobe 側の呼び出し 14 か所も全部 kTrue＝本体の流儀ではある）。`kFalse` なら灰色の項目を並べて開く（実測＝テスト用ビルドの故障スイッチ `menu-keep-grey` で置換済みの行に `Replace (disabled)` が出た）。振る舞いは変えていない＝灰色を見せる形にするかは作者（`docs/ai-notes/hdr-reread-kfc-cannot-2026-10-17.md`）。
+  - 訂正: ⚠2026-10-17（ヘッダーの再読）＝「本体の振る舞い」は正確でない。全部灰色だと開かないのは **KFC が渡している引数**（`IMenuManager::HandlePopupMenu(…, removeDisabledItems = kTrue, …)`・SDK の Adobe 側の呼び出し 14 か所も全部 kTrue＝本体の流儀ではある）。`kFalse` なら灰色の項目を並べて開く（実測＝テスト用ビルドの故障スイッチ `menu-keep-grey` で置換済みの行に `Replace (disabled)` が出た）。→ 同じ夜に作者が灰色を見せる形に決めた（上の★・`docs/ai-notes/hdr-reread-kfc-cannot-2026-10-17.md`）。故障スイッチは逆向きの `menu-drop-grey`（昔の形＝灰色を落とす）。回帰＝`sel-zero-row-greyed`・`sel-zero-book-no-menu`（名前はそのまま・期待は DISABLED）。
 
 - **SET-12** （2026-10-06 に外した＝Check All／Uncheck All。チェックボックスごと＝F16）
   - 訂正:

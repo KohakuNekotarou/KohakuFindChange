@@ -942,8 +942,8 @@ void KFCResultTree::ShowStatus(const PMString& message)
 // KFCResultTree::ShowRowPreview - a GREP row's after-text on the message area
 //----------------------------------------------------------------------------------------
 
-// The heading of a preview: "Preview Text:", or "Preview Text (not selected - no width):" when the click could not
-// select the match.
+// The heading of a preview: "Preview Text:", or with a word on how the click left the match - "Preview Text (not
+// selected - locked):", "Preview Text (Overset Text):" (KFCJump's NotSelectedWords).
 static const char* const kPreviewLabel = "Preview Text:";
 static const char* const kPreviewLabelStem = "Preview Text";
 
@@ -993,13 +993,14 @@ bool KFCResultTree::ShowRowPreview(int32 chapterIdx, int32 hitIdx, const char* n
 	KFCResults()->MarkUpBreaksForDisplay(pre);
 	KFCResults()->MarkUpBreaksForDisplay(shown);
 	KFCResults()->MarkUpBreaksForDisplay(post);
-	// WHY THE CLICK DID NOT SELECT THE MATCH, in the heading (the author's call: the reason and the preview both):
-	// "Preview Text (not selected - no width):". The heading owns its line(s) and wraps like the rest.
+	// HOW THE CLICK LEFT THE MATCH, in the heading (the author's call: the reason and the preview both): "Preview Text (not
+	// selected - locked):", or what cannot be seen of one it selected - "Preview Text (Overset Text):". The words come
+	// whole from the caller (KFCJump's NotSelectedWords). The heading owns its line(s) and wraps like the rest.
 	PMString label(kPreviewLabel);
 	if (notSelectedWhy != nil && *notSelectedWhy != '\0')
 	{
 		label = kPreviewLabelStem;
-		label.Append(" (not selected - ");
+		label.Append(" (");
 		label.Append(notSelectedWhy);
 		label.Append("):");
 	}

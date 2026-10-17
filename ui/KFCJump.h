@@ -8,11 +8,13 @@
 //  location (reopening the chapter windowless if the user closed it), brings that chapter's window
 //  to the front, scrolls the view so the match is centred, and SELECTS the match with the Type tool
 //  on (the author's calls: the tree does what Edit > Find/Change's Find Next does, so the selection
-//  is the pointer and no marker goes over it - JMP-06). The keyboard stays on the list. A match that
-//  cannot be selected - locked, hidden, zero width, no longer found - gets the marker on its
-//  characters instead (KFCHitMarker - a global text adornment), which takes itself down after about a
-//  second, and nothing is left selected. Why it was not selected is said (the author's call): the
-//  row's note on the message area, or a GREP row's preview heading.
+//  is the pointer and no marker goes over it - JMP-06). The keyboard stays on the list. As Find/Change's
+//  own Find Next does (measured 2026-10-17 - the author's calls), a zero-width match gets the caret, and
+//  an overset match or a hidden layer's is selected with nothing of it showing - which is said. A match
+//  that cannot be selected - locked, no longer found - gets the marker on its characters instead
+//  (KFCHitMarker - a global text adornment), which takes itself down after about a second, and nothing
+//  is left selected. Why it was not selected is said (the author's call): the row's note on the
+//  message area, or a GREP row's preview heading.
 //  A double click is two clicks (the author's call: its own selection, which gave the keyboard to the
 //  text, went with the click's). THE MARKER COMES UP AT ONCE (the author's
 //  call: on the same beat as KCM's Story-mode jump, which raises its flash straight away). With
@@ -35,7 +37,7 @@ namespace KFCJump
 {
 	/** The single door every result row goes through: a hit row jumps (front its document, scroll to
 	    the match, select the match, or raise the marker on one that cannot be selected - an overset
-	    match scrolls to the frame's "+" and is neither), a
+	    match scrolls to the frame's "+" and is selected there, unmarked), a
 	    chapter row shows its document (no scroll, no marker), the book row activates its book (the
 	    active book AND its tab in the book panel; a book closed since the search is not reopened).
 	    Called by the row click and by the keyboard walk, which is why it exists - two callers must not

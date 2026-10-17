@@ -77,12 +77,16 @@ void PopRowMenu(const char* menuName, IEvent* e, IPMUnknown* widget)
 	InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
 	InterfacePtr<IActionManager> actionMgr(app != nil ? app->QueryActionManager() : nil);
 	InterfacePtr<IMenuManager> menuMgr(actionMgr, UseDefaultIID());
-	bool16 removeDisabledItems = kTrue;		// InDesign's own row menus' form (every caller in source/open passes kTrue)
+	// GREY ITEMS STAY ON THE MENU (the author, 2026-10-17: "when it cannot be done, grey is fine" - SET-11): a row whose
+	// Replace cannot write, a book row with no hit row under it, still open their menus, the item shown greyed out. Until
+	// then this was kTrue - every caller in source/open passes it - and a menu of grey items alone did not open at all,
+	// which the spec map had called InDesign's own way (the re-read of KFC's headers found it was this argument).
+	bool16 removeDisabledItems = kFalse;
 #ifdef KFC_DIAG
-	// (Test builds only) Fault switch menu-keep-grey: the grey items kept on the menu (removeDisabledItems kFalse) - the
-	// input the spec map's SET-11 / ROW-38 never tried (the re-read of KFC's headers, 2026-10-17).
-	if (KFC_DIAG_FAULT("menu-keep-grey"))
-		removeDisabledItems = kFalse;
+	// (Test builds only) Fault switch menu-drop-grey: the grey items dropped again (kTrue) - the old way, for a test of the
+	// greyed items to be armed against.
+	if (KFC_DIAG_FAULT("menu-drop-grey"))
+		removeDisabledItems = kTrue;
 #endif
 	if (menuMgr != nil)
 		menuMgr->HandlePopupMenu(menuName, e->GlobalWhere(), e->GlobalWhere(), removeDisabledItems, widget);
