@@ -12,7 +12,7 @@
 
 // Interface includes:
 #include "IDataBase.h"
-#include "IFindChangeService.h"
+#include "IFindChangeOptions.h"		// kObjectSearch, kAllFrames - a Frames list's Replace states the Object tab's find side
 #include "IHierarchy.h"
 #include "IObjectWalker.h"
 
@@ -30,6 +30,8 @@
 #include "KFCObjectReplace.h"
 #include "KFCObjectSearch.h"
 #include "KFCPageItemFacts.h"
+#include "IKFCUIServices.h"	// ShowNotice - Find/Change not put back after a Frames list's write
+#include "KFCQueryCopy.h"		// a Frames list's Replace: the Object tab read, stated for the write, put back
 #include "KFCReplaceEngine.h"	// RefuseChangedQuery, CanReplaceHit, WhyGreyed; the write's undo step (WriteStep) and
 								// what its documents are left as (DocsAfterWrite)
 #include "KFCResultModel.h"
@@ -136,8 +138,20 @@ void SayNoneReplaceable(PMString& out, size_t total, const int32 (&counts)[kRefu
 
 // O10 steps 1-2, asked once for a Replace: the settings the search ran with (a changed query CLEARS the results - the
 // author's rule for text, kept), and something to change to. false = refused, outStatus says why.
+// A FRAMES OF THESE MATCHES LIST (KFCResultModel::ListIsFrames - the narrow-down spec's N6): its rows were found by a text
+// search, so no object query of the search is asked; what is asked is the Object tab's change side (HasChangeObjectFormat
+// reads that tab whichever one Find/Change shows), which the write uses (FramesObjectQuery).
 bool CheckSettings(PMString& outStatus)
 {
+	if (KFCResultModel::ListIsFrames())
+	{
+		if (!KFCObjectSearch::HasChangeObjectFormat())
+		{
+			Refuse(outStatus, "nothing to change to - set Change Object Format or an object style on the Object tab of Edit > Find/Change.");
+			return false;
+		}
+		return true;
+	}
 	PMString refusal;
 	if (KFCReplaceEngine::RefuseChangedQuery(refusal))
 	{
@@ -374,6 +388,91 @@ struct ObjectWriteResult
 	ObjectWriteResult() : started(false), ok(false), errorStands(false), searchError(false), writtenCount(0) {}
 };
 
+// A FRAMES OF THESE MATCHES LIST'S WRITE, AIMED (the narrow-down spec's N6 - M5): the walk reaches a row's item by InDesign's
+// own object matching, which goes by the Object tab's find side; a Frames list's frames were found by a text search - so for
+// the length of the write the Object tab is stated with nothing on its find side (no Find Object Format, no object style),
+// Type All Frames, and the Include switches of the list's own query (the walk then reaches every frame the text search could),
+// its change side as the person left it; then the Object tab put back as it was, and the tab Find/Change showed (KFCQueryCopier
+// - KFCQueryScope's way: Apply, then Matches; what cannot be put back is said). A list of any other kind: nothing is stated.
+class FramesObjectQuery
+{
+public:
+	FramesObjectQuery() : fStated(false), fRefused(false)
+	{
+		fWhy.SetTranslatable(kFalse);
+		if (!KFCResultModel::ListIsFrames())
+			return;
+		KFCQueryCopier::Capture(fBeforeNow);
+		KFCQueryCopier::CaptureMode(fBeforeObject, IFindChangeOptions::kObjectSearch);
+		if (!fBeforeNow.valid || !fBeforeObject.valid)
+		{
+			fRefused = true;
+			fWhy = "the Find/Change settings could not be read - nothing was changed.";
+			return;
+		}
+		KFCQueryCopy frames(fBeforeObject);
+		frames.findAttrs.reset();
+		frames.objectFindStyle = kInvalidUID;
+		frames.objectType = IFindChangeOptions::kAllFrames;
+		const std::shared_ptr<const KFCQueryCopy> list(KFCResultModel::GetQueryCopy());
+		if (list != nullptr && list->valid)
+		{
+			frames.includeLockedStories = list->includeLockedStories;
+			frames.includeLockedLayers = list->includeLockedLayers;
+			frames.includeHiddenLayers = list->includeHiddenLayers;
+			frames.includeMasterPages = list->includeMasterPages;
+			frames.includeFootnotes = list->includeFootnotes;
+		}
+		fStated = true;		// (whatever Apply did before a failure is put back by the destructor)
+		PMString what;
+		if (!KFCQueryCopier::Apply(frames, what) || !KFCQueryCopier::Matches(frames, what))
+		{
+			fRefused = true;
+			fWhy = "the Object tab could not be set for the frames (";
+			fWhy.Append(what);
+			fWhy.Append(") - nothing was changed.");
+		}
+		KFC_DIAG_LOG("FRAMESREPLACE stated=%d refused=%d beforeMode=%d", fStated ? 1 : 0, fRefused ? 1 : 0, (int)fBeforeNow.mode);
+	}
+	~FramesObjectQuery()
+	{
+		if (!fStated)
+			return;
+		PMString what;
+		bool back = KFCQueryCopier::Apply(fBeforeObject, what) && KFCQueryCopier::Matches(fBeforeObject, what);
+		if (back && fBeforeNow.mode != fBeforeObject.mode)
+			back = KFCQueryCopier::Apply(fBeforeNow, what) && KFCQueryCopier::Matches(fBeforeNow, what);
+		KFC_DIAG_LOG("FRAMESREPLACE put back=%d (%s)", back ? 1 : 0, what.GetUTF8String().c_str());
+		if (!back)
+		{
+			PMString notice("Find/Change could not be put back as you left it (");
+			notice.SetTranslatable(kFalse);
+			notice.Append(what);
+			notice.Append(") - check Edit > Find/Change.");
+			InterfacePtr<IKFCUIServices> ui(KFCQueryUIServices());
+			if (ui != nil)
+				ui->ShowNotice(notice);
+		}
+	}
+	bool Ready(PMString& outWhy) const
+	{
+		if (!fRefused)
+			return true;
+		outWhy = "Replace: ";
+		outWhy.Append(fWhy);
+		outWhy.SetTranslatable(kFalse);
+		return false;
+	}
+private:
+	bool			fStated;
+	bool			fRefused;
+	PMString		fWhy;
+	KFCQueryCopy	fBeforeNow;
+	KFCQueryCopy	fBeforeObject;
+	FramesObjectQuery(const FramesObjectQuery&);
+	FramesObjectQuery& operator=(const FramesObjectQuery&);
+};
+
 // THE WRITE (steps 6-8, 10, 11) - ONE for one row's Replace and for rows selected together, behind two doors that check
 // their rows first: the text rows' shape (KFCReplaceEngine's ReplaceHit and ReplaceHits, both writing through
 // ReplaceRowsNow). The doors have reached each row's document and listed the rows that pass (each chapter's todo); what
@@ -388,6 +487,11 @@ ObjectWriteResult WriteObjectRows(std::vector<ObjectChapterWrite>& chapters, KFC
 	PMString& outStatus)
 {
 	ObjectWriteResult result;
+	// A Frames list's write: the Object tab aimed at its frames for the length of it (FramesObjectQuery - before any
+	// command sequence below begins, put back after the last one ends).
+	const FramesObjectQuery framesQuery;
+	if (!framesQuery.Ready(outStatus))
+		return result;
 	size_t documents = 0;
 	for (size_t c = 0; c < chapters.size(); ++c)
 		if (!chapters[c].todo.empty())

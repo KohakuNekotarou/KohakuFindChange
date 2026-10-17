@@ -24,6 +24,7 @@
 #include "IWalkerScopeFactoryUtils.h"
 #include "IAttrReport.h"			// IsParagraphAttribute - a Change side that sets paragraph formatting (TakeRowCopy)
 #include "IAttributeStrand.h"		// a paragraph's style and own overrides, kept and put back (TakeRowCopy, PutParagraphBack)
+#include "ICreateOutlinesUtils.h"		// CreateCOTextCmd - a text row's Create Outlines (OutlineHits)
 #include "ITextModelCmds.h"			// ApplyStyleCmd / ApplyCmd - a paragraph's formatting put back (PutParagraphBack)
 #include "IHyperlinkUtils.h"		// hyperlink sources a copy would cut or carry (TakeRowCopy) - source/open/interfaces/layout
 #include "HyperlinkID.h"			// IID_IHYPERLINKTABLE - the document's hyperlinks (LinksOn, PutLinksBack)
@@ -2984,6 +2985,597 @@ bool KFCReplaceEngine::RestoreHits(const KFCRowsByChapter& rowsByChapter, PMStri
 		{
 			outStatus.Append(" Left as they were: ");
 			AppendRestoreCounts(outStatus, counts);
+			outStatus.Append(".");
+		}
+	}
+	outStatus.SetTranslatable(kFalse);
+	return true;
+}
+
+// ======================================================================================================
+// A TEXT ROW'S SPECIAL OPERATIONS > CREATE OUTLINES (docs/superpowers/specs/2026-10-18-kfc-text-outlines-design.md - the
+// author, 2026-10-18: "only the matched characters, Create Outlines - a special operation for text"). The rows' matches
+// outlined as InDesign's Type > Create Outlines does them (ICreateOutlinesUtils::CreateCOTextCmd - SnpInspectPathInfo.cpp's
+// call, with the original deleted: the outlines go in as inline objects, one a line of the match - M7). Restore from Copy's
+// shape: the doors row by row (its place followed by its focus, its text as the row holds it, not locked, not overset), the
+// rows written story by story in text order, each checked again just before its command, every other row carried past
+// what the command turned the match into - by the story's length before and after it, since that is not a fixed number
+// (M7: "aaaa bbbb" over two lines becomes outline, space, outline). ONE undo step ("Create Outlines" - the object rows'
+// name), KFC's mark in it.
+// ======================================================================================================
+
+namespace
+{
+
+// WHY A ROW IS NOT OUTLINED - said in full for one row (OutlineSentence), counted for several (OutlineWords).
+enum OutlineRefusal
+{
+	kOutlineOk = 0,
+	kOutlineNotText,		// an object row (its own Create Outlines is KFCObjectOutline's)
+	kOutlineDone,			// outlined already
+	kOutlineEmpty,			// a match of no characters (GREP's ^, $)
+	kOutlineNoDoc,			// its document could not be found
+	kOutlineNotOpened,		// ...or not opened
+	kOutlineNotFollowed,	// its story changed in a way its foci could not follow
+	kOutlineEdited,			// its text has been edited since
+	kOutlineOverset,		// in overset text - InDesign refuses it (M7: error 80650)
+	kOutlineLocked,			// locked
+	kOutlineRefusalCount
+};
+
+const char* OutlineWords(OutlineRefusal why)
+{
+	switch (why)
+	{
+		case kOutlineNotText:		return "not a text row";
+		case kOutlineDone:			return "outlined already";
+		case kOutlineEmpty:			return "no characters";
+		case kOutlineNoDoc:			return "document not found";
+		case kOutlineNotOpened:		return "document not opened";
+		case kOutlineNotFollowed:	return "not followed";
+		case kOutlineEdited:		return "edited since";
+		case kOutlineOverset:		return "in overset text";
+		case kOutlineLocked:		return "locked";
+		default:					return "";
+	}
+}
+
+// One row's refusal, after "Create Outlines: ".
+const char* OutlineSentence(OutlineRefusal why)
+{
+	switch (why)
+	{
+		case kOutlineNotText:		return "this row is not a text row.";
+		case kOutlineDone:			return "this row is outlined already.";
+		case kOutlineEmpty:			return "this row's match has no characters to outline.";
+		case kOutlineNoDoc:			return "the document of this row could not be found.";
+		case kOutlineNotOpened:		return "the document of this row could not be opened.";
+		case kOutlineNotFollowed:	return "the story of this row has changed in a way KohakuFindChange cannot follow - left as it is.";
+		case kOutlineEdited:		return "the text of this row has been edited since - left as it is.";
+		case kOutlineOverset:		return "the match is in overset text, which InDesign cannot outline - left as it is.";
+		case kOutlineLocked:		return "the text is locked (a locked layer or story) - left as it is.";
+		default:					return "";
+	}
+}
+
+// "2 in overset text, 1 locked" - the reasons counted, in the order of the enum.
+void AppendOutlineCounts(PMString& out, const int32 (&counts)[kOutlineRefusalCount])
+{
+	bool first = true;
+	for (int32 why = kOutlineNotText; why < kOutlineRefusalCount; ++why)
+	{
+		if (counts[why] == 0)
+			continue;
+		if (!first)
+			out.Append(", ");
+		out.AppendNumber(counts[why]);
+		out.Append(" ");
+		out.Append(OutlineWords(static_cast<OutlineRefusal>(why)));
+		first = false;
+	}
+}
+
+// One row to outline, as the doors found it.
+struct OutlineRow
+{
+	int32			hit;
+	UID				story;
+	TextIndex		start;		// its match: [start, end)
+	TextIndex		end;
+	PMString		original;	// the characters there, read by the doors - checked again before the write, kept for the row
+	bool			done;
+	OutlineRefusal	why;
+	OutlineRow() : hit(-1), story(kInvalidUID), start(kInvalidTextIndex), end(kInvalidTextIndex), done(false), why(kOutlineOk) {}
+};
+
+// One document's rows in the write.
+struct OutlineChapter
+{
+	int32					chapterIdx;
+	UIDRef					docRef;
+	std::vector<OutlineRow>	rows;		// the rows that passed the doors
+	std::set<UID>			stories;	// their stories - the ones the write moves
+	int32					outlined;
+	OutlineChapter() : chapterIdx(-1), outlined(0) {}
+};
+
+// THE OUTLINES OF ONE DOCUMENT, inside the write's step (RestoreInChapter's shape): every row of the chapter that stands
+// taken as "this far into this thread" (RowNow), the rows to outline in text order NOW, each checked again just before its
+// command - its characters, overset - then outlined, and every row after it in its thread carried by what the match became
+// (the story's length before and after the command). Then every row where its text stands: the outlined ones Outlined
+// (MarkHitOutlined), the rest carried. False = InDesign would not outline a match: the caller takes the step back.
+bool OutlineInChapter(OutlineChapter& chapter, int32 (&counts)[kOutlineRefusalCount])
+{
+	IDataBase* const db = chapter.docRef.GetDataBase();
+	const int32 chapterIdx = chapter.chapterIdx;
+	const int32 hitCount = KFCResultModel::GetHitCount(chapterIdx);
+	Utils<ICreateOutlinesUtils> outlines;
+	if (db == nil || hitCount <= 0 || !outlines)
+		return false;
+	std::vector<RowNow> rowNow(static_cast<size_t>(hitCount));
+	std::map<int32, size_t> outlining;		// hit -> its place in chapter.rows
+	for (size_t k = 0; k < chapter.rows.size(); ++k)
+		outlining[chapter.rows[k].hit] = k;
+	std::vector<int32> keptRows;			// every other row that stands - read back at the end
+	for (int32 i = 0; i < hitCount; ++i)
+	{
+		const std::map<int32, size_t>::const_iterator r = outlining.find(i);
+		if (r != outlining.end())
+		{
+			const OutlineRow& row = chapter.rows[r->second];
+			SetRowAt(db, rowNow[static_cast<size_t>(i)], row.story, row.start, row.end);	// the doors have just read it there
+			continue;
+		}
+		if (!RowStillStands(chapterIdx, i, db))
+			continue;
+		UID s2 = kInvalidUID;
+		TextIndex a2 = kInvalidTextIndex, b2 = kInvalidTextIndex;
+		uint64 h2 = 0;
+		if (KFCResultModel::GetHitMatchIdentity(chapterIdx, i, s2, a2, b2, h2))
+			SetRowAt(db, rowNow[static_cast<size_t>(i)], s2, a2, b2);
+		keptRows.push_back(i);
+	}
+
+	// The rows to outline in text order (their story, then where they start now).
+	std::vector<std::pair<std::pair<UID, TextIndex>, size_t> > order;
+	for (size_t k = 0; k < chapter.rows.size(); ++k)
+	{
+		TextIndex now = kInvalidTextIndex;
+		if (!RowStartNow(db, rowNow[static_cast<size_t>(chapter.rows[k].hit)], now))
+		{
+			chapter.rows[k].why = kOutlineEdited;
+			continue;
+		}
+		order.push_back(std::make_pair(std::make_pair(chapter.rows[k].story, now), k));
+	}
+	std::sort(order.begin(), order.end());
+	std::set<UID> outlinedStories;
+	for (size_t o = 0; o < order.size(); ++o)
+	{
+		OutlineRow& row = chapter.rows[order[o].second];
+		TextIndex at = kInvalidTextIndex;
+		if (!RowStartNow(db, rowNow[static_cast<size_t>(row.hit)], at))
+		{
+			row.why = kOutlineEdited;
+			continue;
+		}
+		const RowThread thread = rowNow[static_cast<size_t>(row.hit)].thread;
+		const TextIndex offset = rowNow[static_cast<size_t>(row.hit)].offset;
+		const int32 length = rowNow[static_cast<size_t>(row.hit)].length;
+		const UIDRef storyRef(db, row.story);
+		InterfacePtr<ITextModel> model(storyRef, UseDefaultIID());
+		if (model == nil || length <= 0 || KFCSearchEngine::ReadText(storyRef, at, length) != row.original)
+		{
+			row.why = kOutlineEdited;
+			continue;
+		}
+		if (KFCSearchEngine::IsPositionOverset(storyRef, at))
+		{
+			row.why = kOutlineOverset;
+			continue;
+		}
+		const int32 before = model->TotalLength();
+		InterfacePtr<ICommand> cmd(outlines->CreateCOTextCmd(storyRef, at, at + length, kTrue /*deleteOriginal*/));
+		if (cmd == nil || CmdUtils::ProcessCommand(cmd) != kSuccess)
+			return false;
+		// WHAT THE MATCH BECAME (M7): its characters minus what the story lost - an inline a line, the spaces and returns
+		// between kept as text.
+		const int32 became = length + (model->TotalLength() - before);
+		KFC_DIAG_LOG("TEXTOUTLINE chapter=%d row=%d story=%u at=%d length=%d became=%d items=%d", chapterIdx, row.hit,
+			row.story.Get(), (int)at, (int)length, (int)became, (int)cmd->GetItemList()->Length());
+		if (became <= 0)
+			return false;		// (never measured - a match the command took away whole is not a row to keep)
+		CarryRowsPast(rowNow, thread, offset, offset + length, became);
+		SetRowAt(db, rowNow[static_cast<size_t>(row.hit)], row.story, at, at + became);
+		row.done = true;
+		row.why = kOutlineOk;
+		++chapter.outlined;
+		outlinedStories.insert(row.story);
+	}
+	for (size_t k = 0; k < chapter.rows.size(); ++k)
+		if (!chapter.rows[k].done)
+			++counts[chapter.rows[k].why != kOutlineOk ? chapter.rows[k].why : kOutlineEdited];
+	if (chapter.outlined == 0)
+		return true;		// nothing outlined here: nothing moved, nothing to read back
+
+	// EVERY ROW WHERE ITS TEXT STANDS NOW (a Replace's read-back): the rows carried, the rows left, and the outlined ones.
+	for (size_t k = 0; k < keptRows.size(); ++k)
+	{
+		const RowNow& kept = rowNow[static_cast<size_t>(keptRows[k])];
+		TextIndex keptStart = kInvalidTextIndex;
+		if (!RowStartNow(db, kept, keptStart))
+			continue;
+		KFCResultModel::SetHitRange(chapterIdx, keptRows[k], kept.thread.story, keptStart, keptStart + kept.length);
+		KFCSearchEngine::RereadRowText(chapterIdx, keptRows[k], UIDRef(db, kept.thread.story), keptStart, keptStart + kept.length);
+	}
+	for (size_t k = 0; k < chapter.rows.size(); ++k)
+	{
+		const OutlineRow& row = chapter.rows[k];
+		const RowNow& place = rowNow[static_cast<size_t>(row.hit)];
+		TextIndex s = kInvalidTextIndex;
+		if (!RowStartNow(db, place, s))
+			continue;
+		if (row.done)
+			KFCResultModel::MarkHitOutlined(chapterIdx, row.hit, row.story, s, s + place.length, row.original);
+		else
+			KFCResultModel::SetHitRange(chapterIdx, row.hit, row.story, s, s + place.length);
+		KFCSearchEngine::RereadRowText(chapterIdx, row.hit, UIDRef(db, row.story), s, s + place.length);
+	}
+	for (std::set<UID>::const_iterator os = outlinedStories.begin(); os != outlinedStories.end(); ++os)
+		KFCSearchEngine::RereadStoryLead(chapterIdx, UIDRef(db, *os));
+	return true;
+}
+
+}	// anonymous namespace
+
+bool KFCReplaceEngine::CanOutlineHit(int32 chapterIdx, int32 hitIdx)
+{
+	KFCResultModel::RowDisplay row;
+	bool replaced = false, locked = false;
+	UID story = kInvalidUID;
+	TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
+	uint64 hash = 0;
+	return KFCResultModel::GetHitItem(chapterIdx, hitIdx) == kInvalidUID
+		&& KFCResultModel::GetHitRow(chapterIdx, hitIdx, row) && !row.outlined
+		&& KFCResultModel::GetHitFlags(chapterIdx, hitIdx, replaced, locked) && !locked
+		&& !KFCResultModel::IsHitOverset(chapterIdx, hitIdx)
+		&& KFCResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, story, start, end, hash) && end > start;
+}
+
+bool KFCReplaceEngine::OutlineHits(const KFCRowsByChapter& rowsByChapter, PMString& outStatus)
+{
+	KFC_DIAG_WRITTEN_DOCS_CHECK("outline-text-rows");	// (test builds: after DocsAfterWrite, below - KFCDiagWrittenDocs.h)
+	outStatus.Clear();
+	outStatus.SetTranslatable(kFalse);
+	if (KFCRunGuard::IsAnyRunning())
+	{
+		outStatus.Append(KFCRunGuard::BusyMessage());
+		return false;
+	}
+	const ReplacingScope replacing;		// counted by KFCRunGuard from the door to the hand-back (IsReplacing)
+	const size_t total = KFCRowCount(rowsByChapter);
+	if (total == 0)
+		return false;
+
+	// THE DOORS, ROW BY ROW (X4) - nothing written yet. What each document is left as is DocsAfterWrite's, on every way out.
+	int32 counts[kOutlineRefusalCount] = {};
+	OutlineRefusal lastWhy = kOutlineOk;
+	std::vector<OutlineChapter> chapters;
+	KFCReplaceEngine::DocsAfterWrite docsAfter;
+	size_t toWrite = 0;
+	for (size_t c = 0; c < rowsByChapter.size(); ++c)
+	{
+		OutlineChapter chapter;
+		chapter.chapterIdx = rowsByChapter[c].chapter;
+		// The row's own flags first: a chapter with nothing to outline is not opened.
+		std::vector<OutlineRow> candidates;
+		const std::vector<int32>& hits = rowsByChapter[c].hits;
+		for (size_t k = 0; k < hits.size(); ++k)
+		{
+			OutlineRow row;
+			row.hit = hits[k];
+			OutlineRefusal why = kOutlineOk;
+			KFCResultModel::RowDisplay look;
+			bool replaced = false, locked = false;
+			UID s = kInvalidUID;
+			TextIndex a = kInvalidTextIndex, b = kInvalidTextIndex;
+			uint64 h = 0;
+			if (KFCResultModel::GetHitItem(chapter.chapterIdx, row.hit) != kInvalidUID)
+				why = kOutlineNotText;
+			else if (!KFCResultModel::GetHitRow(chapter.chapterIdx, row.hit, look) || look.outlined)
+				why = kOutlineDone;
+			else if (!KFCResultModel::GetHitFlags(chapter.chapterIdx, row.hit, replaced, locked) || locked)
+				why = kOutlineLocked;
+			else if (KFCResultModel::IsHitOverset(chapter.chapterIdx, row.hit))
+				why = kOutlineOverset;
+			else if (!KFCResultModel::GetHitMatchIdentity(chapter.chapterIdx, row.hit, s, a, b, h) || b <= a)
+				why = kOutlineEmpty;
+			if (why != kOutlineOk)
+			{
+				++counts[why];
+				lastWhy = why;
+				continue;
+			}
+			candidates.push_back(row);
+		}
+		if (candidates.empty())
+			continue;
+		// Its document, by its file first: a closed chapter is reopened windowless and held, as a Replace reaches it.
+		IDFile file;
+		OutlineRefusal docWhy = kOutlineOk;
+		if (!KFCResultModel::GetChapterLocation(chapter.chapterIdx, chapter.docRef, file))
+			docWhy = kOutlineNoDoc;
+		else if (!KFCBookScope::ReachChapterDoc(file, chapter.docRef))
+			docWhy = kOutlineNotOpened;
+		if (docWhy != kOutlineOk)
+		{
+			counts[docWhy] += static_cast<int32>(candidates.size());
+			lastWhy = docWhy;
+			continue;
+		}
+		KFCResultModel::RebindChapterDoc(chapter.chapterIdx, chapter.docRef);
+		IDataBase* const db = chapter.docRef.GetDataBase();
+		// THE ROWS OF EACH STORY FOLLOW THEIR FOCI FIRST (a Replace's way - FollowStoryFoci), once per story.
+		std::map<UID, KFCSearchEngine::FollowResult> followed;
+		for (size_t k = 0; k < candidates.size(); ++k)
+		{
+			UID story = kInvalidUID;
+			TextIndex a = kInvalidTextIndex, b = kInvalidTextIndex;
+			uint64 hash = 0;
+			if (db != nil && KFCResultModel::GetHitMatchIdentity(chapter.chapterIdx, candidates[k].hit, story, a, b, hash)
+				&& story != kInvalidUID && followed.find(story) == followed.end())
+				followed[story] = KFCSearchEngine::FollowStoryFoci(chapter.chapterIdx, db, story);
+		}
+		for (size_t k = 0; k < candidates.size(); ++k)
+		{
+			OutlineRow& row = candidates[k];
+			uint64 hash = 0;
+			OutlineRefusal why = kOutlineOk;
+			if (db == nil || !KFCResultModel::GetHitMatchIdentity(chapter.chapterIdx, row.hit, row.story, row.start, row.end, hash)
+				|| row.story == kInvalidUID || !db->IsValidUID(row.story) || followed.find(row.story) == followed.end())
+				why = kOutlineEdited;
+			else
+			{
+				const KFCSearchEngine::FollowResult f = followed[row.story];
+				if (f == KFCSearchEngine::kFollowBroken)
+					why = kOutlineNotFollowed;
+				else if (f == KFCSearchEngine::kFollowNone)
+				{
+					// No focus in the story (its document was not open when the rows took theirs): the version rule.
+					if (!StoryAsKFCLeftIt(chapter.chapterIdx, db, row.story))
+						why = kOutlineNotFollowed;
+				}
+				else
+				{
+					// ITS OWN FOCUS EXACTLY ON ITS PLACE (Restore from Copy's rule): a row left elsewhere had its text edited.
+					TextIndex fs = kInvalidTextIndex, fe = kInvalidTextIndex;
+					if (KFCRowFoci::Where(chapter.chapterIdx, row.hit, db, fs, fe) != KFCRowFoci::kFocused
+						|| fs != row.start || fe != row.end)
+						why = kOutlineEdited;
+				}
+			}
+			// ITS TEXT AS THE ROW HOLDS IT: what its Replace wrote for a replaced row (the author's call - a replaced row can be
+			// outlined), the match as it was found for any other (RowReadsAsFound - its line and its hash).
+			if (why == kOutlineOk)
+			{
+				bool replaced = false, locked = false;
+				PMString written;
+				const UIDRef storyRef(db, row.story);
+				if (KFCResultModel::GetHitFlags(chapter.chapterIdx, row.hit, replaced, locked) && replaced)
+				{
+					if (!KFCResultModel::GetHitWrittenText(chapter.chapterIdx, row.hit, written)
+						|| KFCSearchEngine::ReadText(storyRef, row.start, row.end - row.start) != written)
+						why = kOutlineEdited;
+				}
+				else if (!KFCSearchEngine::RowReadsAsFound(chapter.chapterIdx, row.hit, db))
+					why = kOutlineEdited;
+				if (why == kOutlineOk)
+				{
+					row.original = KFCSearchEngine::ReadText(storyRef, row.start, row.end - row.start);
+					row.original.SetTranslatable(kFalse);
+					if (KFCSearchEngine::IsPositionOverset(storyRef, row.start))
+						why = kOutlineOverset;
+					else if (!KFCSearchEngine::IsFrameEditable(storyRef, KFCSearchEngine::EditableFrameForMatch(storyRef, row.start)))
+						why = kOutlineLocked;
+				}
+			}
+			if (why != kOutlineOk)
+			{
+				++counts[why];
+				lastWhy = why;
+				continue;
+			}
+			chapter.rows.push_back(row);
+			chapter.stories.insert(row.story);
+		}
+		docsAfter.Reached(chapter.docRef, !chapter.rows.empty());
+		toWrite += chapter.rows.size();
+		if (!chapter.rows.empty())
+			chapters.push_back(chapter);
+	}
+	if (toWrite == 0)
+	{
+		outStatus = "Create Outlines: ";
+		if (total == 1)
+			outStatus.Append(OutlineSentence(lastWhy));
+		else
+		{
+			outStatus.Append("none of the ");
+			outStatus.AppendNumber(static_cast<int32>(total));
+			outStatus.Append(" selected rows can be outlined - ");
+			AppendOutlineCounts(outStatus, counts);
+			outStatus.Append(".");
+		}
+		outStatus.SetTranslatable(kFalse);
+		return false;
+	}
+	// EVERY DOCUMENT TO WRITE STILL OPEN once the last is reached (a Replace's rule).
+	const bool acrossDocuments = chapters.size() > 1;
+	for (size_t c = 0; acrossDocuments && c < chapters.size(); ++c)
+	{
+		if (!KFCBookScope::IsDocStillOpen(chapters[c].docRef))
+		{
+			outStatus = "Create Outlines: a document of the selected rows has been closed - nothing was changed.";
+			outStatus.SetTranslatable(kFalse);
+			return false;
+		}
+	}
+
+	// RECORDED FOR THE PANEL'S FOLLOWING OF UNDO (X5): one step for every document of it, by the object rows' name.
+	std::vector<int32> chapterIdxs;
+	for (size_t c = 0; c < chapters.size(); ++c)
+		chapterIdxs.push_back(chapters[c].chapterIdx);
+	KFCUndoFollow::StepRecorder recorder(chapterIdxs);
+	recorder.SetName("Create Outlines");
+	bool ok = false;
+	bool failed = false;
+	int32 outlinedRows = 0;
+	{
+		KFCReplaceEngine::WriteStep step;
+		if (!KFCReplaceEngine::BeginWriteStep(acrossDocuments, step, kKFCCreateOutlinesStepKey, "KFC Create Outlines"))
+		{
+			outStatus = acrossDocuments ? "Create Outlines: InDesign would not start an undoable step - nothing was changed."
+				: "Create Outlines: InDesign would not start a command sequence - nothing was changed.";
+			outStatus.SetTranslatable(kFalse);
+			return false;
+		}
+		for (size_t c = 0; c < chapters.size() && !failed; ++c)
+		{
+			if (!OutlineInChapter(chapters[c], counts))
+				failed = true;
+			outlinedRows += chapters[c].outlined;
+		}
+		// THE ERROR STATE AT THE END (a Replace's rule): anything standing here is a failure nothing reported.
+		ok = !failed && outlinedRows > 0 && ErrorUtils::PMGetGlobalErrorCode() == kSuccess;
+		if (ok)
+			for (size_t c = 0; c < chapters.size(); ++c)
+				if (chapters[c].outlined > 0)
+					KFCUndoFollow::MarkWrite(chapters[c].docRef.GetDataBase());	// in this step, so its Undo / Redo is heard
+		// THE STORIES' FOCI ON THE ROWS, IN THIS STEP (a Replace's D7).
+		if (ok)
+			for (size_t c = 0; c < chapters.size(); ++c)
+				for (std::set<UID>::const_iterator s = chapters[c].stories.begin(); s != chapters[c].stories.end(); ++s)
+					KFCRowFoci::ReanchorStory(chapters[c].chapterIdx, *s, true);
+		KFCReplaceEngine::EndWriteStep(step, ok);
+	}
+	if (!ok)
+	{
+		KFCResultModel::RollBackRows();
+		for (size_t c = 0; c < chapters.size(); ++c)
+			for (std::set<UID>::const_iterator s = chapters[c].stories.begin(); s != chapters[c].stories.end(); ++s)
+				KFCRowFoci::ReanchorStory(chapters[c].chapterIdx, *s);
+		outStatus = "Create Outlines: ";
+		if (failed || outlinedRows > 0)
+			outStatus.Append("InDesign would not outline a match - nothing was changed.");
+		else if (total == 1)
+		{
+			OutlineRefusal why = kOutlineEdited;
+			for (size_t c = 0; c < chapters.size(); ++c)
+				for (size_t k = 0; k < chapters[c].rows.size(); ++k)
+					if (chapters[c].rows[k].why != kOutlineOk)
+						why = chapters[c].rows[k].why;
+			outStatus.Append(OutlineSentence(why));
+		}
+		else
+		{
+			outStatus.Append("none of the ");
+			outStatus.AppendNumber(static_cast<int32>(total));
+			outStatus.Append(" selected rows can be outlined - ");
+			AppendOutlineCounts(outStatus, counts);
+			outStatus.Append(".");
+		}
+		outStatus.SetTranslatable(kFalse);
+		return false;
+	}
+	for (size_t c = 0; c < chapters.size(); ++c)
+		NoteStoryVersions(chapters[c].chapterIdx, chapters[c].docRef.GetDataBase(), chapters[c].stories);	// as KFC left them
+	recorder.Keep();
+	size_t writtenDocuments = 0;
+	for (size_t c = 0; c < chapters.size(); ++c)
+	{
+		if (chapters[c].outlined == 0)
+			continue;
+		++writtenDocuments;
+		docsAfter.Wrote(chapters[c].docRef);
+		KFC_DIAG_NOTE_WRITE(chapters[c].docRef);
+	}
+
+	// WHAT IT DID (X8): "Outlined ID:262 #3." / "Outlined 2 of 3 matches: ID:262 #1, ID:262 #3. Left as they were: 1 in
+	// overset text." / "Outlined 3 matches in 2 documents: a.indd ID:262 #1, ID:262 #3; b.indd ID:270 #1."
+	const size_t kNamedRows = 8;
+	if (total == 1)
+	{
+		PMString name;
+		for (size_t c = 0; c < chapters.size() && name.IsEmpty(); ++c)
+			for (size_t k = 0; k < chapters[c].rows.size() && name.IsEmpty(); ++k)
+				if (chapters[c].rows[k].done)
+					name = RowName(chapters[c].chapterIdx, chapters[c].rows[k].hit);
+		outStatus = name.IsEmpty() ? PMString("Outlined.") : PMString("Outlined ");
+		if (!name.IsEmpty())
+		{
+			outStatus.Append(name);
+			outStatus.Append(".");
+		}
+	}
+	else
+	{
+		outStatus = "Outlined ";
+		outStatus.AppendNumber(outlinedRows);
+		if (static_cast<size_t>(outlinedRows) < total)
+		{
+			outStatus.Append(" of ");
+			outStatus.AppendNumber(static_cast<int32>(total));
+		}
+		outStatus.Append(" matches");
+		if (writtenDocuments > 1)
+		{
+			outStatus.Append(" in ");
+			outStatus.AppendNumber(static_cast<int32>(writtenDocuments));
+			outStatus.Append(" documents");
+		}
+		outStatus.Append(": ");
+		size_t named = 0;
+		bool firstDocument = true;
+		for (size_t c = 0; c < chapters.size() && named < kNamedRows; ++c)
+		{
+			const OutlineChapter& chapter = chapters[c];
+			if (chapter.outlined == 0)
+				continue;
+			if (writtenDocuments > 1)
+			{
+				if (!firstDocument)
+					outStatus.Append("; ");
+				PMString docName;
+				int32 rowsNow = 0;
+				if (KFCResultModel::GetChapterDisplay(chapter.chapterIdx, docName, rowsNow))
+				{
+					outStatus.Append(docName);
+					outStatus.Append(" ");
+				}
+			}
+			firstDocument = false;
+			bool firstInDocument = true;
+			for (size_t k = 0; k < chapter.rows.size() && named < kNamedRows; ++k)
+			{
+				if (!chapter.rows[k].done)
+					continue;
+				const PMString name(RowName(chapter.chapterIdx, chapter.rows[k].hit));
+				if (name.IsEmpty())
+					continue;
+				if (!firstInDocument || (writtenDocuments <= 1 && named > 0))
+					outStatus.Append(", ");
+				outStatus.Append(name);
+				firstInDocument = false;
+				++named;
+			}
+		}
+		if (static_cast<size_t>(outlinedRows) > kNamedRows)
+			outStatus.Append(", ...");
+		outStatus.Append(".");
+		if (static_cast<size_t>(outlinedRows) < total)
+		{
+			outStatus.Append(" Left as they were: ");
+			AppendOutlineCounts(outStatus, counts);
 			outStatus.Append(".");
 		}
 	}

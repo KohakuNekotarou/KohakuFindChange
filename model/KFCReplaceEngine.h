@@ -134,6 +134,21 @@ namespace KFCReplaceEngine
 	    ...") when none could be put back. True when something was written. Refused while a run of ours is up. */
 	bool RestoreHits(const KFCRowsByChapter& rows, PMString& outStatus);
 
+	/** A TEXT ROW'S SPECIAL OPERATIONS > CREATE OUTLINES (docs/superpowers/specs/2026-10-18-kfc-text-outlines-design.md X1-X9):
+	    the rows' matched characters outlined as InDesign's Type > Create Outlines does them, the text deleted and the outlines
+	    put in as inline objects (ICreateOutlinesUtils::CreateCOTextCmd, deleteOriginal kTrue) - one inline per line of the
+	    match (M7); story by story in text order, each checked again just before it is written; every other row carried past
+	    what each one turned into (the story's length before and after the command - M7: the number is not fixed). ONE undo
+	    step ("Create Outlines"), KFC's mark in it: the panel follows its Ctrl+Z and Redo. Each written row Outlined
+	    (KFCResultModel::MarkHitOutlined - the characters it outlined kept for the row to draw). Refused rows counted by why
+	    (overset - InDesign refuses it -, locked, edited since, ...). True = something written; outStatus says what. */
+	bool OutlineHits(const KFCRowsByChapter& rows, PMString& outStatus);
+
+	/** Can a text row be outlined - a text row not outlined yet, not locked, not overset, not zero-width? Read off the row
+	    alone (nothing opened): the menu greys Create Outlines by it (X9); what only the document can tell is said when it is
+	    pressed. */
+	bool CanOutlineHit(int32 chapterIdx, int32 hitIdx);
+
 	/** ONE UNDO STEP FOR A WRITE FROM THE LIST ("Replace" - kKFCReplaceStepKey), the one rule for the text rows (ReplaceHit,
 	    ReplaceHits) and the object rows (KFCObjectReplace):
 	      - ONE DOCUMENT: a plain sequence, rolled back on a failure the SDK's own way - the error state raised, the

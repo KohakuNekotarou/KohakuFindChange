@@ -711,11 +711,13 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 
 		case kKFCCreateOutlinesActionID:
 		{
-			// An OBJECT row's Special Operations > Create Outlines (the author, 2026-10-17): the row it was popped over - or the
-			// rows selected together, when it is one of them (RowsOfRightClick, as Replace) - outlined wherever they stand
-			// (KFCResultTree::OutlineRows). No object row (the action pressed by its ActionID): do nothing.
+			// A row's Special Operations > Create Outlines - an OBJECT row's item outlined whole (the author, 2026-10-17), a TEXT
+			// row's matched characters alone (the text-outlines spec, 2026-10-18): the row it was popped over - or the rows
+			// selected together, when it is one of them (RowsOfRightClick, as Replace) - outlined wherever they stand
+			// (KFCResultTree::OutlineRows; the model takes each kind its own way). No hit row (the action pressed by its
+			// ActionID): do nothing.
 			int32 chapter = -1, hit = -1;
-			if (RightClickedHit(widget, chapter, hit) && KFCResults()->GetHitItem(chapter, hit) != kInvalidUID)
+			if (RightClickedHit(widget, chapter, hit))
 				(void)KFCResultTree::OutlineRows(KFCResultTree::RowsOfRightClick(chapter, hit));
 			break;
 		}
@@ -1043,8 +1045,8 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 			}
 			case kKFCCreateOutlinesActionID:
 			{
-				// An object row's menu: Create Outlines while the row - or one of the rows selected together with it - can be
-				// outlined (CanOutlineAny - its doors, read only: greyed when none can, the author's wish of 2026-10-17; a run
+				// An object or text row's menu: Create Outlines while the row - or one of the rows selected together with it - can
+				// be outlined (CanOutlineAny - its doors, read only: greyed when none can, the author's wish of 2026-10-17; a run
 				// standing greys everything, above). A row of a closed chapter counts as one that can: pressing reaches it, and
 				// what the write then refuses it says on the status line, row by row counted.
 				int32 chapter = -1, hit = -1;

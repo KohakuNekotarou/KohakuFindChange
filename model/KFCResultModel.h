@@ -384,6 +384,9 @@ namespace KFCResultModel
 	/** ARE THE LIST'S ROWS OBJECT ROWS - an Object tab search's, or a Frames of These Matches list's? The heading's menu greys
 	    a condition that only text rows can meet. */
 	bool ListHoldsObjects();
+	/** Is the list a FRAMES OF THESE MATCHES list - object rows found by a text search, not by the Object tab's (its Replace
+	    writes with the Object tab's Change Object Format alone - KFCObjectReplace, the spec's N6)? */
+	bool ListIsFrames();
 	/** The list's limit of rows: kKFCCollectObjectLimit for a list of object rows (ListHoldsObjects), kKFCCollectHitLimit for
 	    any other - what a search's walks and its searches again take the room from. */
 	int32 ListLimit();
@@ -507,6 +510,10 @@ namespace KFCResultModel
 
 	/** Was this row taken off the list (Hit::cleared)? false for an index out of range. */
 	bool IsHitCleared(int32 chapterIdx, int32 hitIdx);
+
+	/** Was this row's match in overset text when it was found or last read (Hit::isOverset)? false for an index out of range.
+	    (A text row's Create Outlines is greyed over one - InDesign refuses overset text, the text-outlines spec's M7.) */
+	bool IsHitOverset(int32 chapterIdx, int32 hitIdx);
 
 	/** The total number of hits across ALL chapters the list shows - none taken off it - for the status summary, the book
 	    row's count and the list's limit. */

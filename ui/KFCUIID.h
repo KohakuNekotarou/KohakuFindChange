@@ -679,6 +679,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 // delimiter (KCM's submenus' Adobe idiom), its items take the path. The name is the words shown, as KCM's are.
 #define kKFCSpecialOpsSubmenuName			"Special Operations"
 #define kKFCSpecialOpsSubmenuPath			kKFCResultObjectMenuName kSDKDefDelimitMenuPath kKFCSpecialOpsSubmenuName
+// ...and a TEXT row's (the text-outlines spec's X1): the same submenu under the hit row's menu, Create Outlines in it.
+#define kKFCHitSpecialOpsSubmenuPath		kKFCResultHitMenuName kSDKDefDelimitMenuPath kKFCSpecialOpsSubmenuName
 // ...and the submenus in it, after InDesign's own Object menu (the spec's E2): Fitting, Arrange, Transform - the same idiom
 // one level down. NAMED BY KFC'S OWN KEYS (basicmenu's idiom - BscMnuID.h, kBscMnuPluginsMenuKey): the plain words are
 // InDesign's own string keys, and the menu showed them in InDesign's language ("Fitting" as Japanese InDesign's
@@ -745,9 +747,11 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 #define kKFCHowToMenuItemPosition			10.5
 #define kKFCAboutThisMenuItemPosition		11.0
 
-// The hit row's menu: Replace, then a text row's Restore Original under it.
+// The hit row's menu: Replace, then a text row's Restore Original under it, then its Special Operations submenu (Create
+// Outlines in it - kKFCCreateOutlinesMenuItemPosition, as the object row's).
 #define kKFCReplaceHitMenuItemPosition		0.5
 #define kKFCRestoreOriginalMenuItemPosition	1.0
+#define kKFCHitSpecialOpsSubmenuPosition	2.0
 // The story row's menu: Search This Story Again.
 #define kKFCSearchStoryAgainMenuItemPosition	0.5
 // The document row's menu: Search This Document Again.

@@ -746,6 +746,19 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCRestoreOriginalMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// ...and its Special Operations > Create Outlines (docs/superpowers/specs/2026-10-18-kfc-text-outlines-design.md X1): the
+		// matched characters alone outlined - the row's, or the rows' selected together (KFCReplaceEngine::OutlineHits). The
+		// object row's action, the object row's submenu name; the parent node as there (ActionID 0, the path and a delimiter).
+		0,
+		kKFCHitSpecialOpsSubmenuPath kSDKDefDelimitMenuPath
+		kKFCHitSpecialOpsSubmenuPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCCreateOutlinesActionID,
+		kKFCHitSpecialOpsSubmenuPath
+		kKFCCreateOutlinesMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 		// ----- A story row's right-click menu -----
 		// Popped by KFCResultNodeEH::RButtonDn over a story row: Search This Story Again walks that story alone with
 		// the search's query and puts its rows back (KFCSearchEngine::SearchStoryAgain).

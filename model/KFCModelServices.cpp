@@ -128,11 +128,19 @@ public:
 	virtual void DropKeptTiers() { KFCTierStore::DropAll(); }
 	virtual bool DropTier(uint32 resultSet) { return KFCTierStore::DropTier(resultSet); }
 	virtual bool SearchListAgain(PMString& outStatus) { return KFCUnderListQuery(outStatus, false, [&]() { return KFCSearchEngine::SearchListAgain(outStatus); }); }
-	virtual bool OutlineRows(const KFCRowsByChapter& rows, PMString& outStatus) { return KFCObjectOutline::OutlineRows(rows, outStatus); }
+	// CREATE OUTLINES, BY THE ROWS' KIND (one kind at a time - the selection rules keep it): object rows' items outlined whole
+	// (KFCObjectOutline), text rows' matched characters (KFCReplaceEngine::OutlineHits - the text-outlines spec).
+	virtual bool OutlineRows(const KFCRowsByChapter& rows, PMString& outStatus)
+	{
+		int32 chapter = -1, hit = -1;
+		if (KFCFirstRow(rows, chapter, hit) && KFCResultModel::GetHitItem(chapter, hit) == kInvalidUID)
+			return KFCReplaceEngine::OutlineHits(rows, outStatus);
+		return KFCObjectOutline::OutlineRows(rows, outStatus);
+	}
 	virtual bool CanRestoreHit(int32 chapterIdx, int32 hitIdx) { return KFCReplaceEngine::CanRestoreHit(chapterIdx, hitIdx); }
 	// (Not under the list's query - KFCUnderListQuery: a copy put back walks no story, as Create Outlines walks none.)
 	virtual bool RestoreRows(const KFCRowsByChapter& rows, PMString& outStatus) { return KFCReplaceEngine::RestoreHits(rows, outStatus); }
-	virtual bool CanOutlineHit(int32 chapterIdx, int32 hitIdx) { return KFCObjectOutline::CanOutlineHit(chapterIdx, hitIdx); }
+	virtual bool CanOutlineHit(int32 chapterIdx, int32 hitIdx) { return (KFCResultModel::GetHitItem(chapterIdx, hitIdx) == kInvalidUID) ? KFCReplaceEngine::CanOutlineHit(chapterIdx, hitIdx) : KFCObjectOutline::CanOutlineHit(chapterIdx, hitIdx); }
 	// (Not under the list's query either - KFCUnderListQuery: a special operation walks no story, as Create Outlines.)
 	virtual bool SpecialRows(int32 op, const KFCRowsByChapter& rows, const KFCSpecialParams& params, PMString& outStatus) { return KFCObjectSpecial::SpecialRows(op, rows, params, outStatus); }
 	virtual bool CanSpecialHit(int32 op, int32 chapterIdx, int32 hitIdx) { return KFCObjectSpecial::CanSpecialHit(op, chapterIdx, hitIdx); }

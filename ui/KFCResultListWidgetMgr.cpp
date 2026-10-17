@@ -520,6 +520,10 @@ bool KFCResultTree::GetRowLook(const NodeID& node, RowLook& out)
 		out.flag = row.accentFlag;
 		out.pre = row.preText;
 		out.match = row.matchText;
+		// A TEXT ROW WRITTEN AS OUTLINES (the text-outlines spec's X6): its match is inline outlines now, which draw nothing in
+		// a line of text - the characters it outlined are drawn in their place, so the row still says what it was.
+		if (row.outlined && !row.outlinedText.IsEmpty())
+			out.match = row.outlinedText;
 		out.post = row.postText;
 		out.kept = row.kept;
 		return true;

@@ -387,6 +387,14 @@ PMString KFCResultModel::NarrowWords()
 	return words;
 }
 
+bool KFCResultModel::ListIsFrames()
+{
+	for (size_t k = 0; k < gHeader.narrow.size(); ++k)
+		if (gHeader.narrow[k].kind == kKFCNarrowFrames)
+			return true;
+	return false;
+}
+
 int32 KFCResultModel::ListLimit()
 {
 	return ListHoldsObjects() ? kKFCCollectObjectLimit : kKFCCollectHitLimit;
@@ -552,6 +560,12 @@ bool KFCResultModel::IsHitCleared(int32 chapterIdx, int32 hitIdx)
 {
 	const Hit* h = HitAt(chapterIdx, hitIdx);
 	return h != nil && h->cleared;
+}
+
+bool KFCResultModel::IsHitOverset(int32 chapterIdx, int32 hitIdx)
+{
+	const Hit* h = HitAt(chapterIdx, hitIdx);
+	return h != nil && h->isOverset;
 }
 
 int32 KFCResultModel::GetTotalHitCount()
