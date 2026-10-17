@@ -166,12 +166,12 @@ public:
 	DocProgress(KFCProgressBar& bar, const UIDRef& docRef, int32 base)
 		: fBar(bar), fBase(base), fReported(base), fSpreads(docRef, UseDefaultIID()) {}
 
-	// The walk has listed an item of the spread `spread`: move the bar.
-	void Listed(const UIDRef& spread)
+	// The walk has listed an item of the spread `spread` (SpreadOf - kInvalidUID for an item on none): move the bar.
+	void Listed(UID spread)
 	{
 		int32 target = fReported + 1;
 		const int32 count = (fSpreads != nil) ? fSpreads->GetSpreadCount() : 0;
-		const int32 index = (fSpreads != nil && spread.GetUID() != kInvalidUID) ? fSpreads->GetSpreadIndex(spread.GetUID()) : -1;
+		const int32 index = (fSpreads != nil && spread != kInvalidUID) ? fSpreads->GetSpreadIndex(spread) : -1;
 		if (count > 0 && index >= 0)
 		{
 			const int32 spreadStart = fBase + static_cast<int32>((static_cast<int64>(kDocSpan) * index) / count);
@@ -199,6 +199,24 @@ private:
 
 // One object row for one page item (O8) - defined below, beside the questions it asks (Fingerprint, IsOnSpread).
 void BuildObjectHit(const UIDRef& docRef, UID item, KFCResultModel::Hit& out);
+
+// THE SPREAD AN ITEM STANDS ON, ASKED OF THE ITEM (IPasteboardUtils::QuerySpread - IsOnSpread's question): what the bar inside
+// a document moves by (DocProgress). kInvalidUID for an item on no spread - an inline in overset text.
+// NOT THE SHARED WALKER'S IObjectWalker::GetCurrentSpread - IT BROUGHT InDesign DOWN (the author's Find Objects on Active
+// Layer, 2026-10-18 02:03; reproduced the same day): a walker initialized for Search: = Selection walks the items it was given
+// and puts no document in its document list, while GetCurrentSpread reads that list's first entry whatever the scope (TEXT
+// WALKER.RPLN - Initialize +0xb9cd0, GetCurrentSpread +0xb9110, read in the disassembly). The list keeps the storage a
+// document walk gave it, so a selection walk read a stale entry - until the session's FIRST object walk was a selection's,
+// with no storage yet: a read of address 0 (+0xb9151), at the first item it listed. The header promises "the spread being
+// walked" and says nothing of the scope.
+UID SpreadOf(const UIDRef& item)
+{
+	InterfacePtr<IHierarchy> hier(item, UseDefaultIID());
+	if (hier == nil)
+		return kInvalidUID;
+	InterfacePtr<ISpread> spread(Utils<IPasteboardUtils>()->QuerySpread(hier));
+	return (spread != nil) ? ::GetUID(spread) : kInvalidUID;
+}
 
 // ONE DOCUMENT'S WALK (O2 / O5): the shared walker initialised for it, InDesign's SearchObject asked "as is" until it
 // stops answering kSuccess, each match read off the shared walker. Read-only: the document's "unsaved" flag is put back
@@ -262,7 +280,7 @@ WalkEnd WalkDoc(IFindChangeService* svc, IObjectWalker* shared, const UIDRef& do
 		// document whose matches stand mostly elsewhere can still be cancelled while it is walked.
 		if (onLayer != kInvalidUID && KFCPageItemFacts::DocLayerOf(db, current.GetUID()) != onLayer)
 		{
-			progress.Listed(shared->GetCurrentSpread());
+			progress.Listed(SpreadOf(current));
 			if (bar.WasCancelled(kFalse) != kFalse)
 				return kWalkCancelled;
 			continue;
@@ -277,7 +295,7 @@ WalkEnd WalkDoc(IFindChangeService* svc, IObjectWalker* shared, const UIDRef& do
 		outHits.push_back(std::move(hit));
 		// CANCEL IS ASKED HERE, AT EVERY ITEM LISTED. The bar first, then the question (DocProgress says why both).
 		// kFalse = no global error state.
-		progress.Listed(shared->GetCurrentSpread());
+		progress.Listed(SpreadOf(current));
 		bool cancel = bar.WasCancelled(kFalse) != kFalse;
 #ifdef KFC_DIAG
 		if (diagCancelAt > 0 && static_cast<int>(outHits.size()) == diagCancelAt)
