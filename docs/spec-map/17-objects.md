@@ -204,6 +204,7 @@
   書いた行は頭に `Outlined`・目玉が付く（ROW-45）・`Replace` は灰色（右クリックに出ない）・行の物はできたアウトライン（クリックでそれを選ぶ）。行の言葉（`[ID278:<alpha one>]`）は検索した時の物のまま。
   文＝`Outlined 2 of 3 objects: ID:278, ID:301. Left as they were: 1 not a text frame.`／`Outlined 1 object: ID:301.`／`Outlined 4 objects in 2 documents: rtoC.indd ID:278, ID:301; rtoD.indd ID:278, ID:301.`／書ける行が無い＝`Create Outlines: none of the 3 selected rows can be outlined - 3 not a text frame.`（1行なら `Create Outlines: <理由の文>`）。
   ✅ 実機（2026-10-17・テスト用ビルド・KIDMCP）＝2つのスプレッドの文字の枠2つと画像の枠1つを Select All Rows で選び、右クリック→`Special Operations`→`Create Outlines`：2つのスプレッドとも文字の枠が消えてアウトライン（ポリゴン）になり、画像の枠は `not a text frame` で残る・行は `Outlined` と目玉・押すと2ページ目のアウトラインが選ばれる・Ctrl+Z で2つの枠と行が戻り未保存の印も元どおり・Redo でまたアウトライン／選んでいない1行の右クリックはその行だけ／閉じていたブックの2つの章を Select All Rows で→2つの文書に1段で書き、章に窓が出る・Ctrl+Z 1回で両方戻る／文字の行の右クリックは `Replace` だけ。⬜まだ＝鍵の掛かった物・あふれの中の物・アンカー付き／インラインの枠・連結した枠・全件の回。
+  ★**灰色＝アウトラインにできる行が1つも無いとき**（2026-10-17 夜の作者「CreateOutline とかの新しく作るの、実行できないときは色を変えられるとうれしい」）＝物の行・まだアウトラインにしていない・文書が開いていれば物があり、スプレッドの上・鍵なし・本体の振り分けが文字の枠と言う、を読むだけで問う（文書を開かない）。閉じた章の行は押せる（押すと章を開いて、書けない理由を言う）。✅ 実機＝画像の枠の行で灰色・文字の枠の行で押せる。
   - 訂正:
 
 ---
