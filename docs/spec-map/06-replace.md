@@ -235,6 +235,17 @@
   文は `Searched this document again: N match(es).`（上限に当たれば ` The list's limit of rows was reached - its other matches are not listed.`）。行の並びが変わるので、それより前の KFC の書き込みの取り消しは一覧が追わなくなる（UNDO-14）。回帰＝`dr-cases.tsv`。（1.4.0）
   - 訂正:
 
+- **REP-38** ★**Restore Original**（文字の行の右クリック・Replace の下・2026-10-17 作者の依頼「コピーで戻すは右クリックメニューで」＝作者の不在中に私のおすすめで作った形・⬜作者の確認待ち＝設計書 `docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md` の C1〜C14）＝**置換した文字の行を、置換の前の文字に戻す**――
+  文字の行の置換（右クリックの Replace・Return・Shift+Return・まとめて選んだ行＝REP-25・REP-32・REP-36）は、書く前に一致の写しを KFC 専用の置き場（文書ごと・クリップボードは使わない・文書の取り消しの段には入らない）へ取っておく。一致が⏎をまたぐときは、一致が終わる段落の⏎の手前まで写す。
+  Restore Original はその写しを、置換で書いた文字（と広げた後ろ）の上に貼る＝一致の中の脚注・アンカー付きの枠も戻り、⏎をまたいだ一致は2段落目の段落の属性も戻る。
+  まとめて選んだ行の1つなら、選んだ行すべて（置換していない行は数えて残す）。同じ段落の2行は、どちらの順で置換していても周回で両方戻る。置換の後に同じストーリーの別の所を直していても、行のフォーカス（JMP の自前のフォーカス）で追った今の場所に戻す。
+  押せる＝置換した文字の行（`Changed`）があるとき・灰色＝無いとき（SET-11）。物の行のメニューには無い（OBJ-19 のメニュー）。
+  戻すと＝`Changed` が消え、目玉は置換の前の状態（ROW-45）、Replace がまた押せる。取り消しの1段（Edit メニューの名前 `Restore Original`）＝Ctrl+Z で `Changed` に戻り、Redo で戻した姿（UNDO-02）。写しは消えない（Ctrl+Z の後にまた戻せる）。
+  断る（行はそのまま・何行なら数えて言う）＝**写しが無い**（表のセル・脚注・ノートの中の一致／一致がハイパーリンク・相互参照の元に触れる／広げる後ろに物の文字やハイパーリンクがある／置換の側が段落の書式を当てた／写せなかった）・置換で書いた文字を後で直した `edited since`・広げた後ろが変わった `rest of paragraph changed`・ストーリーを追えない `not followed`・ロック `locked`・文書を開けない。閉じたブックの章は、置換と同じく窓なしで開いて戻し、窓を出す。
+  文＝`Restored ID:262 #3.`／`Restored 2 of 3 rows: ID:262 #1, ID:262 #3. Left as they were: 1 edited since.`／`Restored 3 rows in 2 documents: a.indd ID:262 #1; b.indd ID:270 #1.`／1行の断り `Restore Original: <理由>`（例 `Restore Original: the text its Replace wrote has been edited since - left as it is.`）。
+  写しの置き場は InDesign を終えるまで残る（保存していない文書の分は閉じたときに捨てる）・キャッシュフォルダに1つ約120KB のファイル（`KohakuFindChangeCopyStore<番号>`）。実機＝設計書 §7（テスト用ビルド・KIDMCP）。（1.4.0）
+  - 訂正:
+
 ---
 
 ## ⬜ この章で未確認

@@ -156,6 +156,7 @@
 
   ```
   ヒットの行       Replace
+                   Restore Original（2026-10-17＝REP-38）
   （物の行）       Replace
                    Special Operations ▸ Create Outlines（2026-10-17＝OBJ-19）
   ストーリーの行   Search This Story Again
