@@ -504,11 +504,14 @@ bool KFCResultTree::GetRowLook(const NodeID& node, RowLook& out)
 		// (A row whose text is gone starts with "Missing" in the same place - the model's BuildHitLocator puts
 		// that one on the locator itself; the two never meet.)
 		out.locator = row.locator;
-		if (row.replaced)
+		if (row.replaced || row.special != kKFCSpecialNone)
 		{
-			// ("Outlined" for a row written as outlines - an object row's Create Outlines, KFCObjectOutline.)
-			PMString changed(row.outlined ? "Outlined " : "Changed ");
+			// ("Outlined" for a row written as outlines - an object row's Create Outlines, KFCObjectOutline; a special
+			// operation's own word for a row one wrote last - "Fitted", "Locked" ... - SpecialRowWord, KFCObjectSpecial.)
+			PMString changed(row.special != kKFCSpecialNone ? SpecialRowWord(row.special)
+				: (row.outlined ? "Outlined" : "Changed"));
 			changed.SetTranslatable(kFalse);
+			changed.Append(" ");
 			changed.Append(row.locator);
 			out.locator = changed;
 		}
@@ -1264,6 +1267,69 @@ bool KFCResultTree::CanOutlineAny(const KFCRowsByChapter& rows)
 			if (KFCRuns()->CanOutlineHit(rows[c].chapter, rows[c].hits[k]))
 				return true;
 	return false;
+}
+
+bool KFCResultTree::SpecialRows(int32 op, const KFCRowsByChapter& rows, const KFCSpecialParams& params)
+{
+	if (KFCJump::IsLanding() || RefusedWhileRunning() || KFCRowCount(rows) == 0)
+		return false;
+	PMString status;
+	const bool wrote = KFCRuns()->SpecialRows(op, rows, params, status);
+	// The rows drawn again - each written one reads the operation's word, its place read again (RefreshRows keeps what the
+	// person had opened and closed) - and the status line either way.
+	if (KFCResults()->HasRun())
+		RefreshRows();
+	else
+		Rebuild();
+	if (!status.IsEmpty())
+		ShowStatus(status);
+	return wrote;
+}
+
+bool KFCResultTree::CanSpecialAny(int32 op, const KFCRowsByChapter& rows)
+{
+	for (size_t c = 0; c < rows.size(); ++c)
+		for (size_t k = 0; k < rows[c].hits.size(); ++k)
+			if (KFCRuns()->CanSpecialHit(op, rows[c].chapter, rows[c].hits[k]))
+				return true;
+	return false;
+}
+
+const char* KFCResultTree::SpecialRowWord(int32 op)
+{
+	switch (op)
+	{
+		case kKFCSpecialFillFrameProp:
+		case kKFCSpecialFitContentProp:
+		case kKFCSpecialContentAwareFit:
+		case kKFCSpecialFitFrameToContent:
+		case kKFCSpecialFitContentToFrame:
+		case kKFCSpecialCenterContent:			return "Fitted";
+		case kKFCSpecialBringToFront:
+		case kKFCSpecialBringForward:
+		case kKFCSpecialSendBackward:
+		case kKFCSpecialSendToBack:				return "Arranged";
+		case kKFCSpecialRotate90CW:
+		case kKFCSpecialRotate90CCW:
+		case kKFCSpecialRotate180:
+		case kKFCSpecialRotate:					return "Rotated";
+		case kKFCSpecialFlipHorizontal:
+		case kKFCSpecialFlipVertical:			return "Flipped";
+		case kKFCSpecialRedefineScaling:		return "Redefined";
+		case kKFCSpecialClearTransformations:	return "Reset";
+		case kKFCSpecialLock:					return "Locked";
+		case kKFCSpecialUnlock:					return "Unlocked";
+		case kKFCSpecialHide:					return "Hidden";
+		case kKFCSpecialShow:					return "Shown";
+		case kKFCSpecialMove:
+		case kKFCSpecialMoveToLayer:			return "Moved";
+		case kKFCSpecialScale:					return "Scaled";
+		case kKFCSpecialShear:					return "Sheared";
+		case kKFCSpecialClearStyleOverrides:	return "Cleared";
+		case kKFCSpecialDelete:					return "Deleted";
+		case kKFCSpecialRunScript:				return "Scripted";
+		default:								return "";
+	}
 }
 
 // End, KFCResultListWidgetMgr.cpp.

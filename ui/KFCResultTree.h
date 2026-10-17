@@ -228,6 +228,21 @@ namespace KFCResultTree
 	    read only)? The question the object row menu greys it by (the author, 2026-10-17). */
 	bool CanOutlineAny(const KFCRowsByChapter& rows);
 
+	/** AN OBJECT ROW'S OTHER SPECIAL OPERATIONS (docs/superpowers/specs/2026-10-17-kfc-object-special-operations-design.md):
+	    the rows' objects written where they stand - across spreads and documents - by InDesign's own Object menu commands
+	    (op, a KFCSpecialOp, with params - Move to Active Layer's layer name), by the model (KFCRuns()->SpecialRows,
+	    KFCObjectSpecial), with no landing: nothing is brought forward. The rows drawn again - each one written reads the
+	    operation's word (SpecialRowWord) - and the status line. Not under a landing or a run. True = written. */
+	bool SpecialRows(int32 op, const KFCRowsByChapter& rows, const KFCSpecialParams& params);
+
+	/** Can a special operation be offered on these rows - can any of them take it (KFCRuns()->CanSpecialHit - their
+	    doors, read only)? The question the object row menu greys each of its items by. */
+	bool CanSpecialAny(int32 op, const KFCRowsByChapter& rows);
+
+	/** The word a row a special operation wrote reads first (the spec's E8 - where a replaced row reads "Changed"):
+	    "Fitted", "Arranged", "Rotated", "Locked" ...; "" for no operation. */
+	const char* SpecialRowWord(int32 op);
+
 	/** The result list's view, reached through its panel - nil while the panel is closed. Not counted (the panel holds
 	    it): use it at once. Asked by whatever outside the panel wants the list alone - the tree's manager, its controller,
 	    the keyboard's questions, the Return filter. (RedrawKeyboardFrame wants the panel's view as well, and asks the

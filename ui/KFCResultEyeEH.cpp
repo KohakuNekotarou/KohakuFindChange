@@ -12,8 +12,9 @@
 //  neither selects the row nor jumps (KFCResultNodeEH does both on the release); every click turns the eye once (a
 //  double click twice, as every click of this list is one click). A kept tier's row (grey) is not a hit row: its eye is
 //  disabled and its clicks go to the row, which switches to its tier (ROW-42). AN EYE IS A WRITTEN ROW'S - one KFC has
-//  replaced or outlined (the author, 2026-10-17 evening: an eye on a row not written only kept a match since deleted as
-//  Missing): on any other row the column is empty and its clicks are the row's too (selected, jumped to).
+//  replaced, outlined, or given a special operation (the author, 2026-10-17 evening: an eye on a row not written only kept
+//  a match since deleted as Missing): on any other row the column is empty and its clicks are the row's too (selected,
+//  jumped to).
 //
 //========================================================================================
 
@@ -48,7 +49,8 @@ public:
 private:
 	/** The live hit row this icon sits in - false for a kept tier's row, or none. */
 	bool LiveHitRow(int32& outChapter, int32& outHit) const;
-	/** ...one KFC has written (replaced or outlined): the only rows with an eye to turn. outRow = its display. */
+	/** ...one KFC has written (replaced, outlined, or given a special operation): the only rows with an eye to turn.
+	    outRow = its display. */
 	bool WrittenRow(int32& outChapter, int32& outHit, KFCResultModel::RowDisplay& outRow) const;
 	/** The eye turned: the model told, the icon drawn, the status line, the keyboard to the list. kFalse = not a written
 	    live hit row's eye - the click is the row's. */
@@ -76,7 +78,8 @@ bool KFCResultEyeEH::LiveHitRow(int32& outChapter, int32& outHit) const
 
 bool KFCResultEyeEH::WrittenRow(int32& outChapter, int32& outHit, KFCResultModel::RowDisplay& outRow) const
 {
-	return LiveHitRow(outChapter, outHit) && KFCResults()->GetHitRow(outChapter, outHit, outRow) && outRow.replaced;
+	return LiveHitRow(outChapter, outHit) && KFCResults()->GetHitRow(outChapter, outHit, outRow)
+		&& (outRow.replaced || outRow.special != kKFCSpecialNone);
 }
 
 bool16 KFCResultEyeEH::Turn()

@@ -37,6 +37,11 @@ namespace KFCPageItemFacts
 
 	/** A story's first 24 visible characters, its breaks kept - what a story row reads. */
 	PMString StoryLeadText(const UIDRef& storyRef);
+
+	/** An item's place in its parent's stack - its index among the parent's children, the back first (Object > Arrange
+	    moves it; nothing of the item's own data does - KFCObjectSearch::Fingerprint leaves it out). -1 = no item, or no
+	    parent. */
+	int32 StackIndex(IDataBase* db, UID item);
 }
 
 #endif // __KFCPageItemFacts_h__

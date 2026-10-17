@@ -140,6 +140,13 @@ public:
 	/** = KFCObjectOutline::CanOutlineHit (appended) - an object row's Create Outlines offered: its doors, read only (a
 	    document not open now answers true). */
 	virtual bool CanOutlineHit(int32 chapterIdx, int32 hitIdx) = 0;
+	/** = KFCObjectSpecial::SpecialRows (appended) - an object row's other Special Operations (op, a KFCSpecialOp, with
+	    params): the rows' objects written by InDesign's own Facades, one undo step. False = nothing written; outStatus says
+	    why. */
+	virtual bool SpecialRows(int32 op, const KFCRowsByChapter& rows, const KFCSpecialParams& params, PMString& outStatus) = 0;
+	/** = KFCObjectSpecial::CanSpecialHit (appended) - a special operation offered for a row: its doors, read only (a
+	    document not open now answers true). */
+	virtual bool CanSpecialHit(int32 op, int32 chapterIdx, int32 hitIdx) = 0;
 };
 
 #endif // __IKFCRuns_h__

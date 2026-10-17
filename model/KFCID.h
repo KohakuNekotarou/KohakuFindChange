@@ -193,6 +193,39 @@ DECLARE_PMID(kImplementationIDSpace, kKFCCopyStoreImpl, kKFCPrefix + 47)
 #define kKFCCreateOutlinesStepKey	kKFCStringPrefix "kKFCCreateOutlinesStepKey"
 // The Edit menu's name of a text row's Restore Original step (KFCReplaceEngine::RestoreHits - the copies put back).
 #define kKFCRestoreOriginalStepKey	kKFCStringPrefix "kKFCRestoreOriginalStepKey"
+// The Edit menu's names of an object row's other Special Operations (KFCObjectSpecial - one per KFCSpecialOp, InDesign's
+// own English command names; "Degrees" for the degree sign, the string table being ASCII).
+#define kKFCFillFramePropStepKey			kKFCStringPrefix "kKFCFillFramePropStepKey"
+#define kKFCFitContentPropStepKey			kKFCStringPrefix "kKFCFitContentPropStepKey"
+#define kKFCContentAwareFitStepKey			kKFCStringPrefix "kKFCContentAwareFitStepKey"
+// (Not "FitFrameToContent": the same letters as Fit Content to Frame's key - one length, one character sum, the pair a
+// string lookup has been seen to take for each other - key_collisions.py. Bring to Front's below for the same reason.)
+#define kKFCFrameToContentStepKey			kKFCStringPrefix "kKFCFrameToContentStepKey"
+#define kKFCFitContentToFrameStepKey		kKFCStringPrefix "kKFCFitContentToFrameStepKey"
+#define kKFCCenterContentStepKey			kKFCStringPrefix "kKFCCenterContentStepKey"
+#define kKFCBringFrontStepKey				kKFCStringPrefix "kKFCBringFrontStepKey"
+#define kKFCBringForwardStepKey				kKFCStringPrefix "kKFCBringForwardStepKey"
+#define kKFCSendBackwardStepKey				kKFCStringPrefix "kKFCSendBackwardStepKey"
+#define kKFCSendToBackStepKey				kKFCStringPrefix "kKFCSendToBackStepKey"
+#define kKFCRotate90CWStepKey				kKFCStringPrefix "kKFCRotate90CWStepKey"
+#define kKFCRotate90CCWStepKey				kKFCStringPrefix "kKFCRotate90CCWStepKey"
+#define kKFCRotate180StepKey				kKFCStringPrefix "kKFCRotate180StepKey"
+#define kKFCFlipHorizontalStepKey			kKFCStringPrefix "kKFCFlipHorizontalStepKey"
+#define kKFCFlipVerticalStepKey				kKFCStringPrefix "kKFCFlipVerticalStepKey"
+#define kKFCRedefineScalingStepKey			kKFCStringPrefix "kKFCRedefineScalingStepKey"
+#define kKFCClearTransformationsStepKey		kKFCStringPrefix "kKFCClearTransformationsStepKey"
+#define kKFCLockStepKey						kKFCStringPrefix "kKFCLockStepKey"
+#define kKFCUnlockStepKey					kKFCStringPrefix "kKFCUnlockStepKey"
+#define kKFCHideStepKey						kKFCStringPrefix "kKFCHideStepKey"
+#define kKFCShowStepKey						kKFCStringPrefix "kKFCShowStepKey"
+#define kKFCMoveToLayerStepKey				kKFCStringPrefix "kKFCMoveToLayerStepKey"
+#define kKFCClearStyleOverridesStepKey		kKFCStringPrefix "kKFCClearStyleOverridesStepKey"
+#define kKFCDeleteStepKey					kKFCStringPrefix "kKFCDeleteStepKey"
+#define kKFCMoveStepKey						kKFCStringPrefix "kKFCMoveStepKey"
+#define kKFCScaleStepKey					kKFCStringPrefix "kKFCScaleStepKey"
+#define kKFCRotateStepKey					kKFCStringPrefix "kKFCRotateStepKey"
+#define kKFCShearStepKey					kKFCStringPrefix "kKFCShearStepKey"
+#define kKFCRunScriptStepKey				kKFCStringPrefix "kKFCRunScriptStepKey"
 #define kKFCRunQueriesStepKey		kKFCStringPrefix "kKFCRunQueriesStepKey"	// the query run's undo step (KFCQuerySequence)
 #define kKFCChangeAllStepKey		kKFCStringPrefix "kKFCChangeAllStepKey"	// Change All in Book (No List)'s undo step (KFCChangeAll)
 

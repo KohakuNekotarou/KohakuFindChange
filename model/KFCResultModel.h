@@ -159,13 +159,18 @@ namespace KFCResultModel
 		bool		outlined;	// written as outlines (an object row's Special Operations > Create Outlines - KFCObjectOutline):
 								// replaced too, and its item the outlines InDesign made (MarkItemOutlined); the row reads
 								// "Outlined" where a replaced one reads "Changed"
+		int32		special;	// THE SPECIAL OPERATION KFC last wrote the row's item with (an object row's Special Operations -
+								// KFCObjectSpecial; a KFCSpecialOp, 0 = none): the row reads its word first (Fitted, Locked ...)
+								// and keeps its eye on. The item is still the row's (its Replace stays offered) - but for Delete,
+								// which takes it away and greys the row's Replace (replaced too). A Replace and Create Outlines
+								// put their own word there (MarkItemReplaced, MarkItemOutlined clear it). MarkItemSpecial.
 		bool		kept;		// THE ROW EYE (docs/superpowers/specs/2026-10-17-kfc-row-eye-keep-design.md): on = the row
 								// stays when its story or document is searched again, found or not (MergeKeptRows). A
 								// replace turns it on (MarkHitReplaced, MarkItemReplaced); the eye's click turns it either
-								// way (SetHitKept) - on a row KFC has WRITTEN only (replaced or outlined - the author,
-								// 2026-10-17 evening: an eye on a row not written only kept a match since deleted as
-								// Missing); its Restore Original turns it off. Copied whole with the row - a tier, an
-								// Undo step, a backup.
+								// way (SetHitKept) - on a row KFC has WRITTEN only (replaced, outlined, or given a special
+								// operation - the author, 2026-10-17 evening: an eye on a row not written only kept a match
+								// since deleted as Missing); its Restore Original turns it off. Copied whole with the row - a
+								// tier, an Undo step, a backup.
 		ChangeOutcome outcome;	// why this row was NOT replaced (kOutcomeNone = it was, or was never
 								// reached at all). The locator shows it as a word.
 		// (No per-hit change count that lets the replace take an unedited story on trust and skip the
@@ -217,7 +222,7 @@ namespace KFCResultModel
 		Hit() : pageIndex(-1), isOverset(false), isLocked(false), isHidden(false),
 				fontGroup(-1), fontGroupPos(-1), storyUID(kInvalidUID),
 				textStart(kInvalidTextIndex), textEnd(kInvalidTextIndex), matchHash(0),
-				replaced(false), outlined(false), kept(false), outcome(kOutcomeNone),
+				replaced(false), outlined(false), special(0), kept(false), outcome(kOutcomeNone),
 				pageOrdinal(0), storyOrdinal(-1),
 				itemUID(kInvalidUID), onPasteboard(false), isMaster(false), isGrouped(false), isInline(false),
 				isAnchored(false), itemPrint(0), itemPrintLength(0) {}
@@ -510,7 +515,7 @@ namespace KFCResultModel
 
 	/** THE ROW EYE'S CLICK (KFCResultEyeEH, through IKFCResults::SetHitKept): the row's eye on or off. Not a change to
 	    the document - no Undo step, no backup. false = no such row, or an eye turned on on a row KFC has not written
-	    (replaced or outlined - the author, 2026-10-17 evening). */
+	    (replaced, outlined, or given a special operation - the author, 2026-10-17 evening). */
 	bool SetHitKept(int32 chapterIdx, int32 hitIdx, bool kept);
 
 	/** How many rows of a chapter have their eye on - of one story, or of the whole chapter (story = kInvalidUID): the
@@ -583,6 +588,15 @@ namespace KFCResultModel
 	    (the row eye), and its item the outlines InDesign made with their fingerprint (kInvalidUID when the command named
 	    none). Backed up like every change a write makes (BeginRowBackup), so an Undo puts the row - its frame - back. */
 	void MarkItemOutlined(int32 chapterIdx, int32 hitIdx, UID newItem, uint64 newPrint, uint32 newLength);
+
+	/** AN OBJECT ROW A SPECIAL OPERATION WROTE (KFCObjectSpecial - docs/superpowers/specs/2026-10-17-kfc-object-special-operations-design.md
+	    E7): its special mark (op, a KFCSpecialOp - the row reads its word first), its eye on, its outcome cleared (the
+	    write has just found the item there). place = the item's place read after the write (KFCObjectSearch::ReadItemPlace -
+	    a move or a turn can take it to another page, Lock and Hide change its words) - the row's page, flags and locator
+	    from it, its place on the page dropped when the page changed (the list is not ordered again); and its fingerprint
+	    as the write left it. place = nil: the write took the item away (Delete) - replaced too, its Replace greyed. Backed up
+	    like every change a write makes (BeginRowBackup), so an Undo puts the row back. */
+	void MarkItemSpecial(int32 chapterIdx, int32 hitIdx, int32 op, uint64 newPrint, uint32 newLength, const Hit* place);
 
 	/** An object row a write of KFC's own did NOT replace, but whose item's fingerprint the write moved - the text frame of
 	    the story an inline written hangs in, the group holding an item written (KFCObjectSearch::WriteReach): its fingerprint

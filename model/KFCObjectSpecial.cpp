@@ -1,0 +1,934 @@
+//========================================================================================
+//
+//  Owner: KohakuNekotarou
+//
+//  KohakuFindChange (KFC)
+//
+//  An object row's other Special Operations - see KFCObjectSpecial.h.
+//
+//========================================================================================
+
+#include "VCPlugInHeaders.h"
+
+// Interface includes:
+#include "IArrangeFacade.h"					// Object > Arrange
+#include "IDataBase.h"
+#include "IDocument.h"						// GetDocWorkSpace - Clear Object Style Overrides
+#include "IDocumentLayer.h"					// Move to Active Layer's layer
+#include "IFrameContentFacade.h"			// Object > Fitting
+#include "IHierarchy.h"
+#include "ILayerFacade.h"					// MoveToLayer - the Layers panel's own (layerpanel/LayerSuiteLayoutCSB.cpp)
+#include "ILayerList.h"						// FindByName - the layer of that name in each document
+#include "IObjectStylesFacade.h"			// ApplyObjectStyleToUIDList - the Object Styles panel's Clear Overrides
+#include "IObjStylesAttrCategoriesList.h"	// GetApplyCategories - the categories a style applies
+#include "IPageItemLockFacade.h"			// Object > Lock / Unlock
+#include "IPageItemScrapFacade.h"			// Edit > Clear (Delete)
+#include "IPageItemVisibilityFacade.h"		// Object > Hide / Show
+#include "IPersistUIDData.h"				// IID_IPERSISTOBJECTSTYLEDATA - the object style applied to an item
+#include "ISpreadLayer.h"					// GetDocLayerUID - the layer an item at the top of a spread layer is on
+#include "ITransformFacade.h"				// Object > Transform
+#include "IWorkspace.h"
+
+// General includes:
+#include "ErrorUtils.h"
+#include "GenericID.h"						// IID_IPERSISTOBJECTSTYLEDATA
+#include "K2Vector.h"
+#include "TransformTypes.h"
+#include "UIDList.h"
+#include "Utils.h"
+
+#include <algorithm>		// std::remove_if - the rows written taken off the rows the write moves
+#include <map>
+#include <set>
+#include <utility>
+#include <vector>
+
+// Project includes:
+#include "KFCBookScope.h"
+#include "KFCDiag.h"
+#include "KFCDiagWrittenDocs.h"		// a test build's written-document check (nothing in a shipping one)
+#include "KFCID.h"					// the Edit menu's names of the steps
+#include "KFCObjectReplace.h"		// RowsTheWriteCanMove, FollowRowsTheWriteMoved - the other rows a write moves
+#include "KFCObjectSearch.h"		// IsOnSpread, Fingerprint, ReadItemPlace
+#include "KFCObjectSpecial.h"
+#include "KFCPageItemFacts.h"		// IsPageItemLockedForEdit, IsFrameOnLockedLayer, StackIndex
+#include "KFCReplaceEngine.h"		// the write's undo step (WriteStep) and what its documents are left as (DocsAfterWrite)
+#include "KFCResultModel.h"
+#include "KFCRunGuard.h"
+#include "KFCUndoFollow.h"
+
+namespace
+{
+// HOW AN OPERATION WRITES (the spec's E5).
+enum WriteKind
+{
+	kWriteBatch = 0,	// one Facade call over a document's items - as InDesign's own command over a selection of them
+	kWriteEach,			// one call per item, about its own centre - a transform (a selection's centre means nothing
+						// across spreads)
+	kWriteGone			// a batch that takes the items away (Delete): the row reads Deleted, its Replace greyed
+};
+
+// ONE OPERATION OF THE TABLE: what it is called, how it writes, and what is said when InDesign's own question says no.
+struct OpInfo
+{
+	int32		op;				// a KFCSpecialOp
+	const char*	name;			// InDesign's English name - the head of the status line ("Fit Content Proportionally: ...")
+	const char*	stepKey;		// the Edit menu's name of its undo step (a key - KFC_enUS.fr)
+	WriteKind	kind;
+	bool		order;			// its write moves no fingerprint, only the item's place in its stack (Arrange - E6)
+	bool		ready;			// written in this stage (Move, Scale, Rotate, Shear and Run Script come with their dialogs)
+	const char*	notApplicable;	// InDesign's own question said no: the words a count of such rows reads
+};
+
+const OpInfo kOps[] =
+{
+	{ kKFCSpecialFillFrameProp,			"Fill Frame Proportionally",			kKFCFillFramePropStepKey,		kWriteBatch,	false,	true,	"no content to fit" },
+	{ kKFCSpecialFitContentProp,		"Fit Content Proportionally",			kKFCFitContentPropStepKey,		kWriteBatch,	false,	true,	"no content to fit" },
+	{ kKFCSpecialContentAwareFit,		"Content-Aware Fit",					kKFCContentAwareFitStepKey,		kWriteBatch,	false,	true,	"not an image frame" },
+	{ kKFCSpecialFitFrameToContent,		"Fit Frame to Content",					kKFCFrameToContentStepKey,		kWriteBatch,	false,	true,	"no content to fit to" },
+	{ kKFCSpecialFitContentToFrame,		"Fit Content to Frame",					kKFCFitContentToFrameStepKey,	kWriteBatch,	false,	true,	"no content to fit" },
+	{ kKFCSpecialCenterContent,			"Center Content",						kKFCCenterContentStepKey,		kWriteBatch,	false,	true,	"no content to center" },
+	{ kKFCSpecialBringToFront,			"Bring to Front",						kKFCBringFrontStepKey,			kWriteBatch,	true,	true,	"in front already" },
+	{ kKFCSpecialBringForward,			"Bring Forward",						kKFCBringForwardStepKey,		kWriteBatch,	true,	true,	"in front already" },
+	{ kKFCSpecialSendBackward,			"Send Backward",						kKFCSendBackwardStepKey,		kWriteBatch,	true,	true,	"at the back already" },
+	{ kKFCSpecialSendToBack,			"Send to Back",							kKFCSendToBackStepKey,			kWriteBatch,	true,	true,	"at the back already" },
+	{ kKFCSpecialRotate90CW,			"Rotate 90 Degrees Clockwise",			kKFCRotate90CWStepKey,			kWriteEach,		false,	true,	"cannot be rotated" },
+	{ kKFCSpecialRotate90CCW,			"Rotate 90 Degrees Counter-clockwise",	kKFCRotate90CCWStepKey,			kWriteEach,		false,	true,	"cannot be rotated" },
+	{ kKFCSpecialRotate180,				"Rotate 180 Degrees",					kKFCRotate180StepKey,			kWriteEach,		false,	true,	"cannot be rotated" },
+	{ kKFCSpecialFlipHorizontal,		"Flip Horizontal",						kKFCFlipHorizontalStepKey,		kWriteEach,		false,	true,	"cannot be flipped" },
+	{ kKFCSpecialFlipVertical,			"Flip Vertical",						kKFCFlipVerticalStepKey,		kWriteEach,		false,	true,	"cannot be flipped" },
+	{ kKFCSpecialRedefineScaling,		"Redefine Scaling as 100%",				kKFCRedefineScalingStepKey,		kWriteBatch,	false,	true,	"at 100% already" },
+	{ kKFCSpecialClearTransformations,	"Clear Transformations",				kKFCClearTransformationsStepKey,	kWriteBatch,	false,	true,	"not transformed" },
+	{ kKFCSpecialLock,					"Lock",									kKFCLockStepKey,				kWriteBatch,	false,	true,	"cannot be locked" },
+	{ kKFCSpecialUnlock,				"Unlock",								kKFCUnlockStepKey,				kWriteBatch,	false,	true,	"cannot be unlocked" },
+	{ kKFCSpecialHide,					"Hide",									kKFCHideStepKey,				kWriteBatch,	false,	true,	"cannot be hidden" },
+	{ kKFCSpecialShow,					"Show",									kKFCShowStepKey,				kWriteBatch,	false,	true,	"cannot be shown" },
+	{ kKFCSpecialMoveToLayer,			"Move to Active Layer",					kKFCMoveToLayerStepKey,			kWriteBatch,	false,	true,	"cannot be moved" },
+	{ kKFCSpecialClearStyleOverrides,	"Clear Object Style Overrides",			kKFCClearStyleOverridesStepKey,	kWriteBatch,	false,	true,	"no object style" },
+	{ kKFCSpecialDelete,				"Delete",								kKFCDeleteStepKey,				kWriteGone,		false,	true,	"cannot be deleted" },
+	{ kKFCSpecialMove,					"Move",									kKFCMoveStepKey,				kWriteEach,		false,	false,	"cannot be moved" },
+	{ kKFCSpecialScale,					"Scale",								kKFCScaleStepKey,				kWriteEach,		false,	false,	"cannot be scaled" },
+	{ kKFCSpecialRotate,				"Rotate",								kKFCRotateStepKey,				kWriteEach,		false,	false,	"cannot be rotated" },
+	{ kKFCSpecialShear,					"Shear",								kKFCShearStepKey,				kWriteEach,		false,	false,	"cannot be sheared" },
+	{ kKFCSpecialRunScript,				"Run Script",							kKFCRunScriptStepKey,			kWriteBatch,	false,	false,	"" },
+};
+
+const OpInfo* FindOp(int32 op)
+{
+	for (size_t k = 0; k < sizeof(kOps) / sizeof(kOps[0]); ++k)
+		if (kOps[k].op == op)
+			return &kOps[k];
+	return nil;
+}
+
+// WHY A ROW IS NOT WRITTEN - said in full for one row (RowSentence), counted for several (RefusalWords).
+enum Refusal
+{
+	kRefusedNone = 0,
+	kRefusedNotReady,		// an operation of a later stage (never from the panel - its menu has no item for it)
+	kRefusedNotObject,		// not an object row (never from the panel - the menu is the object rows')
+	kRefusedNoDoc,			// its document could not be found
+	kRefusedNotOpened,		// ...or not opened
+	kRefusedMissing,		// the item is gone - the row now reads Missing
+	kRefusedOverset,		// no spread holds it - in overset text (KFCObjectSearch::IsOnSpread)
+	kRefusedLockedLayer,	// on a locked layer - every operation, Unlock too (it frees Object > Lock, not a layer)
+	kRefusedLocked,			// locked by Object > Lock - every operation but Unlock
+	kRefusedNotLocked,		// Unlock: nothing of Object > Lock on it
+	kRefusedHidden,			// Hide: hidden already (its own flag)
+	kRefusedNotHidden,		// Show: not hidden by Object > Hide
+	kRefusedNested,			// Move to Active Layer: in a group or in text - its group or its story moves it
+	kRefusedNoLayer,		// ...its document has no layer of that name
+	kRefusedOnLayer,		// ...on that layer already
+	kRefusedNotApplicable,	// InDesign's own question said no (OpInfo::notApplicable)
+	kRefusedUnchanged,		// written, and InDesign changed nothing of it (E7 - not marked)
+	kRefusalCount
+};
+
+// One row's refusal, after "<operation>: ".
+PMString RowSentence(const OpInfo& info, Refusal why, const KFCSpecialParams& params)
+{
+	PMString out;
+	out.SetTranslatable(kFalse);
+	switch (why)
+	{
+		case kRefusedNotReady:		out = "this operation is not available yet."; break;
+		case kRefusedNotObject:		out = "this row is not an object row."; break;
+		case kRefusedNoDoc:			out = "the document of this row could not be found."; break;
+		case kRefusedNotOpened:		out = "the document of this row could not be opened."; break;
+		case kRefusedMissing:		out = "the object is no longer in the document - search again."; break;
+		case kRefusedOverset:		out = "the object is in overset text - left as it is."; break;
+		case kRefusedLockedLayer:	out = "the object is on a locked layer - left as it is."; break;
+		case kRefusedLocked:		out = "the object is locked (Object > Lock) - left as it is."; break;
+		case kRefusedNotLocked:		out = "the object is not locked (Object > Lock)."; break;
+		case kRefusedHidden:		out = "the object is hidden already."; break;
+		case kRefusedNotHidden:		out = "the object is not hidden (Object > Hide)."; break;
+		case kRefusedNested:		out = "the object is in a group or in text - move its group or its frame instead."; break;
+		case kRefusedNoLayer:
+			out = "the document of this row has no layer named \"";
+			out.Append(params.text);
+			out.Append("\".");
+			break;
+		case kRefusedOnLayer:
+			out = "the object is on \"";
+			out.Append(params.text);
+			out.Append("\" already.");
+			break;
+		case kRefusedNotApplicable:
+			out = info.notApplicable;
+			out.Append(" - left as it is.");
+			break;
+		case kRefusedUnchanged:		out = "nothing changed - the object is already as asked."; break;
+		default:					break;
+	}
+	out.SetTranslatable(kFalse);
+	return out;
+}
+
+// The same reasons, a few words each, for a count of rows: "2 locked".
+PMString RefusalWords(const OpInfo& info, Refusal why, const KFCSpecialParams& params)
+{
+	PMString out;
+	switch (why)
+	{
+		case kRefusedNotReady:		out = "not available yet"; break;
+		case kRefusedNotObject:		out = "not an object row"; break;
+		case kRefusedNoDoc:			out = "document not found"; break;
+		case kRefusedNotOpened:		out = "document not opened"; break;
+		case kRefusedMissing:		out = "no longer in the document"; break;
+		case kRefusedOverset:		out = "in overset text"; break;
+		case kRefusedLockedLayer:	out = "on a locked layer"; break;
+		case kRefusedLocked:		out = "locked"; break;
+		case kRefusedNotLocked:		out = "not locked"; break;
+		case kRefusedHidden:		out = "hidden already"; break;
+		case kRefusedNotHidden:		out = "not hidden"; break;
+		case kRefusedNested:		out = "in a group or in text"; break;
+		case kRefusedNoLayer:
+			out = "no layer named \"";
+			out.Append(params.text);
+			out.Append("\"");
+			break;
+		case kRefusedOnLayer:
+			out = "on \"";
+			out.Append(params.text);
+			out.Append("\" already");
+			break;
+		case kRefusedNotApplicable:	out = info.notApplicable; break;
+		case kRefusedUnchanged:		out = "unchanged"; break;
+		default:					break;
+	}
+	out.SetTranslatable(kFalse);
+	return out;
+}
+
+// "1 locked, 2 unchanged" - the reasons counted, in the order of the enum.
+void AppendRefusals(PMString& out, const OpInfo& info, const KFCSpecialParams& params, const int32 (&counts)[kRefusalCount])
+{
+	bool first = true;
+	for (int32 why = kRefusedNotReady; why < kRefusalCount; ++why)
+	{
+		if (counts[why] == 0)
+			continue;
+		if (!first)
+			out.Append(", ");
+		out.AppendNumber(counts[why]);
+		out.Append(" ");
+		out.Append(RefusalWords(info, static_cast<Refusal>(why), params));
+		first = false;
+	}
+}
+
+// A refusal begins with the operation's name (Create Outlines' rule - KFCObjectOutline.cpp).
+void Refuse(PMString& out, const OpInfo& info, const PMString& why)
+{
+	out = info.name;
+	out.Append(": ");
+	out.Append(why);
+	out.SetTranslatable(kFalse);
+}
+
+// The layer of that name in a document (Move to Active Layer - E11: the front document's active layer's name, found in
+// each document of the rows). kInvalidUID = none.
+UID LayerNamed(const UIDRef& docRef, const PMString& name)
+{
+	if (name.IsEmpty())
+		return kInvalidUID;
+	InterfacePtr<ILayerList> layers(docRef, UseDefaultIID());
+	return (layers != nil) ? layers->FindByName(name) : kInvalidUID;
+}
+
+// The object style applied to an item (kInvalidUID = none).
+UID StyleOf(IDataBase* db, UID item)
+{
+	InterfacePtr<IPersistUIDData> style(db, item, IID_IPERSISTOBJECTSTYLEDATA);
+	return (style != nil) ? style->GetUID() : kInvalidUID;
+}
+
+// MOVE TO ACTIVE LAYER'S DOORS (E11): an item at the top of a spread layer - one in a group or in text goes with its group
+// or its story (InDesign's own moves the selection's outermost items - LayerSuiteLayoutCSB.cpp); its document's layer of
+// that name, not the one it is on. With no name (the menu's question - CanSpecialHit), the first door alone.
+Refusal CheckLayerMove(const KFCSpecialParams& params, const UIDRef& docRef, UID item)
+{
+	IDataBase* const db = docRef.GetDataBase();
+	InterfacePtr<IHierarchy> hier(db, item, UseDefaultIID());
+	const UID parent = (hier != nil) ? hier->GetParentUID() : kInvalidUID;
+	if (parent == kInvalidUID)
+		return kRefusedNested;
+	InterfacePtr<ISpreadLayer> spreadLayer(db, parent, UseDefaultIID());
+	if (spreadLayer == nil)
+		return kRefusedNested;
+	if (params.text.IsEmpty())
+		return kRefusedNone;
+	const UID target = LayerNamed(docRef, params.text);
+	if (target == kInvalidUID)
+		return kRefusedNoLayer;
+	return (spreadLayer->GetDocLayerUID() == target) ? kRefusedOnLayer : kRefusedNone;
+}
+
+// INDESIGN'S OWN QUESTION FOR THE OPERATION, of one item (E4) - its Can..., the one its menu item is enabled by.
+Refusal AskInDesign(const OpInfo& info, const KFCSpecialParams& params, const UIDRef& docRef, UID item)
+{
+	IDataBase* const db = docRef.GetDataBase();
+	UIDList one(db, item);
+	bool can = false;
+	switch (info.op)
+	{
+		case kKFCSpecialFillFrameProp:
+		case kKFCSpecialFitContentProp:
+		case kKFCSpecialContentAwareFit:
+		case kKFCSpecialFitFrameToContent:
+		case kKFCSpecialFitContentToFrame:
+		case kKFCSpecialCenterContent:
+		{
+			Utils<Facade::IFrameContentFacade> fitting;
+			if (!fitting)
+				break;
+			if (info.op == kKFCSpecialFillFrameProp)			can = fitting->CanFillFrameProp(one) != kFalse;
+			else if (info.op == kKFCSpecialFitContentProp)		can = fitting->CanFitContentProp(one) != kFalse;
+			else if (info.op == kKFCSpecialContentAwareFit)		can = fitting->CanApplyContentAwareFit(one) != kFalse;
+			else if (info.op == kKFCSpecialFitFrameToContent)	can = fitting->CanFitFrameToContent(one) != kFalse;
+			else if (info.op == kKFCSpecialFitContentToFrame)	can = fitting->CanFitContentToFrame(one) != kFalse;
+			else												can = fitting->CanCenterContentInFrame(one) != kFalse;
+			break;
+		}
+		case kKFCSpecialBringToFront:
+		case kKFCSpecialBringForward:
+		case kKFCSpecialSendBackward:
+		case kKFCSpecialSendToBack:
+		{
+			Utils<Facade::IArrangeFacade> arrange;
+			if (!arrange)
+				break;
+			if (info.op == kKFCSpecialBringToFront)			can = arrange->CanBringToFront(one, kInvalidUID) != kFalse;
+			else if (info.op == kKFCSpecialBringForward)	can = arrange->CanBringForward(one) != kFalse;
+			else if (info.op == kKFCSpecialSendBackward)	can = arrange->CanSendBackward(one) != kFalse;
+			else											can = arrange->CanSendToBack(one, kInvalidUID) != kFalse;
+			break;
+		}
+		case kKFCSpecialRotate90CW:
+		case kKFCSpecialRotate90CCW:
+		case kKFCSpecialRotate180:
+		case kKFCSpecialRotate:
+		case kKFCSpecialFlipHorizontal:
+		case kKFCSpecialFlipVertical:
+		case kKFCSpecialScale:
+		case kKFCSpecialShear:
+		case kKFCSpecialMove:
+		{
+			Utils<Facade::ITransformFacade> transform;
+			if (!transform)
+				break;
+			uint32 values = Transform::kRotationValue;
+			if (info.op == kKFCSpecialFlipHorizontal || info.op == kKFCSpecialFlipVertical || info.op == kKFCSpecialScale)
+				values = Transform::kScaleValue;
+			else if (info.op == kKFCSpecialShear)
+				values = Transform::kSkewValue;
+			else if (info.op == kKFCSpecialMove)
+				values = Transform::kTranslationValue;
+			can = transform->CanChangeItemsTransformValues(one, Transform::PasteboardCoordinates(), values) != kFalse;
+			break;
+		}
+		case kKFCSpecialRedefineScaling:
+		{
+			Utils<Facade::ITransformFacade> transform;
+			can = transform && transform->CanRedefineItemsScaling(one) != kFalse;
+			break;
+		}
+		case kKFCSpecialClearTransformations:
+		{
+			Utils<Facade::ITransformFacade> transform;
+			can = transform && transform->CanRemoveItemsTransformations(one, Transform::PasteboardCoordinates()) != kFalse;
+			break;
+		}
+		case kKFCSpecialLock:
+		{
+			Utils<Facade::IPageItemLockFacade> lock;
+			can = lock && lock->CanLock(one) != kFalse;
+			break;
+		}
+		case kKFCSpecialUnlock:
+		{
+			Utils<Facade::IPageItemLockFacade> lock;
+			return (lock && lock->CanUnlock(one) != kFalse) ? kRefusedNone : kRefusedNotLocked;
+		}
+		case kKFCSpecialHide:
+		{
+			Utils<Facade::IPageItemVisibilityFacade> visibility;
+			if (!visibility)
+				break;
+			if (visibility->GetVisibleState(UIDRef(db, item)) == kFalse)
+				return kRefusedHidden;
+			can = visibility->CanAnyHide(one) != kFalse;
+			break;
+		}
+		case kKFCSpecialShow:
+		{
+			// Its own flag (GetVisibleState - "does not go up the hierarchy"): what Object > Hide set and Show takes off.
+			Utils<Facade::IPageItemVisibilityFacade> visibility;
+			return (visibility && visibility->GetVisibleState(UIDRef(db, item)) == kFalse) ? kRefusedNone : kRefusedNotHidden;
+		}
+		case kKFCSpecialMoveToLayer:
+			return CheckLayerMove(params, docRef, item);
+		case kKFCSpecialClearStyleOverrides:
+			can = StyleOf(db, item) != kInvalidUID;
+			break;
+		case kKFCSpecialDelete:
+		{
+			Utils<Facade::IPageItemScrapFacade> scrap;
+			can = scrap && scrap->CanDeletePageItems(one) != kFalse;
+			break;
+		}
+		default:
+			break;
+	}
+	return can ? kRefusedNone : kRefusedNotApplicable;
+}
+
+// THE DOORS FOR ONE ROW (the spec's E4). reach = the write's: the row's document reached (a closed chapter reopened
+// windowless, held), the row rebound to it, and a row whose item is gone marked Missing. Else the menu's, READ ONLY: nothing
+// reached or opened, a document not open now answers "can" (pressing reaches it). outDoc / outItem: the row's document and
+// its item.
+Refusal CheckItem(const OpInfo& info, const KFCSpecialParams& params, int32 chapterIdx, int32 hitIdx, bool reach,
+	UIDRef& outDoc, UID& outItem)
+{
+	outItem = KFCResultModel::GetHitItem(chapterIdx, hitIdx);
+	if (outItem == kInvalidUID)
+		return kRefusedNotObject;
+	if (!info.ready)
+		return kRefusedNotReady;
+	IDFile file;
+	if (!KFCResultModel::GetChapterLocation(chapterIdx, outDoc, file))
+		return kRefusedNoDoc;
+	if (reach)
+	{
+		if (!KFCBookScope::ReachChapterDoc(file, outDoc))
+			return kRefusedNotOpened;
+		KFCResultModel::RebindChapterDoc(chapterIdx, outDoc);
+	}
+	else if (!KFCBookScope::FindOpenChapterDoc(file, outDoc))
+		return kRefusedNone;
+	IDataBase* const db = outDoc.GetDataBase();
+	bool there = false;
+	if (db != nil && db->IsValidUID(outItem))
+	{
+		InterfacePtr<IHierarchy> hier(db, outItem, UseDefaultIID());
+		there = (hier != nil);
+	}
+	if (!there)
+	{
+		if (reach)
+			KFCResultModel::SetHitOutcome(chapterIdx, hitIdx, KFCResultModel::kOutcomeMissing);
+		return kRefusedMissing;
+	}
+	if (!KFCObjectSearch::IsOnSpread(UIDRef(db, outItem)))
+		return kRefusedOverset;
+	// LOCKED: a locked layer refuses every operation - Unlock frees what Object > Lock locked, not a layer; Object > Lock
+	// refuses all but Unlock, which asks for it (AskInDesign).
+	if (KFCPageItemFacts::IsFrameOnLockedLayer(db, outItem))
+		return kRefusedLockedLayer;
+	if (info.op != kKFCSpecialUnlock && KFCPageItemFacts::IsPageItemLockedForEdit(db, outItem))
+		return kRefusedLocked;
+	return AskInDesign(info, params, outDoc, outItem);
+}
+
+// TRANSFORM EACH ITEM ABOUT ITS OWN CENTRE (E5) - the official shape (codesnippets/SnpTransformPageItems.cpp:
+// ITransformFacade::TransformItems), one item at a time, so each turns or flips where it stands. kSuccess, or the error.
+ErrorCode TransformEach(const UIDList& items, const Transform::TransformValue& how)
+{
+	Utils<Facade::ITransformFacade> transform;
+	if (!transform)
+		return kFailure;
+	for (int32 i = 0; i < items.Length(); ++i)
+	{
+		const ErrorCode err = transform->TransformItems(UIDList(items.GetDataBase(), items[i]), Transform::PasteboardCoordinates(),
+			Transform::CenterLocation(Geometry::OuterStrokeBounds()), how);
+		if (err != kSuccess)
+			return err;
+		if (ErrorUtils::PMGetGlobalErrorCode() != kSuccess)
+			return ErrorUtils::PMGetGlobalErrorCode();
+	}
+	return kSuccess;
+}
+
+// CLEAR OBJECT STYLE OVERRIDES over one document's items: each item's own style applied again over every category the
+// style applies - the Object Styles panel's Clear Overrides (IObjectStylesFacade.h: "clear all overrides means all of the
+// active categories in the style"), over items of any spread. Items of one style are applied together.
+ErrorCode ClearOverrides(const UIDRef& docRef, const UIDList& items)
+{
+	IDataBase* const db = docRef.GetDataBase();
+	Utils<Facade::IObjectStylesFacade> styles;
+	InterfacePtr<IDocument> doc(docRef, UseDefaultIID());
+	if (!styles || doc == nil)
+		return kFailure;
+	InterfacePtr<IWorkspace> ws(doc->GetDocWorkSpace(), UseDefaultIID());
+	if (ws == nil)
+		return kFailure;
+	std::map<UID, UIDList> byStyle;
+	for (int32 i = 0; i < items.Length(); ++i)
+	{
+		const UID style = StyleOf(db, items[i]);
+		if (style == kInvalidUID)
+			continue;
+		std::map<UID, UIDList>::iterator at = byStyle.find(style);
+		if (at == byStyle.end())
+			at = byStyle.insert(std::make_pair(style, UIDList(db))).first;
+		at->second.Append(items[i]);
+	}
+	for (std::map<UID, UIDList>::const_iterator s = byStyle.begin(); s != byStyle.end(); ++s)
+	{
+		InterfacePtr<IObjStylesAttrCategoriesList> categoriesOf(db, s->first, UseDefaultIID());
+		if (categoriesOf == nil)
+			continue;
+		K2Vector<ClassID> categories(categoriesOf->GetApplyCategories());
+		const ErrorCode err = styles->ApplyObjectStyleToUIDList(s->second, ws, s->first, categories, kFalse);
+		if (err != kSuccess)
+			return err;
+		if (ErrorUtils::PMGetGlobalErrorCode() != kSuccess)
+			return ErrorUtils::PMGetGlobalErrorCode();
+	}
+	return kSuccess;
+}
+
+// THE WRITE OF ONE DOCUMENT (E5): InDesign's own Facade over its items - one call over them all, as over a selection of
+// them; a transform one call per item about its own centre. kSuccess, or the error.
+ErrorCode WriteDocument(const OpInfo& info, const KFCSpecialParams& params, const UIDRef& docRef, const UIDList& items)
+{
+	switch (info.op)
+	{
+		case kKFCSpecialFillFrameProp:
+		case kKFCSpecialFitContentProp:
+		case kKFCSpecialContentAwareFit:
+		case kKFCSpecialFitFrameToContent:
+		case kKFCSpecialFitContentToFrame:
+		case kKFCSpecialCenterContent:
+		{
+			Utils<Facade::IFrameContentFacade> fitting;
+			if (!fitting)
+				return kFailure;
+			UIDList list(items);
+			if (info.op == kKFCSpecialFillFrameProp)			return fitting->FillFrameProp(list);
+			if (info.op == kKFCSpecialFitContentProp)			return fitting->FitContentProp(list);
+			if (info.op == kKFCSpecialContentAwareFit)			return fitting->ApplyContentAwareFit(list);
+			if (info.op == kKFCSpecialFitFrameToContent)		return fitting->FitFrameToContent(list);
+			if (info.op == kKFCSpecialFitContentToFrame)		return fitting->FitContentToFrame(list);
+			return fitting->CenterContentInFrame(list);
+		}
+		case kKFCSpecialBringToFront:
+		case kKFCSpecialBringForward:
+		case kKFCSpecialSendBackward:
+		case kKFCSpecialSendToBack:
+		{
+			Utils<Facade::IArrangeFacade> arrange;
+			if (!arrange)
+				return kFailure;
+			if (info.op == kKFCSpecialBringToFront)		return arrange->ProcessBringToFront(items, kInvalidUID, kFalse);
+			if (info.op == kKFCSpecialBringForward)		return arrange->ProcessBringForward(items);
+			if (info.op == kKFCSpecialSendBackward)		return arrange->ProcessSendBackward(items);
+			return arrange->ProcessSendToBack(items, kInvalidUID, kFalse);
+		}
+		// (Transform::RotateBy takes the angle as InDesign's dialogs do - counter-clockwise positive.)
+		case kKFCSpecialRotate90CW:		return TransformEach(items, Transform::RotateBy(-90.0));
+		case kKFCSpecialRotate90CCW:	return TransformEach(items, Transform::RotateBy(90.0));
+		case kKFCSpecialRotate180:		return TransformEach(items, Transform::RotateBy(180.0));
+		case kKFCSpecialFlipHorizontal:	return TransformEach(items, Transform::ScaleBy(-1.0, 1.0));
+		case kKFCSpecialFlipVertical:	return TransformEach(items, Transform::ScaleBy(1.0, -1.0));
+		case kKFCSpecialMove:			return TransformEach(items, Transform::TranslateBy(params.x, params.y));
+		case kKFCSpecialScale:			return TransformEach(items, Transform::ScaleBy(params.x / 100.0, params.y / 100.0));
+		case kKFCSpecialRotate:			return TransformEach(items, Transform::RotateBy(params.x));
+		case kKFCSpecialShear:			return TransformEach(items, Transform::SkewBy(params.x));
+		case kKFCSpecialRedefineScaling:
+		{
+			Utils<Facade::ITransformFacade> transform;
+			return transform ? transform->RedefineItemsScaling(items) : kFailure;
+		}
+		case kKFCSpecialClearTransformations:
+		{
+			Utils<Facade::ITransformFacade> transform;
+			return transform ? transform->RemoveItemsTransformations(items, Transform::PasteboardCoordinates()) : kFailure;
+		}
+		case kKFCSpecialLock:
+		case kKFCSpecialUnlock:
+		{
+			Utils<Facade::IPageItemLockFacade> lock;
+			if (!lock)
+				return kFailure;
+			return (info.op == kKFCSpecialLock) ? lock->LockPageItems(items) : lock->UnlockPageItems(items);
+		}
+		case kKFCSpecialHide:
+		case kKFCSpecialShow:
+		{
+			Utils<Facade::IPageItemVisibilityFacade> visibility;
+			if (!visibility)
+				return kFailure;
+			return (info.op == kKFCSpecialHide) ? visibility->Hide(items) : visibility->Show(items);
+		}
+		case kKFCSpecialMoveToLayer:
+		{
+			Utils<Facade::ILayerFacade> layers;
+			const UID targetUID = LayerNamed(docRef, params.text);
+			if (!layers || targetUID == kInvalidUID)
+				return kFailure;
+			InterfacePtr<IDocumentLayer> target(docRef.GetDataBase(), targetUID, UseDefaultIID());
+			if (target == nil)
+				return kFailure;
+			UIDList moving(items);		// (in and out: the items moved - the same ones, nothing duplicated)
+			return layers->MoveToLayer(moving, target, kFalse);
+		}
+		case kKFCSpecialClearStyleOverrides:
+			return ClearOverrides(docRef, items);
+		case kKFCSpecialDelete:
+		{
+			Utils<Facade::IPageItemScrapFacade> scrap;
+			return scrap ? scrap->DeletePageItems(items) : kFailure;
+		}
+		default:
+			return kFailure;
+	}
+}
+
+// ONE DOCUMENT'S ROWS in the write: those that passed the doors, with their items as they read before it, and what the
+// write changed of them.
+struct SpecialChapter
+{
+	int32								chapterIdx;
+	UIDRef								docRef;			// reached by CheckItem (a closed chapter reopened windowless, held)
+	std::vector<std::pair<int32, UID> >	todo;			// (the row, its item)
+	std::vector<uint64>					prints;			// each todo item's fingerprint before the write...
+	std::vector<uint32>					printLengths;
+	std::vector<int32>					orders;			// ...and its place in its stack (Arrange - E6)
+	std::vector<size_t>					changed;		// the todo entries the write changed (E7)
+	std::set<UID>						changedItems;
+	KFCObjectReplace::RowItems			watched;		// the OTHER rows its write can move (RowsTheWriteCanMove)
+	SpecialChapter() : chapterIdx(-1) {}
+};
+
+// DID THE WRITE CHANGE THE ITEM (E7): gone (Delete), or its fingerprint moved - or, for Arrange, its place in its stack.
+bool WriteChanged(const OpInfo& info, IDataBase* db, UID item, uint64 printBefore, uint32 lengthBefore, int32 orderBefore)
+{
+	bool there = false;
+	if (db != nil && db->IsValidUID(item))
+	{
+		InterfacePtr<IHierarchy> hier(db, item, UseDefaultIID());
+		there = (hier != nil);
+	}
+	if (info.kind == kWriteGone)
+		return !there;
+	if (!there)
+		return false;
+	uint64 print = 0;
+	uint32 length = 0;
+	if (!KFCObjectSearch::Fingerprint(UIDRef(db, item), print, length))
+		return false;
+	if (print != printBefore || length != lengthBefore)
+		return true;
+	return info.order && KFCPageItemFacts::StackIndex(db, item) != orderBefore;
+}
+}	// anonymous namespace
+
+bool KFCObjectSpecial::CanSpecialHit(int32 op, int32 chapterIdx, int32 hitIdx)
+{
+	const OpInfo* const info = FindOp(op);
+	if (info == nil)
+		return false;
+	UIDRef docRef;
+	UID item = kInvalidUID;
+	return CheckItem(*info, KFCSpecialParams(), chapterIdx, hitIdx, false, docRef, item) == kRefusedNone;
+}
+
+bool KFCObjectSpecial::SpecialRows(int32 op, const KFCRowsByChapter& rows, const KFCSpecialParams& params, PMString& outStatus)
+{
+	KFC_DIAG_WRITTEN_DOCS_CHECK("object-special-rows");	// (test builds: when it is over - KFCDiagWrittenDocs.h)
+	outStatus.Clear();
+	outStatus.SetTranslatable(kFalse);
+	const OpInfo* const found = FindOp(op);
+	if (found == nil)
+		return false;
+	const OpInfo& info = *found;
+	if (KFCRunGuard::IsAnyRunning())
+	{
+		outStatus.Append(KFCRunGuard::BusyMessage());
+		return false;
+	}
+	const size_t total = KFCRowCount(rows);
+	if (total == 0)
+		return false;
+
+	// THE DOORS, ROW BY ROW: the rows that pass are written, the rest counted by their reason.
+	int32 counts[kRefusalCount] = {};
+	Refusal lastWhy = kRefusedNone;
+	std::vector<SpecialChapter> chapters(rows.size());
+	KFCReplaceEngine::DocsAfterWrite docsAfter;		// what each document is left as, on every way out from here
+	size_t toWrite = 0;
+	for (size_t c = 0; c < rows.size(); ++c)
+	{
+		SpecialChapter& chapter = chapters[c];
+		chapter.chapterIdx = rows[c].chapter;
+		for (size_t k = 0; k < rows[c].hits.size(); ++k)
+		{
+			UID item = kInvalidUID;
+			const Refusal why = CheckItem(info, params, chapter.chapterIdx, rows[c].hits[k], true, chapter.docRef, item);
+			if (why != kRefusedNone)
+			{
+				++counts[why];
+				lastWhy = why;
+				continue;
+			}
+			chapter.todo.push_back(std::make_pair(rows[c].hits[k], item));
+		}
+		toWrite += chapter.todo.size();
+		// Its "unsaved" flag read now when it has rows to write (a document whose flag was not read is never made clean).
+		if (chapter.docRef.GetDataBase() != nil)
+			docsAfter.Reached(chapter.docRef, !chapter.todo.empty());
+	}
+	if (toWrite == 0)
+	{
+		if (total == 1)
+			Refuse(outStatus, info, RowSentence(info, lastWhy, params));
+		else
+		{
+			PMString why("none of the ");
+			why.AppendNumber(static_cast<int32>(total));
+			why.Append(" selected rows can be changed - ");
+			AppendRefusals(why, info, params, counts);
+			why.Append(".");
+			Refuse(outStatus, info, why);
+		}
+		return false;
+	}
+	// EVERY DOCUMENT TO WRITE STILL OPEN once the last row is checked (the object Replace's rule - KFCObjectReplace.cpp).
+	for (size_t c = 0; c < chapters.size(); ++c)
+	{
+		if (!chapters[c].todo.empty() && !KFCBookScope::IsDocStillOpen(chapters[c].docRef))
+		{
+			Refuse(outStatus, info, PMString("a document of the selected rows has been closed - nothing was changed."));
+			return false;
+		}
+	}
+
+	// BEFORE THE WRITE: each item as it reads now (what tells the rows it changed - E7), and the other rows of its document
+	// the write can move (spec OBJ-12 - the rows written are not among them: their marks are their own).
+	for (size_t c = 0; c < chapters.size(); ++c)
+	{
+		SpecialChapter& chapter = chapters[c];
+		if (chapter.todo.empty())
+			continue;
+		IDataBase* const db = chapter.docRef.GetDataBase();
+		std::set<UID> items;
+		for (size_t k = 0; k < chapter.todo.size(); ++k)
+		{
+			const UID item = chapter.todo[k].second;
+			items.insert(item);
+			uint64 print = 0;
+			uint32 length = 0;
+			(void)KFCObjectSearch::Fingerprint(UIDRef(db, item), print, length);
+			chapter.prints.push_back(print);
+			chapter.printLengths.push_back(length);
+			chapter.orders.push_back(info.order ? KFCPageItemFacts::StackIndex(db, item) : -1);
+		}
+		KFCObjectReplace::RowsTheWriteCanMove(chapter.chapterIdx, db, items, chapter.watched);
+		chapter.watched.erase(std::remove_if(chapter.watched.begin(), chapter.watched.end(),
+			[&items](const std::pair<int32, UID>& row) { return items.count(row.second) > 0; }), chapter.watched.end());
+	}
+
+	// RECORDED FOR THE PANEL'S FOLLOWING OF UNDO (E6): one step, every item read before the write - an Arrange's with its
+	// place in its stack (its print does not move); a Delete's Undo brings the item back, its Redo takes it away again.
+	size_t documents = 0;
+	std::vector<int32> chapterIdxs;
+	for (size_t c = 0; c < chapters.size(); ++c)
+	{
+		if (chapters[c].todo.empty())
+			continue;
+		++documents;
+		chapterIdxs.push_back(chapters[c].chapterIdx);
+	}
+	KFCUndoFollow::StepRecorder recorder(chapterIdxs);
+	recorder.SetName(info.name);
+	for (size_t c = 0; c < chapters.size(); ++c)
+		for (size_t k = 0; k < chapters[c].todo.size(); ++k)
+			recorder.RecordItem(chapters[c].chapterIdx, chapters[c].todo[k].second, info.order);
+	KFCReplaceEngine::WriteStep step;
+	if (!KFCReplaceEngine::BeginWriteStep(documents > 1, step, info.stepKey, "KFC Special Operation"))
+	{
+		Refuse(outStatus, info, PMString("InDesign would not start a command sequence - nothing was changed."));
+		return false;
+	}
+	// THE WRITE: InDesign's own Facade over each document's items (E5). An error standing ends the step by it: the whole
+	// step goes back, and no row is marked over a write InDesign takes back.
+	bool errorStands = false;
+	size_t changedCount = 0;
+	for (size_t c = 0; c < chapters.size() && !errorStands; ++c)
+	{
+		SpecialChapter& chapter = chapters[c];
+		if (chapter.todo.empty())
+			continue;
+		IDataBase* const db = chapter.docRef.GetDataBase();
+		UIDList items(db);
+		for (size_t k = 0; k < chapter.todo.size(); ++k)
+			items.Append(chapter.todo[k].second);
+		const ErrorCode done = WriteDocument(info, params, chapter.docRef, items);
+		if (done != kSuccess || ErrorUtils::PMGetGlobalErrorCode() != kSuccess)
+		{
+			KFC_DIAG_LOG("SPECIAL op=%d chapter=%d err=%d global=%d", info.op, chapter.chapterIdx, (int)done,
+				(int)ErrorUtils::PMGetGlobalErrorCode());
+			errorStands = true;
+			break;
+		}
+		// WHAT IT CHANGED (E7), read in the step: an item it left as it was is counted, not marked.
+		for (size_t k = 0; k < chapter.todo.size(); ++k)
+		{
+			if (!WriteChanged(info, db, chapter.todo[k].second, chapter.prints[k], chapter.printLengths[k], chapter.orders[k]))
+			{
+				++counts[kRefusedUnchanged];
+				continue;
+			}
+			chapter.changed.push_back(k);
+			chapter.changedItems.insert(chapter.todo[k].second);
+		}
+		changedCount += chapter.changed.size();
+	}
+	const bool ok = changedCount > 0 && !errorStands;
+	if (ok)
+		for (size_t c = 0; c < chapters.size(); ++c)
+			if (!chapters[c].changed.empty())
+				KFCUndoFollow::MarkWrite(chapters[c].docRef.GetDataBase());		// in this step, so its Undo / Redo is heard
+	// Kept, or taken back whole when nothing changed or an error stands; the "unsaved" flags are DocsAfterWrite's.
+	KFCReplaceEngine::EndWriteStep(step, ok);
+	if (!ok)
+	{
+		KFCResultModel::RollBackRows();
+		if (errorStands)
+		{
+			PMString why("InDesign's ");
+			why.Append(info.name);
+			why.Append(" stopped with an error - nothing was changed.");
+			Refuse(outStatus, info, why);
+		}
+		else
+		{
+			PMString why("nothing was changed - ");
+			AppendRefusals(why, info, params, counts);
+			why.Append(".");
+			Refuse(outStatus, info, why);
+		}
+		return false;
+	}
+	// E7: each changed row marked - its word, its eye, its place read again, its fingerprint (a Delete's: gone); the other
+	// rows the write moved given the prints it left; the documents told.
+	for (size_t c = 0; c < chapters.size(); ++c)
+	{
+		const SpecialChapter& chapter = chapters[c];
+		if (chapter.changed.empty())
+			continue;
+		IDataBase* const db = chapter.docRef.GetDataBase();
+		for (size_t n = 0; n < chapter.changed.size(); ++n)
+		{
+			const std::pair<int32, UID>& row = chapter.todo[chapter.changed[n]];
+			if (info.kind == kWriteGone)
+			{
+				KFCResultModel::MarkItemSpecial(chapter.chapterIdx, row.first, info.op, 0, 0, nil);
+				continue;
+			}
+			uint64 print = 0;
+			uint32 length = 0;
+			(void)KFCObjectSearch::Fingerprint(UIDRef(db, row.second), print, length);
+			KFCResultModel::Hit place;
+			const bool read = KFCObjectSearch::ReadItemPlace(chapter.docRef, row.second, place);
+			KFCResultModel::MarkItemSpecial(chapter.chapterIdx, row.first, info.op, print, length, read ? &place : nil);
+		}
+		KFCObjectReplace::FollowRowsTheWriteMoved(chapter.chapterIdx, db, chapter.watched, chapter.changedItems);
+		KFC_DIAG_NOTE_WRITE(chapter.docRef);
+		docsAfter.Wrote(chapter.docRef);		// a chapter of ours has to be seen and saved
+	}
+	recorder.Keep();
+
+	// E8: "<operation>: 3 objects - ID:259, ID:260, ID:261." - the items' IDs, up to kNamedIDs; several documents named
+	// before their IDs; the rows left as they were counted after.
+	const size_t kNamedIDs = 8;
+	outStatus = info.name;
+	outStatus.Append(": ");
+	outStatus.AppendNumber(static_cast<int32>(changedCount));
+	if (changedCount < total)
+	{
+		outStatus.Append(" of ");
+		outStatus.AppendNumber(static_cast<int32>(total));
+	}
+	outStatus.Append(changedCount == 1 && total == 1 ? " object" : " objects");
+	size_t writtenDocuments = 0;
+	for (size_t c = 0; c < chapters.size(); ++c)
+		if (!chapters[c].changed.empty())
+			++writtenDocuments;
+	if (writtenDocuments > 1)
+	{
+		outStatus.Append(" in ");
+		outStatus.AppendNumber(static_cast<int32>(writtenDocuments));
+		outStatus.Append(" documents");
+	}
+	if (info.op == kKFCSpecialMoveToLayer)
+	{
+		outStatus.Append(" to \"");
+		outStatus.Append(params.text);
+		outStatus.Append("\"");
+	}
+	outStatus.Append(" - ");
+	size_t named = 0;
+	bool firstDocument = true;
+	for (size_t c = 0; c < chapters.size() && named < kNamedIDs; ++c)
+	{
+		const SpecialChapter& chapter = chapters[c];
+		if (chapter.changed.empty())
+			continue;
+		if (writtenDocuments > 1)
+		{
+			if (!firstDocument)
+				outStatus.Append("; ");
+			PMString docName;
+			int32 rowsNow = 0;
+			if (KFCResultModel::GetChapterDisplay(chapter.chapterIdx, docName, rowsNow))
+			{
+				outStatus.Append(docName);
+				outStatus.Append(" ");
+			}
+		}
+		firstDocument = false;
+		for (size_t n = 0; n < chapter.changed.size() && named < kNamedIDs; ++n)
+		{
+			if (n > 0 || (writtenDocuments <= 1 && named > 0))
+				outStatus.Append(", ");
+			outStatus.Append("ID:");
+			outStatus.AppendNumber(static_cast<int32>(chapter.todo[chapter.changed[n]].second.Get()));
+			++named;
+		}
+	}
+	if (changedCount > kNamedIDs)
+		outStatus.Append(", ...");
+	outStatus.Append(".");
+	if (changedCount < total)
+	{
+		outStatus.Append(" Left as they were: ");
+		AppendRefusals(outStatus, info, params, counts);
+		outStatus.Append(".");
+	}
+	outStatus.SetTranslatable(kFalse);
+	return true;
+}
+
+// End, KFCObjectSpecial.cpp.

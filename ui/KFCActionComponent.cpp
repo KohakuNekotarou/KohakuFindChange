@@ -31,6 +31,8 @@
 #include "IActionManager.h"		// PerformAction - Open Find/Change runs InDesign's own Edit > Find/Change
 #include "IActionStateList.h"	// UpdateActionStates: the items' states, check marks and names
 #include "IApplication.h"		// QueryActionManager
+#include "IDocumentLayer.h"		// GetName - Move to Active Layer's layer
+#include "ILayerUIUtils.h"		// QueryContextActiveLayer - the layer the Layers panel has active (its own menu's target)
 #include "ITreeNodeIDData.h"	// the row a right-click menu was popped over - its widget's NodeID
 #include "FindChangeID.h"		// kFindDialogActionID - Edit > Find/Change
 
@@ -192,6 +194,89 @@ bool RightClickedTier(IPMUnknown* widget, int32& outTier)
 		return false;
 	outTier = tier;
 	return true;
+}
+
+// THE ACTIONS OF AN OBJECT ROW'S OTHER SPECIAL OPERATIONS (docs/superpowers/specs/2026-10-17-kfc-object-special-operations-design.md):
+// each stands for one KFCSpecialOp (KFCModelTypes.h) - one door for them all in DoAction (DoSpecial) and one in
+// UpdateActionStates (the grey).
+const struct SpecialAction
+{
+	uint32	action;
+	int32	op;
+} kSpecialActions[] =
+{
+	{ kKFCFillFramePropActionID, kKFCSpecialFillFrameProp },
+	{ kKFCFitContentPropActionID, kKFCSpecialFitContentProp },
+	{ kKFCContentAwareFitActionID, kKFCSpecialContentAwareFit },
+	{ kKFCFitFrameToContentActionID, kKFCSpecialFitFrameToContent },
+	{ kKFCFitContentToFrameActionID, kKFCSpecialFitContentToFrame },
+	{ kKFCCenterContentActionID, kKFCSpecialCenterContent },
+	{ kKFCBringToFrontActionID, kKFCSpecialBringToFront },
+	{ kKFCBringForwardActionID, kKFCSpecialBringForward },
+	{ kKFCSendBackwardActionID, kKFCSpecialSendBackward },
+	{ kKFCSendToBackActionID, kKFCSpecialSendToBack },
+	{ kKFCRotate90CWActionID, kKFCSpecialRotate90CW },
+	{ kKFCRotate90CCWActionID, kKFCSpecialRotate90CCW },
+	{ kKFCRotate180ActionID, kKFCSpecialRotate180 },
+	{ kKFCFlipHorizontalActionID, kKFCSpecialFlipHorizontal },
+	{ kKFCFlipVerticalActionID, kKFCSpecialFlipVertical },
+	{ kKFCRedefineScalingActionID, kKFCSpecialRedefineScaling },
+	{ kKFCClearTransformationsActionID, kKFCSpecialClearTransformations },
+	{ kKFCLockActionID, kKFCSpecialLock },
+	{ kKFCUnlockActionID, kKFCSpecialUnlock },
+	{ kKFCHideActionID, kKFCSpecialHide },
+	{ kKFCShowActionID, kKFCSpecialShow },
+	{ kKFCMoveToLayerActionID, kKFCSpecialMoveToLayer },
+	{ kKFCClearStyleOverridesActionID, kKFCSpecialClearStyleOverrides },
+	{ kKFCDeleteActionID, kKFCSpecialDelete },
+};
+
+// The special operation an action stands for - kKFCSpecialNone for any other action.
+int32 SpecialOpOf(const ActionID& action)
+{
+	for (size_t k = 0; k < sizeof(kSpecialActions) / sizeof(kSpecialActions[0]); ++k)
+		if (kSpecialActions[k].action == static_cast<uint32>(action.Get()))
+			return kSpecialActions[k].op;
+	return kKFCSpecialNone;
+}
+
+// THE LAYER THE LAYERS PANEL HAS ACTIVE in the front document, by its name (Move to Active Layer - the spec's E11: the
+// author's "the layer selected in the Layers panel"). Asked the way the panel's own menu finds its target layer
+// (layerpanel/LayerPanelMenuComponent.cpp, QueryTargetLayer: ILayerUIUtils::QueryContextActiveLayer). false = none - no
+// document in front.
+bool ActiveLayerName(IActiveContext* ac, PMString& outName)
+{
+	outName.Clear();
+	outName.SetTranslatable(kFalse);
+	Utils<ILayerUIUtils> layerUI;
+	if (ac == nil || !layerUI)
+		return false;
+	InterfacePtr<IDocumentLayer> layer(layerUI->QueryContextActiveLayer(ac));
+	if (layer == nil)
+		return false;
+	outName = layer->GetName();
+	outName.SetTranslatable(kFalse);
+	return !outName.IsEmpty();
+}
+
+// AN OBJECT ROW'S SPECIAL OPERATION: the row the menu was popped over - or the rows selected together, when it is one of
+// them (RowsOfRightClick, as Replace and Create Outlines) - written where they stand (KFCResultTree::SpecialRows). Move to
+// Active Layer takes the active layer's name with it (ActiveLayerName). No object row (the action pressed by its ActionID):
+// nothing.
+void DoSpecial(IActiveContext* ac, int32 op, IPMUnknown* widget)
+{
+	int32 chapter = -1, hit = -1;
+	if (!RightClickedHit(widget, chapter, hit) || KFCResults()->GetHitItem(chapter, hit) == kInvalidUID)
+		return;
+	KFCSpecialParams params;
+	if (op == kKFCSpecialMoveToLayer && !ActiveLayerName(ac, params.text))
+	{
+		PMString why("Move to Active Layer: no layer is active - bring a document forward and pick its layer in the Layers panel.");
+		why.SetTranslatable(kFalse);
+		KFCResultTree::ShowStatus(why);
+		return;
+	}
+	(void)KFCResultTree::SpecialRows(op, KFCResultTree::RowsOfRightClick(chapter, hit), params);
 }
 }
 
@@ -519,6 +604,10 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 
 		default:
 		{
+			// An object row's other Special Operations - one door for them all (SpecialOpOf's table, DoSpecial).
+			const int32 op = SpecialOpOf(actionID);
+			if (op != kKFCSpecialNone)
+				DoSpecial(ac, op, widget);
 			break;
 		}
 	}
@@ -552,7 +641,7 @@ void KFCActionComponent::DoAbout()
 
 /* UpdateActionStates
 */
-void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionStateList* listToUpdate, GSysPoint /*mousePoint*/, IPMUnknown* widget)
+void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList* listToUpdate, GSysPoint /*mousePoint*/, IPMUnknown* widget)
 {
 	// A run of ours is standing - which ones count is KFCRunGuard::IsAnyRunning's to say (a row's Replace among them,
 	// with no bar of its own). Each runs the message loop - a modal progress bar pumps events, a chapter being opened
@@ -822,6 +911,20 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			}
 			default:
 			{
+				// An object row's other Special Operations: while the row - or one of the rows selected together with it - can
+				// take the operation (CanSpecialAny - their doors, read only: greyed when none can, kept on the menu - SET-11);
+				// Move to Active Layer also wants a layer active in the front document. What the write refuses it says on the
+				// status line, row by row counted.
+				const int32 op = SpecialOpOf(action);
+				if (op == kKFCSpecialNone)
+					break;
+				int32 chapter = -1, hit = -1;
+				PMString layer;
+				const bool enable = RightClickedHit(widget, chapter, hit)
+					&& KFCResults()->GetHitItem(chapter, hit) != kInvalidUID
+					&& (op != kKFCSpecialMoveToLayer || ActiveLayerName(ac, layer))
+					&& KFCResultTree::CanSpecialAny(op, KFCResultTree::RowsOfRightClick(chapter, hit));
+				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 				break;
 			}
 		}

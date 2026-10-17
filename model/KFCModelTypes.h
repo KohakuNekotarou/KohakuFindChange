@@ -76,10 +76,72 @@ namespace KFCResultModel
 		bool			replaced;
 		bool			outlined;	// written as outlines (Hit::outlined): the row reads "Outlined" for "Changed"
 		bool			kept;		// the row eye (Hit::kept - docs/superpowers/specs/2026-10-17-kfc-row-eye-keep-design.md)
+		int32			special;	// the special operation KFC last wrote the row's item with (Hit::special - a KFCSpecialOp;
+									// 0 = none): the row reads its word first (the UI half's KFCSpecialRowWord)
 
-		RowDisplay() : replaced(false), outlined(false), kept(false) {}
+		RowDisplay() : replaced(false), outlined(false), kept(false), special(0) {}
 	};
 }
+
+/** AN OBJECT ROW'S SPECIAL OPERATIONS (docs/superpowers/specs/2026-10-17-kfc-object-special-operations-design.md - the
+    author, 2026-10-17): InDesign's own Object menu commands over the rows selected together, across spreads and documents
+    (KFCObjectSpecial). The number crosses the boundary - IKFCRuns::SpecialRows, RowDisplay::special - so it is FIXED:
+    a new operation is appended before kKFCSpecialOpCount, none is renumbered. (Create Outlines is not one of them: it has
+    its own door and mark - KFCObjectOutline, Hit::outlined.) */
+enum KFCSpecialOp
+{
+	kKFCSpecialNone = 0,
+	// Object > Fitting
+	kKFCSpecialFillFrameProp = 1,
+	kKFCSpecialFitContentProp,
+	kKFCSpecialContentAwareFit,
+	kKFCSpecialFitFrameToContent,
+	kKFCSpecialFitContentToFrame,
+	kKFCSpecialCenterContent,
+	// Object > Arrange
+	kKFCSpecialBringToFront,
+	kKFCSpecialBringForward,
+	kKFCSpecialSendBackward,
+	kKFCSpecialSendToBack,
+	// Object > Transform, with no value to ask
+	kKFCSpecialRotate90CW,
+	kKFCSpecialRotate90CCW,
+	kKFCSpecialRotate180,
+	kKFCSpecialFlipHorizontal,
+	kKFCSpecialFlipVertical,
+	kKFCSpecialRedefineScaling,
+	kKFCSpecialClearTransformations,
+	// Object > Lock / Unlock, Hide / Show
+	kKFCSpecialLock,
+	kKFCSpecialUnlock,
+	kKFCSpecialHide,
+	kKFCSpecialShow,
+	// the Layers panel's active layer, the Object Styles panel's Clear Overrides, Edit > Clear
+	kKFCSpecialMoveToLayer,
+	kKFCSpecialClearStyleOverrides,
+	kKFCSpecialDelete,
+	// Object > Transform with a value asked first (a dialog of the UI half's)
+	kKFCSpecialMove,
+	kKFCSpecialScale,
+	kKFCSpecialRotate,
+	kKFCSpecialShear,
+	// a script of the user's run over each row's object
+	kKFCSpecialRunScript,
+	kKFCSpecialOpCount
+};
+
+/** WHAT A SPECIAL OPERATION IS GIVEN besides its rows (IKFCRuns::SpecialRows). x, y: Move - the horizontal and vertical
+    distances in points (right and down positive); Scale - the horizontal and vertical percentages; Rotate, Shear - the
+    angle in degrees in x (counter-clockwise positive, as InDesign's dialogs have it). text: Move to Active Layer - the
+    layer's name; Run Script - the script. */
+struct KFCSpecialParams
+{
+	double		x;
+	double		y;
+	PMString	text;
+
+	KFCSpecialParams() : x(0.0), y(0.0) {}
+};
 
 /** Where the overset "+" locator for a text position is. 'found' is false when nothing in the
     thread (or any enclosing thread) is placed, so there is no on-page location to point at. */

@@ -786,6 +786,176 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCCreateOutlinesMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// ----- The other Special Operations (docs/superpowers/specs/2026-10-17-kfc-object-special-operations-design.md E2) -----
+		// After InDesign's own Object menu: a rule under Create Outlines; the Fitting, Arrange and Transform submenus; a rule;
+		// Lock, Unlock, Hide, Show; a rule; Move to Active Layer, Clear Object Style Overrides; a rule; Delete. Each item's
+		// action stands for one KFCSpecialOp (KFCActionComponent.cpp's table) - the rows' objects written where they stand.
+		kKFCSpecialSep1ActionID,
+		kKFCSpecialOpsSubmenuPath kSDKDefDelimiterAndSeparatorPath,
+		kKFCSpecialSep1MenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		// Fitting (a submenu one level down: the same idiom).
+		0,
+		kKFCFittingSubmenuPath kSDKDefDelimitMenuPath
+		kKFCFittingSubmenuPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCFillFramePropActionID,
+		kKFCFittingSubmenuPath
+		kKFCFillFramePropMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCFitContentPropActionID,
+		kKFCFittingSubmenuPath
+		kKFCFitContentPropMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCContentAwareFitActionID,
+		kKFCFittingSubmenuPath
+		kKFCContentAwareFitMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCFitFrameToContentActionID,
+		kKFCFittingSubmenuPath
+		kKFCFitFrameToContentMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCFitContentToFrameActionID,
+		kKFCFittingSubmenuPath
+		kKFCFitContentToFrameMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCCenterContentActionID,
+		kKFCFittingSubmenuPath
+		kKFCCenterContentMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		// Arrange.
+		0,
+		kKFCArrangeSubmenuPath kSDKDefDelimitMenuPath
+		kKFCArrangeSubmenuPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCBringToFrontActionID,
+		kKFCArrangeSubmenuPath
+		kKFCBringToFrontMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCBringForwardActionID,
+		kKFCArrangeSubmenuPath
+		kKFCBringForwardMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCSendBackwardActionID,
+		kKFCArrangeSubmenuPath
+		kKFCSendBackwardMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCSendToBackActionID,
+		kKFCArrangeSubmenuPath
+		kKFCSendToBackMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		// Transform: the turns and flips, a rule, the two that put a transformation back.
+		0,
+		kKFCTransformSubmenuPath kSDKDefDelimitMenuPath
+		kKFCTransformSubmenuPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCRotate90CWActionID,
+		kKFCTransformSubmenuPath
+		kKFCRotate90CWMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCRotate90CCWActionID,
+		kKFCTransformSubmenuPath
+		kKFCRotate90CCWMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCRotate180ActionID,
+		kKFCTransformSubmenuPath
+		kKFCRotate180MenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCFlipHorizontalActionID,
+		kKFCTransformSubmenuPath
+		kKFCFlipHorizontalMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCFlipVerticalActionID,
+		kKFCTransformSubmenuPath
+		kKFCFlipVerticalMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCTransformSep2ActionID,
+		kKFCTransformSubmenuPath kSDKDefDelimiterAndSeparatorPath,
+		kKFCTransformSep2MenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCRedefineScalingActionID,
+		kKFCTransformSubmenuPath
+		kKFCRedefineScalingMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCClearTransformationsActionID,
+		kKFCTransformSubmenuPath
+		kKFCClearTransformationsMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		// Lock, Unlock, Hide, Show.
+		kKFCSpecialSep2ActionID,
+		kKFCSpecialOpsSubmenuPath kSDKDefDelimiterAndSeparatorPath,
+		kKFCSpecialSep2MenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCLockActionID,
+		kKFCSpecialOpsSubmenuPath
+		kKFCLockMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCUnlockActionID,
+		kKFCSpecialOpsSubmenuPath
+		kKFCUnlockMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCHideActionID,
+		kKFCSpecialOpsSubmenuPath
+		kKFCHideMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCShowActionID,
+		kKFCSpecialOpsSubmenuPath
+		kKFCShowMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		// Move to Active Layer, Clear Object Style Overrides.
+		kKFCSpecialSep3ActionID,
+		kKFCSpecialOpsSubmenuPath kSDKDefDelimiterAndSeparatorPath,
+		kKFCSpecialSep3MenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCMoveToLayerActionID,
+		kKFCSpecialOpsSubmenuPath
+		kKFCMoveToLayerMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCClearStyleOverridesActionID,
+		kKFCSpecialOpsSubmenuPath
+		kKFCClearStyleOverridesMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		// Delete, last.
+		kKFCSpecialSep4ActionID,
+		kKFCSpecialOpsSubmenuPath kSDKDefDelimiterAndSeparatorPath,
+		kKFCSpecialSep4MenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCDeleteActionID,
+		kKFCSpecialOpsSubmenuPath
+		kKFCDeleteMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 	}
 };
 
@@ -1063,6 +1233,225 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKFCActionComponentBoss,
 		kKFCCreateOutlinesActionID,
 		kKFCCreateOutlinesMenuKey,	// "Create Outlines"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// The other Special Operations - an object row's (docs/superpowers/specs/2026-10-17-kfc-object-special-operations-design.md).
+		// kCustomEnabling: an object row's alone, greyed when none of the rows can take it (CanSpecialAny); what the write
+		// refuses it says on the status line, row by row counted.
+		kKFCActionComponentBoss,
+		kKFCFillFramePropActionID,
+		kKFCFillFramePropMenuKey,
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCFitContentPropActionID,
+		kKFCContentProportionalMenuKey,
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCContentAwareFitActionID,
+		kKFCContentAwareFitMenuKey,
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCFitFrameToContentActionID,
+		kKFCFrameToContentMenuKey,
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCFitContentToFrameActionID,
+		kKFCFitContentToFrameMenuKey,
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCCenterContentActionID,
+		kKFCCenterContentMenuKey,
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCBringToFrontActionID,
+		kKFCBringToFrontMenuKey,
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCBringForwardActionID,
+		kKFCBringForwardMenuKey,
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCSendBackwardActionID,
+		kKFCSendBackwardMenuKey,
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCSendToBackActionID,
+		kKFCSendToBackMenuKey,
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCRotate90CWActionID,
+		kKFCRotate90CWMenuKey,
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCRotate90CCWActionID,
+		kKFCRotate90CCWMenuKey,
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCRotate180ActionID,
+		kKFCRotate180MenuKey,
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCFlipHorizontalActionID,
+		kKFCFlipHorizontalMenuKey,
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCFlipVerticalActionID,
+		kKFCFlipVerticalMenuKey,
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCRedefineScalingActionID,
+		kKFCRedefineScalingMenuKey,
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCClearTransformationsActionID,
+		kKFCClearTransformationsMenuKey,
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCLockActionID,
+		kKFCLockMenuKey,
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCUnlockActionID,
+		kKFCUnlockMenuKey,
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCHideActionID,
+		kKFCHideMenuKey,
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCShowActionID,
+		kKFCShowMenuKey,
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCMoveToLayerActionID,
+		kKFCMoveToLayerMenuKey,
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCClearStyleOverridesActionID,
+		kKFCClearStyleOverridesMenuKey,
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCDeleteActionID,
+		kKFCDeleteMenuKey,
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,

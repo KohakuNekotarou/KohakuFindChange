@@ -353,6 +353,46 @@ DECLARE_PMID(kActionIDSpace, kKFCCreateOutlinesActionID, kKFCUIPrefix + 56)
 // "put back with the copy" - the IDs and keys keep the first name, Restore Original): the copy the row's Replace took put back
 // (KFCResultTree::RestoreRows, KFCReplaceEngine::RestoreHits). + 57: the next after the highest spent.
 DECLARE_PMID(kActionIDSpace, kKFCRestoreOriginalActionID, kKFCUIPrefix + 57)
+// An OBJECT row's other Special Operations (docs/superpowers/specs/2026-10-17-kfc-object-special-operations-design.md - the
+// author, 2026-10-17): InDesign's own Object menu commands over the rows' objects across spreads (KFCResultTree::SpecialRows,
+// KFCObjectSpecial). Each action stands for one KFCSpecialOp (KFCActionComponent.cpp's table). + 58 on: the next after the
+// highest spent.
+// ...Fitting:
+DECLARE_PMID(kActionIDSpace, kKFCFillFramePropActionID, kKFCUIPrefix + 58)
+DECLARE_PMID(kActionIDSpace, kKFCFitContentPropActionID, kKFCUIPrefix + 59)
+DECLARE_PMID(kActionIDSpace, kKFCContentAwareFitActionID, kKFCUIPrefix + 60)
+DECLARE_PMID(kActionIDSpace, kKFCFitFrameToContentActionID, kKFCUIPrefix + 61)
+DECLARE_PMID(kActionIDSpace, kKFCFitContentToFrameActionID, kKFCUIPrefix + 62)
+DECLARE_PMID(kActionIDSpace, kKFCCenterContentActionID, kKFCUIPrefix + 63)
+// ...Arrange:
+DECLARE_PMID(kActionIDSpace, kKFCBringToFrontActionID, kKFCUIPrefix + 64)
+DECLARE_PMID(kActionIDSpace, kKFCBringForwardActionID, kKFCUIPrefix + 65)
+DECLARE_PMID(kActionIDSpace, kKFCSendBackwardActionID, kKFCUIPrefix + 66)
+DECLARE_PMID(kActionIDSpace, kKFCSendToBackActionID, kKFCUIPrefix + 67)
+// ...Transform, with no value to ask:
+DECLARE_PMID(kActionIDSpace, kKFCRotate90CWActionID, kKFCUIPrefix + 68)
+DECLARE_PMID(kActionIDSpace, kKFCRotate90CCWActionID, kKFCUIPrefix + 69)
+DECLARE_PMID(kActionIDSpace, kKFCRotate180ActionID, kKFCUIPrefix + 70)
+DECLARE_PMID(kActionIDSpace, kKFCFlipHorizontalActionID, kKFCUIPrefix + 71)
+DECLARE_PMID(kActionIDSpace, kKFCFlipVerticalActionID, kKFCUIPrefix + 72)
+DECLARE_PMID(kActionIDSpace, kKFCRedefineScalingActionID, kKFCUIPrefix + 73)
+DECLARE_PMID(kActionIDSpace, kKFCClearTransformationsActionID, kKFCUIPrefix + 74)
+// ...Lock / Unlock, Hide / Show:
+DECLARE_PMID(kActionIDSpace, kKFCLockActionID, kKFCUIPrefix + 75)
+DECLARE_PMID(kActionIDSpace, kKFCUnlockActionID, kKFCUIPrefix + 76)
+DECLARE_PMID(kActionIDSpace, kKFCHideActionID, kKFCUIPrefix + 77)
+DECLARE_PMID(kActionIDSpace, kKFCShowActionID, kKFCUIPrefix + 78)
+// ...Move to Active Layer, Clear Object Style Overrides, Delete:
+DECLARE_PMID(kActionIDSpace, kKFCMoveToLayerActionID, kKFCUIPrefix + 79)
+DECLARE_PMID(kActionIDSpace, kKFCClearStyleOverridesActionID, kKFCUIPrefix + 80)
+DECLARE_PMID(kActionIDSpace, kKFCDeleteActionID, kKFCUIPrefix + 81)
+// ...and the rules between their groups: in Special Operations (under Create Outlines, above Lock, above Move to Active
+// Layer, above Delete) and in Transform (above Redefine Scaling as 100%).
+DECLARE_PMID(kActionIDSpace, kKFCSpecialSep1ActionID, kKFCUIPrefix + 82)
+DECLARE_PMID(kActionIDSpace, kKFCSpecialSep2ActionID, kKFCUIPrefix + 83)
+DECLARE_PMID(kActionIDSpace, kKFCSpecialSep3ActionID, kKFCUIPrefix + 84)
+DECLARE_PMID(kActionIDSpace, kKFCSpecialSep4ActionID, kKFCUIPrefix + 85)
+DECLARE_PMID(kActionIDSpace, kKFCTransformSep2ActionID, kKFCUIPrefix + 86)
 
 
 // WidgetIDs:
@@ -476,6 +516,35 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 #define kKFCCreateOutlinesMenuKey	kKFCStringPrefix "kKFCCreateOutlinesMenuKey"
 // ...and a text row's Restore Original (measured against every other key - key_collisions.py).
 #define kKFCRestoreOriginalMenuKey	kKFCStringPrefix "kKFCRestoreOriginalMenuKey"
+// ...and an object row's other Special Operations - InDesign's own English command names ("Degrees" for the degree sign: the
+// string table is ASCII) (measured against every other key - key_collisions.py).
+#define kKFCFillFramePropMenuKey			kKFCStringPrefix "kKFCFillFramePropMenuKey"
+// (Not "FitContentPropMenuKey" - one length, one character sum with kKFCQueryOrderFileTypeKey; nor "FitFrameToContent"
+// below - the same letters as Fit Content to Frame's key: a pair a string lookup has been seen to take for each other -
+// key_collisions.py.)
+#define kKFCContentProportionalMenuKey		kKFCStringPrefix "kKFCContentProportionalMenuKey"
+#define kKFCContentAwareFitMenuKey			kKFCStringPrefix "kKFCContentAwareFitMenuKey"
+#define kKFCFrameToContentMenuKey			kKFCStringPrefix "kKFCFrameToContentMenuKey"
+#define kKFCFitContentToFrameMenuKey		kKFCStringPrefix "kKFCFitContentToFrameMenuKey"
+#define kKFCCenterContentMenuKey			kKFCStringPrefix "kKFCCenterContentMenuKey"
+#define kKFCBringToFrontMenuKey				kKFCStringPrefix "kKFCBringToFrontMenuKey"
+#define kKFCBringForwardMenuKey				kKFCStringPrefix "kKFCBringForwardMenuKey"
+#define kKFCSendBackwardMenuKey				kKFCStringPrefix "kKFCSendBackwardMenuKey"
+#define kKFCSendToBackMenuKey				kKFCStringPrefix "kKFCSendToBackMenuKey"
+#define kKFCRotate90CWMenuKey				kKFCStringPrefix "kKFCRotate90CWMenuKey"
+#define kKFCRotate90CCWMenuKey				kKFCStringPrefix "kKFCRotate90CCWMenuKey"
+#define kKFCRotate180MenuKey				kKFCStringPrefix "kKFCRotate180MenuKey"
+#define kKFCFlipHorizontalMenuKey			kKFCStringPrefix "kKFCFlipHorizontalMenuKey"
+#define kKFCFlipVerticalMenuKey				kKFCStringPrefix "kKFCFlipVerticalMenuKey"
+#define kKFCRedefineScalingMenuKey			kKFCStringPrefix "kKFCRedefineScalingMenuKey"
+#define kKFCClearTransformationsMenuKey		kKFCStringPrefix "kKFCClearTransformationsMenuKey"
+#define kKFCLockMenuKey						kKFCStringPrefix "kKFCLockMenuKey"
+#define kKFCUnlockMenuKey					kKFCStringPrefix "kKFCUnlockMenuKey"
+#define kKFCHideMenuKey						kKFCStringPrefix "kKFCHideMenuKey"
+#define kKFCShowMenuKey						kKFCStringPrefix "kKFCShowMenuKey"
+#define kKFCMoveToLayerMenuKey				kKFCStringPrefix "kKFCMoveToLayerMenuKey"
+#define kKFCClearStyleOverridesMenuKey		kKFCStringPrefix "kKFCClearStyleOverridesMenuKey"
+#define kKFCDeleteMenuKey					kKFCStringPrefix "kKFCDeleteMenuKey"
 // "How to Use...": the operating reference. English in every UI language, like the rest of the
 // flyout - there is one string table, and the one thing switched to Japanese at run time is this page's
 // body (KFCLoc::JapaneseUI).
@@ -556,6 +625,11 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 // delimiter (KCM's submenus' Adobe idiom), its items take the path. The name is the words shown, as KCM's are.
 #define kKFCSpecialOpsSubmenuName			"Special Operations"
 #define kKFCSpecialOpsSubmenuPath			kKFCResultObjectMenuName kSDKDefDelimitMenuPath kKFCSpecialOpsSubmenuName
+// ...and the submenus in it, after InDesign's own Object menu (the spec's E2): Fitting, Arrange, Transform - the same idiom
+// one level down.
+#define kKFCFittingSubmenuPath				kKFCSpecialOpsSubmenuPath kSDKDefDelimitMenuPath "Fitting"
+#define kKFCArrangeSubmenuPath				kKFCSpecialOpsSubmenuPath kSDKDefDelimitMenuPath "Arrange"
+#define kKFCTransformSubmenuPath			kKFCSpecialOpsSubmenuPath kSDKDefDelimitMenuPath "Transform"
 
 // Menu item positions:
 //
@@ -627,6 +701,45 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 #define kKFCObjectReplaceMenuItemPosition		1.0
 #define kKFCSpecialOpsSubmenuPosition			2.0
 #define kKFCCreateOutlinesMenuItemPosition		1.0
+// ...and in Special Operations after it (the spec's E2 - InDesign's Object menu's order): a rule; the Fitting, Arrange and
+// Transform submenus; a rule; Lock, Unlock, Hide, Show; a rule; Move to Active Layer, Clear Object Style Overrides; a rule;
+// Delete last (the strongest - it can be undone, but it takes the object away).
+#define kKFCSpecialSep1MenuItemPosition			1.5
+#define kKFCFittingSubmenuPosition				2.0
+#define kKFCArrangeSubmenuPosition				3.0
+#define kKFCTransformSubmenuPosition			4.0
+#define kKFCSpecialSep2MenuItemPosition			4.5
+#define kKFCLockMenuItemPosition				5.0
+#define kKFCUnlockMenuItemPosition				5.1
+#define kKFCHideMenuItemPosition				5.2
+#define kKFCShowMenuItemPosition				5.3
+#define kKFCSpecialSep3MenuItemPosition			5.5
+#define kKFCMoveToLayerMenuItemPosition			6.0
+#define kKFCClearStyleOverridesMenuItemPosition	6.1
+#define kKFCSpecialSep4MenuItemPosition			7.5
+#define kKFCDeleteMenuItemPosition				8.0
+// Fitting, in InDesign's own order.
+#define kKFCFillFramePropMenuItemPosition		1.0
+#define kKFCFitContentPropMenuItemPosition		2.0
+#define kKFCContentAwareFitMenuItemPosition		3.0
+#define kKFCFitFrameToContentMenuItemPosition	4.0
+#define kKFCFitContentToFrameMenuItemPosition	5.0
+#define kKFCCenterContentMenuItemPosition		6.0
+// Arrange.
+#define kKFCBringToFrontMenuItemPosition		1.0
+#define kKFCBringForwardMenuItemPosition		2.0
+#define kKFCSendBackwardMenuItemPosition		3.0
+#define kKFCSendToBackMenuItemPosition			4.0
+// Transform: the turns and flips, a rule, then the two that put a transformation back (the ones asking a value come at
+// 1.0 - 4.5, with their own rule).
+#define kKFCRotate90CWMenuItemPosition			5.0
+#define kKFCRotate90CCWMenuItemPosition			6.0
+#define kKFCRotate180MenuItemPosition			7.0
+#define kKFCFlipHorizontalMenuItemPosition		8.0
+#define kKFCFlipVerticalMenuItemPosition		9.0
+#define kKFCTransformSep2MenuItemPosition		9.5
+#define kKFCRedefineScalingMenuItemPosition		10.0
+#define kKFCClearTransformationsMenuItemPosition	11.0
 
 
 // View (kViewRsrcType) resource IDs for the result tree's row widgets. Offset from the panel's own

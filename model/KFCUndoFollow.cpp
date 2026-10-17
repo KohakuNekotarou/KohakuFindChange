@@ -43,6 +43,7 @@
 #include "KFCRunGuard.h"		// IsAnyRunning - nothing is followed while any run of ours (the replace among them) is up
 #include "KFCSearchEngine.h"	// ReadStoryVersion - a story's version
 #include "KFCObjectSearch.h"	// Fingerprint - an object row's item, before and after a write
+#include "KFCPageItemFacts.h"	// StackIndex - an item's place in its stack, before and after an Arrange
 #include "KFCTierStore.h"		// the kept tiers: their writes are kept, and followed onto their copies (the tier switch)
 #include "KFCUndoFollow.h"
 
@@ -78,7 +79,11 @@ struct ItemMoved
 	uint32		afterLength;
 	IDataBase*	now;
 	bool		afterGone;	// the write took the item away (Create Outlines): no print after it - gone is its "after"
-	ItemMoved() : item(kInvalidUID), before(0), beforeLength(0), after(0), afterLength(0), now(nil), afterGone(false) {}
+	bool		withOrder;	// its place in its parent's stack is asked too (Arrange - RecordItem's withOrder)...
+	int32		orderBefore;	// ...before the write (KFCPageItemFacts::StackIndex)
+	int32		orderAfter;		// ...and after it
+	ItemMoved() : item(kInvalidUID), before(0), beforeLength(0), after(0), afterLength(0), now(nil), afterGone(false),
+		withOrder(false), orderBefore(-1), orderAfter(-1) {}
 };
 
 // One kept write.
@@ -417,7 +422,11 @@ void TakeMovedItems(Step& step)
 			}
 			continue;
 		}
-		if (m.after == m.before && m.afterLength == m.beforeLength)
+		// AN ITEM MOVED IN ITS STACK (Arrange - its print does not move: the stack is its parent's): its place after it, and
+		// kept when that moved.
+		if (m.withOrder)
+			m.orderAfter = KFCPageItemFacts::StackIndex(m.now, m.item);
+		if (m.after == m.before && m.afterLength == m.beforeLength && (!m.withOrder || m.orderAfter == m.orderBefore))
 			continue;
 		step.items.push_back(m);
 	}
@@ -457,6 +466,9 @@ bool AllAt(const Step& step, bool after)
 		if (!KFCObjectSearch::Fingerprint(UIDRef(m.now, m.item), print, length))
 			return false;
 		if (print != (after ? m.after : m.before) || length != (after ? m.afterLength : m.beforeLength))
+			return false;
+		// ...and, for an item a write moved in its stack (Arrange), its place there back at "before" or at "after".
+		if (m.withOrder && KFCPageItemFacts::StackIndex(m.now, m.item) != (after ? m.orderAfter : m.orderBefore))
 			return false;
 	}
 	return !step.stories.empty() || !step.items.empty();
@@ -789,7 +801,7 @@ void KFCUndoFollow::StepRecorder::SetName(const char* name)
 		gRecording.name = name;
 }
 
-void KFCUndoFollow::StepRecorder::RecordItem(int32 chapterIdx, UID item)
+void KFCUndoFollow::StepRecorder::RecordItem(int32 chapterIdx, UID item, bool withOrder)
 {
 	if (!fOpen || item == kInvalidUID)
 		return;
@@ -804,6 +816,9 @@ void KFCUndoFollow::StepRecorder::RecordItem(int32 chapterIdx, UID item)
 	m.now = found.GetDataBase();
 	if (!KFCObjectSearch::Fingerprint(UIDRef(m.now, item), m.before, m.beforeLength))
 		return;
+	m.withOrder = withOrder;
+	if (withOrder)
+		m.orderBefore = KFCPageItemFacts::StackIndex(m.now, item);
 	gRecording.items.push_back(m);
 }
 

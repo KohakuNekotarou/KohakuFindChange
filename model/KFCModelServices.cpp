@@ -27,6 +27,7 @@
 #include "KFCHitMarker.h"
 #include "KFCObjectReplace.h"
 #include "KFCObjectOutline.h"		// OutlineRows - an object row's Special Operations > Create Outlines
+#include "KFCObjectSpecial.h"		// SpecialRows - an object row's other Special Operations
 #include "KFCOversetLocator.h"
 #include "KFCQueryScope.h"		// KFCUnderListQuery - a row operation under its own list's query (v2)
 #include "KFCQuerySequence.h"
@@ -127,6 +128,9 @@ public:
 	// (Not under the list's query - KFCUnderListQuery: a copy put back walks no story, as Create Outlines walks none.)
 	virtual bool RestoreRows(const KFCRowsByChapter& rows, PMString& outStatus) { return KFCReplaceEngine::RestoreHits(rows, outStatus); }
 	virtual bool CanOutlineHit(int32 chapterIdx, int32 hitIdx) { return KFCObjectOutline::CanOutlineHit(chapterIdx, hitIdx); }
+	// (Not under the list's query either - KFCUnderListQuery: a special operation walks no story, as Create Outlines.)
+	virtual bool SpecialRows(int32 op, const KFCRowsByChapter& rows, const KFCSpecialParams& params, PMString& outStatus) { return KFCObjectSpecial::SpecialRows(op, rows, params, outStatus); }
+	virtual bool CanSpecialHit(int32 op, int32 chapterIdx, int32 hitIdx) { return KFCObjectSpecial::CanSpecialHit(op, chapterIdx, hitIdx); }
 };
 
 CREATE_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)

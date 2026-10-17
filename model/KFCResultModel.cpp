@@ -604,14 +604,15 @@ bool KFCResultModel::GetHitRow(int32 chapterIdx, int32 hitIdx, RowDisplay& out)
 	out.replaced = h.replaced;
 	out.outlined = h.outlined;
 	out.kept = h.kept;
+	out.special = h.special;
 	return true;
 }
 
 bool KFCResultModel::SetHitKept(int32 chapterIdx, int32 hitIdx, bool kept)
 {
 	Hit* h = HitAt(chapterIdx, hitIdx);
-	if (h == nil || (kept && !h->replaced))
-		return false;		// an eye is a written row's (replaced or outlined - Hit::kept)
+	if (h == nil || (kept && !h->replaced && h->special == 0))
+		return false;		// an eye is a written row's (replaced, outlined, or given a special operation - Hit::kept)
 	h->kept = kept;
 	return true;
 }
@@ -1225,6 +1226,7 @@ int32 KFCResultModel::MergeKeptRows(std::vector<Hit>& found, std::vector<Hit>& k
 					: (h.storyUID == row.storyUID && h.textStart == row.textStart && h.textEnd == row.textEnd))
 				{
 					h.kept = true;
+					h.special = row.special;	// ...and what KFC last wrote it with (an object row's special operation)
 					again = true;
 				}
 			}
@@ -1554,6 +1556,7 @@ void KFCResultModel::MarkItemReplaced(int32 chapterIdx, int32 hitIdx, uint64 new
 		return;
 	BackUpRow(chapterIdx, hitIdx, *h);
 	h->replaced = true;
+	h->special = 0;		// (the row reads "Changed" - its last write)
 	h->kept = true;		// ...and its eye on (the row eye, E2)
 	h->itemPrint = newPrint;
 	h->itemPrintLength = newLength;
@@ -1567,10 +1570,48 @@ void KFCResultModel::MarkItemOutlined(int32 chapterIdx, int32 hitIdx, UID newIte
 	BackUpRow(chapterIdx, hitIdx, *h);
 	h->replaced = true;		// written by KFC: its Replace greyed, counted as written
 	h->outlined = true;		// ...as outlines: the row reads "Outlined"
+	h->special = 0;			// (its last write - no special operation's word over it)
 	h->kept = true;			// ...and its eye on (the row eye - a row KFC wrote stays through a search again)
 	h->itemUID = newItem;	// the outlines InDesign made: the row's jump selects them
 	h->itemPrint = newPrint;
 	h->itemPrintLength = newLength;
+}
+
+void KFCResultModel::MarkItemSpecial(int32 chapterIdx, int32 hitIdx, int32 op, uint64 newPrint, uint32 newLength,
+	const Hit* place)
+{
+	Hit* h = HitAt(chapterIdx, hitIdx);
+	if (h == nil || h->itemUID == kInvalidUID)
+		return;
+	BackUpRow(chapterIdx, hitIdx, *h);
+	h->special = op;			// the row reads the operation's word first (the UI half's KFCSpecialRowWord)
+	h->kept = true;				// ...and its eye on (a row KFC wrote stays through a search again)
+	h->outcome = kOutcomeNone;	// the write has just found the item there
+	if (place == nil)
+	{
+		// THE ITEM TAKEN AWAY (Delete): nothing left to replace - its Replace greyed, the row counted as written. Its UID is
+		// kept: an Undo brings the item back under it, and the row's copy (the backup) with it.
+		h->replaced = true;
+		BuildHitLocator(*h);
+		return;
+	}
+	h->itemPrint = newPrint;
+	h->itemPrintLength = newLength;
+	// WHERE IT STANDS NOW - read after the write (KFCObjectSearch::ReadItemPlace). Its place among its page's rows is
+	// dropped when the page changed: the rows are not ordered again (an Undo step names them by index).
+	if (h->pageIndex != place->pageIndex || !h->pageString.IsEqual(place->pageString))
+		h->pageOrdinal = 0;
+	h->pageString = place->pageString;
+	h->pageIndex = place->pageIndex;
+	h->onPasteboard = place->onPasteboard;
+	h->isMaster = place->isMaster;
+	h->isGrouped = place->isGrouped;
+	h->isInline = place->isInline;
+	h->isAnchored = place->isAnchored;
+	h->isOverset = place->isOverset;
+	h->isHidden = place->isHidden;
+	h->isLocked = place->isLocked;
+	BuildHitLocator(*h);
 }
 
 void KFCResultModel::SetHitItemPrint(int32 chapterIdx, int32 hitIdx, uint64 newPrint, uint32 newLength)

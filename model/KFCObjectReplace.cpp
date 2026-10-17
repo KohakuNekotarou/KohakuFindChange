@@ -239,16 +239,17 @@ bool CheckRow(int32 chapterIdx, int32 hitIdx, PMString& outStatus, UIDRef& outDo
 	return true;
 }
 
+}	// anonymous namespace
+
 // THE ROWS A WRITE OF KFC'S OWN MOVES BESIDES ITS OWN (spec OBJ-12; the author's call). A fingerprint holds more
 // than its item (KFCObjectSearch::WriteReach), so a write moved the print of rows it did not write - the text frame an inline
 // written hangs in, the group holding an item written - and their Replace then refused them as "changed since the
 // search", the change being KFC's own. BEFORE the write: the rows of the chapter the write can reach that read now as their
 // row holds them - the rows to be written among them, which CheckItem has just read so. AFTER it, each of them not written
 // takes the print the write left (FollowRowsTheWriteMoved). A row that read otherwise before the write was changed by
-// someone else, and its Replace refuses it still.
-typedef std::vector<std::pair<int32, UID> > RowItems;		// (the row, its item)
-
-void RowsTheWriteCanMove(int32 chapterIdx, IDataBase* db, const std::set<UID>& toWrite, RowItems& out)
+// someone else, and its Replace refuses it still. (In the namespace: a special operation's write follows them too -
+// KFCObjectSpecial.)
+void KFCObjectReplace::RowsTheWriteCanMove(int32 chapterIdx, IDataBase* db, const std::set<UID>& toWrite, RowItems& out)
 {
 	out.clear();
 	if (db == nil)
@@ -281,7 +282,8 @@ void RowsTheWriteCanMove(int32 chapterIdx, IDataBase* db, const std::set<UID>& t
 		(unsigned)toWrite.size(), (unsigned)reach.items.size(), (unsigned)reach.stories.size(), (unsigned)out.size());
 }
 
-void FollowRowsTheWriteMoved(int32 chapterIdx, IDataBase* db, const RowItems& rows, const std::set<UID>& written)
+void KFCObjectReplace::FollowRowsTheWriteMoved(int32 chapterIdx, IDataBase* db, const RowItems& rows,
+	const std::set<UID>& written)
 {
 	// (A test build's fault switch: the other rows left as they were, the old way - case obj-f2-inline-armed.)
 	if (db == nil || KFC_DIAG_FAULT("object-prints-stale"))
@@ -304,6 +306,12 @@ void FollowRowsTheWriteMoved(int32 chapterIdx, IDataBase* db, const RowItems& ro
 	}
 	KFC_DIAG_LOG("OBJPRINTS after chapter=%d followed=%d", chapterIdx, followed);
 }
+
+namespace
+{
+using KFCObjectReplace::RowItems;
+using KFCObjectReplace::RowsTheWriteCanMove;
+using KFCObjectReplace::FollowRowsTheWriteMoved;
 
 // ONE STEP OF A WRITE'S WALK (steps 7-8 - the one write, WriteObjectRows): InDesign's own object search moved on to its next
 // match in the walker's document - true with that item in outItem. False when the walk is over by itself, as the search's

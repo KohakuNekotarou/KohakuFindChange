@@ -86,8 +86,10 @@ namespace KFCUndoFollow
 		void Keep();
 
 		/** AN OBJECT ROW'S ITEM: read its fingerprint now, before the write - an object Replace moves no
-		    story, so its Undo and Redo are told by the item's fingerprint coming back to "before" or "after". */
-		void RecordItem(int32 chapterIdx, UID item);
+		    story, so its Undo and Redo are told by the item's fingerprint coming back to "before" or "after".
+		    withOrder: its place in its parent's stack is read too (KFCPageItemFacts::StackIndex) - Object > Arrange moves
+		    that and nothing of the item's own data (KFCObjectSpecial), so its Undo and Redo are told by the place. */
+		void RecordItem(int32 chapterIdx, UID item, bool withOrder = false);
 
 		/** The write's name on the message line when an Undo or a Redo takes it ("Undo: <name> - ...") - a string that
 		    outlives the step (a literal). Not named: "Replace". */

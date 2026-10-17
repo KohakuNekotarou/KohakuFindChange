@@ -444,6 +444,19 @@ PMString StoryLeadText(const UIDRef& storyRef)
 	return out;
 }
 
+int32 StackIndex(IDataBase* db, UID item)
+{
+	// Its parent's own list of children, in which the order IS the stacking order (IHierarchy.h - GetChildIndex): what
+	// Object > Arrange moves.
+	if (db == nil || item == kInvalidUID || !db->IsValidUID(item))
+		return -1;
+	InterfacePtr<IHierarchy> hier(db, item, UseDefaultIID());
+	if (hier == nil)
+		return -1;
+	InterfacePtr<IHierarchy> parent(hier->QueryParent());
+	return (parent != nil) ? parent->GetChildIndex(hier) : -1;
+}
+
 
 }	// namespace KFCPageItemFacts
 

@@ -26,8 +26,25 @@
 #include "UIDRef.h"
 #include "KFCModelTypes.h"		// KFCRowsByChapter
 
+#include <set>					// RowsTheWriteCanMove
+#include <utility>
+#include <vector>
+
+class IDataBase;
+
 namespace KFCObjectReplace
 {
+	/** THE ROWS A WRITE OF KFC'S OWN MOVES BESIDES ITS OWN (spec OBJ-12): a fingerprint holds more than its item
+	    (KFCObjectSearch::WriteReach), so a write moves the print of rows it does not write - the text frame an inline
+	    written hangs in, the group holding an item written. RowsTheWriteCanMove, BEFORE the write: the rows of the chapter
+	    the write can reach that read now as their row holds them (the rows to be written among them - each written row's
+	    door has just read it so); FollowRowsTheWriteMoved, AFTER it: each of them not written takes the print the write
+	    left. A row that read otherwise before was changed by someone else, and its Replace refuses it still. The object
+	    Replace's write and a special operation's (KFCObjectSpecial) both follow them. */
+	typedef std::vector<std::pair<int32, UID> > RowItems;		// (the row, its item)
+	void RowsTheWriteCanMove(int32 chapterIdx, IDataBase* db, const std::set<UID>& toWrite, RowItems& out);
+	void FollowRowsTheWriteMoved(int32 chapterIdx, IDataBase* db, const RowItems& rows, const std::set<UID>& written);
+
 	/** O10 steps 1-5 for an object row, with nothing written: the Find/Change settings still the search's (the tab, the
 	    Type, the five switches, Find Object Format and its style - a changed one CLEARS the results, as for text), something
 	    to change to, the item still in its document (else the row reads Missing), not locked, and its fingerprint the one

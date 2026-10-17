@@ -782,16 +782,33 @@ void BuildObjectHit(const UIDRef& docRef, UID item, KFCResultModel::Hit& out)
 	out.matchText.Append(name);
 	out.matchText.SetTranslatable(kFalse);
 
+	// WHERE IT STANDS - its page, its words (ReadItemPlace: the one reading of it, which a special operation of KFC's own
+	// reads again after its write - KFCObjectSpecial).
+	(void)KFCObjectSearch::ReadItemPlace(docRef, item, out);
+
+	(void)KFCObjectSearch::Fingerprint(itemRef, out.itemPrint, out.itemPrintLength);
+}
+}	// anonymous namespace
+
+bool KFCObjectSearch::ReadItemPlace(const UIDRef& docRef, UID item, KFCResultModel::Hit& io)
+{
+	IDataBase* const db = docRef.GetDataBase();
+	if (db == nil || item == kInvalidUID || !db->IsValidUID(item))
+		return false;
+	const UIDRef itemRef(db, item);
+
 	// WHERE IT STANDS: in a group, or in text (inline / above line, or anchored with a position of its own).
 	InterfacePtr<IHierarchy> hier(itemRef, UseDefaultIID());
 	const UID parent = (hier != nil) ? hier->GetParentUID() : kInvalidUID;
 	const ClassID parentClass = (parent != kInvalidUID) ? db->GetClass(parent) : kInvalidClass;
-	out.isGrouped = (parentClass == kGroupItemBoss);
+	io.isGrouped = (parentClass == kGroupItemBoss);
+	io.isAnchored = false;
+	io.isInline = false;
 	if (parentClass == kInlineBoss)
 	{
 		InterfacePtr<IAnchoredObjectData> anchored(db, parent, UseDefaultIID());
-		out.isAnchored = (anchored != nil && anchored->GetPosition() == IAnchoredObjectData::kAnchoredObject);
-		out.isInline = !out.isAnchored;
+		io.isAnchored = (anchored != nil && anchored->GetPosition() == IAnchoredObjectData::kAnchoredObject);
+		io.isInline = !io.isAnchored;
 	}
 
 	// THE PAGE (D7 - the plan's Task 1 M10: grouped, inline and anchored items read their owner page; an item on the
@@ -799,33 +816,35 @@ void BuildObjectHit(const UIDRef& docRef, UID item, KFCResultModel::Hit& out)
 	// a parent page's items and the pasteboard's after them, in the order InDesign walked them - a parent page's by a key
 	// of its own, so each is numbered on its own (NumberHitsWithinPages).
 	const UID page = (hier != nil) ? Utils<ILayoutUtils>()->GetOwnerPageUID(hier) : kInvalidUID;
+	io.pageString.Clear();
+	io.pageString.SetTranslatable(kFalse);
+	io.isMaster = false;
 	if (page == kInvalidUID || db->GetClass(page) != kPageBoss)
 	{
-		out.onPasteboard = true;
-		out.pageIndex = -1;
+		io.onPasteboard = true;
+		io.pageIndex = -1;
 	}
 	else
 	{
+		io.onPasteboard = false;
 		InterfacePtr<IPageList> pageList(docRef, UseDefaultIID());
 		if (pageList != nil)
-			pageList->GetPageString(page, &out.pageString, kTrue /*bIncludeSectionName*/, kFalse /*bUseIntegerStyle*/);
-		out.pageString.SetTranslatable(kFalse);
-		out.isMaster = Utils<ILayoutUtils>()->IsAMaster(page, db) != kFalse;
-		out.pageIndex = out.isMaster ? (-2 - static_cast<int32>(page.Get()))
+			pageList->GetPageString(page, &io.pageString, kTrue /*bIncludeSectionName*/, kFalse /*bUseIntegerStyle*/);
+		io.pageString.SetTranslatable(kFalse);
+		io.isMaster = Utils<ILayoutUtils>()->IsAMaster(page, db) != kFalse;
+		io.pageIndex = io.isMaster ? (-2 - static_cast<int32>(page.Get()))
 			: ((pageList != nil) ? pageList->GetPageIndex(page) : -1);
 	}
 
 	// NO SPREAD HOLDS IT - an inline in overset text (QuerySpread answers nil): its row reads "overset" (BuildHitLocator),
 	// nothing of it is shown or selected, and its row's Replace is refused (IsOnSpread).
-	out.isOverset = !KFCObjectSearch::IsOnSpread(itemRef);
+	io.isOverset = !IsOnSpread(itemRef);
 
 	// Out of the user's reach where it is (the text rows' two words, by the same code).
-	out.isHidden = KFCPageItemFacts::IsFrameHidden(db, item);
-	out.isLocked = KFCPageItemFacts::IsPageItemLockedForEdit(db, item) || KFCPageItemFacts::IsFrameOnLockedLayer(db, item);
-
-	(void)KFCObjectSearch::Fingerprint(itemRef, out.itemPrint, out.itemPrintLength);
+	io.isHidden = KFCPageItemFacts::IsFrameHidden(db, item);
+	io.isLocked = KFCPageItemFacts::IsPageItemLockedForEdit(db, item) || KFCPageItemFacts::IsFrameOnLockedLayer(db, item);
+	return true;
 }
-}	// anonymous namespace
 
 void KFCObjectSearch::CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBook, bool allDocuments,
 	int32 selectionScope, std::vector<KFCBookScope::SkippedChapter>& unopenable, KFCSearchEngine::CollectTally& out,
