@@ -226,13 +226,13 @@
 
 - **REP-37** ★**Search This Document Again**（文書の行の右クリック・2026-10-10 作者の依頼＝ブックなど複数の文書の検索で、Object タブもほかのタブの検索も）＝**その文書を、検索のときの条件で丸ごともう一度歩き**、その文書の行を作り直し、ストーリーの版を覚え直す
   ―― 検索の後で直した文書でも、その行の Replace がまた書ける。Search This Story Again（REP-35）の文書版。
-  使えるのは**文書を丸ごと探した検索**（ブックの章・All Documents の文書・「検索:」ドキュメント）だけ。Object タブの検索でも（本体のオブジェクトの検索で歩き直す・利用者の選択は戻す＝OBJ-06）。
+  使えるのは**文書を丸ごと探した検索**（ブックの章・All Documents の文書・「検索:」ドキュメント）だけ。★**文書の一部を探した段（「検索:」ストーリー・ストーリーの最後まで・選択範囲）では灰色**（2026-10-17 夜の作者「灰色でもいいかも」＝その段はストーリーの行と段の見出しで、最初と同じ条件で探し直す＝REP-35・ROW-44）。スクリプトから ID で押されたときだけ、下の断りの文が出る。Object タブの検索でも（本体のオブジェクトの検索で歩き直す・利用者の選択は戻す＝OBJ-06）。
   その文書の置換済みの行は、目玉の無いものだけ消え（検索がもう見つけないため・目玉の付いた行は残る＝ROW-45）、ほかの文書の行と、その状態はそのまま。一致が0件になっても文書の行は `(0/0)` で残る（ROW-07）。一覧の行の数の上限（300）はそのまま（入りきらなければ文で言う）。
   進捗バー（Cancel つき）を出す＝その間は検索と同じく、ほかの実行を断る（GEN-33）。KFC が検索の後で閉じた章は、窓なしで開いて歩き、閉じて返す。
-  断る（一覧はそのまま）＝実行中／検索が文書の一部だった `Search This Document Again: the search was over part of the document (Search: Story) - search again.`（`To End of Story`・`Selection` も）／
+  断る（一覧はそのまま）＝実行中／検索が文書の一部だった（灰色の項目をスクリプトが押したとき）`Search This Document Again: the search was over part of the document (Search: Story) - search again.`（`To End of Story`・`Selection` も）／
   検索と置換の設定が変わった `Search This Document Again: the Find/Change settings have changed since the search - search again.`／開けない `...: the document of this row could not be opened.`／
   Cancel `...: cancelled - the document's rows are left as they were.`／本体の検索がエラーで止まった `...: InDesign's search stopped with an error - the document's rows are left as they were.`。
-  文は `Searched this document again: N match(es).`（上限に当たれば ` The list's limit of rows was reached - its other matches are not listed.`）。行の並びが変わるので、それより前の KFC の書き込みの取り消しは一覧が追わなくなる（UNDO-14）。回帰＝`dr-cases.tsv`。（1.4.0）
+  文は `Searched this document again: N match(es).`（上限に当たれば ` The list's limit of rows was reached - its other matches are not listed.`）。行の並びが変わるので、それより前の KFC の書き込みの取り消しは一覧が追わなくなる（UNDO-14）。回帰＝`dr-cases.tsv`（`dr-part-refused`＝2026-10-17 から灰色を期待）。（1.4.0）
   - 訂正:
 
 - **REP-38** ★**Restore from Copy**（文字の行の右クリック・Replace の下・2026-10-17 作者の依頼「コピーで戻すは右クリックメニューで」・名前は同じ夜の作者「Copy で戻すというのにしてほしい」＝最初の名前 Restore Original から改名＝作者の不在中に私のおすすめで作り、その夜に作者の決定で直した形＝設計書 `docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md` の C1〜C16）＝**置換した文字の行を、置換の前の文字に戻す**――
