@@ -407,6 +407,9 @@ DECLARE_PMID(kActionIDSpace, kKFCScaleActionID, kKFCUIPrefix + 88)
 DECLARE_PMID(kActionIDSpace, kKFCRotateActionID, kKFCUIPrefix + 89)
 DECLARE_PMID(kActionIDSpace, kKFCShearActionID, kKFCUIPrefix + 90)
 DECLARE_PMID(kActionIDSpace, kKFCTransformSep1ActionID, kKFCUIPrefix + 91)
+// FIND OBJECTS ON ACTIVE LAYER (the panel menu, under Find - the spec's E14, the author's S3 "the same layer"): the Object
+// tab's search kept to the objects on the Layers panel's layer. + 92: the next after the highest spent.
+DECLARE_PMID(kActionIDSpace, kKFCFindOnActiveLayerActionID, kKFCUIPrefix + 92)
 
 
 // WidgetIDs:
@@ -575,6 +578,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 #define kKFCHowToMenuKey				kKFCStringPrefix "kKFCHowToMenuKey"
 // "Open Find/Change...".
 #define kKFCOpenFindChangeMenuKey		kKFCStringPrefix "kKFCOpenFindChangeMenuKey"
+// "Find Objects on Active Layer" - a name that stays put (a script finds it by its name, as Move to Active Layer's).
+#define kKFCFindOnActiveLayerMenuKey	kKFCStringPrefix "kKFCFindOnActiveLayerMenuKey"
 // "Run Saved Queries..." - and the query dialog's own words: its title, the two lists' headings, the four
 // buttons between them, Find, Run and Close. English in every UI language, like the rest of the flyout.
 #define kKFCRunSavedQueriesMenuKey		kKFCStringPrefix "kKFCRunSavedQueriesMenuKey"
@@ -675,6 +680,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 // Open Find/Change... leads the block: open the dialog, type the query, then search.
 #define kKFCOpenFindChangeMenuItemPosition	0.5
 #define kKFCSearchBookMenuItemPosition		1.0
+// Find Objects on Active Layer right under Find - the same search, kept to a layer (the spec's E14).
+#define kKFCFindOnActiveLayerMenuItemPosition	1.05
 // Change All in Book (No List) under Find, then Clear Results (the spec's section 4).
 #define kKFCChangeAllMenuItemPosition		1.1
 #define kKFCClearResultsMenuItemPosition	1.25

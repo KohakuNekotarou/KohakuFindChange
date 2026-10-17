@@ -311,6 +311,19 @@ KFCResultModel::SearchScopeKind KFCResultModel::GetSearchScope()
 	return gHeader.searchScope;
 }
 
+void KFCResultModel::SetSearchLayer(const PMString& layer)
+{
+	gHeader.searchLayer = layer;
+	gHeader.searchLayer.SetTranslatable(kFalse);
+}
+
+PMString KFCResultModel::GetSearchLayer()
+{
+	PMString layer(gHeader.searchLayer);
+	layer.SetTranslatable(kFalse);
+	return layer;
+}
+
 void KFCResultModel::CloseChapter(int32 chapterIdx, const IDFile* closedFile)
 {
 	Chapter* c = ChapterAt(chapterIdx);

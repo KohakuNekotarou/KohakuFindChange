@@ -92,6 +92,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 // The operating reference. English in every UI language, like the rest of the flyout.
                 kKFCHowToMenuKey,				"How to Use...",
                 kKFCOpenFindChangeMenuKey,		"Open Find/Change...",
+                kKFCFindOnActiveLayerMenuKey,	"Find Objects on Active Layer",
                 kKFCRunSavedQueriesMenuKey,		"Run Saved Queries...",
                 // The Keyboard Shortcuts editor's area (kKFCPanelMenuActionArea): files the
                 // shortcut-assignable actions under "Palette Menus" as "Kohaku Find/Change: <name>".

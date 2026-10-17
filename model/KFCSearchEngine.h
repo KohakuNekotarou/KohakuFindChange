@@ -93,6 +93,14 @@ namespace KFCSearchEngine
 	    @return the total number of matches across the scope. */
 	int32 SearchBook(PMString& outSummary);
 
+	/** FIND OBJECTS ON ACTIVE LAYER (the panel menu - the spec's E14, the author's S3 "the same layer"): SearchBook on the
+	    Object tab, its rows kept to the objects that stand on the layer of this name - each document's layer of the name
+	    (a document with none is searched for nothing and named). InDesign's own object search matches, as SearchBook's does
+	    - an empty Find Object Format lists every frame of the Type on the layer. The list keeps the layer
+	    (KFCResultModel::SetSearchLayer): its searches again search it, and its tier's heading names it. Refused on any
+	    other tab. */
+	int32 SearchBookOnLayer(const PMString& layer, PMString& outSummary);
+
 	/** What a run searches - asked of Book Scope and Edit > Find/Change's Search: by ResolveRunScope. */
 	struct RunScope
 	{

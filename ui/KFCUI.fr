@@ -599,6 +599,13 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCSearchBookMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// Find Objects on Active Layer: the same search on the Object tab, its rows kept to the objects on the Layers
+		// panel's layer (the spec's E14). Greyed off the Object tab and with no document in front.
+		kKFCFindOnActiveLayerActionID,
+		kKFCTargetMenuPath
+		kKFCFindOnActiveLayerMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 		// Change All in Book (No List): InDesign's own Change All over the book's chapters, no list (KFCChangeAll).
 		// Greyed with Book Scope off (F18 - a document's Change All is InDesign's own dialog's).
 		kKFCChangeAllActionID,
@@ -1064,6 +1071,18 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKFCActionComponentBoss,
 		kKFCSearchBookActionID,
 		kKFCSearchBookMenuKey,			// "Search" (renamed at run time to carry the scope)
+		kKFCPanelMenuActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefVisibleInKBSCEditorFlag,
+
+		// Find Objects on Active Layer (the spec's E14). kCustomEnabling: UpdateActionStates greys it off the Object tab, with
+		// no document in front or no layer active there, and with nothing to search (Find's own test). In the Keyboard
+		// Shortcuts editor under Palette Menus, like Find.
+		kKFCActionComponentBoss,
+		kKFCFindOnActiveLayerActionID,
+		kKFCFindOnActiveLayerMenuKey,	// "Find Objects on Active Layer"
 		kKFCPanelMenuActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,

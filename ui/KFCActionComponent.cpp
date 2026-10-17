@@ -32,6 +32,7 @@
 #include "IActionStateList.h"	// UpdateActionStates: the items' states, check marks and names
 #include "IApplication.h"		// QueryActionManager
 #include "IDocumentLayer.h"		// GetName - Move to Active Layer's layer
+#include "IFindChangeOptions.h"	// kObjectSearch - Find Objects on Active Layer runs on the Object tab only
 #include "ILayerUIUtils.h"		// QueryContextActiveLayer - the layer the Layers panel has active (its own menu's target)
 #include "ITreeNodeIDData.h"	// the row a right-click menu was popped over - its widget's NodeID
 #include "FindChangeID.h"		// kFindDialogActionID - Edit > Find/Change
@@ -383,6 +384,28 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			break;
 		}
 
+		case kKFCFindOnActiveLayerActionID:
+		{
+			// FIND OBJECTS ON ACTIVE LAYER (the spec's E14 - the author's S3, "the same layer"): Find's search through the same
+			// door (KFCResultHistory::Find - kept as a tier above the list it replaces), on the Object tab, its rows kept to
+			// the objects on the front document's Layers panel layer - by its name (ActiveLayerName, Move to Active Layer's
+			// reading), so each document of an All Documents or book search is searched on its layer of that name. Not while
+			// a landing is under way - Find's reason (KFCJump::IsLanding).
+			if (KFCJump::IsLanding())
+				break;
+			PMString layer;
+			PMString summary;
+			if (!ActiveLayerName(ac, layer))
+			{
+				summary.SetTranslatable(kFalse);
+				summary.Append("Find Objects on Active Layer: no layer is active in the Layers panel - open a document.");
+				KFCResultTree::ShowStatus(summary);
+				break;
+			}
+			(void)KFCResultHistory::Find(KFCResultHistory::QueryLabel(), summary, nil, &layer);
+			break;
+		}
+
 		case kKFCChangeAllActionID:
 		{
 			// Change All in Book (No List) (the author's calls - F6 and F18): InDesign's own Change All over
@@ -722,6 +745,18 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 				// (CanSearchTab).
 				const bool canRun = haveTarget
 					&& KFCRuns()->CanSearchTab(KFCRuns()->CurrentSearchMode());
+				listToUpdate->SetNthActionState(i, canRun ? kEnabledAction : kDisabled_Unselected);
+				break;
+			}
+			case kKFCFindOnActiveLayerActionID:
+			{
+				// Find Objects on Active Layer (the spec's E14): Find's test, on the Object tab only - the rows it keeps are
+				// page items - and with a layer active in the front document's Layers panel (the name each document's layer
+				// is found by). The name stays put (Move to Active Layer's rule): a script finds it by its name.
+				PMString layer;
+				const bool canRun = haveTarget
+					&& KFCRuns()->CurrentSearchMode() == IFindChangeOptions::kObjectSearch
+					&& ActiveLayerName(ac, layer);
 				listToUpdate->SetNthActionState(i, canRun ? kEnabledAction : kDisabled_Unselected);
 				break;
 			}

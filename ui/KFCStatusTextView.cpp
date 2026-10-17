@@ -58,20 +58,17 @@
 #include "VCPlugInHeaders.h"
 
 // Interface includes:
-#include "IGraphicsPort.h"
 #include "IInterfaceColors.h"	// RealAGMColor, InterfaceColor indices
 #include "ITextControlData.h"	// the message as plain text, for a reader that walks the widgets
 
 // General includes:
-#include "AGMGraphicsContext.h"
-#include "AutoGSave.h"
 #include "CPMUnknown.h"
+#include "DVAPublicIncludes.h"	// dvaui::drawbot - what DV_Draw is handed
 #include "DVControlView.h"
-#include "DrawStringUtils.h"	// StringUtils::PMDrawStringRGB / PMMeasureString
+#include "DrawStringUtils.h"	// StringUtils::PMDrawStringRGB (drawbot)
 #include "ISession.h"			// GetExecutionContextSession
-#include "IWidgetUtils.h"		// GetViewYPosition - only for the fallback when the metrics are refused
 #include "TextChar.h"			// kTextChar_Ellipse - the mark a cut piece carries
-#include "Utils.h"				// Utils<IWidgetUtils>()
+#include "WidgetDefs.h"			// kAlignLeft
 
 // Project includes:
 #include "IKFCStatusTextData.h"
@@ -166,19 +163,19 @@ bool16 KFCIsSpaceAt(const PMString& s, int32 pos)
 /* How many characters from the front of s fit in `room` - measured as WHOLE PREFIXES, not summed per
    character: a sum ignores the spacing a font puts between glyphs, and the error accumulates along the
    line. A binary search asks the question the drawing will ask, about six times per line. */
-int32 KFCFitCount(IGraphicsContext* gc, const InterfaceFontInfo& font, const PMString& s, const PMReal& room)
+int32 KFCFitCount(const InterfaceFontInfo& font, const PMString& s, const PMReal& room)
 {
 	const int32 total = s.CharCount();
 	if (total <= 0 || room <= PMReal(0.0))
 		return 0;
-	if (KFCDrawnWidth(gc, s, font) <= room)
+	if (KFCDrawnWidth(s, font) <= room)
 		return total;
 
 	int32 lo = 0, hi = total;
 	while (lo < hi)
 	{
 		const int32 mid = (lo + hi + 1) / 2;
-		if (KFCDrawnWidth(gc, KFCHead(s, mid), font) <= room)
+		if (KFCDrawnWidth(KFCHead(s, mid), font) <= room)
 			lo = mid;
 		else
 			hi = mid - 1;
@@ -211,7 +208,7 @@ bool16 KFCAnythingLeft(const std::vector<KFCRun>& runs, size_t atRun, const PMSt
         is the only thing Japanese offers and the only thing a long file name offers;
      3. a wrapped line never starts with the space it was broken at (a line the TEXT broke keeps its
         spaces: those are the author's). */
-bool16 KFCLayoutRuns(IGraphicsContext* gc, const InterfaceFontInfo& font,
+bool16 KFCLayoutRuns(const InterfaceFontInfo& font,
 					 const std::vector<KFCRun>& runs, const PMReal& availWidth,
 					 int32 maxLines, std::vector<KFCFrag>& out)
 {
@@ -270,7 +267,7 @@ bool16 KFCLayoutRuns(IGraphicsContext* gc, const InterfaceFontInfo& font,
 			const PMString chunk = (breakAt < 0) ? rest : KFCHead(rest, breakAt);
 
 			const PMReal room = availWidth - x;
-			int32 fit = KFCFitCount(gc, font, chunk, room);
+			int32 fit = KFCFitCount(font, chunk, room);
 
 			if (fit >= chunk.CharCount())
 			{
@@ -278,7 +275,7 @@ bool16 KFCLayoutRuns(IGraphicsContext* gc, const InterfaceFontInfo& font,
 				if (!chunk.IsEmpty())
 				{
 					out.push_back(KFCFrag(chunk, faded, isCaret, line, x));
-					x += KFCDrawnWidth(gc, chunk, font);
+					x += KFCDrawnWidth(chunk, font);
 				}
 				rest = (breakAt < 0) ? PMString() : KFCTail(rest, breakAt);	// leave the break itself
 				justWrapped = kFalse;
@@ -478,18 +475,17 @@ public:
 	KFCStatusTextView(IPMUnknown* boss) : inherited(boss) {}
 	virtual ~KFCStatusTextView() {}
 
-	virtual void Draw(IViewPort* viewPort, SysRgn updateRgn);
+	/** DV_Draw, not Draw: drawn by drover as the stock rows are (KFCPanelTextDraw.h - Draw is handed an offscreen AGM
+	    port, and text drawn there came out black and white beside the stock rows' ClearType). */
+	virtual void DV_Draw(dvaui::drawbot::Drawbot* drawbotP) const;
 };
 
 CREATE_PERSIST_PMINTERFACE(KFCStatusTextView, kKFCStatusTextViewImpl)
 
-void KFCStatusTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
+void KFCStatusTextView::DV_Draw(dvaui::drawbot::Drawbot* drawbotP) const
 {
-	AGMGraphicsContext gc(viewPort, this, updateRgn);
-	InterfacePtr<IGraphicsPort> gPort(gc.GetViewPort(), UseDefaultIID());
-	if (gPort == nil)
+	if (drawbotP == nil)
 		return;
-	AutoGSave gSave(gPort);
 
 	InterfacePtr<IKFCStatusTextData> data(this, UseDefaultIID());
 	if (data == nil)
@@ -526,16 +522,12 @@ void KFCStatusTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	// PMMeasureString("Ag").Y() answers 19.0 - and that one pixel costs a whole line in a box sized to
 	// a whole number of lines (KFCPanelMetrics::MessageBlockHeight). Measuring a string answers "how
 	// tall is this ink", which is a different question from "how far to the next line".
-	// The fallback is the measured string, so a font whose metrics are refused still draws something.
+	// A font whose metrics are refused draws nothing: drover answers them and every width below alike, so a font it does
+	// not know could not be laid out either. (The AGM-drawn box fell back on a measured "Ag" and an AGM baseline.)
 	PMReal lineHeight(0.0);
 	PMReal ascent(0.0);
-	if (!KFCPanelMetrics::MessageLineMetrics(lineHeight, ascent))
-	{
-		lineHeight = StringUtils::PMMeasureString(&gc, PMString("Ag"), fontInfo, kKFCDontConvertAmpersand).Y();
-		if (lineHeight <= PMReal(0.0))
-			return;
-		ascent = Utils<IWidgetUtils>()->GetViewYPosition(&gc, fontInfo, lineHeight);
-	}
+	if (!KFCPanelMetrics::MessageLineMetrics(lineHeight, ascent) || lineHeight <= PMReal(0.0))
+		return;
 
 	// A HAIR ADDED BEFORE THE CUT. This box is sized to a WHOLE number of lines, so the quotient is meant
 	// to come out at exactly 4 - and a line height a rounding step over what the box was made of would
@@ -562,7 +554,7 @@ void KFCStatusTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	// ---- lay the message out, giving the context away first if it does not fit ------------------
 
 	std::vector<KFCFrag> frags;
-	if (!KFCLayoutRuns(&gc, fontInfo, KFCMakeRuns(label, pre, mid, post, wantCaret), availWidth, maxLines, frags))
+	if (!KFCLayoutRuns(fontInfo, KFCMakeRuns(label, pre, mid, post, wantCaret), availWidth, maxLines, frags))
 	{
 		// frags holds as much of the whole message as the box could take - kept as the last resort
 		// below, so nothing here has to succeed for something to be drawn.
@@ -584,7 +576,7 @@ void KFCStatusTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 			{
 				const int32 keep = lo + (hi - lo) / 2;
 				std::vector<KFCFrag> trial;
-				if (KFCLayoutRuns(&gc, fontInfo, build(keep), availWidth, maxLines, trial))
+				if (KFCLayoutRuns(fontInfo, build(keep), availWidth, maxLines, trial))
 				{
 					best.swap(trial);
 					any = kTrue;
@@ -634,26 +626,27 @@ void KFCStatusTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 
 	// Each fragment is drawn at an explicit BASELINE rather than centred in a line-high box: the advance
 	// (18) is a pixel less than the ink the renderer reports (19), so centring would let the last line's
-	// descenders drift below the box. The first baseline sits one ascent below the top.
+	// descenders drift below the box. The first baseline sits one ascent below the top - ON A WHOLE PIXEL: the
+	// ascent is not one (12.7 on a Japanese UI), and a baseline between two rows of pixels is drawn across both.
 	const PMReal baseline0 = frame.Top() + ascent;
 
 	for (size_t i = 0; i < frags.size(); ++i)
 	{
 		const KFCFrag& f = frags[i];
-		const PMPoint at(frame.Left() + f.fX, baseline0 + lineHeight * PMReal(f.fLine));
+		const PMPoint at(frame.Left() + f.fX, ::Round(baseline0 + lineHeight * PMReal(f.fLine)));
 
 		// A PLACE WITH NOTHING IN IT IS DRAWN, NOT WRITTEN: the space reserved the room, the bar goes over
 		// it, and the space itself never is.
 		if (f.fIsCaret)
 		{
-			KFCDrawCaret(gPort, kStrongColor, at.X(), KFCDrawnWidth(&gc, f.fText, fontInfo),
+			KFCDrawCaret(drawbotP, kStrongColor, at.X(), KFCDrawnWidth(f.fText, fontInfo),
 						 at.Y() - ascent, lineHeight);
 			continue;
 		}
 
-		StringUtils::PMDrawStringRGB(&gc, at, f.fText, fontInfo,
+		StringUtils::PMDrawStringRGB(drawbotP, at, kAlignLeft, f.fText, fontInfo,
 									 f.fFaded ? kContextColor : kStrongColor,
-									 kKFCDontConvertAmpersand, kKFCNoUnderline);
+									 kKFCDontConvertAmpersand, kKFCNoUnderline, kKFCTextSmoothing);
 	}
 }
 

@@ -16,6 +16,7 @@
 #include "IDocumentLayer.h"
 #include "IHierarchy.h"
 #include "IItemLockData.h"
+#include "ILayerList.h"				// FindByName - a document's layer of a name (DocLayerNamed)
 #include "ILayerUtils.h"
 #include "ILayoutUtils.h"
 #include "ILockPosition.h"
@@ -455,6 +456,25 @@ int32 StackIndex(IDataBase* db, UID item)
 		return -1;
 	InterfacePtr<IHierarchy> parent(hier->QueryParent());
 	return (parent != nil) ? parent->GetChildIndex(hier) : -1;
+}
+
+UID DocLayerOf(IDataBase* db, UID item)
+{
+	if (db == nil || item == kInvalidUID || !db->IsValidUID(item))
+		return kInvalidUID;
+	InterfacePtr<IHierarchy> hier(db, item, UseDefaultIID());
+	if (hier == nil)
+		return kInvalidUID;
+	InterfacePtr<IDocumentLayer> docLayer(QueryDocLayerOf(db, hier));
+	return (docLayer != nil) ? ::GetUID(docLayer) : kInvalidUID;
+}
+
+UID DocLayerNamed(const UIDRef& docRef, const PMString& name)
+{
+	if (name.IsEmpty() || docRef.GetDataBase() == nil)
+		return kInvalidUID;
+	InterfacePtr<ILayerList> layers(docRef, UseDefaultIID());
+	return (layers != nil) ? layers->FindByName(name) : kInvalidUID;
 }
 
 

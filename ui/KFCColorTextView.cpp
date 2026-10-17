@@ -10,12 +10,12 @@
 //  the page locator, the accent-coloured flag word, then the line split around the match (before /
 //  matched / after). KFCRowData is the tiny data holder aggregated on the same boss.
 //
-//  Recipe: the multi-colour cell draw proven against customdatalinkui's DVControlView -
-//  AGMGraphicsContext + StringUtils::PMDrawString / PMDrawStringRGB, the palette SYSTEM SCRIPT
-//  font from IInterfaceFonts (the one the branch rows use, and the one the shipping panels use for
-//  document text), the baseline from IWidgetUtils::GetViewYPosition. convertAmpersand is kFalse
-//  on BOTH the draw and the measure so a literal '&' in the search text is neither underlined
-//  nor dropped. Selected rows are drawn in the theme's selected-text colours, which a hand-drawn
+//  Recipe: a DVControlView cell (customdatalinkui's) drawn in DV_Draw with DrawStringUtils.h's drawbot overloads -
+//  drover, as the stock rows beside it are, so its letters come out as theirs do (KFCPanelTextDraw.h says why it is
+//  not Draw and AGM any more) - the palette SYSTEM SCRIPT font from IInterfaceFonts (the one the branch rows use, and
+//  the one the shipping panels use for document text), each run in the cell's box, centred top to bottom by the draw
+//  itself. convertAmpersand is kFalse on BOTH the draw and the measure so a literal '&' in the search text is neither
+//  underlined nor dropped. Selected rows are drawn in the theme's selected-text colours, which a hand-drawn
 //  cell has to ask for itself (a stock StaticText gets all four colours from its .fr and lets the
 //  framework choose) - the same isHilited switch the app's own drawing makes. When a line overflows
 //  the cell the match is kept at full strength and the context is ellipsized around it (the stock rows
@@ -29,23 +29,19 @@
 
 // Interface includes:
 #include "IControlView.h"		// IsHilited - is this cell's row the selected one?
-#include "IGraphicsPort.h"
 #include "IInterfaceColors.h"	// RealAGMColor, InterfaceColor indices
 #include "IInterfaceFonts.h"	// the palette window font
 #include "ITextControlData.h"	// the row's line as plain text, for a reader that walks the widgets
 #include "IWidgetParent.h"		// QueryParentFor - this cell -> the row widget that carries the hilite
 
 // General includes:
-#include "AGMGraphicsContext.h"
-#include "AutoGSave.h"
 #include "CPMUnknown.h"
+#include "DVAPublicIncludes.h"	// dvaui::drawbot - what DV_Draw is handed
 #include "DVControlView.h"
-#include "DrawStringUtils.h"	// StringUtils::PMDrawString / PMDrawStringRGB / PMMeasureString / PMEllipsizeString
-#include "WidgetDefs.h"			// EllipsizeStyle (kEllipsizeBeginning / kEllipsizeEnd)
+#include "DrawStringUtils.h"	// StringUtils::PMDrawStringRGB (drawbot) / PMEllipsizeString
+#include "WidgetDefs.h"			// EllipsizeStyle (kEllipsizeBeginning / kEllipsizeEnd), kAlignLeft
 #include "ISession.h"			// GetExecutionContextSession
-#include "IWidgetUtils.h"		// GetViewYPosition
 #include "ShuksanID.h"			// kPaletteWindowSystemScriptFontId
-#include "Utils.h"
 
 // Project includes:
 #include "KFCUIID.h"
@@ -62,7 +58,7 @@ static const int32 kKFCHiliteParentSteps = 3;
 // user has selected. The tree applies the hilite to the ROW widget (the base
 // CTreeViewWidgetMgr::ApplyNodeIDToWidget does it, "for hilite selection"), and this cell is one of
 // that row's children, so a cell that only asked itself would never see the selection.
-static bool16 KFCViewOrParentIsHilited(IControlView* view, int32 stepsLeft)
+static bool16 KFCViewOrParentIsHilited(const IControlView* view, int32 stepsLeft)
 {
 	if (view == nil)
 		return kFalse;
@@ -174,18 +170,18 @@ public:
 	KFCColorTextView(IPMUnknown* boss) : inherited(boss) {}
 	virtual ~KFCColorTextView() {}
 
-	virtual void Draw(IViewPort* viewPort, SysRgn updateRgn);
+	/** DV_Draw, not Draw: drawn by drover as the stock rows are (KFCPanelTextDraw.h - Draw is handed an offscreen AGM
+	    port, and text drawn there came out black and white beside the stock rows' ClearType). Nothing is painted
+	    behind the text: the row's own fill (the selection's included) is the tree's. */
+	virtual void DV_Draw(dvaui::drawbot::Drawbot* drawbotP) const;
 };
 
 CREATE_PERSIST_PMINTERFACE(KFCColorTextView, kKFCColorTextViewImpl)
 
-void KFCColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
+void KFCColorTextView::DV_Draw(dvaui::drawbot::Drawbot* drawbotP) const
 {
-	AGMGraphicsContext gc(viewPort, this, updateRgn);
-	InterfacePtr<IGraphicsPort> gPort(gc.GetViewPort(), UseDefaultIID());
-	if (gPort == nil)
+	if (drawbotP == nil)
 		return;
-	AutoGSave gSave(gPort);
 
 	InterfacePtr<IKFCRowData> data(this, UseDefaultIID());
 	if (data == nil)
@@ -218,7 +214,6 @@ void KFCColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	const InterfaceFontInfo& fontInfo = fonts->GetFont(kPaletteWindowSystemScriptFontId);
 
 	const PMRect frame = this->GetInnerContentFrame();
-	const PMReal y = Utils<IWidgetUtils>()->GetViewYPosition(&gc, fontInfo, frame.Height());
 	const PMReal rightEdge = frame.Right();
 	PMReal x = frame.Left();
 
@@ -300,12 +295,15 @@ void KFCColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	//
 	// Draw one run at the running x and advance past it (an empty run is a no-op) - every run of the row: the locator,
 	// its flag word, and the line's three below.
+	// Each run in the cell's box from the running x, centred top to bottom by the draw itself (centerVertically) - the
+	// baseline used to come from IWidgetUtils::GetViewYPosition, which asks an AGM graphics context DV_Draw has not.
 	auto drawRun = [&](const PMString& s, const RealAGMColor& c)
 	{
 		if (s.IsEmpty())
 			return;
-		StringUtils::PMDrawStringRGB(&gc, PMPoint(x, y), s, fontInfo, c, kKFCDontConvertAmpersand, kKFCNoUnderline);
-		x += KFCDrawnWidth(&gc, s, fontInfo);
+		StringUtils::PMDrawStringRGB(drawbotP, PMRect(x, frame.Top(), rightEdge, frame.Bottom()), kAlignLeft, s, fontInfo, c,
+			kKFCDontConvertAmpersand, kTrue /*centerVertically*/, kKFCNoUnderline, kKFCTextSmoothing);
+		x += KFCDrawnWidth(s, fontInfo);
 	};
 
 	const PMReal kLocatorGap(8.0);		// space between the locator and the line text
@@ -348,9 +346,9 @@ void KFCColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	const bool wantCaret = match.IsEmpty();
 
 	// The widths of the line's runs - the match's is the bar's room when it has no characters.
-	const PMReal preW   = KFCDrawnWidth(&gc, pre, fontInfo);
-	const PMReal matchW = KFCDrawnWidth(&gc, wantCaret ? KFCCaretPlaceholder() : match, fontInfo);
-	const PMReal postW  = KFCDrawnWidth(&gc, post, fontInfo);
+	const PMReal preW   = KFCDrawnWidth(pre, fontInfo);
+	const PMReal matchW = KFCDrawnWidth(wantCaret ? KFCCaretPlaceholder() : match, fontInfo);
+	const PMReal postW  = KFCDrawnWidth(post, fontInfo);
 
 	// The match at the running x: its characters, or the bar in their place - spanning the cell a pixel
 	// short of each edge, as KCM's one-line change row draws it.
@@ -361,7 +359,7 @@ void KFCColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 			drawRun(s, kMatchColor);
 			return;
 		}
-		KFCDrawCaret(gPort, kMatchColor, x, matchW, frame.Top() + PMReal(1.0), frame.Height() - PMReal(2.0));
+		KFCDrawCaret(drawbotP, kMatchColor, x, matchW, frame.Top() + PMReal(1.0), frame.Height() - PMReal(2.0));
 		x += matchW;
 	};
 
@@ -385,7 +383,7 @@ void KFCColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 			//   new string keeps the "do not translate" its source carries (SetSegments), and a PMString starts out
 			//   translatable (PMString.h) - so it is said again: document text that happens to spell a key of the
 			//   string table is drawn as it is, not translated. The two cuts below are the same.
-			PMString m = StringUtils::PMEllipsizeString(&gc, availWidth, match, fontInfo, kEllipsizeEnd, nil, kKFCDontConvertAmpersand);
+			PMString m = StringUtils::PMEllipsizeString(availWidth, match, fontInfo, kEllipsizeEnd, nil, kKFCDontConvertAmpersand);
 			m.SetTranslatable(kFalse);
 			drawRun(m, kMatchColor);
 		}
@@ -402,16 +400,16 @@ void KFCColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 		PMString preCut = pre;
 		if (!pre.IsEmpty())
 		{
-			preCut = StringUtils::PMEllipsizeString(&gc, rem, pre, fontInfo, kEllipsizeBeginning, nil, kKFCDontConvertAmpersand);
+			preCut = StringUtils::PMEllipsizeString(rem, pre, fontInfo, kEllipsizeBeginning, nil, kKFCDontConvertAmpersand);
 			preCut.SetTranslatable(kFalse);
 		}
-		const PMReal preCutW = KFCDrawnWidth(&gc, preCut, fontInfo);
+		const PMReal preCutW = KFCDrawnWidth(preCut, fontInfo);
 
 		const PMReal postBudget = rem - preCutW;
 		PMString postCut;
 		if (!post.IsEmpty() && postBudget > PMReal(0.0))
 		{
-			postCut = StringUtils::PMEllipsizeString(&gc, postBudget, post, fontInfo, kEllipsizeEnd, nil, kKFCDontConvertAmpersand);
+			postCut = StringUtils::PMEllipsizeString(postBudget, post, fontInfo, kEllipsizeEnd, nil, kKFCDontConvertAmpersand);
 			postCut.SetTranslatable(kFalse);
 		}
 

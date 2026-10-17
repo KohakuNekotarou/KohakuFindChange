@@ -69,7 +69,9 @@ namespace KFCObjectSearch
 	    the walk lists, not only between documents; a Cancel ends the run as one between documents does (out.cancelled). */
 	void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBook, bool allDocuments,
 		int32 selectionScope, std::vector<KFCBookScope::SkippedChapter>& unopenable, KFCSearchEngine::CollectTally& out,
-		int32 reserved);	// rows the list holds before the walk - a search again's kept rows (the row eye); 0 otherwise
+		int32 reserved,			// rows the list holds before the walk - a search again's kept rows (the row eye); 0 otherwise
+		const PMString& layer);	// Find Objects on Active Layer: only what stands on each document's layer of this name
+								// (a document with none is named in out.unsearchable); empty = everything found
 
 	/** SEARCH THIS DOCUMENT AGAIN on the Object tab (KFCSearchEngine::SearchDocumentAgain): ONE open document
 	    walked whole as CollectTargets walks each of its targets, under a bar of its own ("Document 1 / 1 - <name>"), the
@@ -77,7 +79,8 @@ namespace KFCObjectSearch
 	    outHits (not in the model) - at most `limit` (outCapped when there were more). true = the walk ended cleanly;
 	    false = it broke off, or Cancel was pressed (outCancelled) - the rows are not to be used then. */
 	bool WalkOneDocument(const UIDRef& docRef, const PMString& name, size_t limit,
-		std::vector<KFCResultModel::Hit>& outHits, bool& outCapped, bool& outCancelled);
+		std::vector<KFCResultModel::Hit>& outHits, bool& outCapped, bool& outCancelled,
+		UID onLayer);	// the document's layer the rows are kept to (Find Objects on Active Layer); kInvalidUID = all
 
 	/** An item's FINGERPRINT (O12): its own persistent data as the database writes it (IPMPersist::SaveAll into memory),
 	    with what it holds - a group's members, a graphic frame's image - its anchored settings when it hangs in text,

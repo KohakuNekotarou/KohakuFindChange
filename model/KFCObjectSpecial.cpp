@@ -18,7 +18,6 @@
 #include "IFrameContentFacade.h"			// Object > Fitting
 #include "IHierarchy.h"
 #include "ILayerFacade.h"					// MoveToLayer - the Layers panel's own (layerpanel/LayerSuiteLayoutCSB.cpp)
-#include "ILayerList.h"						// FindByName - the layer of that name in each document
 #include "IObjectStylesFacade.h"			// ApplyObjectStyleToUIDList - the Object Styles panel's Clear Overrides
 #include "IObjStylesAttrCategoriesList.h"	// GetApplyCategories - the categories a style applies
 #include "IPageItemLockFacade.h"			// Object > Lock / Unlock
@@ -249,10 +248,7 @@ void Refuse(PMString& out, const OpInfo& info, const PMString& why)
 // each document of the rows). kInvalidUID = none.
 UID LayerNamed(const UIDRef& docRef, const PMString& name)
 {
-	if (name.IsEmpty())
-		return kInvalidUID;
-	InterfacePtr<ILayerList> layers(docRef, UseDefaultIID());
-	return (layers != nil) ? layers->FindByName(name) : kInvalidUID;
+	return KFCPageItemFacts::DocLayerNamed(docRef, name);		// the one reading of it - Find Objects on Active Layer's too
 }
 
 // The object style applied to an item (kInvalidUID = none).

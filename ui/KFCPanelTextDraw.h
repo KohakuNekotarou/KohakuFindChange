@@ -29,11 +29,12 @@
 #define __KFCPanelTextDraw_h__
 
 // Interface includes:
-#include "IGraphicsPort.h"		// setrgbcolor / rectfill - the bar is filled, not written
 #include "IInterfaceColors.h"	// RealAGMColor
 
 // General includes:
-#include "DrawStringUtils.h"	// StringUtils::PMMeasureString - how wide a string comes out
+#include "DVAPublicIncludes.h"	// dvaui::drawbot - what both widgets draw with (DV_Draw)
+#include "DVPublicUtilities.h"	// dv_utils::DVFillRect - the bar is filled, not written (source/open/includes/widgets)
+#include "DrawStringUtils.h"	// StringUtils::PMMeasureStringDroverized - how wide a string comes out
 #include "PMReal.h"
 #include "PMString.h"			// the bar's placeholder
 
@@ -46,13 +47,26 @@
 const bool16 kKFCDontConvertAmpersand = kFalse;
 const bool16 kKFCNoUnderline = kFalse;
 
-/** How wide `s` comes out as drawn here - measured with the flag the draws pass (above); 0 for nothing. The one
-    measure of both widgets: a hit row's cell lays its runs out by it, the message area its lines. */
-inline PMReal KFCDrawnWidth(IGraphicsContext* gc, const PMString& s, const InterfaceFontInfo& font)
+/** DRAWN BY DROVER, AS INDESIGN'S OWN ROWS ARE (2026-10-17 - the author, on the Bright theme: the panel's message "looks
+    blurred, hard to read", and after a first fix "still crushed, not sharp" beside the document row). Both widgets used to
+    draw in Draw, with an AGM graphics context - and Draw is handed an OFFSCREEN AGM port that DVAbstractControlView blits
+    back onto the panel (DVAbstractControlView.h): text drawn there came out in black and white (photographed on the
+    Bright theme: one grey at the draws' default Med, solid and swollen; still one at High, thinner), while the stock rows
+    beside them - drawn by drover straight onto the panel - came out in ClearType (1594 of their 2287 inked pixels
+    coloured; KFC's 0). So both draw in DV_Draw now, with DrawStringUtils.h's drawbot overloads - the shipping code's way
+    (open/components/dynamicdocumentsui/TimingPanelTreeDDTarget.cpp: a row's name drawn with
+    StringUtils::PMDrawStringRGB(drawbotP, ...)). (The raster port's text bit, IRasterPort::setantialiaspolicy - the AGM
+    samples' way - was tried first and changed nothing.) This is the policy the drawbot draws are handed. */
+const dv_utils::AntiAliasPolicy kKFCTextSmoothing = dv_utils::kAntiAliasPolicy_Med;
+
+/** How wide `s` comes out as drawn here - drover's measure (the draws are drover's), with the flag the draws pass
+    (above); 0 for nothing. The one measure of both widgets: a hit row's cell lays its runs out by it, the message area
+    its lines. */
+inline PMReal KFCDrawnWidth(const PMString& s, const InterfaceFontInfo& font)
 {
 	if (s.IsEmpty())
 		return PMReal(0.0);
-	return StringUtils::PMMeasureString(gc, s, font, kKFCDontConvertAmpersand).X();
+	return StringUtils::PMMeasureStringDroverized(s, font, kKFCDontConvertAmpersand).X();
 }
 
 /** How much of the theme's text colour the CONTEXT keeps: 0 = the background itself (invisible),
@@ -111,15 +125,15 @@ inline PMString KFCCaretPlaceholder()
     @param top the top of the line's box and @param height its height - the bar spans the WHOLE of it,
            which is what makes it read as "between these two characters" rather than as a character
            of its own. */
-inline void KFCDrawCaret(IGraphicsPort* gPort, const RealAGMColor& colour,
+inline void KFCDrawCaret(dvaui::drawbot::Drawbot* drawbotP, const RealAGMColor& colour,
 						 const PMReal& x, const PMReal& roomW,
 						 const PMReal& top, const PMReal& height)
 {
-	if (gPort == nil || height <= PMReal(0.0))
+	if (drawbotP == nil || height <= PMReal(0.0))
 		return;
 	const PMReal left = ::Round(x + (roomW - kKFCCaretWidth) / PMReal(2.0));
-	gPort->setrgbcolor(colour.red, colour.green, colour.blue);
-	gPort->rectfill(left, ::Round(top), kKFCCaretWidth, height);
+	const PMReal y = ::Round(top);
+	dv_utils::DVFillRect(drawbotP, colour, PMRect(left, y, left + kKFCCaretWidth, y + height));
 }
 
 #endif // __KFCPanelTextDraw_h__

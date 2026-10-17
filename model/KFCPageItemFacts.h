@@ -42,6 +42,15 @@ namespace KFCPageItemFacts
 	    moves it; nothing of the item's own data does - KFCObjectSearch::Fingerprint leaves it out). -1 = no item, or no
 	    parent. */
 	int32 StackIndex(IDataBase* db, UID item);
+
+	/** THE DOCUMENT LAYER AN ITEM IS ON - the Layers panel's row: its spread layer's (a group's member, the group's), and
+	    for an item in text its anchor frame's (the hidden / locked tests above read it the same way). kInvalidUID when it
+	    cannot be told (an inline in overset text). */
+	UID DocLayerOf(IDataBase* db, UID item);
+
+	/** A document's layer of that name - the one ILayerList::FindByName finds (Move to Active Layer's, and Find Objects on
+	    Active Layer's in each document). kInvalidUID = none, or no name. */
+	UID DocLayerNamed(const UIDRef& docRef, const PMString& name);
 }
 
 #endif // __KFCPageItemFacts_h__

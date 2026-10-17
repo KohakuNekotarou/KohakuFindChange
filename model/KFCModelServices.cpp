@@ -75,6 +75,7 @@ public:
 	virtual UID GetHitItem(int32 chapterIdx, int32 hitIdx) { return KFCResultModel::GetHitItem(chapterIdx, hitIdx); }
 	virtual uint32 GetResultSetId() { return KFCResultModel::GetResultSetId(); }
 	virtual bool SetHitKept(int32 chapterIdx, int32 hitIdx, bool kept) { return KFCResultModel::SetHitKept(chapterIdx, hitIdx, kept); }
+	virtual void GetSearchLayer(PMString& out) { out = KFCResultModel::GetSearchLayer(); out.SetTranslatable(kFalse); }
 };
 
 CREATE_PMINTERFACE(KFCResultsSession, kKFCResultsImpl)
@@ -131,6 +132,7 @@ public:
 	// (Not under the list's query either - KFCUnderListQuery: a special operation walks no story, as Create Outlines.)
 	virtual bool SpecialRows(int32 op, const KFCRowsByChapter& rows, const KFCSpecialParams& params, PMString& outStatus) { return KFCObjectSpecial::SpecialRows(op, rows, params, outStatus); }
 	virtual bool CanSpecialHit(int32 op, int32 chapterIdx, int32 hitIdx) { return KFCObjectSpecial::CanSpecialHit(op, chapterIdx, hitIdx); }
+	virtual int32 SearchBookOnLayer(const PMString& layer, PMString& outSummary) { return KFCSearchEngine::SearchBookOnLayer(layer, outSummary); }
 };
 
 CREATE_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)

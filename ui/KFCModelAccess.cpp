@@ -95,6 +95,7 @@ namespace
 		virtual UID GetHitItem(int32, int32) { return kInvalidUID; }
 		virtual uint32 GetResultSetId() { return 0; }
 		virtual bool SetHitKept(int32, int32, bool) { return false; }
+		virtual void GetSearchLayer(PMString& out) { out.Clear(); }
 	};
 
 	class KFCRunsStandInImpl : public IKFCRuns
@@ -150,6 +151,7 @@ namespace
 		virtual bool CanOutlineHit(int32, int32) { return false; }
 		virtual bool SpecialRows(int32, const KFCRowsByChapter&, const KFCSpecialParams&, PMString& outStatus) { SayWhy(outStatus); return false; }
 		virtual bool CanSpecialHit(int32, int32, int32) { return false; }
+		virtual int32 SearchBookOnLayer(const PMString&, PMString& outSummary) { SayWhy(outSummary); return 0; }
 	};
 
 	class KFCChaptersStandInImpl : public IKFCChapters

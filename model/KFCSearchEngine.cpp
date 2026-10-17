@@ -2996,23 +2996,48 @@ namespace KFCSearchEngine
 		KFCBookScope::ChapterDoc	doc;			// Search: Document - the list's document, found open (when hasDoc)
 		bool					hasDoc;			// false = the front document, as Find searches (a search that found nothing)
 		PMString				bookPath;
+		PMString				layer;			// Find Objects on Active Layer's list: the layer it was searched on (else empty)
 		uint32					set;			// the list's result set: kept, so the tier stays where it stands (v2 R4)
 		AgainTarget() : fromBook(false), allDocuments(false), hasDoc(false), set(0) {}
 	};
 
-	/** THE SEARCH'S ONE BODY - SearchBook's (again nil) and SearchListAgain's: the same doors, the same walk, the same
-	    summary. A list searched again is not parked as a tier - it is the same one - and is put back as it was when the
-	    search does not go through. outCommitted = past the commit point, and not put back. */
-	int32 RunSearch(const AgainTarget* again, PMString& outSummary, bool& outCommitted);
+	/** THE SEARCH'S ONE BODY - SearchBook's (again nil), SearchBookOnLayer's (onLayer) and SearchListAgain's: the same
+	    doors, the same walk, the same summary. A list searched again is not parked as a tier - it is the same one - and is
+	    put back as it was when the search does not go through. outCommitted = past the commit point, and not put back.
+	    onLayer: Find Objects on Active Layer's layer (nil otherwise - a list searched again brings its own, again->layer). */
+	int32 RunSearch(const AgainTarget* again, PMString& outSummary, bool& outCommitted, const PMString* onLayer);
+
+	/** " on layer "Images"" - what a summary says of Find Objects on Active Layer's layer; nothing for no layer. */
+	void AppendLayerWords(PMString& out, const PMString& layer)
+	{
+		if (layer.IsEmpty())
+			return;
+		out.Append(" on layer \"");
+		out.Append(layer);
+		out.Append("\"");
+	}
 }
 
 int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 {
 	bool committed = false;
-	return RunSearch(nil, outSummary, committed);
+	return RunSearch(nil, outSummary, committed, nil);
 }
 
-int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary, bool& outCommitted)
+int32 KFCSearchEngine::SearchBookOnLayer(const PMString& layer, PMString& outSummary)
+{
+	bool committed = false;
+	if (layer.IsEmpty())
+	{
+		outSummary.Clear();
+		outSummary.SetTranslatable(kFalse);
+		outSummary.Append("Find Objects on Active Layer: no layer is active in the Layers panel - open a document.");
+		return 0;
+	}
+	return RunSearch(nil, outSummary, committed, &layer);
+}
+
+int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary, bool& outCommitted, const PMString* onLayer)
 {
 	outCommitted = false;
 	outSummary.Clear();
@@ -3086,6 +3111,26 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 		return 0;
 	}
 	const bool objectTab = (tab == IFindChangeOptions::kObjectSearch);	// the Object tab - KFCObjectSearch
+
+	// FIND OBJECTS ON ACTIVE LAYER'S LAYER (the spec's E14) - the command's, or the list's own when it is searched again: its
+	// rows are page items on a layer, which only the Object tab lists. The menu greys the command on the other tabs; this
+	// stays for a caller that never opened the menu, as the Colour tab's refusal above does.
+	PMString layer;
+	layer.SetTranslatable(kFalse);
+	if (again != nil)
+		layer = again->layer;
+	else if (onLayer != nil)
+		layer = *onLayer;
+	layer.SetTranslatable(kFalse);
+	if (!layer.IsEmpty() && !objectTab)
+	{
+		outSummary.Append("Find Objects on Active Layer searches the Object tab - the Find/Change dialog is on the ");
+		PMString tabName(KFCSearchEngine::TabName(tab));
+		tabName.SetTranslatable(kFalse);
+		outSummary.Append(tabName);
+		outSummary.Append(" tab.");
+		return 0;
+	}
 
 	// Transliterate - the CJK character-type conversion (Kanji / kana / half- and full-width) - is
 	// walked like any other text tab (the author's call: whatever the official panel is set to, this
@@ -3317,6 +3362,9 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 		: (selectionScope == IWalkerScopeFactoryUtils::kToEndOfStoryScope) ? KFCResultModel::kScopeToEndOfStory
 		: (selectionScope == IWalkerScopeFactoryUtils::kSelectionScope) ? KFCResultModel::kScopeSelection
 		: KFCResultModel::kScopeDocument);
+	// ...and the layer it kept to (Find Objects on Active Layer - empty for every other search), for the same reason: the
+	// list's searches again search that layer, and its tier's heading names it.
+	KFCResultModel::SetSearchLayer(layer);
 
 	// ...and that a search HAPPENED, which the panel's illustration follows. Said separately from
 	// the two lines around it because it survives finding nothing: a search that returned no hits
@@ -3374,7 +3422,7 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	CollectTally tally;
 	if (objectTab)		// THE OBJECT TAB: page items, walked by InDesign's own object search one document at a time.
 		KFCObjectSearch::CollectTargets(targets, fromBook, allDocuments, static_cast<int32>(selectionScope), unopenable, tally,
-			reserved);
+			reserved, layer);
 	else
 		CollectTargets(targets, fromBook, allDocuments, selectionScope, unopenable, tally, reserved);
 
@@ -3429,6 +3477,7 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	if (tally.total == 0)
 	{
 		outSummary.Append("No matches");
+		AppendLayerWords(outSummary, layer);	// Find Objects on Active Layer: " on layer "Images"" (nothing otherwise)
 		if (fromBook && selection.selected > 0)
 		{
 			// the selected documents were all that was looked at (Find/Change Selected Documents (Book))
@@ -3474,6 +3523,7 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	// still name what was searched - there is no tree under it to read.
 	outSummary.AppendNumber(tally.total);
 	outSummary.Append(" hit(s)");
+	AppendLayerWords(outSummary, layer);		// Find Objects on Active Layer: " on layer "Images"" (nothing otherwise)
 	if (fromBook && selection.selected > 0)
 	{
 		// "in M of S selected document(s) (T in the book)" (the query dialog's spec, section 4-4): M held a hit, S were
@@ -4697,6 +4747,23 @@ bool KFCSearchEngine::SearchDocumentAgain(int32 chapterIdx, PMString& outStatus)
 	}
 	KFCResultModel::RebindChapterDoc(chapterIdx, docRef);
 	const bool ours = KFCBookScope::IsHeldDoc(docRef);
+	// FIND OBJECTS ON ACTIVE LAYER'S LIST: the same layer again - this document's layer of the name; refused (the rows left
+	// as they are) when it has none now. (A chapter of ours goes back on the way out.)
+	UID onLayer = kInvalidUID;
+	const PMString layer(KFCResultModel::GetSearchLayer());
+	if (!layer.IsEmpty() && KFCResultModel::GetSearchMode() == IFindChangeOptions::kObjectSearch)
+	{
+		onLayer = KFCPageItemFacts::DocLayerNamed(docRef, layer);
+		if (onLayer == kInvalidUID)
+		{
+			if (ours)
+				(void)KFCBookScope::HandBackHeldDocNow(docRef);
+			outStatus.Append("the document has no layer named \"");
+			outStatus.Append(layer);
+			outStatus.Append("\" now - the rows are left as they were.");
+			return false;
+		}
+	}
 	// The rows - the kept ones too (the row eye) - where their foci stand now: a kept row the walk does not find again
 	// stays at that place (MergeKeptRows).
 	FollowChapterFoci(chapterIdx);
@@ -4712,7 +4779,7 @@ bool KFCSearchEngine::SearchDocumentAgain(int32 chapterIdx, PMString& outStatus)
 		const SearchingFlagGuard searchingGuard;
 		KFCForwardSearchScope forward;		// forward, as the search was
 		if (KFCResultModel::GetSearchMode() == IFindChangeOptions::kObjectSearch)
-			walked = KFCObjectSearch::WalkOneDocument(docRef, name, limit, hits, capped, cancelled);
+			walked = KFCObjectSearch::WalkOneDocument(docRef, name, limit, hits, capped, cancelled, onLayer);
 		else
 		{
 			// The search's walk of one of its documents (CollectTargets' chapter walk): from the top, the whole of it.
@@ -4781,6 +4848,7 @@ bool KFCSearchEngine::SearchListAgain(PMString& outStatus)
 	}
 	AgainTarget again;
 	again.set = KFCResultModel::GetResultSetId();
+	again.layer = KFCResultModel::GetSearchLayer();		// Find Objects on Active Layer's list: the same layer again
 	const char* part = nil;
 	switch (KFCResultModel::GetSearchScope())
 	{
@@ -4858,7 +4926,7 @@ bool KFCSearchEngine::SearchListAgain(PMString& outStatus)
 		}
 	}
 	bool committed = false;
-	(void)RunSearch(&again, outStatus, committed);
+	(void)RunSearch(&again, outStatus, committed, nil);
 	return committed;
 }
 

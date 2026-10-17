@@ -112,6 +112,9 @@ public:
 	virtual uint32 GetResultSetId() = 0;
 	/** = KFCResultModel::SetHitKept (appended) - the row eye's click: a row's eye on or off. false = no such row. */
 	virtual bool SetHitKept(int32 chapterIdx, int32 hitIdx, bool kept) = 0;
+	/** = KFCResultModel::GetSearchLayer (appended) - the layer Find Objects on Active Layer kept the list to (empty for any
+	    other list): a tier's heading names it. */
+	virtual void GetSearchLayer(PMString& out) = 0;
 };
 
 #endif // __IKFCResults_h__

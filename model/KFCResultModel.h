@@ -339,6 +339,12 @@ namespace KFCResultModel
 	void SetSearchScope(SearchScopeKind scope);
 	SearchScopeKind GetSearchScope();
 
+	/** THE LAYER THESE RESULTS WERE SEARCHED ON (Find Objects on Active Layer - the spec's E14): its name, each document's
+	    layer of that name - empty for every other search. Kept with the list as its Search: is, so a search again
+	    searches the same layer and a tier's heading names it; recorded beside SetSearchScope, after the commit point. */
+	void SetSearchLayer(const PMString& layer);
+	PMString GetSearchLayer();
+
 	/** A DOCUMENT OF THE LIST WAS CLOSED (the author's calls: only its rows go - an All Documents list's, 2026-09-29, and
 	    every list's, its heading staying while it is a tier, 2026-10-14 night - KFCCloseDocResponder).
 	    Its chapter is emptied - rows, groups, story versions - and unbound (no docRef, no file), but
@@ -926,6 +932,7 @@ namespace KFCResultModel
 	{
 		bool			fromBook;		// SetFromBook
 		SearchScopeKind	searchScope;	// SetSearchScope
+		PMString		searchLayer;	// SetSearchLayer - empty but for Find Objects on Active Layer's list
 		PMString		bookName;		// SetBookName
 		int32			searchMode;		// SetSearchMode (-1 = nothing searched yet)
 		PMString		walkSignature;	// SetWalkSignature

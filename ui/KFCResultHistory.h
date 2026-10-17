@@ -48,8 +48,9 @@ namespace KFCResultHistory
 	    `label` names the new list's tier.
 	    Then the list drawn again (KFCResultTree::Rebuild) and the status line set to the search's words - with a word on
 	    the tier let go, if one was. Returns the search's answer (the matches found); *outCommitted, when given, says whether
-	    the search went through. */
-	int32 Find(const PMString& label, PMString& outSummary, bool* outCommitted = nil);
+	    the search went through. onLayer, when given: Find Objects on Active Layer's layer - the search is
+	    KFCRuns()->SearchBookOnLayer, its rows kept to that layer, and the tier's heading names it (LiveTierLabel). */
+	int32 Find(const PMString& label, PMString& outSummary, bool* outCommitted = nil, const PMString* onLayer = nil);
 
 	/** A tier's name - the query Find/Change holds now, in the author's words (10-14; F and C rather than Find and Change,
 	    the same night): "[<tab>] F:"<find>" C:"<change>"",

@@ -147,6 +147,9 @@ public:
 	/** = KFCObjectSpecial::CanSpecialHit (appended) - a special operation offered for a row: its doors, read only (a
 	    document not open now answers true). */
 	virtual bool CanSpecialHit(int32 op, int32 chapterIdx, int32 hitIdx) = 0;
+	/** = KFCSearchEngine::SearchBookOnLayer (appended) - the panel menu's Find Objects on Active Layer: SearchBook on the
+	    Object tab, its rows kept to the objects on each document's layer of that name. */
+	virtual int32 SearchBookOnLayer(const PMString& layer, PMString& outSummary) = 0;
 };
 
 #endif // __IKFCRuns_h__

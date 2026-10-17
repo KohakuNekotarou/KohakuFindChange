@@ -222,29 +222,24 @@ const char* const kScale = R"JS(
   var tip = "In percent. Each object is scaled about its own centre.";
   var ex = field(col, "Scale X:", "@@X@@%", tip);
   var ey = field(col, "Scale Y:", "@@Y@@%", tip);
-  // THE CHAIN, as InDesign's: pressed, the two values are one; let go, each its own. Drawn here - a link closed or open.
-  var chain = g.add("iconbutton", undefined, undefined, { style: "toolbutton", toggle: true });
-  chain.preferredSize = [20, 34];
+  // THE CHAIN, as InDesign's own (the author: "the icon and what it does change as it is pressed" - and "the same as the
+  // official"): linked, the chain whole on its square and the two values one; unlinked, the chain broken and each value
+  // its own; a square under the pointer and a blue ring with the keyboard focus, as InDesign's button draws them - drawn
+  // from that button, photographed in each colour theme and state (kChain).
+@@CHAIN@@
+  var first = null;
+  try { first = chainImage(@@C@@, false, false); } catch (e1) {}
+  var chain = g.add("iconbutton", undefined, first, { style: "toolbutton", toggle: true });
+  chain.preferredSize = [20, 20];
   chain.value = @@C@@;
   chain.helpTip = "Constrain proportions for scaling";
-  chain.onDraw = function () {
+  chain.onDraw = function (state) {
     try {
-      var gr = this.graphics, W = this.size[0], H = this.size[1];
-      var dark = true;
-      try { dark = app.generalPreferences.uiBrightnessPreference < 0.5; } catch (e1) {}
-      var inkColour = [0.25, 0.25, 0.25, 1], fillColour = [0.78, 0.78, 0.78, 1];
-      if (dark) { inkColour = [0.85, 0.85, 0.85, 1]; fillColour = [0.36, 0.36, 0.36, 1]; }
-      if (this.value) {
-        gr.newPath(); gr.rectPath(0, 0, W, H); gr.fillPath(gr.newBrush(gr.BrushType.SOLID_COLOR, fillColour));
-      }
-      var pen = gr.newPen(gr.PenType.SOLID_COLOR, inkColour, 1.5);
-      var lw = 7, lh = 11, x = (W - lw) / 2;
-      var gap = 3;
-      if (this.value) gap = -3;
-      var top = (H - (2 * lh + gap)) / 2;
-      gr.newPath(); gr.ellipsePath(x, top, lw, lh); gr.strokePath(pen);
-      gr.newPath(); gr.ellipsePath(x, top + lh + gap, lw, lh); gr.strokePath(pen);
-    } catch (e) {}
+      var hover = false, focus = false;
+      if (state) { hover = state.mouseOver; focus = state.hasFocus; }
+      var img = chainImage(this.value, hover, focus);
+      if (img) this.graphics.drawImage(img, (this.size[0] - 20) / 2, (this.size[1] - 20) / 2);
+    } catch (e2) {}
   };
   ex.onChanging = function () { if (chain.value) ey.text = ex.text; };
   ey.onChanging = function () { if (chain.value) ex.text = ey.text; };
@@ -264,6 +259,107 @@ const char* const kScale = R"JS(
   w.show();
   return answer;
 })();
+)JS";
+
+// THE CHAIN, for Scale's script (@@CHAIN@@): InDesign's own chain button, drawn as InDesign draws it. Not the SDK's link
+// icons (source/open/icons) nor the app's own PNG resources 296 / 297 (Required/(Application UI Resources)/idrc_PNGA and
+// idrc_PNGD - on screen InDesign draws the button from the SVG ones, idrc_SVGA, which come out a little differently): the
+// button was photographed in InDesign's Scale dialog at the four colour-theme presets in every state it draws - at rest,
+// under the pointer, with the keyboard focus, linked and unlinked - and ONE shape (the square's ring and inside, the two
+// chains: coverage masks) with each theme's colours was fitted to those photographs; drawn back through this script's own
+// arithmetic, every one of them comes out within 2 greys. The script builds the state's PNG from them when it is first
+// drawn. ! Two of InDesign's drawings were left out: its first drawing after a theme change, still in the old theme's chain
+// colour until the button is pressed, and the button held down (not photographed - drawn as under the pointer).
+// Made by work/note-scripts/2026-10-17-kfc-object-special/chain_js2.py (photographs: theme_states.ps1; fit: chain_model2.py).
+const char* const kChain = R"JS(
+  // The button's shape, 20 x 20, one hex pair (0..255) a pixel: the square's ring and its inside (one shape for every
+  // state), the chain whole and the chain broken.
+  var CH_RING = "20a0ffffffffffffffffffffffffffffffffa820b07f01ffffffffffffffffffffffffffff016dd0ff01ffffffffffffffffffffffffffffffff01ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff01ffffffffffffffffffffffffffffffff06ffd04702ffffffffffffffffffffffffffff0832e740e0ffffffffffffffffffffffffffffffffe749";
+  var CH_FILL = "0001000000000000000000000000000000000200000ea2ffffffffffffffffffffffffffffa6200100afffffffffffffffffffffffffffffffffcf0000ffffffffffffffffffffffffffffffffffff0000ffffffffffffffffffffffffffffffffffff0000ffffffffffffffffffffffffffffffffffff0000ffffffffffffffffffffffffffffffffffff0000ffffffffffffffffffffffffffffffffffff0000ffffffffffffffffffffffffffffffffffff0000ffffffffffffffffffffffffffffffffffff0000ffffffffffffffffffffffffffffffffffff0000ffffffffffffffffffffffffffffffffffff0000ffffffffffffffffffffffffffffffffffff0000ffffffffffffffffffffffffffffffffffff0000ffffffffffffffffffffffffffffffffffff0000ffffffffffffffffffffffffffffffffffff0000ffffffffffffffffffffffffffffffffffff0000cfffffffffffffffffffffffffffffffffe4000133e2fffffffffffffffffffffffffffff159000202000000000000000000000000000000000000";
+  var CH_LINK = "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004fb8b85f00000000000000000000000000000058ffd0d0ff760000000000000000000000000000c1c70000a7df0000000000000000000000000000ff7f00007fff0000000000000000000000000000b80f40207fff000000000000000000000000000018d0ff7f7fff0000000000000000000000000000a7f75f207fff0000000000000000000000000000f0980018d0e70000000000000000000000000000ff7f7fffff5f0000000000000000000000000000ff7f407f40470000000000000000000000000000ff7f000067ff0000000000000000000000000000d8a0000089f0000000000000000000000000000089ff9089f7a0000000000000000000000000000008a0ffffa708000000000000000000000000000000000f0f00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+  var CH_BREAK = "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000050b6c060000000000000000000000039e72f0050ffd0d0ff780000000000000000000008b6ef2f60c60000a7d6000000000000000000000008b6ef2f1000007fff00000000000000000000000008b6ef2f00007fff0000000000000000000000000008b6ef2f007fff000000000000000000000000000008b6ef2f50ff0000000000000000000000000000a710b6ef2f500000000000000000000000000000ff7808b6ef2f0000000000000000000000000000ff7f0008b6ef2f00000000000000000000000000ff7f000008b6ef2f000000000000000000000000d69f00004910b6ef2f000000000000000000000078ff8f87f78f08b6ef0800000000000000000000009fffffc01000084900000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+  // InDesign's colours for it at the four colour-theme presets (uiBrightnessPreference): the chain; the linked square's ring
+  // and inside; the unlinked one's under the pointer; the inside with the keyboard focus; the focus ring.
+  var CH_THEMES = [
+    { at: 0, glyph: 0xb6, lring: 0x3e, lin: 0x1f, hring: 0x47, hin: 0x29, fin: 0x2a, blue: [0x46, 0xa0, 0xf5] },
+    { at: 0.5, glyph: 0xc2, lring: 0x56, lin: 0x30, hring: 0x59, hin: 0x3d, fin: 0x45, blue: [0x46, 0xa0, 0xf5] },
+    { at: 0.51, glyph: 0x40, lring: 0x83, lin: 0x96, hring: 0xb2, hin: 0xdc, fin: 0xdf, blue: [0x0f, 0x67, 0xd2] },
+    { at: 1, glyph: 0x53, lring: 0xa7, lin: 0xbd, hring: 0xbd, hin: 0xf9, fin: 0xfb, blue: [0x14, 0x76, 0xe6] }
+  ];
+  // The colours for the theme now. Between two presets on one side (dark 0..0.50, light 0.51..1) they are taken in
+  // proportion - a guess: InDesign's own between its presets were not measured.
+  function chainColours() {
+    var b = 0.5;
+    try { b = app.generalPreferences.uiBrightnessPreference; } catch (e0) {}
+    var lo = CH_THEMES[0], hi = CH_THEMES[1];
+    if (b > 0.5) { lo = CH_THEMES[2]; hi = CH_THEMES[3]; }
+    var t = (b - lo.at) / (hi.at - lo.at);
+    if (t < 0) t = 0;
+    if (t > 1) t = 1;
+    var out = {}, k;
+    for (k in lo) { if (k != "at" && k != "blue") out[k] = lo[k] + (hi[k] - lo[k]) * t; }
+    out.blue = [lo.blue[0] + (hi.blue[0] - lo.blue[0]) * t, lo.blue[1] + (hi.blue[1] - lo.blue[1]) * t, lo.blue[2] + (hi.blue[2] - lo.blue[2]) * t];
+    return out;
+  }
+  // A PNG of 20 x 20 straight RGBA (px: 1600 numbers), for ScriptUI.newImage: zlib's stored block - no compression - and
+  // each chunk's CRC-32.
+  var CH_CRC = [];
+  (function () {
+    for (var n = 0; n < 256; n++) {
+      var c = n;
+      for (var k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      CH_CRC[n] = c;
+    }
+  })();
+  function chU32(n) { return String.fromCharCode((n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255); }
+  function chChunk(type, data) {
+    var s = type + data, c = -1;
+    for (var i = 0; i < s.length; i++) c = CH_CRC[(c ^ s.charCodeAt(i)) & 255] ^ (c >>> 8);
+    return chU32(data.length) + s + chU32((c ^ -1) >>> 0);
+  }
+  function chPng(px) {
+    var raw = "", a = 1, b = 0, i;
+    for (var y = 0; y < 20; y++) {
+      raw += "\x00";
+      for (var x = 0; x < 80; x++) raw += String.fromCharCode(px[y * 80 + x]);
+    }
+    for (i = 0; i < raw.length; i++) { a = (a + raw.charCodeAt(i)) % 65521; b = (b + a) % 65521; }
+    var n = raw.length;
+    var z = "\x78\x01\x01" + String.fromCharCode(n & 255, (n >>> 8) & 255, ~n & 255, (~n >>> 8) & 255) + raw + chU32(((b << 16) | a) >>> 0);
+    return "\x89PNG\r\n\x1A\n" + chChunk("IHDR", chU32(20) + chU32(20) + "\x08\x06\x00\x00\x00") + chChunk("IDAT", z) + chChunk("IEND", "");
+  }
+  // The button as InDesign draws it in this state, made once: linked - the square (grey ring) and the chain whole;
+  // unlinked - the chain broken, a square only under the pointer or with the focus; the keyboard focus - a blue ring.
+  var CH_IMG = {};
+  function chainImage(linked, hover, focus) {
+    var key = (linked ? "L" : "U") + (hover ? "H" : "") + (focus ? "F" : "");
+    if (CH_IMG[key]) return CH_IMG[key];
+    var c = chainColours(), ring = null, inside = 0;
+    if (focus) ring = c.blue;
+    else if (linked) ring = [c.lring, c.lring, c.lring];
+    else if (hover) ring = [c.hring, c.hring, c.hring];
+    if (linked) inside = c.lin;
+    else if (hover) inside = c.hin;
+    else if (focus) inside = c.fin;
+    var glyph = CH_BREAK;
+    if (linked) glyph = CH_LINK;
+    var px = [];
+    for (var i = 0; i < 400; i++) {
+      var r = 0, g = 0, bl = 0, al = 0, o;
+      if (ring) {
+        o = parseInt(CH_RING.substr(i * 2, 2), 16) / 255;
+        r = ring[0] * o + r * (1 - o); g = ring[1] * o + g * (1 - o); bl = ring[2] * o + bl * (1 - o); al = o + al * (1 - o);
+        o = parseInt(CH_FILL.substr(i * 2, 2), 16) / 255;
+        r = inside * o + r * (1 - o); g = inside * o + g * (1 - o); bl = inside * o + bl * (1 - o); al = o + al * (1 - o);
+      }
+      o = parseInt(glyph.substr(i * 2, 2), 16) / 255;
+      r = c.glyph * o + r * (1 - o); g = c.glyph * o + g * (1 - o); bl = c.glyph * o + bl * (1 - o); al = o + al * (1 - o);
+      if (al > 0) px.push(Math.floor(r / al + 0.5), Math.floor(g / al + 0.5), Math.floor(bl / al + 0.5), Math.floor(al * 255 + 0.5));
+      else px.push(0, 0, 0, 0);
+    }
+    CH_IMG[key] = ScriptUI.newImage(chPng(px));
+    return CH_IMG[key];
+  }
 )JS";
 
 const char* const kRotate = R"JS(
@@ -376,6 +472,7 @@ bool KFCSpecialDialogs::AskTransformValues(int32 op, KFCSpecialParams& io, PMStr
 			ReplaceAll(body, "@@X@@", JsLiteral(gScaleX));
 			ReplaceAll(body, "@@Y@@", JsLiteral(gScaleY));
 			ReplaceAll(body, "@@C@@", gScaleConstrain ? "true" : "false");
+			ReplaceAll(body, "@@CHAIN@@", kChain);
 			js += body;
 			break;
 		}
