@@ -115,6 +115,16 @@ public:
 	/** = KFCResultModel::GetSearchLayer (appended) - the layer Find Objects on Active Layer kept the list to (empty for any
 	    other list): a tier's heading names it. */
 	virtual void GetSearchLayer(PMString& out) = 0;
+	/** = KFCResultModel::NarrowWords (appended) - a narrowed list's conditions in words ("In Tables / Pages 1-5"; empty for
+	    any other list): a tier's heading names them after its name. */
+	virtual void GetNarrowWords(PMString& out) = 0;
+	/** = KFCResultModel::ListHoldsObjects (appended) - the list's rows are object rows (an Object tab search's, Frames of These
+	    Matches'): the heading's menu greys a text-only condition. */
+	virtual bool ListHoldsObjects() = 0;
+	/** = KFCResultModel::ClearRows (appended) - Clear from Results: the rows taken off the list. Answers how many. */
+	virtual int32 ClearRows(const KFCRowsByChapter& rows) = 0;
+	/** = KFCResultModel::GetObjectRowHit (appended) - an object list's chapter: its nth row shown, as a hit index. */
+	virtual int32 GetObjectRowHit(int32 chapterIdx, int32 nth) = 0;
 };
 
 #endif // __IKFCResults_h__

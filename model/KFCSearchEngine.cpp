@@ -2420,7 +2420,7 @@ int32 CarryKeptRowsByDocument(const KFCResultModel::ModelSnapshot& before,
 				continue;
 			carried[o] = true;
 			for (size_t i = 0; i < old.hits.size(); ++i)
-				if (old.hits[i].kept)
+				if (old.hits[i].kept && !old.hits[i].cleared)	// (a row taken off the list is not carried - Clear from Results)
 					kept.push_back(old.hits[i]);
 			versions = old.storyVersions;
 			break;
@@ -2444,7 +2444,7 @@ int32 CarryKeptRowsByDocument(const KFCResultModel::ModelSnapshot& before,
 			continue;
 		std::vector<KFCResultModel::Hit> kept;
 		for (size_t i = 0; i < old.hits.size(); ++i)
-			if (old.hits[i].kept)
+			if (old.hits[i].kept && !old.hits[i].cleared)
 				kept.push_back(old.hits[i]);
 		if (!kept.empty())
 			keptChapter(old.name, old.file, old.docRef, kept, old.storyVersions);
@@ -3248,7 +3248,7 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 		// THE ROW EYE: the rows with their eye on stay through the search again - their room is kept from the walk's.
 		for (size_t c = 0; c < before.chapters.size(); ++c)
 			for (size_t i = 0; i < before.chapters[c].hits.size(); ++i)
-				if (before.chapters[c].hits[i].kept)
+				if (before.chapters[c].hits[i].kept && !before.chapters[c].hits[i].cleared)
 					++reserved;
 	}
 	else
@@ -4440,7 +4440,7 @@ bool SearchPartsAgain(const PMString& lead, PMString& outStatus)
 	// The room the list leaves: its limit less the rows of the chapters not searched again, and the rows with their eye on.
 	int32 room = KFCResultModel::kKFCCollectHitLimit - KFCResultModel::GetTotalHitCount();
 	for (size_t k = 0; k < chapters.size(); ++k)
-		room += KFCResultModel::GetHitCount(chapters[k].chapter) - KFCResultModel::CountKeptRows(chapters[k].chapter, kInvalidUID);
+		room += KFCResultModel::GetShownHitCount(chapters[k].chapter) - KFCResultModel::CountKeptRows(chapters[k].chapter, kInvalidUID);
 	bool capped = false, cancelled = false, walked = true;
 	{
 		const SearchingFlagGuard searchingGuard;
@@ -4629,7 +4629,8 @@ bool KFCSearchEngine::SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMStrin
 		UID s = kInvalidUID;
 		TextIndex a = kInvalidTextIndex, b = kInvalidTextIndex;
 		uint64 h = 0;
-		if (KFCResultModel::GetHitMatchIdentity(chapterIdx, i, s, a, b, h) && s == story)
+		if (!KFCResultModel::IsHitCleared(chapterIdx, i) && KFCResultModel::GetHitMatchIdentity(chapterIdx, i, s, a, b, h)
+			&& s == story)
 			++storyRows;
 	}
 	// ...and the room the story's rows with their eye on keep (the row eye - they stay, found or not).
@@ -4928,6 +4929,15 @@ bool KFCSearchEngine::SearchListAgain(PMString& outStatus)
 	bool committed = false;
 	(void)RunSearch(&again, outStatus, committed, nil);
 	return committed;
+}
+
+bool KFCSearchEngine::NarrowList(const KFCNarrowStep& step, PMString& outStatus)
+{
+	(void)step;
+	outStatus.Clear();
+	outStatus.SetTranslatable(kFalse);
+	outStatus.Append("Narrow Down: not built yet.");
+	return false;
 }
 
 void KFCSearchEngine::RestoreSearchScope(int32 mode, int32 scope)

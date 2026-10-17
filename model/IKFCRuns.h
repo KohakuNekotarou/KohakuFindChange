@@ -150,6 +150,10 @@ public:
 	/** = KFCSearchEngine::SearchBookOnLayer (appended) - the panel menu's Find Objects on Active Layer: SearchBook on the
 	    Object tab, its rows kept to the objects on each document's layer of that name. */
 	virtual int32 SearchBookOnLayer(const PMString& layer, PMString& outSummary) = 0;
+	/** = KFCSearchEngine::NarrowList (appended) - a tier heading's Narrow Down: the live list's own search run once more over
+	    what it searched, with its conditions and `step`, into a new list (a new tier). False = refused, nothing changed
+	    (outStatus says why), or cancelled. */
+	virtual bool NarrowList(const KFCNarrowStep& step, PMString& outStatus) = 0;
 };
 
 #endif // __IKFCRuns_h__

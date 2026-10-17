@@ -15,6 +15,7 @@
 
 // General includes:
 #include "TextChar.h"	// kTextChar_CR / kTextChar_LF / kTextChar_PilchrowSign and the hidden markers - see MarkUpBreaksForDisplay
+#include "IFindChangeOptions.h"	// kObjectSearch - ListHoldsObjects reads the list's search mode
 
 #include <algorithm>	// std::stable_sort - the page order and each story's order (OrderHitsByPage, NumberHitsWithinStories)
 #include <set>			// the rows already copied aside - see BackUpRow
@@ -86,11 +87,22 @@ namespace
 		gBackup = RowBackup();	// a fresh one in its place: off, and the storage goes too, not just the contents
 	}
 
+	// The rows a chapter's list still shows - none taken off it (Hit::cleared): what every count counts.
+	int32 ShownRows(const std::vector<KFCResultModel::Hit>& hits)
+	{
+		int32 shown = 0;
+		for (size_t i = 0; i < hits.size(); ++i)
+			if (!hits[i].cleared)
+				++shown;
+		return shown;
+	}
+
 	// Does the tree show this chapter? Rows, or searched again with none (Chapter::shownEmpty) - the one question
-	// GetDisplayChapterCount, GetShownChapter and GetShownChapterPos ask.
+	// GetDisplayChapterCount, GetShownChapter and GetShownChapterPos ask. A chapter whose every row was taken off the list
+	// (Clear from Results) is not shown.
 	bool ChapterShown(const KFCResultModel::Chapter& c)
 	{
-		return !c.hits.empty() || c.shownEmpty;
+		return ShownRows(c.hits) > 0 || c.shownEmpty;
 	}
 
 	// THE INDEXES, ASKED IN ONE PLACE. A chapter, a row, a story group - or nil when an index
@@ -161,15 +173,25 @@ namespace
 		// would otherwise compare every hit with every group made before it (the speed-up study). The
 		// groups are still made in first-appearance order - the map only finds them.
 		std::map<UID, int32> groupOf;
+		int32 objectPos = 0;
 		for (size_t i = 0; i < chapter.hits.size(); ++i)
 		{
 			KFCResultModel::Hit& hit = chapter.hits[i];
-			// AN OBJECT ROW has no story: it hangs off its document row directly (the adapter's branch for a
-			// chapter with no groups, KFCResultListAdapter.cpp).
-			if (hit.itemUID != kInvalidUID)
+			// A ROW TAKEN OFF THE LIST (Clear from Results - Hit::cleared) is in no group and has no place: the tree does not
+			// draw it.
+			if (hit.cleared)
 			{
 				hit.fontGroup = -1;
 				hit.fontGroupPos = -1;
+				continue;
+			}
+			// AN OBJECT ROW has no story: it hangs off its document row directly (the adapter's branch for a
+			// chapter with no groups, KFCResultListAdapter.cpp) - at its place among the chapter's object rows the list
+			// shows (GetObjectRowHit; its index, while no row is taken off).
+			if (hit.itemUID != kInvalidUID)
+			{
+				hit.fontGroup = -1;
+				hit.fontGroupPos = objectPos++;
 				continue;
 			}
 			int32 found = -1;
@@ -196,11 +218,18 @@ namespace
 	// Hit::storyOrdinal in the header): a group's hits sorted by where they started when the search found them. Not
 	// the hits' own order - that is page order, and the walk's order inside a table is reading order (memory
 	// walker-scope-options-and-hidden-layers), neither of which is the text's.
+	// EVERY TEXT ROW OF THE STORY, the ones taken off the list too (Clear from Results - Hit::cleared): they stand in the text
+	// all the same, and a row looked for again ranks itself among every look-alike row of its story (LookAlikeRows,
+	// KFCSearchEngine.cpp) - so the story's rows are gathered here by their story, not by the groups the list draws.
 	void NumberHitsWithinStories(KFCResultModel::Chapter& chapter)
 	{
-		for (size_t g = 0; g < chapter.fontGroups.size(); ++g)
+		std::map<UID, std::vector<int32> > byStory;
+		for (size_t i = 0; i < chapter.hits.size(); ++i)
+			if (chapter.hits[i].itemUID == kInvalidUID)
+				byStory[chapter.hits[i].storyUID].push_back(static_cast<int32>(i));
+		for (std::map<UID, std::vector<int32> >::iterator s = byStory.begin(); s != byStory.end(); ++s)
 		{
-			std::vector<int32> order(chapter.fontGroups[g].hitIndices);
+			std::vector<int32>& order = s->second;
 			std::stable_sort(order.begin(), order.end(), [&chapter](int32 a, int32 b)
 				{ return chapter.hits[static_cast<size_t>(a)].textStart < chapter.hits[static_cast<size_t>(b)].textStart; });
 			for (size_t k = 0; k < order.size(); ++k)
@@ -322,6 +351,52 @@ PMString KFCResultModel::GetSearchLayer()
 	PMString layer(gHeader.searchLayer);
 	layer.SetTranslatable(kFalse);
 	return layer;
+}
+
+void KFCResultModel::SetNarrowSteps(const std::vector<KFCNarrowStep>& steps)
+{
+	gHeader.narrow = steps;
+}
+
+std::vector<KFCNarrowStep> KFCResultModel::GetNarrowSteps()
+{
+	return gHeader.narrow;
+}
+
+PMString KFCResultModel::NarrowWords()
+{
+	PMString words;
+	words.SetTranslatable(kFalse);
+	for (size_t k = 0; k < gHeader.narrow.size(); ++k)
+	{
+		const KFCNarrowStep& step = gHeader.narrow[k];
+		if (!words.IsEmpty())
+			words.Append(" / ");
+		switch (step.kind)
+		{
+			case kKFCNarrowInTables:		words.Append("In Tables"); break;
+			case kKFCNarrowInFootnotes:		words.Append("In Footnotes"); break;
+			case kKFCNarrowInEndnotes:		words.Append("In Endnotes"); break;
+			case kKFCNarrowPages:			words.Append("Pages "); words.Append(step.pages); break;
+			case kKFCNarrowOnPasteboard:	words.Append("On Pasteboard"); break;
+			case kKFCNarrowFrames:			words.Append("Frames"); break;
+			default:						words.Append("?"); break;
+		}
+	}
+	words.SetTranslatable(kFalse);
+	return words;
+}
+
+bool KFCResultModel::ListHoldsObjects()
+{
+	// An Object tab search's list - its search mode (SetSearchMode keeps it as a plain int) - or a list a Frames of These
+	// Matches step made, found or empty.
+	if (gHeader.searchMode == static_cast<int32>(IFindChangeOptions::kObjectSearch))
+		return true;
+	for (size_t k = 0; k < gHeader.narrow.size(); ++k)
+		if (gHeader.narrow[k].kind == kKFCNarrowFrames)
+			return true;
+	return false;
 }
 
 void KFCResultModel::CloseChapter(int32 chapterIdx, const IDFile* closedFile)
@@ -462,11 +537,23 @@ int32 KFCResultModel::GetHitCount(int32 chapterIdx)
 	return (c != nil) ? static_cast<int32>(c->hits.size()) : 0;
 }
 
+int32 KFCResultModel::GetShownHitCount(int32 chapterIdx)
+{
+	const Chapter* c = ChapterAt(chapterIdx);
+	return (c != nil) ? ShownRows(c->hits) : 0;
+}
+
+bool KFCResultModel::IsHitCleared(int32 chapterIdx, int32 hitIdx)
+{
+	const Hit* h = HitAt(chapterIdx, hitIdx);
+	return h != nil && h->cleared;
+}
+
 int32 KFCResultModel::GetTotalHitCount()
 {
 	int32 total = 0;
 	for (size_t i = 0; i < gChapters.size(); ++i)
-		total += static_cast<int32>(gChapters[i].hits.size());
+		total += ShownRows(gChapters[i].hits);
 	return total;
 }
 
@@ -481,7 +568,7 @@ int32 KFCResultModel::GetDisplayChapterCount()
 
 int32 KFCResultModel::GetDisplayHitCount(int32 chapterIdx)
 {
-	return GetHitCount(chapterIdx);
+	return GetShownHitCount(chapterIdx);
 }
 
 bool KFCResultModel::GetChapterDisplay(int32 chapterIdx, PMString& outName, int32& outHitCount)
@@ -491,8 +578,52 @@ bool KFCResultModel::GetChapterDisplay(int32 chapterIdx, PMString& outName, int3
 		return false;
 	outName = c->name;
 	outName.SetTranslatable(kFalse);
-	outHitCount = static_cast<int32>(c->hits.size());
+	outHitCount = ShownRows(c->hits);
 	return true;
+}
+
+int32 KFCResultModel::GetObjectRowHit(int32 chapterIdx, int32 nth)
+{
+	const Chapter* c = ChapterAt(chapterIdx);
+	if (c == nil || nth < 0)
+		return -1;
+	for (size_t i = 0; i < c->hits.size(); ++i)
+		if (!c->hits[i].cleared && c->hits[i].itemUID != kInvalidUID && c->hits[i].fontGroupPos == nth)
+			return static_cast<int32>(i);
+	return -1;
+}
+
+int32 KFCResultModel::ClearRows(const KFCRowsByChapter& rows)
+{
+	int32 cleared = 0;
+	for (size_t k = 0; k < rows.size(); ++k)
+	{
+		Chapter* c = ChapterAt(rows[k].chapter);
+		if (c == nil)
+			continue;
+		bool touched = false;
+		for (size_t j = 0; j < rows[k].hits.size(); ++j)
+		{
+			Hit* h = HitAt(rows[k].chapter, rows[k].hits[j]);
+			if (h == nil || h->cleared)
+				continue;
+			h->cleared = true;
+			h->kept = false;		// a row taken off is not kept through a search again either (MergeKeptRows reads the eye)
+			++cleared;
+			touched = true;
+		}
+		if (!touched)
+			continue;
+		// The groups and the object rows' places again, around the rows taken off - NOT the stories' order (Hit::storyOrdinal
+		// is the search's order, which finds a row among look-alikes): BuildFontGroups alone, no new layout generation (no
+		// row moves), so the writes kept for an Undo still name their rows.
+		BuildFontGroups(*c);
+		// A document searched again with nothing found was shown at (0/0) to be searched again; its rows taken off by hand,
+		// its row goes as any other document's (the spec's K5).
+		if (ShownRows(c->hits) == 0)
+			c->shownEmpty = false;
+	}
+	return cleared;
 }
 
 int32 KFCResultModel::GetDisplayFontHitCount(int32 chapterIdx, int32 fontIdx)
@@ -555,7 +686,7 @@ int32 KFCResultModel::GetChapterReplacedCount(int32 chapterIdx)
 		return 0;
 	int32 replaced = 0;
 	for (size_t i = 0; i < c->hits.size(); ++i)
-		if (c->hits[i].replaced)
+		if (c->hits[i].replaced && !c->hits[i].cleared)
 			++replaced;
 	return replaced;
 }
@@ -618,6 +749,7 @@ bool KFCResultModel::GetHitRow(int32 chapterIdx, int32 hitIdx, RowDisplay& out)
 	out.outlined = h.outlined;
 	out.kept = h.kept;
 	out.special = h.special;
+	out.outlinedText = h.outlinedText;
 	return true;
 }
 
@@ -637,7 +769,7 @@ int32 KFCResultModel::CountKeptRows(int32 chapterIdx, UID story)
 		return 0;
 	int32 count = 0;
 	for (size_t i = 0; i < c->hits.size(); ++i)
-		if (c->hits[i].kept && (story == kInvalidUID || c->hits[i].storyUID == story))
+		if (c->hits[i].kept && !c->hits[i].cleared && (story == kInvalidUID || c->hits[i].storyUID == story))
 			++count;
 	return count;
 }
@@ -1044,6 +1176,29 @@ void KFCResultModel::MarkHitRestored(int32 chapterIdx, int32 hitIdx, UID storyUI
 	BuildHitLocator(h);
 }
 
+void KFCResultModel::MarkHitOutlined(int32 chapterIdx, int32 hitIdx, UID storyUID, TextIndex start, TextIndex end,
+	const PMString& original)
+{
+	Hit* hp = HitAt(chapterIdx, hitIdx);
+	if (hp == nil || hp->itemUID != kInvalidUID)
+		return;		// a text row's - an object row's outlines are MarkItemOutlined's
+	Hit& h = *hp;
+	BackUpRow(chapterIdx, hitIdx, h);
+	h.replaced = true;		// written by KFC: its Replace greyed, counted as written
+	h.outlined = true;		// ...as outlines: the row reads "Outlined"
+	h.special = 0;
+	h.kept = true;			// ...and its eye on (the row eye - a row KFC wrote stays through a search again)
+	h.replacedText.Clear();	// no text written: LocateRow does not look for it by text
+	h.copy = HitCopy();		// nothing for Restore from Copy to put back (X6 - its Ctrl+Z puts the text back)
+	h.outlinedText = original;
+	h.outlinedText.SetTranslatable(kFalse);
+	h.storyUID = storyUID;
+	h.textStart = start;
+	h.textEnd = end;
+	h.outcome = kOutcomeNone;
+	BuildHitLocator(h);
+}
+
 // The page words of a row that names its page - a text row's and an object row's alike (BuildHitLocator): "P<page>",
 // "(<n>)" when the page holds more than one row (Hit::pageOrdinal), and " overset" after them for an overset match.
 static void AppendPageWords(KFCResultModel::Hit& hit)
@@ -1320,7 +1475,7 @@ int32 KFCResultModel::ReplaceStoryRows(int32 chapterIdx, UID story, std::vector<
 	// carried into the walk's rows (MergeKeptRows) - copied before the story's rows go out below.
 	std::vector<Hit> keptRows;
 	for (size_t i = 0; i < c->hits.size(); ++i)
-		if (c->hits[i].storyUID == story && c->hits[i].kept)
+		if (c->hits[i].storyUID == story && c->hits[i].kept && !c->hits[i].cleared)	// (a row taken off the list goes - Clear from Results)
 			keptRows.push_back(c->hits[i]);
 	const int32 stayed = MergeKeptRows(storyHits, keptRows);
 	if (outStayed != nil)
@@ -1375,7 +1530,7 @@ int32 KFCResultModel::ReplaceChapterRows(int32 chapterIdx, std::vector<Hit>& doc
 	std::vector<Hit> keptRows;
 	for (size_t i = 0; i < c->hits.size(); ++i)
 	{
-		if (!c->hits[i].kept)
+		if (!c->hits[i].kept || c->hits[i].cleared)	// (a row taken off the list goes - Clear from Results)
 			continue;
 		keptRows.push_back(c->hits[i]);
 		const UID s = c->hits[i].storyUID;
@@ -1467,12 +1622,28 @@ void KFCResultModel::TakeRowBackup(RowStep& out)
 		out.versionsAfter.push_back(VersionNow(out.versionsBefore[i].chapter, out.versionsBefore[i].story));
 }
 
+// A ROW PUT BACK FROM A STEP'S COPY KEEPS WHAT THE LIST DID TO IT SINCE (Clear from Results - the spec's K5): taken off the list
+// it stays off - an Undo of a write does not bring back a row the person cleared - and its place in its group is the list's
+// now (BuildFontGroups gave the rows around a cleared one new places; the copy holds the ones from before).
+static void PutRowBack(KFCResultModel::Hit& h, const KFCResultModel::Hit& copy)
+{
+	const bool cleared = h.cleared;
+	const int32 group = h.fontGroup;
+	const int32 groupPos = h.fontGroupPos;
+	h = copy;
+	h.cleared = cleared;
+	h.fontGroup = group;
+	h.fontGroupPos = groupPos;
+	if (cleared)
+		h.kept = false;
+}
+
 void KFCResultModel::ApplyRowStep(const RowStep& step, bool after)
 {
 	const std::vector<RowCopy>& rows = after ? step.after : step.before;
 	for (size_t i = 0; i < rows.size(); ++i)
 		if (Hit* h = HitAt(rows[i].chapter, rows[i].hit))
-			*h = rows[i].row;
+			PutRowBack(*h, rows[i].row);
 	const std::vector<VersionCopy>& versions = after ? step.versionsAfter : step.versionsBefore;
 	for (size_t i = 0; i < versions.size(); ++i)
 		PutVersionBack(versions[i]);
@@ -1515,7 +1686,7 @@ void KFCResultModel::ApplyRowStepTo(ModelSnapshot& list, const RowStep& step, bo
 			continue;
 		std::vector<Hit>& hits = list.chapters[static_cast<size_t>(r.chapter)].hits;
 		if (r.hit >= 0 && r.hit < static_cast<int32>(hits.size()))
-			hits[static_cast<size_t>(r.hit)] = r.row;
+			PutRowBack(hits[static_cast<size_t>(r.hit)], r.row);
 	}
 	const std::vector<VersionCopy>& versions = after ? step.versionsAfter : step.versionsBefore;
 	for (size_t i = 0; i < versions.size(); ++i)
@@ -1539,9 +1710,9 @@ void KFCResultModel::GetListCounts(const ModelSnapshot& list, int32& outReplaced
 	for (size_t c = 0; c < list.chapters.size(); ++c)
 	{
 		const std::vector<Hit>& hits = list.chapters[c].hits;
-		outHits += static_cast<int32>(hits.size());
+		outHits += ShownRows(hits);
 		for (size_t i = 0; i < hits.size(); ++i)
-			if (hits[i].replaced)
+			if (hits[i].replaced && !hits[i].cleared)
 				++outReplaced;
 	}
 }

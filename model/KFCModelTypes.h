@@ -78,10 +78,39 @@ namespace KFCResultModel
 		bool			kept;		// the row eye (Hit::kept - docs/superpowers/specs/2026-10-17-kfc-row-eye-keep-design.md)
 		int32			special;	// the special operation KFC last wrote the row's item with (Hit::special - a KFCSpecialOp;
 									// 0 = none): the row reads its word first (the UI half's KFCSpecialRowWord)
+		PMString		outlinedText;	// A TEXT ROW WRITTEN AS OUTLINES (Hit::outlinedText - docs/superpowers/specs/
+									// 2026-10-18-kfc-text-outlines-design.md X6): the characters it outlined, drawn where the
+									// match stands - matchText holds what the row reads now (the inline's mark, not shown),
+									// which the doors compare. Empty for every other row.
 
 		RowDisplay() : replaced(false), outlined(false), kept(false), special(0) {}
 	};
 }
+
+/** A TIER'S NARROWING (docs/superpowers/specs/2026-10-18-kfc-narrow-down-design.md - the author, 2026-10-18): one condition
+    of a tier heading's Narrow Down, kept with the list in the order the steps were taken (ListHeader::narrow) and handed over
+    one at a time (IKFCRuns::NarrowList). The kind crosses the boundary, so it is FIXED: a new one is appended before
+    kKFCNarrowKindCount, none is renumbered. */
+enum KFCNarrowKind
+{
+	kKFCNarrowNone = 0,
+	kKFCNarrowInTables = 1,		// the match's text in a table cell
+	kKFCNarrowInFootnotes,		// ...in a footnote
+	kKFCNarrowInEndnotes,		// ...in an endnote (its own story)
+	kKFCNarrowPages,			// the row's page in a range of pages (`pages` - the print dialog's way of writing one)
+	kKFCNarrowOnPasteboard,		// the item, or the match's frame, out on the pasteboard
+	kKFCNarrowFrames,			// the frames holding the matches, one object row each
+	kKFCNarrowKindCount
+};
+
+struct KFCNarrowStep
+{
+	int32		kind;		// a KFCNarrowKind
+	PMString	pages;		// kKFCNarrowPages: the range as typed ("1-5, 8"); empty for every other kind
+
+	KFCNarrowStep() : kind(kKFCNarrowNone) {}
+	explicit KFCNarrowStep(int32 k) : kind(k) {}
+};
 
 /** AN OBJECT ROW'S SPECIAL OPERATIONS (docs/superpowers/specs/2026-10-17-kfc-object-special-operations-design.md - the
     author, 2026-10-17): InDesign's own Object menu commands over the rows selected together, across spreads and documents

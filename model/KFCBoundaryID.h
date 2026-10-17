@@ -84,7 +84,10 @@ DECLARE_PMID(kInterfaceIDSpace, IID_IKFCUIBOUNDARY, kKFCPrefix + 14)
 // find its own in the UI half takes it for no UI half.
 // kKFCBoundaryRevision GOES UP BY ONE whenever a door gains, loses or reorders a method, or a type that crosses changes
 // its layout; kKFCVersion is in the stamp too, so two releases never pass for one.
-#define kKFCBoundaryRevision	"16"		// 16: IKFCUIServices::SnapshotBackgroundSelections and RestoreBackgroundSelections
+#define kKFCBoundaryRevision	"17"		// 17: IKFCRuns::NarrowList, IKFCResults::GetNarrowWords / ListHoldsObjects / ClearRows /
+										// GetObjectRowHit appended; KFCNarrowStep and RowDisplay::outlinedText cross (Narrow
+										// Down, Clear from Results, a text row's Create Outlines - 2026-10-18).
+										// 16: IKFCUIServices::SnapshotBackgroundSelections and RestoreBackgroundSelections
 										// appended (an object search gives back the selections of the documents behind the
 										// front one, 2026-10-18). 15: IKFCRuns::SearchBookOnLayer and IKFCResults::GetSearchLayer appended (Find
 										// Objects on Active Layer, 2026-10-17). 14: KFCSpecialParams::y is Shear's axis too -

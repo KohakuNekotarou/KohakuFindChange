@@ -570,6 +570,15 @@ namespace KFCSearchEngine
 	    either way. */
 	bool SearchListAgain(PMString& outStatus);
 
+	/** NARROW DOWN (a tier's heading's right-click menu - docs/superpowers/specs/2026-10-18-kfc-narrow-down-design.md): the live
+	    list's own search run once more - over what it searched, with its query, as Search These Results Again runs it - with its
+	    conditions and `step` (KFCNarrowStep), the matches that do not meet them dropped as the walk meets them, before the
+	    list's limit counts them (N3 - the author's call). Into a NEW list: the live one parked as a tier first, as Find parks it
+	    (N4). Refused, the list as it was: Search These Results Again's refusals, a text-only condition on an object list. True =
+	    a new list (no match too); false = refused or cancelled (the cancelled run's list is empty, the list it narrowed a tier -
+	    N8). outStatus says what happened either way. */
+	bool NarrowList(const KFCNarrowStep& step, PMString& outStatus);
+
 	/** A story's VERSION: ITextModel::GetChangeCount - the counter InDesign moves for every change to the
 	    story's text, attributes, tables and inlines (ITextModel.h, GetChangeCount), and moves BACK on Undo
 	    to exactly the value it had (measured - docs/ai-notes/text-change-counters-2026-08-08.md). The

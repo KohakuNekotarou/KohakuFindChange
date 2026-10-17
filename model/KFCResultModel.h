@@ -133,9 +133,11 @@ namespace KFCResultModel
 		int32		fontGroup;	// which of its chapter's fontGroups (its STORY group) this hit belongs
 		int32		fontGroupPos;	// to, and where it sits inside that group. -1 until the model groups
 								// the chapter's rows (AppendChapter, and a chapter a search again lays out
-								// anew - IndexRows in the .cpp), and on an object row, which has no story
-								// (every text hit has a group). The tree reads them to answer "who is my
-								// parent" and "which child am I" without searching.
+								// anew - IndexRows in the .cpp), and on a row taken off the list (cleared).
+								// An object row has no story, so no group (fontGroup -1): its fontGroupPos
+								// is its place among the object rows its chapter shows (GetObjectRowHit).
+								// The tree reads them to answer "who is my parent" and "which child am I"
+								// without searching.
 
 		UID			storyUID;	// the story the match lives in (within its chapter's database)
 		TextIndex	textStart;	// the match's start position in that story
@@ -171,6 +173,20 @@ namespace KFCResultModel
 								// operation - the author, 2026-10-17 evening: an eye on a row not written only kept a match
 								// since deleted as Missing); its Restore Original turns it off. Copied whole with the row - a
 								// tier, an Undo step, a backup.
+		bool		cleared;	// TAKEN OFF THE LIST (Clear from Results - docs/superpowers/specs/2026-10-18-kfc-clear-from-results-design.md
+								// K5): the row keeps its place in the chapter - the writes kept for an Undo name rows by their
+								// place - but no story group and no object row's position holds it, so the tree does not draw it
+								// and no count counts it. The list's alone (the document is not touched): an Undo's copy of the
+								// row does not bring it back (ApplyRowStep keeps it), and a search again drops it for good.
+		// WHERE THE MATCH'S TEXT STANDS (Narrow Down - docs/superpowers/specs/2026-10-18-kfc-narrow-down-design.md N5), read
+		// as the search builds a text row (KFCSearchEngine's BuildHit): in a table cell, in a footnote, in an endnote's story.
+		bool		inTable;
+		bool		inFootnote;
+		bool		inEndnote;
+		bool		frameOnPasteboard;	// a TEXT row's frame - the match's, or for an overset match the "+" frame its page is
+								// named after - stands on no page (Narrow Down's On Pasteboard; told by the class of the frame's
+								// owner page, never by its "PB" spelling). An object row says so in onPasteboard.
+		PMString	outlinedText;	// a text row written as outlines (RowDisplay::outlinedText): the characters it outlined
 		ChangeOutcome outcome;	// why this row was NOT replaced (kOutcomeNone = it was, or was never
 								// reached at all). The locator shows it as a word.
 		// (No per-hit change count that lets the replace take an unedited story on trust and skip the
@@ -222,7 +238,8 @@ namespace KFCResultModel
 		Hit() : pageIndex(-1), isOverset(false), isLocked(false), isHidden(false),
 				fontGroup(-1), fontGroupPos(-1), storyUID(kInvalidUID),
 				textStart(kInvalidTextIndex), textEnd(kInvalidTextIndex), matchHash(0),
-				replaced(false), outlined(false), special(0), kept(false), outcome(kOutcomeNone),
+				replaced(false), outlined(false), special(0), kept(false), cleared(false), inTable(false),
+				inFootnote(false), inEndnote(false), frameOnPasteboard(false), outcome(kOutcomeNone),
 				pageOrdinal(0), storyOrdinal(-1),
 				itemUID(kInvalidUID), onPasteboard(false), isMaster(false), isGrouped(false), isInline(false),
 				isAnchored(false), itemPrint(0), itemPrintLength(0) {}
@@ -345,6 +362,18 @@ namespace KFCResultModel
 	void SetSearchLayer(const PMString& layer);
 	PMString GetSearchLayer();
 
+	/** A NARROWED LIST'S STEPS (Narrow Down - the spec's N4, N5): its conditions in the order they were taken - kept with the
+	    list as its Search: is, so a tier's heading names them and its search again searches with them; recorded beside
+	    SetSearchScope, after the commit point. Empty for every list no Narrow Down made. */
+	void SetNarrowSteps(const std::vector<KFCNarrowStep>& steps);
+	std::vector<KFCNarrowStep> GetNarrowSteps();
+	/** The steps in words, as a tier's heading draws them after its name and the status line names them: "In Tables /
+	    Pages 1-5" - empty for none. */
+	PMString NarrowWords();
+	/** ARE THE LIST'S ROWS OBJECT ROWS - an Object tab search's, or a Frames of These Matches list's? The heading's menu greys
+	    a condition that only text rows can meet. */
+	bool ListHoldsObjects();
+
 	/** A DOCUMENT OF THE LIST WAS CLOSED (the author's calls: only its rows go - an All Documents list's, 2026-09-29, and
 	    every list's, its heading staying while it is a tier, 2026-10-14 night - KFCCloseDocResponder).
 	    Its chapter is emptied - rows, groups, story versions - and unbound (no docRef, no file), but
@@ -454,10 +483,19 @@ namespace KFCResultModel
 	    (Chapter::shownEmpty), included: indexes run 0 .. this - 1. (What the tree shows: GetDisplayChapterCount.) */
 	int32 GetChapterCount();
 
-	/** The number of hits under chapter 'chapterIdx'. */
+	/** The number of hits under chapter 'chapterIdx' - every row it holds, one taken off the list (Hit::cleared) too: the range
+	    of its row indices. */
 	int32 GetHitCount(int32 chapterIdx);
 
-	/** The total number of hits across ALL chapters - for the status summary. */
+	/** The rows of chapter 'chapterIdx' the list still shows - none taken off it (Clear from Results): what its row counts,
+	    and the room a search again takes the list's limit with. */
+	int32 GetShownHitCount(int32 chapterIdx);
+
+	/** Was this row taken off the list (Hit::cleared)? false for an index out of range. */
+	bool IsHitCleared(int32 chapterIdx, int32 hitIdx);
+
+	/** The total number of hits across ALL chapters the list shows - none taken off it - for the status summary, the book
+	    row's count and the list's limit. */
 	int32 GetTotalHitCount();
 
 	/** The number of chapters the tree shows - those with a row, and one searched again with none (Chapter::shownEmpty):
@@ -525,8 +563,18 @@ namespace KFCResultModel
 	bool SetHitKept(int32 chapterIdx, int32 hitIdx, bool kept);
 
 	/** How many rows of a chapter have their eye on - of one story, or of the whole chapter (story = kInvalidUID): the
-	    room a search again leaves them (SearchStoryAgain, SearchDocumentAgain). */
+	    room a search again leaves them (SearchStoryAgain, SearchDocumentAgain). A row taken off the list is not counted. */
 	int32 CountKeptRows(int32 chapterIdx, UID story);
+
+	/** CLEAR FROM RESULTS (docs/superpowers/specs/2026-10-18-kfc-clear-from-results-design.md K3, K5): the rows taken off the
+	    list (Hit::cleared - their eyes off with them) and each of their chapters' story groups and object rows' positions
+	    built again around them; no row moves, so whatever names a row by its place still names it. Not backed up and no
+	    Undo step: the document is not touched. Answers how many rows were taken off (one already off counts nothing). */
+	int32 ClearRows(const KFCRowsByChapter& rows);
+
+	/** A chapter with no story groups - an object list's: the nth of its rows the tree shows, as an index into its hits;
+	    -1 = none. (Its rows' positions there are their Hit::fontGroupPos.) */
+	int32 GetObjectRowHit(int32 chapterIdx, int32 nth);
 
 	// (No script property hands the result set out as text: the regression suite reads the panel
 	//  through KIDMCP.)
@@ -646,6 +694,13 @@ namespace KFCResultModel
 	    forgotten, its place the text put back - [start, end) of storyUID - and nothing said about it (kOutcomeNone). Backed
 	    up first, so an Undo puts the replaced row back, copy and all. The caller reads its line again (RereadRowText). */
 	void MarkHitRestored(int32 chapterIdx, int32 hitIdx, UID storyUID, TextIndex start, TextIndex end);
+
+	/** A TEXT ROW WRITTEN AS OUTLINES (KFCReplaceEngine::OutlineHits - docs/superpowers/specs/2026-10-18-kfc-text-outlines-design.md
+	    X6): replaced and outlined (its Replace greyed, "Outlined" on its locator), its eye on, its place [start, end) of storyUID
+	    - the inline marks that took the match's place - and `original`, the characters it outlined, kept for the row to draw
+	    (Hit::outlinedText). Backed up first, as every change a write makes to a row, so an Undo puts the match back. The caller
+	    reads its line again (RereadRowText). */
+	void MarkHitOutlined(int32 chapterIdx, int32 hitIdx, UID storyUID, TextIndex start, TextIndex end, const PMString& original);
 
 	/** A chapter's document binding and file. The replace pass works chapter at a time, so it
 	    needs this without going through a hit. false = index out of range. */
@@ -933,6 +988,7 @@ namespace KFCResultModel
 		bool			fromBook;		// SetFromBook
 		SearchScopeKind	searchScope;	// SetSearchScope
 		PMString		searchLayer;	// SetSearchLayer - empty but for Find Objects on Active Layer's list
+		std::vector<KFCNarrowStep>	narrow;	// SetNarrowSteps - a Narrow Down's conditions, in order (empty for any other list)
 		PMString		bookName;		// SetBookName
 		int32			searchMode;		// SetSearchMode (-1 = nothing searched yet)
 		PMString		walkSignature;	// SetWalkSignature

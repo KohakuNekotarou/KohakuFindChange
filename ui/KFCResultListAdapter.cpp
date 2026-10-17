@@ -179,9 +179,9 @@ public:
 			return KFCResultHistory::KeptChildPos(childID->GetTier(), childID->GetKeptRow());
 		if (childID->IsHitRow())
 		{
-			// Its place under its story ("font") row (its place in the chapter for a hit with no group).
-			const int32 pos = KFCResults()->GetHitFontGroupPos(childID->GetChapter(), childID->GetHit());
-			return (pos >= 0) ? pos : childID->GetHit();
+			// Its place under its story ("font") row - an object row's among its document's rows (GetNthChild's reverse); -1
+			// for a row taken off the list (Clear from Results), which is no row's child now.
+			return KFCResults()->GetHitFontGroupPos(childID->GetChapter(), childID->GetHit());
 		}
 		if (childID->IsFontRow())
 			return childID->GetFont();		// under its document row: the group itself
@@ -262,9 +262,12 @@ NodeID_rv KFCResultTree::LiveRow(const NodeID& node, int32 nth)
 			return kInvalidNodeID;
 		return KFCResultNodeID::CreateFont(nodeID->GetChapter(), nth);
 	}
-	if (nth < 0 || nth >= KFCResults()->GetDisplayHitCount(nodeID->GetChapter()))
+	// ...its rows directly for a chapter with no groups (an object search's): the nth row it SHOWS, which is row nth until a
+	// row is taken off the list (Clear from Results - KFCResultModel::GetObjectRowHit).
+	const int32 hit = KFCResults()->GetObjectRowHit(nodeID->GetChapter(), nth);
+	if (hit < 0)
 		return kInvalidNodeID;
-	return KFCResultNodeID::Create(nodeID->GetChapter(), nth);
+	return KFCResultNodeID::Create(nodeID->GetChapter(), hit);
 }
 
 // End, KFCResultListAdapter.cpp.
