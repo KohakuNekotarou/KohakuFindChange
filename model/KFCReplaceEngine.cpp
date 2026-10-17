@@ -1594,6 +1594,20 @@ KFCResultModel::HitCopy TakeRowCopy(const UIDRef& storyRef, TextIndex start, Tex
 		for (TextIndex i = start; i < end && !holdsReturn && !it.IsNull(); ++i, ++it)
 			holdsReturn = ((*it).GetValue() == kTextChar_CR);
 	}
+	// AN ANCHORED OR INLINE OBJECT IN THE MATCH KEEPS NO COPY (the author's call of 2026-10-17 evening: its UID changing is
+	// the problem) - put back, it would be a copy of the object under a new UID (measured live the same day, R19c: the same
+	// rectangle in all but its identity).
+	{
+		TextIterator it(model, start);
+		for (TextIndex i = start; i < end && !it.IsNull(); ++i, ++it)
+		{
+			if ((*it).GetValue() == kTextChar_ObjectReplacementCharacter)
+			{
+				copy.whyNot = KFCResultModel::kCopyHoldsAnchoredObject;
+				return copy;
+			}
+		}
+	}
 	if (paragraphChange)
 	{
 		// The paragraph the match starts in: its style and its own overrides, as they read before the write.
@@ -2208,6 +2222,8 @@ const char* RestoreSentence(RestoreRefusal why, int32 whyNoCopy)
 					return "no copy was kept when this row was replaced - its match touches a cross-reference.";
 				case KFCResultModel::kCopyRestHoldsObject:
 					return "no copy was kept when this row was replaced - the rest of its paragraph holds an object or a marker.";
+				case KFCResultModel::kCopyHoldsAnchoredObject:
+					return "no copy was kept when this row was replaced - its match holds an anchored object, which a copy would put back as a new object (a new ID).";
 				case KFCResultModel::kCopyFailed:
 					return "no copy could be kept when this row was replaced.";
 				default:
@@ -2301,11 +2317,14 @@ bool PutLinksBack(ITextModel* model, const UIDRef& storyRef, TextIndex at, int32
 	InterfacePtr<IHyperlinkTable> table(db, db->GetRootUID(), IID_IHYPERLINKTABLE);
 	if (!facade || table == nil)
 		return false;
-	// Where each kept source still a text source of this story is to stand.
+	// Where each kept source still in the document is to stand. ONE WHOSE TEXT THE PASTE REPLACED HAS NO STORY ANY MORE
+	// (measured live 2026-10-17, H1 and H5: its owning story read invalid, its range gone - the DOM's sourceText an error):
+	// it is still the link to keep, and is given this story back with its range. One standing in another story is not ours.
 	struct Wanted
 	{
 		UID			source;
 		TextIndex	start, end;
+		bool		storyLost;
 	};
 	std::vector<Wanted> wanted;
 	for (size_t k = 0; k < kept.size(); ++k)
@@ -2313,10 +2332,16 @@ bool PutLinksBack(ITextModel* model, const UIDRef& storyRef, TextIndex at, int32
 		if (!db->IsValidUID(kept[k].source))
 			continue;
 		InterfacePtr<IHyperlinkTextSourceData> data(db, kept[k].source, UseDefaultIID());
-		if (data == nil || data->GetOwningStoryUID() != storyRef.GetUID())
+		if (data == nil)
+			continue;
+		const UID owner = data->GetOwningStoryUID();
+		KFC_DIAG_LOG("LINK kept source=%u owner=%u (story %u)", (unsigned)kept[k].source.Get(), (unsigned)owner.Get(),
+			(unsigned)storyRef.GetUID().Get());
+		if (owner != storyRef.GetUID() && owner != kInvalidUID)
 			continue;
 		TextIndex nowStart = kInvalidTextIndex;
 		int32 nowLength = 0;
+		if (owner != kInvalidUID)
 		{
 			InterfacePtr<ITextRangeNode> node(data->GetHyperlinkRangeReference().Instantiate());
 			if (node != nil)
@@ -2327,6 +2352,7 @@ bool PutLinksBack(ITextModel* model, const UIDRef& storyRef, TextIndex at, int32
 		}
 		Wanted w;
 		w.source = kept[k].source;
+		w.storyLost = (owner == kInvalidUID);
 		w.start = (kept[k].from < 0 && nowStart != kInvalidTextIndex) ? nowStart : at + kept[k].from;
 		w.end = (kept[k].to > copied && nowStart != kInvalidTextIndex) ? nowStart + nowLength : at + kept[k].to;
 		if (w.start < 0 || w.end < w.start)
@@ -2361,10 +2387,10 @@ bool PutLinksBack(ITextModel* model, const UIDRef& storyRef, TextIndex at, int32
 	// (2) The kept sources where they stood.
 	for (size_t w = 0; w < wanted.size(); ++w)
 	{
-		KFC_DIAG_LOG("LINK kept source=%u set to [%d,%d)", (unsigned)wanted[w].source.Get(), (int)wanted[w].start,
-			(int)wanted[w].end);
-		if (facade->ChangeTextSource(UIDRef(db, wanted[w].source), kFalse, storyRef, kTrue, wanted[w].start,
-									 wanted[w].end - wanted[w].start) != kSuccess)
+		KFC_DIAG_LOG("LINK kept source=%u set to [%d,%d)%s", (unsigned)wanted[w].source.Get(), (int)wanted[w].start,
+			(int)wanted[w].end, wanted[w].storyLost ? " - its story given back" : "");
+		if (facade->ChangeTextSource(UIDRef(db, wanted[w].source), wanted[w].storyLost ? kTrue : kFalse, storyRef, kTrue,
+									 wanted[w].start, wanted[w].end - wanted[w].start) != kSuccess)
 			return false;
 	}
 	// (3) The destinations the paste made that no link names now.

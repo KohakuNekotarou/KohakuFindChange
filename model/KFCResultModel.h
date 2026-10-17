@@ -61,6 +61,8 @@ namespace KFCResultModel
 		kCopyTouchesHyperlink,	// its match (or the rest it runs on over) touches a CROSS-REFERENCE source - its text is
 								// made by InDesign (a hyperlink's is copied and put back as one link: HitCopy::links - C15)
 		kCopyRestHoldsObject,	// the rest of its paragraph, which the copy would run on over, holds an object or a marker
+		kCopyHoldsAnchoredObject,	// its match holds an anchored or inline object - a copy would put it back under a new
+								// UID (the author's call of 2026-10-17 evening)
 		kCopyFailed				// the copy could not be taken
 		// (kCopyParagraphFormat stood here until the author's call of 2026-10-17 evening - the spec's C16: a Replace that
 		//  sets paragraph formatting keeps its copy now, and the paragraph's own formatting with it - HitCopy::paraStyle.)
