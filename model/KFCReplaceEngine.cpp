@@ -3216,7 +3216,8 @@ bool OutlineInChapter(OutlineChapter& chapter, int32 (&counts)[kOutlineRefusalCo
 		if (!RowStartNow(db, place, s))
 			continue;
 		if (row.done)
-			KFCResultModel::MarkHitOutlined(chapterIdx, row.hit, row.story, s, s + place.length, row.original);
+			KFCResultModel::MarkHitOutlined(chapterIdx, row.hit, row.story, s, s + place.length, row.original,
+				KFCSearchEngine::ReadText(UIDRef(db, row.story), s, place.length));
 		else
 			KFCResultModel::SetHitRange(chapterIdx, row.hit, row.story, s, s + place.length);
 		KFCSearchEngine::RereadRowText(chapterIdx, row.hit, UIDRef(db, row.story), s, s + place.length);

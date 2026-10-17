@@ -719,9 +719,12 @@ namespace KFCResultModel
 	/** A TEXT ROW WRITTEN AS OUTLINES (KFCReplaceEngine::OutlineHits - docs/superpowers/specs/2026-10-18-kfc-text-outlines-design.md
 	    X6): replaced and outlined (its Replace greyed, "Outlined" on its locator), its eye on, its place [start, end) of storyUID
 	    - the inline marks that took the match's place - and `original`, the characters it outlined, kept for the row to draw
-	    (Hit::outlinedText). Backed up first, as every change a write makes to a row, so an Undo puts the match back. The caller
-	    reads its line again (RereadRowText). */
-	void MarkHitOutlined(int32 chapterIdx, int32 hitIdx, UID storyUID, TextIndex start, TextIndex end, const PMString& original);
+	    (Hit::outlinedText); `written`, the text [start, end) holds now (the marks, and the spaces between them), as a Replace's
+	    row keeps what it wrote (Hit::replacedText): what a later write asks to carry the row (RowStillStands). Backed up first,
+	    as every change a write makes to a row, so an Undo puts the match back. The caller reads its line again
+	    (RereadRowText). */
+	void MarkHitOutlined(int32 chapterIdx, int32 hitIdx, UID storyUID, TextIndex start, TextIndex end, const PMString& original,
+		const PMString& written);
 
 	/** A chapter's document binding and file. The replace pass works chapter at a time, so it
 	    needs this without going through a hit. false = index out of range. */

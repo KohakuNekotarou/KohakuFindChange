@@ -1196,7 +1196,7 @@ void KFCResultModel::MarkHitRestored(int32 chapterIdx, int32 hitIdx, UID storyUI
 }
 
 void KFCResultModel::MarkHitOutlined(int32 chapterIdx, int32 hitIdx, UID storyUID, TextIndex start, TextIndex end,
-	const PMString& original)
+	const PMString& original, const PMString& written)
 {
 	Hit* hp = HitAt(chapterIdx, hitIdx);
 	if (hp == nil || hp->itemUID != kInvalidUID)
@@ -1207,7 +1207,8 @@ void KFCResultModel::MarkHitOutlined(int32 chapterIdx, int32 hitIdx, UID storyUI
 	h.outlined = true;		// ...as outlines: the row reads "Outlined"
 	h.special = 0;
 	h.kept = true;			// ...and its eye on (the row eye - a row KFC wrote stays through a search again)
-	h.replacedText.Clear();	// no text written: LocateRow does not look for it by text
+	h.replacedText = written;	// what stands there now - a later write carries the row by it, as a Replace's (RowStillStands)
+	h.replacedText.SetTranslatable(kFalse);
 	h.copy = HitCopy();		// nothing for Restore from Copy to put back (X6 - its Ctrl+Z puts the text back)
 	h.outlinedText = original;
 	h.outlinedText.SetTranslatable(kFalse);
