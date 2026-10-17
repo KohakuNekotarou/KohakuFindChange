@@ -123,6 +123,9 @@ public:
 	virtual bool DropTier(uint32 resultSet) { return KFCTierStore::DropTier(resultSet); }
 	virtual bool SearchListAgain(PMString& outStatus) { return KFCUnderListQuery(outStatus, false, [&]() { return KFCSearchEngine::SearchListAgain(outStatus); }); }
 	virtual bool OutlineRows(const KFCRowsByChapter& rows, PMString& outStatus) { return KFCObjectOutline::OutlineRows(rows, outStatus); }
+	virtual bool CanRestoreHit(int32 chapterIdx, int32 hitIdx) { return KFCReplaceEngine::CanRestoreHit(chapterIdx, hitIdx); }
+	// (Not under the list's query - KFCUnderListQuery: a copy put back walks no story, as Create Outlines walks none.)
+	virtual bool RestoreRows(const KFCRowsByChapter& rows, PMString& outStatus) { return KFCReplaceEngine::RestoreHits(rows, outStatus); }
 };
 
 CREATE_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)

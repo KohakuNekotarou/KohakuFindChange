@@ -114,6 +114,25 @@ namespace KFCReplaceEngine
 	    document's write (WriteStep, below). One row = ReplaceHit. */
 	bool ReplaceHits(const KFCRowsByChapter& rows, PMString& outStatus);
 
+	/** RESTORE ORIGINAL (docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md): is the row one to offer it to -
+	    a text row a Replace of the list wrote (replaced, no item)? Whether its copy can be put back now - kept, its text,
+	    the rest of its paragraph, a lock - is RestoreHits' to say, on the status line (the spec's C7). */
+	bool CanRestoreHit(int32 chapterIdx, int32 hitIdx);
+
+	/** RESTORE ORIGINAL over text rows - the right-clicked row, or the rows selected together it is one of: the copy each
+	    one's Replace took of the text it wrote over (KFCCopyStore - ReplaceHits takes it) pasted back over what it wrote,
+	    in ONE undo step ("Restore Original" in the Edit menu - WriteStep) that the panel follows (KFCUndoFollow). The doors,
+	    row by row (C8): a replaced text row with its copy kept; its document reached (a closed chapter reopened windowless,
+	    as a Replace reaches it); its story followed (its rows take their foci's places - KFCSearchEngine::FollowStoryFoci -
+	    and its own focus stands exactly on its place; a story with no foci as KFC left it); what its Replace wrote still
+	    there; not locked. The rows that pass are pasted in text order, each checked again just before (its run-on rest
+	    too); one that cannot be yet waits for another round. Each row put back reads as before its Replace - not replaced,
+	    its eye as it was (KFCResultModel::MarkHitRestored); every other row is carried to where its text stands.
+	    outStatus: "Restored ID:262 #3." - "Restored 2 of 3 rows: ID:262 #1, ID:262 #3. Left as they were: 1 edited
+	    since." - "Restored 3 rows in 2 documents: a.indd ID:262 #1; b.indd ID:270 #1."; a refusal ("Restore Original:
+	    ...") when none could be put back. True when something was written. Refused while a run of ours is up. */
+	bool RestoreHits(const KFCRowsByChapter& rows, PMString& outStatus);
+
 	/** ONE UNDO STEP FOR A WRITE FROM THE LIST ("Replace" - kKFCReplaceStepKey), the one rule for the text rows (ReplaceHit,
 	    ReplaceHits) and the object rows (KFCObjectReplace):
 	      - ONE DOCUMENT: a plain sequence, rolled back on a failure the SDK's own way - the error state raised, the

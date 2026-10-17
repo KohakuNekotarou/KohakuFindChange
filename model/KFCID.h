@@ -191,6 +191,8 @@ DECLARE_PMID(kImplementationIDSpace, kKFCCopyStoreImpl, kKFCPrefix + 47)
 #define kKFCReplaceStepKey			kKFCStringPrefix "kKFCReplaceStepKey"
 // The Edit menu's name of an object row's Create Outlines step (KFCObjectOutline - Special Operations).
 #define kKFCCreateOutlinesStepKey	kKFCStringPrefix "kKFCCreateOutlinesStepKey"
+// The Edit menu's name of a text row's Restore Original step (KFCReplaceEngine::RestoreHits - the copies put back).
+#define kKFCRestoreOriginalStepKey	kKFCStringPrefix "kKFCRestoreOriginalStepKey"
 #define kKFCRunQueriesStepKey		kKFCStringPrefix "kKFCRunQueriesStepKey"	// the query run's undo step (KFCQuerySequence)
 #define kKFCChangeAllStepKey		kKFCStringPrefix "kKFCChangeAllStepKey"	// Change All in Book (No List)'s undo step (KFCChangeAll)
 

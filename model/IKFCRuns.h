@@ -131,6 +131,12 @@ public:
 	/** = KFCObjectOutline::OutlineRows (appended) - an object row's Special Operations > Create Outlines: the rows' frames
 	    outlined, one undo step. False = nothing written; outStatus says why. */
 	virtual bool OutlineRows(const KFCRowsByChapter& rows, PMString& outStatus) = 0;
+	/** = KFCReplaceEngine::CanRestoreHit (appended) - a text row's Restore Original offered: a row a Replace of the list
+	    wrote. */
+	virtual bool CanRestoreHit(int32 chapterIdx, int32 hitIdx) = 0;
+	/** = KFCReplaceEngine::RestoreHits (appended) - Restore Original over text rows: the copies their Replace took put back,
+	    one undo step. False = nothing written; outStatus says why. */
+	virtual bool RestoreRows(const KFCRowsByChapter& rows, PMString& outStatus) = 0;
 };
 
 #endif // __IKFCRuns_h__
