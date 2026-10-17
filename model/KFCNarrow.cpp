@@ -12,12 +12,14 @@
 
 // Interface includes:
 #include "IDataBase.h"
+#include "IPageList.h"				// PageRangeStringToUIDList - Pages...' range, read in a document
 #include "ITextModel.h"				// QueryStoryThread - the thread a match stands in
 #include "ITextStoryThread.h"		// GetDictUID - the thread's owner
 
 // General includes:
 #include "TablesID.h"				// kTableModelBoss - a table's cells are its threads
 #include "TextID.h"					// kFootnoteReferenceBoss, kEndnoteStoryBoss
+#include "UIDList.h"
 #include "Utils.h"
 
 // Project includes:
@@ -55,6 +57,27 @@ void KFCNarrow::ReadTextPlace(const UIDRef& storyRef, TextIndex at, KFCResultMod
 	KFC_DIAG_LOG("NARROWFACT story=%u class=0x%x at=%d dict=%u dictClass=0x%x table=%d foot=%d endnote=%d",
 		storyRef.GetUID().Get(), (unsigned)storyClass.Get(), (int)at, dict.Get(), (unsigned)owner.Get(),
 		io.inTable ? 1 : 0, io.inFootnote ? 1 : 0, io.inEndnote ? 1 : 0);
+}
+
+ITextDataValidation::RangeError KFCNarrow::ReadPageRange(IDataBase* db, const PMString& pages, std::set<UID>& outPages)
+{
+	outPages.clear();
+	if (db == nil || pages.IsEmpty())
+		return ITextDataValidation::kInvalidValue;
+	InterfacePtr<IPageList> pageList(db, db->GetRootUID(), UseDefaultIID());
+	if (pageList == nil)
+		return ITextDataValidation::kInvalidValue;
+	PMString range(pages);		// (the call takes it by reference, not const)
+	range.SetTranslatable(kFalse);
+	UIDList uids(db);
+	const ITextDataValidation::RangeError error = pageList->PageRangeStringToUIDList(range, &uids);
+	if (error == ITextDataValidation::kNoError)
+		for (int32 i = 0; i < uids.Length(); ++i)
+			outPages.insert(uids[i]);
+	// (Test builds only) What each document answered - the plan's M4.
+	KFC_DIAG_LOG("PAGERANGE db=%p range=%s error=%d pages=%d", (void*)db, pages.GetUTF8String().c_str(), (int)error,
+		(int)outPages.size());
+	return error;
 }
 
 bool KFCNarrow::IsTextOnly(int32 kind)
@@ -105,32 +128,47 @@ bool KFCNarrow::Filter::MakesFrames() const
 	return fFramesAt < fSteps.size();
 }
 
-bool KFCNarrow::Filter::KeepText(const KFCResultModel::Hit& hit) const
+bool KFCNarrow::Filter::KeepText(const KFCResultModel::Hit& hit, IDataBase* db) const
 {
 	for (size_t k = 0; k < fFramesAt; ++k)
-		if (!Meets(fSteps[k], hit, false))
+		if (!Meets(k, hit, false, db))
 			return false;
 	return true;
 }
 
-bool KFCNarrow::Filter::KeepObject(const KFCResultModel::Hit& hit) const
+bool KFCNarrow::Filter::KeepObject(const KFCResultModel::Hit& hit, IDataBase* db) const
 {
 	// A frame a Frames step made: the conditions after that step. An Object tab list's item: every condition.
 	for (size_t k = MakesFrames() ? fFramesAt + 1 : 0; k < fSteps.size(); ++k)
-		if (!Meets(fSteps[k], hit, true))
+		if (!Meets(k, hit, true, db))
 			return false;
 	return true;
 }
 
-bool KFCNarrow::Filter::Meets(const KFCNarrowStep& step, const KFCResultModel::Hit& hit, bool objectRow) const
+const std::set<UID>& KFCNarrow::Filter::PagesOf(size_t k, IDataBase* db) const
 {
+	const std::pair<size_t, IDataBase*> key(k, db);
+	std::map<std::pair<size_t, IDataBase*>, std::set<UID> >::const_iterator known = fPages.find(key);
+	if (known != fPages.end())
+		return known->second;
+	std::set<UID>& pages = fPages[key];
+	(void)ReadPageRange(db, fSteps[k].pages, pages);
+	return pages;
+}
+
+bool KFCNarrow::Filter::Meets(size_t k, const KFCResultModel::Hit& hit, bool objectRow, IDataBase* db) const
+{
+	const KFCNarrowStep& step = fSteps[k];
 	switch (step.kind)
 	{
 		case kKFCNarrowInTables:		return !objectRow && hit.inTable;
 		case kKFCNarrowInFootnotes:		return !objectRow && hit.inFootnote;
 		case kKFCNarrowInEndnotes:		return !objectRow && hit.inEndnote;
 		case kKFCNarrowOnPasteboard:	return objectRow ? hit.onPasteboard : hit.frameOnPasteboard;
-		default:						return true;	// (Frames is a turn, not a test; Pages - the plan's Task 5)
+		// THE PAGE THE ROW NAMES, in the range as the row's document reads it (N5): an overset text row by its "+" page, an
+		// object row by its own; a row on a parent page or the pasteboard is in no such range.
+		case kKFCNarrowPages:			return hit.pageUID != kInvalidUID && PagesOf(k, db).count(hit.pageUID) > 0;
+		default:						return true;	// (Frames is a turn, not a test)
 	}
 }
 

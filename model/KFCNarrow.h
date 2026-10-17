@@ -18,8 +18,13 @@
 
 #include "PMString.h"
 #include "UIDRef.h"
+#include "ITextDataValidation.h"	// RangeError - what IPageList answers a page range with
 #include "KFCModelTypes.h"		// KFCNarrowStep
 #include "KFCResultModel.h"		// Hit
+
+#include <map>
+#include <set>
+#include <utility>
 
 #include <set>
 #include <vector>
@@ -31,6 +36,12 @@ namespace KFCNarrow
 	    text one of kFootnoteReferenceBoss - the iid-boss dictionary's owners of IID_ITEXTSTORYTHREADDICT) - and the story's own
 	    class (an endnote's text is a story of kEndnoteStoryBoss). Written onto the row; nothing for a position it cannot read. */
 	void ReadTextPlace(const UIDRef& storyRef, TextIndex at, KFCResultModel::Hit& io);
+
+	/** PAGES... - A PAGE RANGE READ IN ONE DOCUMENT (the spec's N5): as the Print dialog reads its Range - "1-5, 8", a section's
+	    name ("Sec1:3"), an absolute number ("+3") - through IPageList::PageRangeStringToUIDList (SnpPrintDocument.cpp's call),
+	    the document's own numbering (kDefaultPageType: as the preferences show page numbers - a book's chapter by its own
+	    Pages panel). outPages = the pages named (empty unless kNoError). */
+	ITextDataValidation::RangeError ReadPageRange(IDataBase* db, const PMString& pages, std::set<UID>& outPages);
 
 	/** THE CONDITIONS OF ONE NARROWED LIST, asked of each row a walk builds. Made of the list's steps; an empty Filter keeps
 	    every row (a list no Narrow Down made walks as it always has). */
@@ -46,17 +57,21 @@ namespace KFCNarrow
 		/** Do the conditions turn the text rows into the frames holding them (Frames of These Matches)? */
 		bool MakesFrames() const;
 
-		/** A TEXT ROW, built (its page, its flags, its place): does it meet every condition taken before a Frames step - every
-		    condition, when there is none? */
-		bool KeepText(const KFCResultModel::Hit& hit) const;
-		/** AN OBJECT ROW - an Object tab search's, or a frame a Frames step made: does it meet every condition that asks of an
-		    object (those after a Frames step, or every one of an Object tab's list)? */
-		bool KeepObject(const KFCResultModel::Hit& hit) const;
+		/** A TEXT ROW, built (its page, its flags, its place) in document `db`: does it meet every condition taken before a
+		    Frames step - every condition, when there is none? */
+		bool KeepText(const KFCResultModel::Hit& hit, IDataBase* db) const;
+		/** AN OBJECT ROW in document `db` - an Object tab search's, or a frame a Frames step made: does it meet every condition
+		    that asks of an object (those after a Frames step, or every one of an Object tab's list)? */
+		bool KeepObject(const KFCResultModel::Hit& hit, IDataBase* db) const;
 
 	private:
-		bool Meets(const KFCNarrowStep& step, const KFCResultModel::Hit& hit, bool objectRow) const;
+		bool Meets(size_t k, const KFCResultModel::Hit& hit, bool objectRow, IDataBase* db) const;
+		/** Step k's page range as document db reads it - read once a document (ReadPageRange): a document that cannot read
+		    it lists nothing for it. */
+		const std::set<UID>& PagesOf(size_t k, IDataBase* db) const;
 		std::vector<KFCNarrowStep>	fSteps;
 		size_t						fFramesAt;		// the index of the Frames step - fSteps.size() when there is none
+		mutable std::map<std::pair<size_t, IDataBase*>, std::set<UID> >	fPages;		// PagesOf's reading, by step and document
 	};
 
 	/** Is this a condition only a text row can meet (In Tables / In Footnotes / In Endnotes / Frames of These Matches)? */

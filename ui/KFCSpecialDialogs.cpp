@@ -25,6 +25,7 @@
 #include "PMString.h"
 #include "ScriptData.h"				// ScriptData / ScriptRecordData - the script handed over, its answer
 #include "Utils.h"
+#include "WideString.h"				// a typed range read as characters - JsLiteralUtf8
 
 #include <cmath>					// std::fabs
 #include <cstdio>					// std::snprintf
@@ -49,6 +50,9 @@ bool gScaleConstrain = true;
 char gRotate[kTyped] = "0";
 char gShear[kTyped] = "0";
 bool gShearVertical = false;
+// Narrow Down's Pages...: the range as typed, UTF-8 (a section's name can be any text) - longer ones are not kept.
+const size_t kTypedPages = 256;
+char gPages[kTypedPages] = "";
 
 void Keep(char (&slot)[kTyped], const std::string& typed)
 {
@@ -71,6 +75,40 @@ std::string JsLiteral(const char* text)
 		}
 		else if (ch >= 0x20 && ch <= 0x7E)
 			out += static_cast<char>(ch);
+	}
+	return out;
+}
+
+// A JavaScript string literal's body for any text (UTF-8 in): printable ASCII as it is, the quote and the backslash escaped,
+// every other character as \uXXXX (a surrogate pair past U+FFFF) - the script stays pure ASCII (KFCHowTo's rule).
+std::string JsLiteralUtf8(const char* utf8)
+{
+	PMString text;
+	text.SetUTF8String(utf8);
+	const WideString wide(text);
+	std::string out;
+	char buf[16];
+	for (WideString::const_iterator c = wide.begin(); c != wide.end(); ++c)
+	{
+		const uint32 cp = static_cast<uint32>(*c);
+		if (cp == '"' || cp == '\\')
+		{
+			out += '\\';
+			out += static_cast<char>(cp);
+		}
+		else if (cp >= 0x20 && cp <= 0x7E)
+			out += static_cast<char>(cp);
+		else if (cp > 0xFFFF)
+		{
+			const uint32 v = cp - 0x10000;
+			std::snprintf(buf, sizeof(buf), "\\u%04X\\u%04X", 0xD800 + (v >> 10), 0xDC00 + (v & 0x3FF));
+			out += buf;
+		}
+		else
+		{
+			std::snprintf(buf, sizeof(buf), "\\u%04X", cp);
+			out += buf;
+		}
 	}
 	return out;
 }
@@ -410,6 +448,28 @@ const char* const kShear = R"JS(
 })();
 )JS";
 
+const char* const kPages = R"JS(
+  var w = frame("Kohaku Find/Change - Narrow Down");
+  var col = w.add("group");
+  col.orientation = "column";
+  col.alignChildren = "left";
+  col.spacing = 6;
+  var e = field(col, "Pages:", "@@P@@", "As the Print dialog's Range: 1-5, 8 - a section's pages by its name (Sec1:3), absolute numbers with + (+3). Each document reads it by its own page numbers.");
+  e.characters = 18;
+  col.add("statictext", undefined, "e.g. 1-5, 8");
+  var ok = buttons(w);
+  e.active = true;
+  ok.onClick = function () {
+    var t = trim(e.text);
+    if (t === "") { alert("Type the pages - for example 1-5, 8."); return; }
+    answer = "ok;" + t;
+    w.close(1);
+  };
+  w.show();
+  return answer;
+})();
+)JS";
+
 // The answer's fields, split at ';'.
 std::vector<std::string> Fields(const std::string& answer)
 {
@@ -449,6 +509,51 @@ bool KFCSpecialDialogs::NothingToDo(int32 op, const KFCSpecialParams& params)
 		case kKFCSpecialShear:	return std::fabs(params.x) < kTiny;		// a shear of 0 is nothing on either axis
 		default:				return false;
 	}
+}
+
+bool KFCSpecialDialogs::AskPageRange(PMString& io, PMString& outWhy)
+{
+	outWhy.Clear();
+	outWhy.SetTranslatable(kFalse);
+	std::string js(kHead);
+	std::string body(kPages);
+	ReplaceAll(body, "@@P@@", JsLiteralUtf8(gPages));
+	js += body;
+	// Through the plug-in's own engine, as the transforms' (AskTransformValues says why).
+	Utils<IExtendScriptUtils> esUtils;
+	if (!esUtils.Exists())
+	{
+		outWhy.Append("Narrow Down: the dialog could not be shown (no script engine) - nothing was searched.");
+		return false;
+	}
+	PMString scriptText;
+	scriptText.SetTranslatable(kFalse);
+	scriptText.SetUTF8String(js);
+	ScriptData script;
+	script.SetPMString(scriptText);
+	ScriptRecordData arguments;
+	ScriptData result;
+	PMString errorString;
+	const ErrorCode ran = esUtils->RunScriptInEngine("KFC", script, arguments, result, errorString, kFalse /*showErrorAlert*/,
+		kFalse /*invokeDebugger*/);
+	PMString answerText;
+	if (ran != kSuccess || !errorString.IsEmpty() || result.GetType() != ScriptData::s_string
+		|| result.GetPMString(answerText) != kSuccess)
+	{
+		outWhy.Append("Narrow Down: the dialog could not be shown - nothing was searched.");
+		return false;
+	}
+	// "ok;<the range>" - the range is everything after the first ';' (it holds no ';' of its own that matters: a range is
+	// separated by commas).
+	const std::string answer(answerText.GetUTF8String());
+	if (answer.compare(0, 3, "ok;") != 0)
+		return false;		// Cancel: nothing searched, nothing said
+	const std::string typed(answer.substr(3));
+	io.SetUTF8String(typed);
+	io.SetTranslatable(kFalse);
+	if (typed.size() < kTypedPages)
+		std::snprintf(gPages, kTypedPages, "%s", typed.c_str());
+	return !io.IsEmpty();
 }
 
 bool KFCSpecialDialogs::AskTransformValues(int32 op, KFCSpecialParams& io, PMString& outWhy)

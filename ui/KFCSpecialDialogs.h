@@ -36,6 +36,13 @@ namespace KFCSpecialDialogs
 
 	/** The operation's name - "Move", "Scale", "Rotate", "Shear" ("" for any other) - for the status line. */
 	const char* OpName(int32 op);
+
+	/** NARROW DOWN > PAGES... (docs/superpowers/specs/2026-10-18-kfc-narrow-down-design.md N5): the page range asked, in a
+	    dialog of the same make as the transforms' - one field, "Pages:", written as the Print dialog's Range ("1-5, 8", a
+	    section's pages by its name, absolute numbers with +). What was typed last is offered again for the session. io: the
+	    range on OK. false = Cancel (outWhy empty), or the dialog could not be shown (outWhy says so). The model reads the
+	    range in each document (KFCNarrow::ReadPageRange). */
+	bool AskPageRange(PMString& io, PMString& outWhy);
 }
 
 #endif // __KFCSpecialDialogs_h__

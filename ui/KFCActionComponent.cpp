@@ -305,13 +305,24 @@ void DoNarrow(int32 kind, IPMUnknown* widget)
 	int32 tier = -1;
 	if (KFCJump::IsLanding() || KFCResultTree::RefusedWhileRunning() || !RightClickedTier(widget, tier))
 		return;
+	// PAGES...: the range asked FIRST (KFCSpecialDialogs - the spec's N5) - Cancel changes nothing, a grey tier not switched to.
+	KFCNarrowStep step(kind);
+	if (kind == kKFCNarrowPages)
+	{
+		PMString why;
+		if (!KFCSpecialDialogs::AskPageRange(step.pages, why))
+		{
+			if (!why.IsEmpty())
+				KFCResultTree::ShowStatus(why);
+			return;
+		}
+	}
 	if (tier >= 0)
 	{
 		NodeID liveRow;
 		if (!KFCResultHistory::SwitchToKeptRow(tier, -1, liveRow))
 			return;
 	}
-	const KFCNarrowStep step(kind);
 	PMString summary;
 	(void)KFCResultHistory::Narrow(step, summary);
 }

@@ -389,8 +389,9 @@ struct FrameFacts
 	bool		isHidden;
 	bool		isLocked;
 	bool		onPasteboard;	// the page named is a spread ("PB") - the frame is out on the pasteboard (Narrow Down)
+	UID			pageUID;		// the page (or spread) named (Narrow Down's Pages)
 
-	FrameFacts() : pageIndex(-1), hasPage(false), isHidden(false), isLocked(false), onPasteboard(false) {}
+	FrameFacts() : pageIndex(-1), hasPage(false), isHidden(false), isLocked(false), onPasteboard(false), pageUID(kInvalidUID) {}
 };
 
 // Keyed by story as well as frame. kInvalidUID stands for "no frame", which matches in two
@@ -407,12 +408,14 @@ const FrameFacts& LookUpFrame(const UIDRef& docRef, const UIDRef& storyRef, UID 
 
 	FrameFacts facts;
 	if (frameUID != kInvalidUID)
-		facts.hasPage = GetFramePageString(docRef, frameUID, facts.pageString, facts.pageIndex, &facts.onPasteboard);
+		facts.hasPage = GetFramePageString(docRef, frameUID, facts.pageString, facts.pageIndex, &facts.onPasteboard,
+			&facts.pageUID);
 	if (!facts.hasPage)
 	{
 		facts.pageString.Clear();
 		facts.pageIndex = -1;
 		facts.onPasteboard = false;
+		facts.pageUID = kInvalidUID;
 	}
 	facts.pageString.SetTranslatable(kFalse);
 	facts.isHidden = IsFrameHidden(docRef.GetDataBase(), frameUID);
@@ -837,6 +840,7 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 	}
 
 	outHit.frameOnPasteboard = facts->onPasteboard;	// the frame the row names its page after - out on the pasteboard
+	outHit.pageUID = facts->pageUID;				// ...and its page (Narrow Down's Pages)
 	outHit.pageString = facts->pageString;		// empty when the frame has no page
 	outHit.pageString.SetTranslatable(kFalse);
 	outHit.pageIndex = facts->pageIndex;		// -1 then, which sorts the hit to the end
@@ -1583,7 +1587,7 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 				KFCNarrow::ReadTextPlace(story, start, hit);
 			KFC_DIAG_LOG("NARROWPB story=%u at=%d pb=%d page=%s overset=%d", story.GetUID().Get(), (int)start,
 				hit.frameOnPasteboard ? 1 : 0, hit.pageString.GetUTF8String().c_str(), hit.isOverset ? 1 : 0);
-			if (!gWalkFilter->KeepText(hit))
+			if (!gWalkFilter->KeepText(hit, storyDB))
 			{
 				outHits.pop_back();
 				continue;
@@ -5024,12 +5028,57 @@ bool SearchListOnceMore(const KFCNarrowStep* step, PMString& outStatus)
 			outStatus.Append(" narrows text results - these are objects.");
 			return false;
 		}
-		if (step->kind == kKFCNarrowPages || step->kind == kKFCNarrowFrames)
+		if (step->kind == kKFCNarrowFrames)
 		{
 			outStatus.Append(lead);
 			outStatus.Append(KFCNarrow::StepWords(*step));
 			outStatus.Append(" is not built yet.");
 			return false;
+		}
+		// PAGES...: A RANGE NO DOCUMENT CAN READ IS REFUSED BEFORE ANYTHING IS WALKED (N5) - read in the list's documents open
+		// now (one that reads it is enough: a book's chapter has pages another has not), else in the front document (a list
+		// that found nothing searches it). A list whose documents are all closed (a book's chapters, handed back) is walked,
+		// each chapter reading it for itself (KFCNarrow::Filter - a chapter that cannot lists nothing).
+		if (step->kind == kKFCNarrowPages)
+		{
+			PMString pages(step->pages);
+			pages.SetTranslatable(kFalse);
+			if (pages.IsEmpty())
+			{
+				outStatus.Append(lead);
+				outStatus.Append("no pages were given - nothing was searched.");
+				return false;
+			}
+			bool read = false, readable = false;
+			for (int32 c = 0; c < KFCResultModel::GetChapterCount() && !readable; ++c)
+			{
+				UIDRef docRef;
+				IDFile file;
+				if (!KFCResultModel::GetChapterLocation(c, docRef, file))
+					continue;
+				UIDRef open(docRef);
+				if (!((docRef.GetDataBase() != nil || KFCBookScope::ChapterHasFile(file)) && KFCBookScope::FindOpenChapterDoc(file, open))
+					|| open.GetDataBase() == nil)
+					continue;
+				std::set<UID> named;
+				read = true;
+				readable = (KFCNarrow::ReadPageRange(open.GetDataBase(), pages, named) == ITextDataValidation::kNoError);
+			}
+			IDocument* const front = KFCBookScope::ActiveDocument();
+			if (!read && KFCResultModel::GetChapterCount() == 0 && front != nil)
+			{
+				std::set<UID> named;
+				read = true;
+				readable = (KFCNarrow::ReadPageRange(::GetDataBase(front), pages, named) == ITextDataValidation::kNoError);
+			}
+			if (read && !readable)
+			{
+				outStatus.Append(lead);
+				outStatus.Append("\"");
+				outStatus.Append(pages);
+				outStatus.Append("\" is not a page range in any document - nothing was searched.");
+				return false;
+			}
 		}
 	}
 	// ITS OWN QUERY, KEPT AND READABLE: what the door states into Find/Change (KFCQueryScope states only a valid copy, and

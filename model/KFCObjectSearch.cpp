@@ -302,7 +302,7 @@ WalkEnd WalkDoc(IFindChangeService* svc, IObjectWalker* shared, const UIDRef& do
 		const bool built = (narrow != nil);
 		if (built)
 			BuildObjectHit(docRef, current.GetUID(), hit);
-		if (narrow != nil && !narrow->KeepObject(hit))
+		if (narrow != nil && !narrow->KeepObject(hit, db))
 		{
 			KFC_DIAG_LOG("NARROWOBJ item=%u pb=%d page=%s - passed over", current.GetUID().Get(), hit.onPasteboard ? 1 : 0,
 				hit.pageString.GetUTF8String().c_str());
@@ -877,6 +877,7 @@ bool KFCObjectSearch::ReadItemPlace(const UIDRef& docRef, UID item, KFCResultMod
 	io.pageString.Clear();
 	io.pageString.SetTranslatable(kFalse);
 	io.isMaster = false;
+	io.pageUID = (page != kInvalidUID && db->GetClass(page) == kPageBoss) ? page : kInvalidUID;	// (Narrow Down's Pages)
 	if (page == kInvalidUID || db->GetClass(page) != kPageBoss)
 	{
 		io.onPasteboard = true;

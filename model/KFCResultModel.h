@@ -187,6 +187,9 @@ namespace KFCResultModel
 								// named after - stands on no page (Narrow Down's On Pasteboard; told by the class of the frame's
 								// owner page, never by its "PB" spelling). An object row says so in onPasteboard.
 		PMString	outlinedText;	// a text row written as outlines (RowDisplay::outlinedText): the characters it outlined
+		UID			pageUID;	// the page the row names (a text row's frame's - the "+" frame's for an overset match -, an object
+								// row's owner page), kInvalidUID for none: Narrow Down's Pages asks it of the range read in the
+								// row's document (a parent page or a spread - the pasteboard - is never in a range read so)
 		ChangeOutcome outcome;	// why this row was NOT replaced (kOutcomeNone = it was, or was never
 								// reached at all). The locator shows it as a word.
 		// (No per-hit change count that lets the replace take an unedited story on trust and skip the
@@ -239,7 +242,7 @@ namespace KFCResultModel
 				fontGroup(-1), fontGroupPos(-1), storyUID(kInvalidUID),
 				textStart(kInvalidTextIndex), textEnd(kInvalidTextIndex), matchHash(0),
 				replaced(false), outlined(false), special(0), kept(false), cleared(false), inTable(false),
-				inFootnote(false), inEndnote(false), frameOnPasteboard(false), outcome(kOutcomeNone),
+				inFootnote(false), inEndnote(false), frameOnPasteboard(false), pageUID(kInvalidUID), outcome(kOutcomeNone),
 				pageOrdinal(0), storyOrdinal(-1),
 				itemUID(kInvalidUID), onPasteboard(false), isMaster(false), isGrouped(false), isInline(false),
 				isAnchored(false), itemPrint(0), itemPrintLength(0) {}

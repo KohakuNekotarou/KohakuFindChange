@@ -52,13 +52,16 @@ namespace KFCPageItemFacts
 // frame). false only when neither a page nor a spread can be resolved. outPageIndex is the page's
 // plain document order (for sorting); the STRING follows the section, so it can read "iv" or "A-1",
 // and "PB" for a frame sitting on the pasteboard.
-bool GetFramePageString(const UIDRef& docRef, UID frameUID, PMString& outPage, int32& outPageIndex, bool* outOnPasteboard)
+bool GetFramePageString(const UIDRef& docRef, UID frameUID, PMString& outPage, int32& outPageIndex, bool* outOnPasteboard,
+	UID* outPageUID)
 {
 	outPage.Clear();
 	outPage.SetTranslatable(kFalse);
 	outPageIndex = -1;
 	if (outOnPasteboard != nil)
 		*outOnPasteboard = false;
+	if (outPageUID != nil)
+		*outPageUID = kInvalidUID;
 	if (frameUID == kInvalidUID)
 		return false;
 
@@ -104,6 +107,8 @@ bool GetFramePageString(const UIDRef& docRef, UID frameUID, PMString& outPage, i
 	// ...and whether that UID is a page at all - the check the fallback's note above leaves to code that wants real pages.
 	if (outOnPasteboard != nil)
 		*outOnPasteboard = (db->GetClass(pageUID) != kPageBoss);
+	if (outPageUID != nil)
+		*outPageUID = pageUID;
 	return !outPage.IsEmpty();
 }
 

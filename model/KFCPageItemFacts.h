@@ -26,7 +26,7 @@ namespace KFCPageItemFacts
 	    spread name can be read for it. outOnPasteboard (optional): the UID named is not a page (kPageBoss) - the frame is
 	    out on the pasteboard (Narrow Down's On Pasteboard: told by the class, never by the "PB" spelling). */
 	bool GetFramePageString(const UIDRef& docRef, UID frameUID, PMString& outPage, int32& outPageIndex,
-		bool* outOnPasteboard = nil);
+		bool* outOnPasteboard = nil, UID* outPageUID = nil);	// outPageUID: the page (or spread) named - Narrow Down's Pages
 
 	/** Is this item switched off - its layer hidden, or the item itself (Object > Hide)? */
 	bool IsFrameHidden(IDataBase* db, UID frameUID);
