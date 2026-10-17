@@ -129,7 +129,7 @@
 ## 4. キーボードショートカット
 
 - **SET-13** ★ショートカットを割り当てられるのは**6つだけ** ―― `Open Find/Change...`・`Find in …`・`Find Objects on Active Layer`・`Change All in Book (No List)`・`Run Saved Queries...`・`Clear Results`
-  （`Find Objects on Active Layer` は 2026-10-17 夜に足した＝Find と同じ扱い・私の判断＝⬜作者の確認待ち・OBJ-21。）
+  （`Find Objects on Active Layer` は 2026-10-17 夜に足した＝Find と同じ扱い・私の判断＝2026-10-18 作者が承認「キーボードショートカットの件、有難うございます。」・OBJ-21。）
   （2026-09-27 に検索、10-01 に Open Find/Change＝作者の決定。10-06 の設計（第5版）で Change All in Book と Clear Results を足し、Change Checked と Show Changes を外した。
   10-07 に Run Saved Queries... を足した（作者の依頼）。`Find/Change Selected Documents (Book)` は Book Scope と同じく割り当てない。
   行の置換はショートカットでなく Return キー＝F17）。
