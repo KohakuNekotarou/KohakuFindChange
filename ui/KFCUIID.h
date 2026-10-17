@@ -348,6 +348,10 @@ DECLARE_PMID(kActionIDSpace, kKFCSearchTierAgainActionID, kKFCUIPrefix + 55)
 // "Create Outlines" in an OBJECT row's right-click menu, under Special Operations (the author, 2026-10-17 - the rows'
 // objects outlined across spreads: KFCResultTree::OutlineRows, KFCObjectOutline). + 56: the next after the highest spent.
 DECLARE_PMID(kActionIDSpace, kKFCCreateOutlinesActionID, kKFCUIPrefix + 56)
+// "Restore Original" on a TEXT row's right-click menu, under Replace (docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md
+// C1 - the author, 2026-10-17: "copy back, from the right-click menu"): the copy the row's Replace took put back
+// (KFCResultTree::RestoreRows, KFCReplaceEngine::RestoreHits). + 57: the next after the highest spent.
+DECLARE_PMID(kActionIDSpace, kKFCRestoreOriginalActionID, kKFCUIPrefix + 57)
 
 
 // WidgetIDs:
@@ -469,6 +473,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 #define kKFCSearchTierAgainMenuKey	kKFCStringPrefix "kKFCSearchTierAgainMenuKey"
 // ...and an object row's Create Outlines (measured against every other key - key_collisions.py: none reads alike).
 #define kKFCCreateOutlinesMenuKey	kKFCStringPrefix "kKFCCreateOutlinesMenuKey"
+// ...and a text row's Restore Original (measured against every other key - key_collisions.py).
+#define kKFCRestoreOriginalMenuKey	kKFCStringPrefix "kKFCRestoreOriginalMenuKey"
 // "How to Use...": the operating reference. English in every UI language, like the rest of the
 // flyout - there is one string table, and the one thing switched to Japanese at run time is this page's
 // body (KFCLoc::JapaneseUI).
@@ -604,8 +610,9 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 #define kKFCHowToMenuItemPosition			10.5
 #define kKFCAboutThisMenuItemPosition		11.0
 
-// The hit row's menu: Replace.
+// The hit row's menu: Replace, then a text row's Restore Original under it.
 #define kKFCReplaceHitMenuItemPosition		0.5
+#define kKFCRestoreOriginalMenuItemPosition	1.0
 // The story row's menu: Search This Story Again.
 #define kKFCSearchStoryAgainMenuItemPosition	0.5
 // The document row's menu: Search This Document Again.

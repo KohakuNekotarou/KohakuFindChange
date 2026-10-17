@@ -710,6 +710,13 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCReplaceHitMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// ...and Restore Original under it (docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md C1): the copy
+		// the row's Replace took put back - or the copies of the rows selected together it is one of (KFCReplaceEngine::RestoreHits).
+		kKFCRestoreOriginalActionID,
+		kKFCResultHitMenuName
+		kKFCRestoreOriginalMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 		// ----- A story row's right-click menu -----
 		// Popped by KFCResultNodeEH::RButtonDn over a story row: Search This Story Again walks that story alone with
 		// the search's query and puts its rows back (KFCSearchEngine::SearchStoryAgain).
@@ -1056,6 +1063,17 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKFCActionComponentBoss,
 		kKFCCreateOutlinesActionID,
 		kKFCCreateOutlinesMenuKey,	// "Create Outlines"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// Restore Original - a text row's right-click menu, under Replace (docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md).
+		// kCustomEnabling: a text row a Replace wrote (CanRestoreAny); why a copy cannot go back it says on the status line.
+		kKFCActionComponentBoss,
+		kKFCRestoreOriginalActionID,
+		kKFCRestoreOriginalMenuKey,	// "Restore Original"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,

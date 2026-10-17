@@ -506,6 +506,17 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			break;
 		}
 
+		case kKFCRestoreOriginalActionID:
+		{
+			// A TEXT row's Restore Original (docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md): the row it was
+			// popped over - or the rows selected together, when it is one of them (RowsOfRightClick, as Replace) - their
+			// copies put back (KFCResultTree::RestoreRows). No hit row (the action pressed by its ActionID): do nothing.
+			int32 chapter = -1, hit = -1;
+			if (RightClickedHit(widget, chapter, hit))
+				(void)KFCResultTree::RestoreRows(KFCResultTree::RowsOfRightClick(chapter, hit));
+			break;
+		}
+
 		default:
 		{
 			break;
@@ -786,6 +797,17 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 				// write refuses - not a text frame, locked, already outlined - it says on the status line, row by row counted.
 				int32 chapter = -1, hit = -1;
 				const bool enable = RightClickedHit(widget, chapter, hit) && KFCResults()->GetHitItem(chapter, hit) != kInvalidUID;
+				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
+				break;
+			}
+			case kKFCRestoreOriginalActionID:
+			{
+				// A text row's menu: Restore Original while the row - or one of the rows selected together with it - is a text
+				// row a Replace wrote (CanRestoreAny - the spec's C7). Whether its copy can go back now it says on the status
+				// line when pressed (no copy kept, edited since, locked), as Create Outlines says its refusals.
+				int32 chapter = -1, hit = -1;
+				const bool enable = RightClickedHit(widget, chapter, hit)
+					&& KFCResultTree::CanRestoreAny(KFCResultTree::RowsOfRightClick(chapter, hit));
 				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 				break;
 			}

@@ -213,6 +213,16 @@ namespace KFCResultTree
 	    nothing is brought forward. The rows drawn again, the status line. Not under a landing or a run. True = written. */
 	bool OutlineRows(const KFCRowsByChapter& rows);
 
+	/** A TEXT ROW'S RESTORE ORIGINAL (docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md): the copies the rows'
+	    Replace took put back over what it wrote, by the model (KFCRuns()->RestoreRows, KFCReplaceEngine::RestoreHits), with
+	    no landing: nothing is brought forward. The rows drawn again - the tree rebuilt when the list went - and the status
+	    line. Not under a landing or a run. True = written. */
+	bool RestoreRows(const KFCRowsByChapter& rows);
+
+	/** Can Restore Original be offered on these rows - is any of them a text row a Replace wrote (KFCRuns()->CanRestoreHit)?
+	    The question the row menu greys it by (the spec's C7); why a copy cannot go back now is said by RestoreRows. */
+	bool CanRestoreAny(const KFCRowsByChapter& rows);
+
 	/** The result list's view, reached through its panel - nil while the panel is closed. Not counted (the panel holds
 	    it): use it at once. Asked by whatever outside the panel wants the list alone - the tree's manager, its controller,
 	    the keyboard's questions, the Return filter. (RedrawKeyboardFrame wants the panel's view as well, and asks the

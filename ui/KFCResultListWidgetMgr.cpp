@@ -1231,4 +1231,30 @@ bool KFCResultTree::OutlineRows(const KFCRowsByChapter& rows)
 	return wrote;
 }
 
+bool KFCResultTree::RestoreRows(const KFCRowsByChapter& rows)
+{
+	if (KFCJump::IsLanding() || RefusedWhileRunning() || KFCRowCount(rows) == 0)
+		return false;
+	PMString status;
+	const bool wrote = KFCRuns()->RestoreRows(rows, status);
+	// The rows drawn again - each one put back reads as before its Replace (RefreshRows keeps what the person had opened
+	// and closed) - and the status line either way.
+	if (KFCResults()->HasRun())
+		RefreshRows();
+	else
+		Rebuild();
+	if (!status.IsEmpty())
+		ShowStatus(status);
+	return wrote;
+}
+
+bool KFCResultTree::CanRestoreAny(const KFCRowsByChapter& rows)
+{
+	for (size_t c = 0; c < rows.size(); ++c)
+		for (size_t k = 0; k < rows[c].hits.size(); ++k)
+			if (KFCRuns()->CanRestoreHit(rows[c].chapter, rows[c].hits[k]))
+				return true;
+	return false;
+}
+
 // End, KFCResultListWidgetMgr.cpp.
