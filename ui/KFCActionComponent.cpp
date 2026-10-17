@@ -756,11 +756,16 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			}
 			case kKFCSearchDocumentAgainActionID:
 			{
-				// A document row's menu: Search This Document Again over a document row - its refusals (a changed query, a
-				// search over part of a document) said on the status line, as the story row's are
-				// (KFCSearchEngine::SearchDocumentAgain).
+				// A document row's menu: Search This Document Again over a document row - GREYED OVER A SEARCH OF PART OF A
+				// DOCUMENT (Search: Story, To End of Story, Selection - the author, 2026-10-17 evening: "greyed may be
+				// fine"): it walks a whole document, and such a list is searched again as it was searched by its story rows
+				// and its heading. Its other refusals (a changed query) said on the status line, as the story row's are
+				// (KFCSearchEngine::SearchDocumentAgain - which still refuses a part, for a caller that never opened the menu).
 				int32 chapter = -1;
-				const bool enable = RightClickedDocument(widget, chapter);
+				const KFCResultModel::SearchScopeKind scope = KFCResults()->GetSearchScope();
+				const bool overPart = (scope == KFCResultModel::kScopeStory || scope == KFCResultModel::kScopeToEndOfStory
+					|| scope == KFCResultModel::kScopeSelection);
+				const bool enable = !overPart && RightClickedDocument(widget, chapter);
 				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 				break;
 			}

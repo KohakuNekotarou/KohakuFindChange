@@ -271,8 +271,14 @@ namespace KFCResultModel
 		// Each story's version (ITextModel::GetChangeCount) where KFC last knew the rows in it to stand
 		// - see GetStoryVersion.
 		std::map<UID, uint32>	storyVersions;
-		// A search over part of a story: the part of each story holding a row (SearchedRange). Empty otherwise.
+		// A search over part of a story: the part of each story holding a row (SearchedRange). Empty otherwise. What the
+		// story row's and the tier heading's searches again walk again (the author, 2026-10-17 evening: "the same
+		// conditions as the first search") - so kept through them, and recorded again where it is found.
 		std::map<UID, SearchedRange>	searchedRanges;
+		// A SEARCH: STORY'S STORY - the one story it searched (its first match's, KFCSearchEngine's CollectTargets): what the
+		// tier heading's search again walks again ("a Story search, that story alone" - the author, the same evening), as
+		// the story row walks its own. kInvalidUID otherwise.
+		UID						searchedStory;
 		// SEARCHED AGAIN AND NOTHING FOUND (Search This Document Again, and Search This Story Again over its last story with
 		// rows - the author's calls): shown with no rows, (0/0), so it can be searched again after the next edit. A
 		// chapter with no rows is otherwise not shown - a search
@@ -282,7 +288,7 @@ namespace KFCResultModel
 		// (No "not reached" mark per chapter: rows of several documents replaced together are written in one
 		// sequence, which a chapter not written whole takes back entire - every chapter is written or none is.)
 
-		Chapter() : shownEmpty(false) {}
+		Chapter() : searchedStory(kInvalidUID), shownEmpty(false) {}
 	};
 
 
@@ -549,6 +555,9 @@ namespace KFCResultModel
 	void SetSearchedRange(int32 chapterIdx, UID story, const SearchedRange& range);
 	/** The stories of the chapter with a searched part - KFCRowFoci gives each part its focus. */
 	void GetSearchedRangeStories(int32 chapterIdx, std::vector<UID>& outStories);
+	/** The story a Search: Story search searched (Chapter::searchedStory) - kInvalidUID for any other search, or an index
+	    out of range. */
+	UID GetSearchedStory(int32 chapterIdx);
 
 	/** A hit's row flags: already replaced, and locked - both mean "this row's Replace is greyed", for different
 	    reasons. false = index out of range. */
@@ -754,8 +763,10 @@ namespace KFCResultModel
 
 	/** SEARCH THIS DOCUMENT AGAIN's change to the list (KFCSearchEngine::SearchDocumentAgain - the author's call):
 	    every row of the chapter replaced by docHits - the document walked again, taken (swapped out) - put in
-	    page order, its story groups and their numbers rebuilt, its stories' versions replaced by storyVersions (taken),
-	    its searched parts dropped (a document is searched again whole). With no row left the chapter is shown empty
+	    page order, its story groups and their numbers rebuilt, its stories' versions replaced by storyVersions (taken).
+	    What a search over part of the document searched stays - its searched parts, recorded again by the caller where they
+	    stand, and its story (Chapter::searchedStory): the tier heading's search again walks them again (the author, 2026-10-17
+	    evening: "the same conditions as the first search"). With no row left the chapter is shown empty
 	    (Chapter::shownEmpty). The rows' places in the list change, so what indexes them is let go, as ReplaceStoryRows
 	    lets it go. Returns the chapter's row count now; -1 = no such chapter. */
 	int32 ReplaceChapterRows(int32 chapterIdx, std::vector<Hit>& docHits, std::map<UID, uint32>& storyVersions,

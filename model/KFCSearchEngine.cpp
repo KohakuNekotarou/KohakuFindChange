@@ -2294,7 +2294,8 @@ bool KFCSearchEngine::ReadStoryVersion(IDataBase* db, UID story, uint32& outVers
 }
 
 void KFCSearchEngine::FileChapter(const KFCBookScope::ChapterDoc& target, std::vector<KFCResultModel::Hit>& hits,
-	CollectTally& tally, std::map<UID, uint32>* storyVersions, std::map<UID, KFCResultModel::SearchedRange>* searchedRanges)
+	CollectTally& tally, std::map<UID, uint32>* storyVersions, std::map<UID, KFCResultModel::SearchedRange>* searchedRanges,
+	UID searchedStory)
 {
 	// Page order and each row's "P<page>(<n>) " locator - the model's one ordering, a search again's too. It needs the
 	// WHOLE target's rows (page order and the within-page ordinal are only known once they are all in), which is why the
@@ -2313,6 +2314,7 @@ void KFCSearchEngine::FileChapter(const KFCBookScope::ChapterDoc& target, std::v
 		chapter.storyVersions.swap(*storyVersions);
 	if (searchedRanges != nil)
 		chapter.searchedRanges.swap(*searchedRanges);
+	chapter.searchedStory = searchedStory;
 	// Counted before the handover: the model takes the rows and leaves this Chapter empty.
 	tally.total += static_cast<int32>(chapter.hits.size());
 	++tally.chaptersWithHits;
@@ -2599,6 +2601,9 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 		const KFCResultModel::SearchScopeKind partKind = (selectionScope == IWalkerScopeFactoryUtils::kToEndOfStoryScope)
 			? KFCResultModel::kScopeToEndOfStory : KFCResultModel::kScopeSelection;
 		std::vector<ScopePiece> partPieces;
+		// A Search: Story search's story - recorded on its chapter (Chapter::searchedStory): what its searches again walk.
+		IDataBase* storySearchDB = nil;
+		UID storySearchStory = kInvalidUID;
 		if (progressBar.WasCancelled(kFalse))
 			out.cancelled = true;
 		else if (allDocuments)
@@ -2657,6 +2662,8 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 					CollectHitsInDoc(UIDRef(storyDB, storyDB->GetRootUID()), limit, scopeOptions, kHitEverything, hits,
 						capped, walkResult, wholeBar, UIDRef(storyDB, first[0].storyUID), IWalkerScopeFactoryUtils::kEmptyScope,
 						&hitDBs);
+					storySearchDB = storyDB;
+					storySearchStory = first[0].storyUID;
 				}
 			}
 			else
@@ -2710,7 +2717,8 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 						parts[story] = MakeSearchedRange(targets[t].docRef.GetDataBase(), story, partKind, partPieces,
 							scopeOptions);
 				}
-				KFCSearchEngine::FileChapter(targets[t], perTarget[t], out, &storyVersions, &parts);
+				KFCSearchEngine::FileChapter(targets[t], perTarget[t], out, &storyVersions, &parts,
+					(storySearchDB != nil && targets[t].docRef.GetDataBase() == storySearchDB) ? storySearchStory : kInvalidUID);
 			}
 		}
 	}
@@ -4256,6 +4264,244 @@ void SayFoundAgain(PMString& outStatus, const char* what, int32 now, bool capped
 	if (capped)
 		outStatus.Append(" The list's limit of rows was reached - its other matches are not listed.");
 }
+
+// A SEARCH OVER PART OF A DOCUMENT, SEARCHED AGAIN AS IT WAS SEARCHED - the tier heading's Search These Results Again over a
+// list Search: Story, To End of Story or Selection made (the author, 2026-10-17 evening: "the same conditions as the first
+// search; a Story search, that story alone"; the document row's is greyed over such a list). In each of the list's
+// chapters: the story a Story search searched (Chapter::searchedStory - the stories of its rows for a chapter with none
+// recorded), walked whole by the story form, as the story row walks it; the part of each story a To End of Story or
+// Selection search walked (Chapter::searchedRanges), found again where it stands (FindSearchedPartAgain) and walked by its
+// own scope (QueryPartScope) - Search This Story Again's walk, story by story - and recorded again where it was walked.
+// Then each chapter's rows are replaced by what its walks found (ReplaceChapterRows - the rows with their eye on stay, a
+// chapter with nothing found is shown empty, (0/0), to be searched again). EVERY DOOR IS ASKED BEFORE ANYTHING IS WALKED,
+// so a refusal leaves the list as it was: a changed query, a part that cannot be walked on its own or whose edge cannot be
+// told (Search This Story Again's refusals), a document not open (KFC does not open again what the person closed -
+// LIFE-01; a document closed since has forgotten what was searched in it - KFCResultModel::EmptyChapter). Under a bar with
+// Cancel, counted as a search for every other door, as Search This Document Again.
+bool SearchPartsAgain(const PMString& lead, PMString& outStatus)
+{
+	outStatus.Clear();
+	outStatus.SetTranslatable(kFalse);
+	const KFCResultModel::SearchScopeKind scope = KFCResultModel::GetSearchScope();
+	const bool storyForm = (scope == KFCResultModel::kScopeStory);
+	struct PartAgain
+	{
+		UID								story;
+		TextIndex						start, end;
+		KFCResultModel::SearchedRange	record;
+		PartAgain() : story(kInvalidUID), start(kInvalidTextIndex), end(kInvalidTextIndex) {}
+	};
+	struct ChapterAgain
+	{
+		int32								chapter;
+		UIDRef								docRef;
+		PMString							name;
+		std::vector<PartAgain>				parts;
+		std::vector<KFCResultModel::Hit>	hits;
+		std::map<UID, uint32>				versions;
+		ChapterAgain() : chapter(-1) {}
+	};
+	// Asked, not refused - and the tab the walk runs in stated (QueryUnchangedForAgain).
+	outStatus.Append(lead);
+	if (!QueryUnchangedForAgain(outStatus))
+		return false;
+	outStatus.Clear();
+	std::vector<ChapterAgain> chapters;
+	for (int32 c = 0; c < KFCResultModel::GetChapterCount(); ++c)
+	{
+		ChapterAgain one;
+		one.chapter = c;
+		IDFile file;
+		int32 rows = 0;
+		(void)KFCResultModel::GetChapterLocation(c, one.docRef, file);
+		(void)KFCResultModel::GetChapterDisplay(c, one.name, rows);
+		// What it searched: its story, or each story's part.
+		if (storyForm)
+		{
+			PartAgain part;
+			part.story = KFCResultModel::GetSearchedStory(c);
+			if (part.story != kInvalidUID)
+				one.parts.push_back(part);
+			else
+			{
+				std::set<UID> stories;
+				KFCResultModel::GetChapterStories(c, stories);
+				for (std::set<UID>::const_iterator s = stories.begin(); s != stories.end(); ++s)
+				{
+					PartAgain each;
+					each.story = *s;
+					one.parts.push_back(each);
+				}
+			}
+		}
+		else
+		{
+			std::vector<UID> stories;
+			KFCResultModel::GetSearchedRangeStories(c, stories);
+			for (size_t s = 0; s < stories.size(); ++s)
+			{
+				PartAgain part;
+				part.story = stories[s];
+				if (KFCResultModel::GetSearchedRange(c, part.story, part.record))
+					one.parts.push_back(part);
+			}
+		}
+		if (one.parts.empty())
+			continue;		// a chapter a close emptied (EmptyChapter): nothing of it is known now
+		// Its document, open - by its binding (a search over part of a document is of the person's own document: no file).
+		if (!KFCBookScope::ReachChapterDoc(file, one.docRef))
+		{
+			outStatus.Append(lead);
+			outStatus.Append(one.name);
+			outStatus.Append(" is not open - open it, then search again.");
+			return false;
+		}
+		KFCResultModel::RebindChapterDoc(c, one.docRef);
+		IDataBase* const db = one.docRef.GetDataBase();
+		// The rows - the kept ones too (the row eye) - and the parts' foci where they stand now.
+		KFCSearchEngine::FollowChapterFoci(c);
+		for (size_t p = 0; !storyForm && p < one.parts.size(); ++p)
+		{
+			PartAgain& part = one.parts[p];
+			if (db == nil || !db->IsValidUID(part.story))
+				continue;		// the story went: nothing of it to walk, its rows go (an eye's stays)
+			if (!part.record.walkable)
+			{
+				outStatus.Append(lead);
+				outStatus.Append("the searched part of a story cannot be searched again on its own (separate stretches)"
+					" - search again.");
+				return false;
+			}
+			if (!FindSearchedPartAgain(c, db, part.story, scope, part.record, part.start, part.end))
+			{
+				outStatus.Append(lead);
+				outStatus.Append("the text at the edge of the searched part of a story has changed - search again.");
+				return false;
+			}
+		}
+		chapters.push_back(one);
+	}
+	if (chapters.empty())
+	{
+		outStatus.Append(lead);
+		outStatus.Append("what these results searched is no longer known (its document was closed) - search again with Find.");
+		return false;
+	}
+	// The room the list leaves: its limit less the rows of the chapters not searched again, and the rows with their eye on.
+	int32 room = KFCResultModel::kKFCCollectHitLimit - KFCResultModel::GetTotalHitCount();
+	for (size_t k = 0; k < chapters.size(); ++k)
+		room += KFCResultModel::GetHitCount(chapters[k].chapter) - KFCResultModel::CountKeptRows(chapters[k].chapter, kInvalidUID);
+	bool capped = false, cancelled = false, walked = true;
+	{
+		const SearchingFlagGuard searchingGuard;
+		KFCForwardSearchScope forward;		// forward, as the search was
+		WalkerScopeOptions scopeOptions;
+		KFCSearchEngine::GetKFCWalkerScopeOptions(scopeOptions);
+		PMString title("Searching...");
+		title.SetTranslatable(kFalse);
+		KFCProgressBar bar(title, 0, static_cast<int32>(chapters.size()) * kKFCChapterProgressSpan, kTrue, kTrue);
+		bar.DisableChildProgressBars(kTrue);
+		int32 reported = 0;
+		size_t taken = 0;		// the rows the walks before this one found - the room is the whole list's
+		for (size_t k = 0; k < chapters.size() && walked && !capped; ++k)
+		{
+			ChapterAgain& one = chapters[k];
+			IDataBase* const db = one.docRef.GetDataBase();
+			const int32 base = static_cast<int32>(k) * kKFCChapterProgressSpan;
+			KFCSetCountedTask(bar, "Document", k, chapters.size(), one.name);
+			KFCAdvanceProgress(&bar, reported, base, true /*force*/);
+			const size_t limit = (room > static_cast<int32>(taken)) ? static_cast<size_t>(room) - taken : 0;
+			for (size_t p = 0; p < one.parts.size() && walked && !capped; ++p)
+			{
+				const PartAgain& part = one.parts[p];
+				if (db == nil || !db->IsValidUID(part.story))
+					continue;
+				ChapterWalkResult result = kChapterWalked;
+				if (storyForm)
+					CollectHitsInDoc(one.docRef, limit, scopeOptions, kHitEverything, one.hits, capped, result,
+						WalkBar(bar, base, kKFCChapterProgressSpan, one.docRef, reported), UIDRef(db, part.story));
+				else
+				{
+					TempFocus partFocus;
+					InterfacePtr<ITextWalkerScope> partScope(QueryPartScope(UIDRef(db, part.story), scope, part.start, part.end,
+						scopeOptions, partFocus));
+					if (partScope == nil)
+						result = kChapterNoScope;
+					else
+						CollectHitsInDoc(one.docRef, limit, scopeOptions, kHitEverything, one.hits, capped, result,
+							WalkBar(bar, base, kKFCChapterProgressSpan, one.docRef, reported), UIDRef(db, part.story),
+							IWalkerScopeFactoryUtils::kEmptyScope, nil, nil, partScope);
+				}
+				cancelled = (result == kChapterCancelled) || bar.WasCancelled(kFalse) != kFalse;
+				walked = (result == kChapterWalked) && !cancelled;
+			}
+			taken += one.hits.size();
+			// The stories' versions while the document is open - each searched part's too, found or not (its record).
+			if (walked)
+			{
+				ReadStoryVersions(one.docRef, one.hits, one.versions);
+				for (size_t p = 0; p < one.parts.size(); ++p)
+				{
+					uint32 version = 0;
+					if (db != nil && db->IsValidUID(one.parts[p].story) && one.versions.count(one.parts[p].story) == 0
+						&& KFCSearchEngine::ReadStoryVersion(db, one.parts[p].story, version))
+						one.versions[one.parts[p].story] = version;
+				}
+			}
+		}
+	}
+	if (cancelled)
+	{
+		outStatus.Append(lead);
+		outStatus.Append("cancelled - the rows are left as they were.");
+		return false;
+	}
+	if (!walked)
+	{
+		outStatus.Append(lead);
+		outStatus.Append("InDesign's search stopped with an error - the rows are left as they were.");
+		return false;
+	}
+	// Each part recorded again where it was walked, at the version it was walked at - before the rows go in, whose foci
+	// come back with it (ReplaceChapterRows - KFCRowFoci::AttachChapter); then the rows.
+	int32 found = 0, stayed = 0;
+	for (size_t k = 0; k < chapters.size(); ++k)
+	{
+		ChapterAgain& one = chapters[k];
+		for (size_t p = 0; !storyForm && p < one.parts.size(); ++p)
+		{
+			PartAgain& part = one.parts[p];
+			const std::map<UID, uint32>::const_iterator v = one.versions.find(part.story);
+			if (v == one.versions.end())
+				continue;		// the story went
+			part.record.start = part.start;
+			part.record.end = part.end;
+			part.record.version = v->second;
+			KFCResultModel::SetSearchedRange(one.chapter, part.story, part.record);
+		}
+		int32 kept = 0;
+		const int32 rows = KFCResultModel::ReplaceChapterRows(one.chapter, one.hits, one.versions, &kept);
+		found += (rows > kept) ? rows - kept : 0;
+		stayed += kept;
+	}
+	// "Searched these results again: 4 hit(s) in the story. 4 kept rows stay." - the words of the search's own summary.
+	outStatus.Append("Searched these results again: ");
+	if (found == 0)
+		outStatus.Append("No matches");
+	else
+	{
+		outStatus.AppendNumber(found);
+		outStatus.Append(" hit(s)");
+	}
+	outStatus.Append(SelectionScopeWords(storyForm ? IWalkerScopeFactoryUtils::kStoryScope
+		: (scope == KFCResultModel::kScopeToEndOfStory) ? IWalkerScopeFactoryUtils::kToEndOfStoryScope
+		: IWalkerScopeFactoryUtils::kSelectionScope));
+	outStatus.Append(".");
+	AppendKeptStay(outStatus, stayed);
+	if (capped)
+		outStatus.Append(" The list's limit of rows was reached - its other matches are not listed.");
+	return true;
+}
 }	// anonymous namespace
 
 // SEARCH THIS STORY AGAIN (a story row's right-click menu - the author's call). A story edited since the
@@ -4545,15 +4791,19 @@ bool KFCSearchEngine::SearchListAgain(PMString& outStatus)
 		case KFCResultModel::kScopeAllDocuments:	again.allDocuments = true; break;
 		default:									break;
 	}
-	// A SEARCH OVER PART OF A DOCUMENT: refused, as Search This Document Again refuses it - a story's part is Search This
-	// Story Again's.
+	// A SEARCH OVER PART OF A DOCUMENT (Search: Story, To End of Story, Selection): searched again as it was searched - its
+	// story alone, its parts alone (SearchPartsAgain - the author, 2026-10-17 evening: "the same conditions as the first
+	// search; a Story search, that story alone"). The Object tab's Selection was the objects selected then, which the list
+	// does not keep: refused.
 	if (part != nil)
 	{
-		outStatus.Append(lead);
-		outStatus.Append("the search was over part of a document (Search: ");
-		outStatus.Append(part);
-		outStatus.Append(") - use Search This Story Again on a story row.");
-		return false;
+		if (KFCResultModel::GetSearchMode() == IFindChangeOptions::kObjectSearch)
+		{
+			outStatus.Append(lead);
+			outStatus.Append("the search was over the objects selected then (Search: Selection) - search again.");
+			return false;
+		}
+		return SearchPartsAgain(lead, outStatus);
 	}
 	if (again.fromBook)
 	{

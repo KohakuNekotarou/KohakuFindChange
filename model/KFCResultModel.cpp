@@ -818,6 +818,12 @@ void KFCResultModel::GetSearchedRangeStories(int32 chapterIdx, std::vector<UID>&
 			outStories.push_back(it->first);
 }
 
+UID KFCResultModel::GetSearchedStory(int32 chapterIdx)
+{
+	const Chapter* c = ChapterAt(chapterIdx);
+	return (c != nil) ? c->searchedStory : kInvalidUID;
+}
+
 bool KFCResultModel::GetHitFlags(int32 chapterIdx, int32 hitIdx, bool& outReplaced, bool& outLocked)
 {
 	const Hit* h = HitAt(chapterIdx, hitIdx);
@@ -1368,14 +1374,16 @@ int32 KFCResultModel::ReplaceChapterRows(int32 chapterIdx, std::vector<Hit>& doc
 		*outStayed = stayed;
 	// ReplaceStoryRows' steps over the whole chapter: its foci let go (they name rows by index), the walk's rows in, in
 	// page order, and the end ReplaceStoryRows has (RowsLaidOutAgain - indexed as the search's are, what names the rows
-	// by index let go).
+	// by index let go). WHAT A SEARCH OVER PART OF THE DOCUMENT SEARCHED STAYS - its searched parts (recorded again where
+	// they stand by the caller, so their foci come back on them) and its story: the tier heading's search again walks
+	// them again (the author, 2026-10-17 evening: "the same conditions as the first search - a Story search, that story
+	// alone").
 	KFCRowFoci::DetachChapter(chapterIdx);
 	OrderHitsByPage(docHits);
 	c->hits.swap(docHits);
 	std::vector<Hit>().swap(docHits);
 	c->storyVersions.swap(storyVersions);
 	storyVersions.clear();
-	c->searchedRanges.clear();
 	c->shownEmpty = c->hits.empty();
 	RowsLaidOutAgain(chapterIdx, *c);
 	return static_cast<int32>(c->hits.size());

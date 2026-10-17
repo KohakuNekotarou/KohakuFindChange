@@ -130,9 +130,11 @@ namespace KFCSearchEngine
 	    (CollectTargets in the .cpp, and KFCObjectSearch::CollectTargets): the rows put in page order, each with its
 	    "P<page>(<n>)" locator (KFCResultModel::OrderHitsByPage), handed to the model as the target's chapter
 	    (KFCResultModel::AppendChapter), and counted. The rows - and the stories' versions and searched parts, where
-	    given - are TAKEN, not copied. For a target that holds at least one row. */
+	    given - are TAKEN, not copied. For a target that holds at least one row. searchedStory: a Search: Story search's
+	    story (KFCResultModel::Chapter::searchedStory). */
 	void FileChapter(const KFCBookScope::ChapterDoc& target, std::vector<KFCResultModel::Hit>& hits, CollectTally& tally,
-		std::map<UID, uint32>* storyVersions = nil, std::map<UID, KFCResultModel::SearchedRange>* searchedRanges = nil);
+		std::map<UID, uint32>* storyVersions = nil, std::map<UID, KFCResultModel::SearchedRange>* searchedRanges = nil,
+		UID searchedStory = kInvalidUID);
 
 	/** THE SCOPE DOORS SEARCHBOOK HAS ALWAYS ASKED, IN ONE PLACE (so the query run asks the same):
 	    Book Scope with a Search: other than Document, a Search: this panel cannot follow, no target book, an
