@@ -415,6 +415,16 @@ DECLARE_PMID(kActionIDSpace, kKFCFindOnActiveLayerActionID, kKFCUIPrefix + 92)
 // spent).
 DECLARE_PMID(kActionIDSpace, kKFCClearFromResultsActionID, kKFCUIPrefix + 93)
 DECLARE_PMID(kActionIDSpace, kKFCClearRowsSepActionID, kKFCUIPrefix + 94)
+// NARROW DOWN (docs/superpowers/specs/2026-10-18-kfc-narrow-down-design.md N1, N2): a tier heading's submenu - its items in
+// their order and its two rules (+ 95 ... + 102).
+DECLARE_PMID(kActionIDSpace, kKFCNarrowInTablesActionID, kKFCUIPrefix + 95)
+DECLARE_PMID(kActionIDSpace, kKFCNarrowInFootnotesActionID, kKFCUIPrefix + 96)
+DECLARE_PMID(kActionIDSpace, kKFCNarrowInEndnotesActionID, kKFCUIPrefix + 97)
+DECLARE_PMID(kActionIDSpace, kKFCNarrowSep1ActionID, kKFCUIPrefix + 98)
+DECLARE_PMID(kActionIDSpace, kKFCNarrowPagesActionID, kKFCUIPrefix + 99)
+DECLARE_PMID(kActionIDSpace, kKFCNarrowOnPasteboardActionID, kKFCUIPrefix + 100)
+DECLARE_PMID(kActionIDSpace, kKFCNarrowSep2ActionID, kKFCUIPrefix + 101)
+DECLARE_PMID(kActionIDSpace, kKFCNarrowFramesActionID, kKFCUIPrefix + 102)
 
 
 // WidgetIDs:
@@ -541,6 +551,15 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 // ...and Clear from Results - a hit, object, story or document row's. NOT "kKFCClearFromResultsMenuKey": the length and the
 // character sum of kKFCClearTierResultsMenuKey ("From" and "Tier" add up alike - key_collisions.py, 2026-10-18).
 #define kKFCClearRowsMenuKey		kKFCStringPrefix "kKFCClearRowsMenuKey"
+// ...and a tier heading's Narrow Down - the submenu's name and its items (measured against every other key -
+// key_collisions.py, 2026-10-18: none reads alike).
+#define kKFCNarrowDownSubmenuKey		kKFCStringPrefix "kKFCNarrowDownSubmenuKey"
+#define kKFCNarrowInTablesMenuKey		kKFCStringPrefix "kKFCNarrowInTablesMenuKey"
+#define kKFCNarrowInFootnotesMenuKey	kKFCStringPrefix "kKFCNarrowInFootnotesMenuKey"
+#define kKFCNarrowInEndnotesMenuKey		kKFCStringPrefix "kKFCNarrowInEndnotesMenuKey"
+#define kKFCNarrowPagesMenuKey			kKFCStringPrefix "kKFCNarrowPagesMenuKey"
+#define kKFCNarrowOnPasteboardMenuKey	kKFCStringPrefix "kKFCNarrowOnPasteboardMenuKey"
+#define kKFCNarrowFramesMenuKey			kKFCStringPrefix "kKFCNarrowFramesMenuKey"
 // ...and an object row's other Special Operations - InDesign's own English command names ("Degrees" for the degree sign: the
 // string table is ASCII) (measured against every other key - key_collisions.py).
 #define kKFCFillFramePropMenuKey			kKFCStringPrefix "kKFCFillFramePropMenuKey"
@@ -667,6 +686,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 #define kKFCFittingSubmenuPath				kKFCSpecialOpsSubmenuPath kSDKDefDelimitMenuPath kKFCFittingSubmenuKey
 #define kKFCArrangeSubmenuPath				kKFCSpecialOpsSubmenuPath kSDKDefDelimitMenuPath kKFCArrangeSubmenuKey
 #define kKFCTransformSubmenuPath			kKFCSpecialOpsSubmenuPath kSDKDefDelimitMenuPath kKFCTransformSubmenuKey
+// A tier heading's Narrow Down submenu (the narrow-down spec's N1) - named by KFC's own key, as Fitting is.
+#define kKFCNarrowDownSubmenuPath			kKFCResultTierMenuName kSDKDefDelimitMenuPath kKFCNarrowDownSubmenuKey
 
 // Menu item positions:
 //
@@ -733,9 +754,21 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 #define kKFCSearchDocumentAgainMenuItemPosition	0.5
 // Select All Rows: after the row's own Search ... Again on a story or document row; alone on the book row's menu.
 #define kKFCSelectAllRowsMenuItemPosition		1.0
-// A tier's own row's menu: Search These Results Again, then Clear These Results.
+// A tier's own row's menu: Search These Results Again, the Narrow Down submenu, then Clear These Results (the narrow-down
+// spec's N1: the searches above, the one that takes away last).
 #define kKFCSearchTierAgainMenuItemPosition	0.5
+#define kKFCNarrowDownSubmenuPosition		0.75
 #define kKFCClearTheseResultsMenuItemPosition	1.0
+// ...and in Narrow Down (N2): In Tables, In Footnotes, In Endnotes; a rule; Pages..., On Pasteboard; a rule; Frames of These
+// Matches.
+#define kKFCNarrowInTablesMenuItemPosition		1.0
+#define kKFCNarrowInFootnotesMenuItemPosition	2.0
+#define kKFCNarrowInEndnotesMenuItemPosition	3.0
+#define kKFCNarrowSep1MenuItemPosition			3.5
+#define kKFCNarrowPagesMenuItemPosition			4.0
+#define kKFCNarrowOnPasteboardMenuItemPosition	5.0
+#define kKFCNarrowSep2MenuItemPosition			5.5
+#define kKFCNarrowFramesMenuItemPosition		6.0
 // An object row's menu: Replace, then the Special Operations submenu, Create Outlines in it.
 #define kKFCObjectReplaceMenuItemPosition		1.0
 #define kKFCSpecialOpsSubmenuPosition			2.0

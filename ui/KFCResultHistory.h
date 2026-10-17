@@ -52,6 +52,17 @@ namespace KFCResultHistory
 	    KFCRuns()->SearchBookOnLayer, its rows kept to that layer, and the tier's heading names it (LiveTierLabel). */
 	int32 Find(const PMString& label, PMString& outSummary, bool* outCommitted = nil, const PMString* onLayer = nil);
 
+	/** NARROW DOWN (docs/superpowers/specs/2026-10-18-kfc-narrow-down-design.md - a tier heading's submenu): the live list's
+	    search run once more with its conditions and `step` (KFCRuns()->NarrowList) into a NEW list, carried as Find carries a
+	    search's: the list it narrowed kept as a tier when the model kept it, the copies following the model's tiers, the new
+	    list named as the one it narrowed (its conditions are drawn after the name - LiveTierLabel - not kept in it: the name
+	    is what QueryReadsAsTier reads the query against). The list drawn again, the status line set. True = a new list. */
+	bool Narrow(const KFCNarrowStep& step, PMString& outSummary);
+
+	/** Are tier `tier`'s rows object rows - an Object tab search's, a Frames of These Matches list's (-1 = the live list,
+	    asked of the model; a grey one as its copy noted it)? The heading's Narrow Down greys a text-only condition by it. */
+	bool TierHoldsObjects(int32 tier);
+
 	/** A tier's name - the query Find/Change holds now, in the author's words (10-14; F and C rather than Find and Change,
 	    the same night): "[<tab>] F:"<find>" C:"<change>"",
 	    each side as the Application Bar's field would show it (KFCFindChangeQueryWords / KFCFindChangeChangeWords) and cut
@@ -93,7 +104,7 @@ namespace KFCResultHistory
 	/** The live tier's name as its row draws it: the label of the search that made the list the model holds, with the
 	    Search: it was searched with after the tab ("[Text/Story] F:..." - the author, 2026-10-17 evening: "easy to read";
 	    drawn, not kept in the name, which QueryReadsAsTier reads the query against), or "Results" for a list KFC did not
-	    name (one an Undo put back, say). */
+	    name (one an Undo put back, say) - and a narrowed list's conditions after it, drawn so too ("... / In Tables"). */
 	PMString LiveTierLabel();
 
 	/** WHERE THE LIVE TIER STANDS AMONG THE TIERS (v2 R4 - the tiers stay in search order, the live one in its place: the

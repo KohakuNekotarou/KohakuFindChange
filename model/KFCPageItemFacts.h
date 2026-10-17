@@ -23,8 +23,10 @@ namespace KFCPageItemFacts
 {
 	/** A frame's page, named the way the Pages panel names it (section prefix and all), and its plain document order
 	    (for sorting). A frame on no page reads as its spread, which GetPageString spells "PB". false when no page or
-	    spread name can be read for it. */
-	bool GetFramePageString(const UIDRef& docRef, UID frameUID, PMString& outPage, int32& outPageIndex);
+	    spread name can be read for it. outOnPasteboard (optional): the UID named is not a page (kPageBoss) - the frame is
+	    out on the pasteboard (Narrow Down's On Pasteboard: told by the class, never by the "PB" spelling). */
+	bool GetFramePageString(const UIDRef& docRef, UID frameUID, PMString& outPage, int32& outPageIndex,
+		bool* outOnPasteboard = nil);
 
 	/** Is this item switched off - its layer hidden, or the item itself (Object > Hide)? */
 	bool IsFrameHidden(IDataBase* db, UID frameUID);

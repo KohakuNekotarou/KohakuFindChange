@@ -98,6 +98,7 @@
 #include "KFCFindChangeCmds.h"	// the find/change settings' commands, one at a time
 #include "KFCQueryCopy.h"		// the query copied in memory - onto each new list (the tier switch); the spike (DiagProbe)
 #include "KFCTierStore.h"		// ParkCurrent - the list a search replaces, kept as a tier
+#include "KFCNarrow.h"			// Narrow Down - a narrowed list's conditions, asked of each row a walk builds
 
 namespace
 {
@@ -252,6 +253,23 @@ struct SearchingFlagGuard
 	~SearchingFlagGuard()	{ gSearching = false; }
 };
 
+// A NARROWED LIST'S CONDITIONS, FOR THE LENGTH OF A WALK THAT LISTS ITS ROWS (Narrow Down - KFCNarrow.h): the search's
+// (RunSearch), and its searches again (SearchStoryAgain, SearchDocumentAgain, SearchPartsAgain - a narrowed list is
+// searched again with its conditions, the spec's N4). Read by CollectHitsInDoc for a search's rows (kHitEverything) alone -
+// never by a walk that looks a row up again (CollectStoryHits - kHitPlaceAndText), which must meet every match. Set and
+// let go by WalkFilterScope, one walk at a time (the walks are not entered twice - gSearching, KFCRunGuard).
+const KFCNarrow::Filter* gWalkFilter = nil;
+
+struct WalkFilterScope
+{
+	explicit WalkFilterScope(const KFCNarrow::Filter& filter) : fWas(gWalkFilter) { gWalkFilter = filter.Empty() ? nil : &filter; }
+	~WalkFilterScope() { gWalkFilter = fWas; }
+private:
+	const KFCNarrow::Filter* fWas;
+	WalkFilterScope(const WalkFilterScope&);
+	WalkFilterScope& operator=(const WalkFilterScope&);
+};
+
 // Is there anything to find on the Find/Change panel right now (in the current mode)?
 bool HasFindQuery()
 {
@@ -370,8 +388,9 @@ struct FrameFacts
 	bool		hasPage;	// false for a frame on no page, and for "no frame at all"
 	bool		isHidden;
 	bool		isLocked;
+	bool		onPasteboard;	// the page named is a spread ("PB") - the frame is out on the pasteboard (Narrow Down)
 
-	FrameFacts() : pageIndex(-1), hasPage(false), isHidden(false), isLocked(false) {}
+	FrameFacts() : pageIndex(-1), hasPage(false), isHidden(false), isLocked(false), onPasteboard(false) {}
 };
 
 // Keyed by story as well as frame. kInvalidUID stands for "no frame", which matches in two
@@ -388,11 +407,12 @@ const FrameFacts& LookUpFrame(const UIDRef& docRef, const UIDRef& storyRef, UID 
 
 	FrameFacts facts;
 	if (frameUID != kInvalidUID)
-		facts.hasPage = GetFramePageString(docRef, frameUID, facts.pageString, facts.pageIndex);
+		facts.hasPage = GetFramePageString(docRef, frameUID, facts.pageString, facts.pageIndex, &facts.onPasteboard);
 	if (!facts.hasPage)
 	{
 		facts.pageString.Clear();
 		facts.pageIndex = -1;
+		facts.onPasteboard = false;
 	}
 	facts.pageString.SetTranslatable(kFalse);
 	facts.isHidden = IsFrameHidden(docRef.GetDataBase(), frameUID);
@@ -816,6 +836,7 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 		}
 	}
 
+	outHit.frameOnPasteboard = facts->onPasteboard;	// the frame the row names its page after - out on the pasteboard
 	outHit.pageString = facts->pageString;		// empty when the frame has no page
 	outHit.pageString.SetTranslatable(kFalse);
 	outHit.pageIndex = facts->pageIndex;		// -1 then, which sorts the hit to the end
@@ -1552,6 +1573,22 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 		KFC_CLOCK(cSearchBuild);
 		BuildHit(hitDocRef, story, start, end, detail, walkCaches[storyDB], hit);
 		KFC_SPENT(tSearchBuild, cSearchBuild);
+		// A NARROWED LIST'S CONDITIONS (Narrow Down - gWalkFilter): a row that does not meet them goes again at once, before the
+		// ceiling above counts it - the list's limit counts the rows that pass (the spec's N3, the author's call). Where the
+		// match's text stands is read for the conditions that ask it alone (ReadTextPlace); its frame out on the pasteboard
+		// came with its page (BuildHit).
+		if (gWalkFilter != nil && detail == kHitEverything)
+		{
+			if (gWalkFilter->NeedsTextPlace())
+				KFCNarrow::ReadTextPlace(story, start, hit);
+			KFC_DIAG_LOG("NARROWPB story=%u at=%d pb=%d page=%s overset=%d", story.GetUID().Get(), (int)start,
+				hit.frameOnPasteboard ? 1 : 0, hit.pageString.GetUTF8String().c_str(), hit.isOverset ? 1 : 0);
+			if (!gWalkFilter->KeepText(hit))
+			{
+				outHits.pop_back();
+				continue;
+			}
+		}
 		if (outHitDBs != nil)
 			outHitDBs->push_back(storyDB);
 	}
@@ -2998,12 +3035,17 @@ namespace KFCSearchEngine
 		PMString				bookPath;
 		PMString				layer;			// Find Objects on Active Layer's list: the layer it was searched on (else empty)
 		uint32					set;			// the list's result set: kept, so the tier stays where it stands (v2 R4)
-		AgainTarget() : fromBook(false), allDocuments(false), hasDoc(false), set(0) {}
+		std::vector<KFCNarrowStep>	narrow;	// the list's conditions (Narrow Down) - and a Narrow Down's new one after them
+		bool					newTier;	// NARROW DOWN: into a new list, the live one parked as a tier first, as Find parks it
+										// (the spec's N4); false = Search These Results Again, the list searched in place
+		AgainTarget() : fromBook(false), allDocuments(false), hasDoc(false), set(0), newTier(false) {}
 	};
 
-	/** THE SEARCH'S ONE BODY - SearchBook's (again nil), SearchBookOnLayer's (onLayer) and SearchListAgain's: the same
-	    doors, the same walk, the same summary. A list searched again is not parked as a tier - it is the same one - and is
-	    put back as it was when the search does not go through. outCommitted = past the commit point, and not put back.
+	/** THE SEARCH'S ONE BODY - SearchBook's (again nil), SearchBookOnLayer's (onLayer), SearchListAgain's and NarrowList's:
+	    the same doors, the same walk, the same summary. A list searched again is not parked as a tier - it is the same one -
+	    and is put back as it was when the search does not go through. A Narrow Down's (again->newTier) is a new list, as
+	    Find's is: the list it narrows parked first; its rows are what again->narrow lets through (KFCNarrow::Filter).
+	    outCommitted = past the commit point, and not put back.
 	    onLayer: Find Objects on Active Layer's layer (nil otherwise - a list searched again brings its own, again->layer). */
 	int32 RunSearch(const AgainTarget* again, PMString& outSummary, bool& outCommitted, const PMString* onLayer);
 
@@ -3235,11 +3277,16 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	// SEARCH THESE RESULTS AGAIN KEEPS THE LIST WHERE IT IS (SearchListAgain): not parked - it is the same tier, searched
 	// anew - and copied whole first, its rows on their foci as they stand, to be put back if the search does not go
 	// through (putBack, below).
+	// NARROW DOWN (again->newTier) MAKES A NEW LIST, AS FIND DOES (the spec's N4): the list it narrows is parked as a tier, as
+	// Find parks it - and its own query copy taken first, to go on the new list (N3: the list's query, which the door
+	// states into Find/Change, searched with its conditions). Search These Results Again searches the list in place.
+	const bool inPlace = (again != nil && !again->newTier);
+	const std::shared_ptr<const KFCQueryCopy> againCopy((again != nil) ? KFCResultModel::GetQueryCopy() : nullptr);
 	KFCResultModel::ModelSnapshot before;
 	int32 reserved = 0;		// the row eye: the kept rows' room (below)
 	PMString beforeBook;
 	beforeBook.SetTranslatable(kFalse);
-	if (again != nil)
+	if (inPlace)
 	{
 		for (int32 c = 0; c < KFCResultModel::GetChapterCount(); ++c)
 			FollowChapterFoci(c);
@@ -3257,7 +3304,7 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	KFCSearchEngine::DropResults();
 	// ...the same result set again, in a new layout (Clear numbered both anew): the tier keeps its place (v2 R4), and the
 	// writes kept for its old rows are no longer followed (UNDO-14, as after Search This Document Again).
-	if (again != nil)
+	if (inPlace)
 		KFCResultModel::ReturnToResultSet(again->set);
 	outCommitted = true;
 	// WHAT A SEARCH AGAIN THAT DOES NOT GO THROUGH OWES THE LIST: its rows, its result set, its book and its Find Format
@@ -3296,7 +3343,7 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 			// (KFCBookScope::ResolveTargetBook).
 			// (An empty book is refused at the front door. This is the safety net - see the note at the
 			// end of ListBookChapters - and the same sentence.)
-			if (again != nil)
+			if (inPlace)
 				putBack();
 			outSummary.Append(kBookHasNoChapters);
 			return 0;
@@ -3325,7 +3372,7 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 		}
 		if (targets.empty())
 		{
-			if (again != nil)
+			if (inPlace)
 				putBack();
 			outSummary.Append(kNoDocumentToSearch);
 			return 0;
@@ -3341,7 +3388,7 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 		IDocument* doc = KFCBookScope::ActiveDocument();
 		if (doc == nil)
 		{
-			if (again != nil)
+			if (inPlace)
 				putBack();
 			outSummary.Append(kNoDocumentToSearch);
 			return 0;
@@ -3365,6 +3412,9 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	// ...and the layer it kept to (Find Objects on Active Layer - empty for every other search), for the same reason: the
 	// list's searches again search that layer, and its tier's heading names it.
 	KFCResultModel::SetSearchLayer(layer);
+	// ...and a narrowed list's conditions (Narrow Down - the spec's N4: its searches again search with them, its tier's heading
+	// names them) - empty for every other search.
+	KFCResultModel::SetNarrowSteps((again != nil) ? again->narrow : std::vector<KFCNarrowStep>());
 
 	// ...and that a search HAPPENED, which the panel's illustration follows. Said separately from
 	// the two lines around it because it survives finding nothing: a search that returned no hits
@@ -3408,9 +3458,9 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	// this list, kept as a tier by a later search, is switched to. Read here, beside the signature and the format, for their
 	// reason: on this side of CommitSearchMode. A copy that cannot be read is not put on - that tier then refuses a switch.
 	// (SEARCH THESE RESULTS AGAIN keeps the list's own copy: the tier keeps its name, and its query - whatever Change to
-	// the dialog holds.)
+	// the dialog holds. A NARROW DOWN's new list takes the copy of the list it narrows, for the same reason.)
 	if (again != nil)
-		KFCResultModel::SetQueryCopy(before.header.query);
+		KFCResultModel::SetQueryCopy(againCopy);
 	else
 	{
 		KFCQueryCopy copy;
@@ -3420,11 +3470,17 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	}
 
 	CollectTally tally;
-	if (objectTab)		// THE OBJECT TAB: page items, walked by InDesign's own object search one document at a time.
-		KFCObjectSearch::CollectTargets(targets, fromBook, allDocuments, static_cast<int32>(selectionScope), unopenable, tally,
-			reserved, layer);
-	else
-		CollectTargets(targets, fromBook, allDocuments, selectionScope, unopenable, tally, reserved);
+	// A NARROWED LIST'S CONDITIONS, asked of every row the walk builds (KFCNarrow::Filter - empty, and asked nothing, for any
+	// other search): the text walk's through gWalkFilter, the object walk's handed in.
+	const KFCNarrow::Filter narrowFilter((again != nil) ? again->narrow : std::vector<KFCNarrowStep>());
+	{
+		const WalkFilterScope walkFilter(narrowFilter);
+		if (objectTab)		// THE OBJECT TAB: page items, walked by InDesign's own object search one document at a time.
+			KFCObjectSearch::CollectTargets(targets, fromBook, allDocuments, static_cast<int32>(selectionScope), unopenable, tally,
+				reserved, layer, narrowFilter.Empty() ? nil : &narrowFilter);
+		else
+			CollectTargets(targets, fromBook, allDocuments, selectionScope, unopenable, tally, reserved);
+	}
 
 	// Cancelled: throw the half-finished result away rather than leave a partial list looking like a
 	// complete one, and give the chapters back - the results that would have needed them are gone.
@@ -3433,30 +3489,39 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	{
 		outSummary.Clear();
 		outSummary.SetTranslatable(kFalse);
-		if (again != nil)
+		if (inPlace)
 		{
 			putBack();		// SEARCH THESE RESULTS AGAIN: the list as it was
 			outSummary.Append("Search These Results Again: cancelled - the rows are left as they were.");
 			return 0;
 		}
 		KFCSearchEngine::DropResults();		// the rows, the book (its chapters closed) and the format
-		outSummary.Append("Search cancelled.");
+		// (A NARROW DOWN cancelled as Find is - the spec's N8: the list it narrowed is a tier, to be switched back to.)
+		outSummary.Append((again != nil) ? "Narrow Down: cancelled." : "Search cancelled.");
 		return 0;
 	}
 
 	// THE ROW EYE (docs/superpowers/specs/2026-10-17-kfc-row-eye-keep-design.md 2-2): Search These Results Again carries
 	// the rows of the list as it was whose eye is on into the new one, each to its own document (CarryKeptRowsByDocument)
 	// - ahead of the foci, which attach to them with the rest.
+	// (Not a Narrow Down's - the spec's N9: a new search; the rows with their eye on stay with the list it narrowed.)
 	int32 keptStay = 0;
-	if (again != nil)
+	if (inPlace)
 		keptStay = CarryKeptRowsByDocument(before, targets);
 
 	// THE ROWS' FOCI (spec T6 a): every chapter whose document is still open - the documents of a document-scope search,
 	// a book's chapters the user has open. The chapters a book search opened itself were handed back in the loop.
 	KFCRowFoci::AttachOpenChapters();
-	// (SEARCH THESE RESULTS AGAIN says so ahead of the search's own words.)
-	if (again != nil)
+	// (SEARCH THESE RESULTS AGAIN says so ahead of the search's own words - and a NARROW DOWN its conditions, the spec's N10:
+	// "Narrowed down (In Tables): 12 hit(s) in 3 of 5 chapter(s).")
+	if (inPlace)
 		outSummary.Append("Searched these results again: ");
+	else if (again != nil)
+	{
+		outSummary.Append("Narrowed down (");
+		outSummary.Append(KFCResultModel::NarrowWords());
+		outSummary.Append("): ");
+	}
 
 	// Every chapter KFC opened has already been handed back inside the loop - a book search leaves
 	// nothing of its own open, and no .indd locked. The rows carry their chapter's file, so a jump
@@ -4328,7 +4393,10 @@ void SayFoundAgain(PMString& outStatus, const char* what, int32 now, bool capped
 // told (Search This Story Again's refusals), a document not open (KFC does not open again what the person closed -
 // LIFE-01; a document closed since has forgotten what was searched in it - KFCResultModel::EmptyChapter). Under a bar with
 // Cancel, counted as a search for every other door, as Search This Document Again.
-bool SearchPartsAgain(const PMString& lead, PMString& outStatus)
+// AND NARROW DOWN over such a list (again.newTier - the spec's N3, N4): the same walks with the list's conditions and the new
+// one (again.narrow - a narrowed list's own conditions searched again in place too), then not put back in place but filed
+// as a NEW list - the list narrowed parked as a tier, as Find parks it.
+bool SearchPartsAgain(const PMString& lead, PMString& outStatus, const KFCSearchEngine::AgainTarget& again)
 {
 	outStatus.Clear();
 	outStatus.SetTranslatable(kFalse);
@@ -4345,6 +4413,7 @@ bool SearchPartsAgain(const PMString& lead, PMString& outStatus)
 	{
 		int32								chapter;
 		UIDRef								docRef;
+		IDFile								file;		// its file (a Narrow Down's new list files it under it)
 		PMString							name;
 		std::vector<PartAgain>				parts;
 		std::vector<KFCResultModel::Hit>	hits;
@@ -4365,6 +4434,7 @@ bool SearchPartsAgain(const PMString& lead, PMString& outStatus)
 		int32 rows = 0;
 		(void)KFCResultModel::GetChapterLocation(c, one.docRef, file);
 		(void)KFCResultModel::GetChapterDisplay(c, one.name, rows);
+		one.file = file;
 		// What it searched: its story, or each story's part.
 		if (storyForm)
 		{
@@ -4438,12 +4508,18 @@ bool SearchPartsAgain(const PMString& lead, PMString& outStatus)
 		return false;
 	}
 	// The room the list leaves: its limit less the rows of the chapters not searched again, and the rows with their eye on.
+	// A Narrow Down's new list has the whole limit (nothing of the list it narrows comes along - N9).
 	int32 room = KFCResultModel::kKFCCollectHitLimit - KFCResultModel::GetTotalHitCount();
 	for (size_t k = 0; k < chapters.size(); ++k)
 		room += KFCResultModel::GetShownHitCount(chapters[k].chapter) - KFCResultModel::CountKeptRows(chapters[k].chapter, kInvalidUID);
+	if (again.newTier)
+		room = KFCResultModel::kKFCCollectHitLimit;
 	bool capped = false, cancelled = false, walked = true;
 	{
 		const SearchingFlagGuard searchingGuard;
+		// The list's conditions - and a Narrow Down's new one - asked of every row the walks build (gWalkFilter).
+		const KFCNarrow::Filter narrowFilter(again.narrow);
+		const WalkFilterScope walkFilter(narrowFilter);
 		KFCForwardSearchScope forward;		// forward, as the search was
 		WalkerScopeOptions scopeOptions;
 		KFCSearchEngine::GetKFCWalkerScopeOptions(scopeOptions);
@@ -4511,6 +4587,86 @@ bool SearchPartsAgain(const PMString& lead, PMString& outStatus)
 		outStatus.Append(lead);
 		outStatus.Append("InDesign's search stopped with an error - the rows are left as they were.");
 		return false;
+	}
+	// NARROW DOWN: what the walks found filed as a NEW list. What goes on it is read off the list it narrows before that is
+	// parked - each document's searched story or parts (recorded where they were walked, at the version walked at), its
+	// scope, its layer, its query copy; then the list parked as Find parks it (KFCTierStore::ParkCurrent - its rows' foci go
+	// with it), its documents handed back, the list dropped (a new result set), and the new list's header written as the
+	// search writes it - its mode, its walk's key and its Find Format read under the door that stated its query, as the
+	// search reads them - its conditions after them. No row with its eye on comes along (N9).
+	if (again.newTier)
+	{
+		struct NewChapter
+		{
+			KFCBookScope::ChapterDoc						target;
+			std::map<UID, KFCResultModel::SearchedRange>	ranges;
+			UID												story;
+			NewChapter() : story(kInvalidUID) {}
+		};
+		std::vector<NewChapter> made(chapters.size());
+		for (size_t k = 0; k < chapters.size(); ++k)
+		{
+			ChapterAgain& one = chapters[k];
+			made[k].target.docRef = one.docRef;
+			made[k].target.shortName = one.name;
+			made[k].target.file = one.file;
+			made[k].story = storyForm ? KFCResultModel::GetSearchedStory(one.chapter) : kInvalidUID;
+			for (size_t p = 0; !storyForm && p < one.parts.size(); ++p)
+			{
+				PartAgain& part = one.parts[p];
+				const std::map<UID, uint32>::const_iterator v = one.versions.find(part.story);
+				if (v == one.versions.end())
+					continue;		// the story went
+				part.record.start = part.start;
+				part.record.end = part.end;
+				part.record.version = v->second;
+				made[k].ranges[part.story] = part.record;
+			}
+		}
+		PMString layer(KFCResultModel::GetSearchLayer());
+		layer.SetTranslatable(kFalse);
+		const std::shared_ptr<const KFCQueryCopy> copy(KFCResultModel::GetQueryCopy());
+		KFCTierStore::ParkCurrent();
+		KFCBookScope::ReleaseHeldDocs(true /*close now*/);
+		KFCSearchEngine::DropResults();
+		KFCResultModel::SetFromBook(false);
+		KFCResultModel::SetSearchScope(scope);
+		KFCResultModel::SetSearchLayer(layer);
+		KFCResultModel::SetNarrowSteps(again.narrow);
+		KFCResultModel::NoteRun();
+		KFCResultModel::SetBookName(PMString());
+		KFCResultModel::SetSearchMode(KFCSearchEngine::CurrentSearchMode());
+		{
+			PMString walkSignature;
+			KFCSearchEngine::BuildWalkSignature(walkSignature);
+			KFCResultModel::SetWalkSignature(walkSignature);
+		}
+		RememberFindFormat();
+		KFCResultModel::SetQueryCopy(copy);
+		KFCSearchEngine::CollectTally tally;
+		for (size_t k = 0; k < chapters.size(); ++k)
+			if (!chapters[k].hits.empty())
+				KFCSearchEngine::FileChapter(made[k].target, chapters[k].hits, tally, &chapters[k].versions, &made[k].ranges,
+					made[k].story);
+		KFCRowFoci::AttachOpenChapters();
+		// "Narrowed down (In Tables): 4 hit(s) in the story." - the search's own words (N10).
+		outStatus.Append("Narrowed down (");
+		outStatus.Append(KFCResultModel::NarrowWords());
+		outStatus.Append("): ");
+		if (tally.total == 0)
+			outStatus.Append("No matches");
+		else
+		{
+			outStatus.AppendNumber(tally.total);
+			outStatus.Append(" hit(s)");
+		}
+		outStatus.Append(SelectionScopeWords(storyForm ? IWalkerScopeFactoryUtils::kStoryScope
+			: (scope == KFCResultModel::kScopeToEndOfStory) ? IWalkerScopeFactoryUtils::kToEndOfStoryScope
+			: IWalkerScopeFactoryUtils::kSelectionScope));
+		outStatus.Append(".");
+		if (capped)
+			outStatus.Append(" The list's limit of rows was reached - its other matches are not listed.");
+		return true;
 	}
 	// Each part recorded again where it was walked, at the version it was walked at - before the rows go in, whose foci
 	// come back with it (ReplaceChapterRows - KFCRowFoci::AttachChapter); then the rows.
@@ -4653,6 +4809,10 @@ bool KFCSearchEngine::SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMStrin
 		KFCForwardSearchScope forward;
 		WalkerScopeOptions scopeOptions;
 		KFCSearchEngine::GetKFCWalkerScopeOptions(scopeOptions);
+		// A NARROWED LIST'S CONDITIONS, searched again with it (Narrow Down - the spec's N4: the list's rows are its search's,
+		// conditions and all - a story walked again lists what the list would).
+		const KFCNarrow::Filter narrowFilter(KFCResultModel::GetNarrowSteps());
+		const WalkFilterScope walkFilter(narrowFilter);
 		// A searched part's own scope - nil for a whole story, which CollectHitsInDoc walks by the story form.
 		TempFocus partFocus;
 		InterfacePtr<ITextWalkerScope> partScope(overPart
@@ -4779,8 +4939,12 @@ bool KFCSearchEngine::SearchDocumentAgain(int32 chapterIdx, PMString& outStatus)
 	{
 		const SearchingFlagGuard searchingGuard;
 		KFCForwardSearchScope forward;		// forward, as the search was
+		// A NARROWED LIST'S CONDITIONS, searched again with it (Narrow Down - Search This Story Again's rule).
+		const KFCNarrow::Filter narrowFilter(KFCResultModel::GetNarrowSteps());
+		const WalkFilterScope walkFilter(narrowFilter);
 		if (KFCResultModel::GetSearchMode() == IFindChangeOptions::kObjectSearch)
-			walked = KFCObjectSearch::WalkOneDocument(docRef, name, limit, hits, capped, cancelled, onLayer);
+			walked = KFCObjectSearch::WalkOneDocument(docRef, name, limit, hits, capped, cancelled, onLayer,
+				narrowFilter.Empty() ? nil : &narrowFilter);
 		else
 		{
 			// The search's walk of one of its documents (CollectTargets' chapter walk): from the top, the whole of it.
@@ -4826,7 +4990,13 @@ bool KFCSearchEngine::SearchDocumentAgain(int32 chapterIdx, PMString& outStatus)
 // tier again from its heading: "let's try it"). The live list's own search run once more - RunSearch, the search's
 // one body - over what the list searched, with its own query (the door states it when Find/Change holds another one -
 // KFCQueryScope): its document, its book, or the documents open now; its rows replaced in place. See the header.
-bool KFCSearchEngine::SearchListAgain(PMString& outStatus)
+namespace
+{
+// SEARCH THESE RESULTS AGAIN AND NARROW DOWN, ONE BODY (KFCSearchEngine::SearchListAgain / NarrowList): the live list's own
+// search run once more over what it searched, with its query and its conditions (a narrowed list's - KFCNarrow) - and, for a
+// Narrow Down (`step`), the new condition after them and the result put into a new list (AgainTarget::newTier - the spec's
+// N3, N4); nil = the list searched in place. The same doors and the same refusals for both (N8), each said after its lead.
+bool SearchListOnceMore(const KFCNarrowStep* step, PMString& outStatus)
 {
 	outStatus.Clear();
 	outStatus.SetTranslatable(kFalse);
@@ -4835,8 +5005,33 @@ bool KFCSearchEngine::SearchListAgain(PMString& outStatus)
 		outStatus.Append(KFCRunGuard::BusyMessage());
 		return false;
 	}
-	PMString lead("Search These Results Again: ");
+	PMString lead((step != nil) ? "Narrow Down: " : "Search These Results Again: ");
 	lead.SetTranslatable(kFalse);
+	// A NARROW DOWN'S CONDITION: one this build knows; one only a text row can meet, refused over a list of object rows (the
+	// menu greys it - this stays for a caller that never opened the menu, as Find's refusals do - N8).
+	if (step != nil)
+	{
+		if (step->kind <= kKFCNarrowNone || step->kind >= kKFCNarrowKindCount)
+		{
+			outStatus.Append(lead);
+			outStatus.Append("that is not a condition this build knows.");
+			return false;
+		}
+		if (KFCNarrow::IsTextOnly(step->kind) && KFCResultModel::ListHoldsObjects())
+		{
+			outStatus.Append(lead);
+			outStatus.Append(KFCNarrow::StepWords(*step));
+			outStatus.Append(" narrows text results - these are objects.");
+			return false;
+		}
+		if (step->kind == kKFCNarrowPages || step->kind == kKFCNarrowFrames)
+		{
+			outStatus.Append(lead);
+			outStatus.Append(KFCNarrow::StepWords(*step));
+			outStatus.Append(" is not built yet.");
+			return false;
+		}
+	}
 	// ITS OWN QUERY, KEPT AND READABLE: what the door states into Find/Change (KFCQueryScope states only a valid copy, and
 	// lets the operation through on Find/Change as it is otherwise) - so none, or one that could not be read, is refused
 	// here rather than searched with whatever the dialog holds.
@@ -4847,9 +5042,15 @@ bool KFCSearchEngine::SearchListAgain(PMString& outStatus)
 		outStatus.Append("these results keep no query of their own - search with Find.");
 		return false;
 	}
-	AgainTarget again;
+	KFCSearchEngine::AgainTarget again;
 	again.set = KFCResultModel::GetResultSetId();
 	again.layer = KFCResultModel::GetSearchLayer();		// Find Objects on Active Layer's list: the same layer again
+	again.narrow = KFCResultModel::GetNarrowSteps();	// a narrowed list's conditions - searched with again (N4)
+	if (step != nil)
+	{
+		again.narrow.push_back(*step);		// ...and a Narrow Down's new one after them, into a new list
+		again.newTier = true;
+	}
 	const char* part = nil;
 	switch (KFCResultModel::GetSearchScope())
 	{
@@ -4872,7 +5073,7 @@ bool KFCSearchEngine::SearchListAgain(PMString& outStatus)
 			outStatus.Append("the search was over the objects selected then (Search: Selection) - search again.");
 			return false;
 		}
-		return SearchPartsAgain(lead, outStatus);
+		return SearchPartsAgain(lead, outStatus, again);
 	}
 	if (again.fromBook)
 	{
@@ -4927,17 +5128,19 @@ bool KFCSearchEngine::SearchListAgain(PMString& outStatus)
 		}
 	}
 	bool committed = false;
-	(void)RunSearch(&again, outStatus, committed, nil);
+	(void)KFCSearchEngine::RunSearch(&again, outStatus, committed, nil);
 	return committed;
+}
+}	// anonymous namespace
+
+bool KFCSearchEngine::SearchListAgain(PMString& outStatus)
+{
+	return SearchListOnceMore(nil, outStatus);
 }
 
 bool KFCSearchEngine::NarrowList(const KFCNarrowStep& step, PMString& outStatus)
 {
-	(void)step;
-	outStatus.Clear();
-	outStatus.SetTranslatable(kFalse);
-	outStatus.Append("Narrow Down: not built yet.");
-	return false;
+	return SearchListOnceMore(&step, outStatus);
 }
 
 void KFCSearchEngine::RestoreSearchScope(int32 mode, int32 scope)

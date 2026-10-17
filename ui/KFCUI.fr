@@ -795,6 +795,54 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCSearchTierAgainMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// ...and Narrow Down (docs/superpowers/specs/2026-10-18-kfc-narrow-down-design.md N1, N2): that tier's search run once more
+		// with its conditions and the one chosen, into a new tier - a grey tier switched to first (KFCResultHistory::Narrow). The
+		// submenu's parent node: ActionID 0 and its path ending in the delimiter (Special Operations' idiom).
+		0,
+		kKFCNarrowDownSubmenuPath kSDKDefDelimitMenuPath
+		kKFCNarrowDownSubmenuPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCNarrowInTablesActionID,
+		kKFCNarrowDownSubmenuPath
+		kKFCNarrowInTablesMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCNarrowInFootnotesActionID,
+		kKFCNarrowDownSubmenuPath
+		kKFCNarrowInFootnotesMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCNarrowInEndnotesActionID,
+		kKFCNarrowDownSubmenuPath
+		kKFCNarrowInEndnotesMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCNarrowSep1ActionID,
+		kKFCNarrowDownSubmenuPath kSDKDefDelimiterAndSeparatorPath,
+		kKFCNarrowSep1MenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCNarrowPagesActionID,
+		kKFCNarrowDownSubmenuPath
+		kKFCNarrowPagesMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCNarrowOnPasteboardActionID,
+		kKFCNarrowDownSubmenuPath
+		kKFCNarrowOnPasteboardMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCNarrowSep2ActionID,
+		kKFCNarrowDownSubmenuPath kSDKDefDelimiterAndSeparatorPath,
+		kKFCNarrowSep2MenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCNarrowFramesActionID,
+		kKFCNarrowDownSubmenuPath
+		kKFCNarrowFramesMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 		// ----- Clear from Results: the hit, object, story and document rows' menus (docs/superpowers/specs/2026-10-18-kfc-clear-from-results-design.md K2) -----
 		// Last, under a rule (one rule id for the four menus, as Select All Rows takes one action id for three): a hit or object row's
 		// rows - the rows selected together when it is one of them - or every hit row under a story or document row, taken off the
@@ -1610,6 +1658,62 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKFCActionComponentBoss,
 		kKFCClearFromResultsActionID,
 		kKFCClearRowsMenuKey,			// "Clear from Results"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// Narrow Down's items - a tier heading's submenu (docs/superpowers/specs/2026-10-18-kfc-narrow-down-design.md). kCustomEnabling:
+		// UpdateActionStates greys them with no tier row (pressed by ID), and a text-only one over a tier of object rows.
+		kKFCActionComponentBoss,
+		kKFCNarrowInTablesActionID,
+		kKFCNarrowInTablesMenuKey,	// "In Tables"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCNarrowInFootnotesActionID,
+		kKFCNarrowInFootnotesMenuKey,	// "In Footnotes"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCNarrowInEndnotesActionID,
+		kKFCNarrowInEndnotesMenuKey,	// "In Endnotes"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCNarrowPagesActionID,
+		kKFCNarrowPagesMenuKey,	// "Pages..."
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCNarrowOnPasteboardActionID,
+		kKFCNarrowOnPasteboardMenuKey,	// "On Pasteboard"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCNarrowFramesActionID,
+		kKFCNarrowFramesMenuKey,	// "Frames of These Matches"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,

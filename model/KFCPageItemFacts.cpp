@@ -31,6 +31,7 @@
 // General includes:
 #include "InCopySharedID.h"
 #include "PersistUtils.h"
+#include "SpreadID.h"				// kPageBoss - is the UID a frame's page resolves to a page (GetFramePageString)
 #include "TextChar.h"
 #include "TextID.h"					// kInlineBoss
 #include "UnicodeClass.h"
@@ -51,11 +52,13 @@ namespace KFCPageItemFacts
 // frame). false only when neither a page nor a spread can be resolved. outPageIndex is the page's
 // plain document order (for sorting); the STRING follows the section, so it can read "iv" or "A-1",
 // and "PB" for a frame sitting on the pasteboard.
-bool GetFramePageString(const UIDRef& docRef, UID frameUID, PMString& outPage, int32& outPageIndex)
+bool GetFramePageString(const UIDRef& docRef, UID frameUID, PMString& outPage, int32& outPageIndex, bool* outOnPasteboard)
 {
 	outPage.Clear();
 	outPage.SetTranslatable(kFalse);
 	outPageIndex = -1;
+	if (outOnPasteboard != nil)
+		*outOnPasteboard = false;
 	if (frameUID == kInvalidUID)
 		return false;
 
@@ -98,6 +101,9 @@ bool GetFramePageString(const UIDRef& docRef, UID frameUID, PMString& outPage, i
 	pageList->GetPageString(pageUID, &outPage, kTrue /*bIncludeSectionName*/, kFalse /*bUseIntegerStyle*/);
 	outPage.SetTranslatable(kFalse);
 	outPageIndex = pageList->GetPageIndex(pageUID);
+	// ...and whether that UID is a page at all - the check the fallback's note above leaves to code that wants real pages.
+	if (outOnPasteboard != nil)
+		*outOnPasteboard = (db->GetClass(pageUID) != kPageBoss);
 	return !outPage.IsEmpty();
 }
 

@@ -70,8 +70,10 @@ namespace
 		std::vector<KeptRow>	rows;
 		std::vector<int32>		top;		// the rows under the tier's own row, in order
 		bool					open;		// the tier's row open - noted before each rebuild (NoteOpenTiers)
+		bool					holdsObjects;	// its rows are object rows (IKFCResults::ListHoldsObjects when it was kept) -
+												// its heading's Narrow Down greys a text-only condition (TierHoldsObjects)
 
-		KeptTier() : set(0), open(false) {}
+		KeptTier() : set(0), open(false), holdsObjects(false) {}
 	};
 
 	/** THE LIVE TIER'S NAME and the list it names: the model's result set it was given to (0 = none - the model counts its
@@ -204,6 +206,7 @@ namespace
 		// list drawn with no tiers shows all its rows) or the panel is closed.
 		out.open = (treeMgr != nil && KFCResultHistory::IsStacking())
 			? (treeMgr->IsNodeExpanded(KFCResultNodeID::CreateLiveTier()) != kFalse) : true;
+		out.holdsObjects = KFCResults()->ListHoldsObjects();
 		CopyRows(treeMgr, KFCResultNodeID::CreateLiveTier(), -1, out);
 		return true;
 	}
@@ -448,6 +451,57 @@ int32 KFCResultHistory::Find(const PMString& label, PMString& outSummary, bool* 
 	return found;
 }
 
+bool KFCResultHistory::Narrow(const KFCNarrowStep& step, PMString& outSummary)
+{
+	outSummary.Clear();
+	outSummary.SetTranslatable(kFalse);
+	KFCPanelTitle::Update();
+	// The list narrowed: its copy taken before the model can park it (Find's rule), and its name - the new list's name.
+	const uint32 setBefore = KFCResults()->GetResultSetId();
+	PMString label;
+	label.SetTranslatable(kFalse);
+	if (gLive.set != 0 && gLive.set == setBefore)
+		label = gLive.label;
+	KeptTier pending;
+	const bool havePending = TakeSnapshot(pending);
+	(void)KFCRuns()->NarrowList(step, outSummary);
+	// A NEW LIST = narrowed (a new result set - the model's commit point, as a search's); refused, nothing has changed.
+	const bool committed = KFCResults()->GetResultSetId() != setBefore;
+	if (committed && havePending)
+		gKept.push_back(std::move(pending));
+	const int32 went = FollowModelTiers();
+	const bool keptPending = committed && havePending && !gKept.empty() && gKept.back().set == setBefore;
+	const int32 letGo = went - ((committed && havePending && !keptPending) ? 1 : 0);
+	if (committed)
+	{
+		gLive.label = label;
+		gLive.label.SetTranslatable(kFalse);
+		gLive.set = KFCResults()->GetResultSetId();
+		gLive.stacked = true;
+	}
+	KFC_DIAG_LOG("STACK narrow kind=%d went=%d kept=%d letgo=%d tiers=%d", static_cast<int>(step.kind), committed ? 1 : 0,
+		keptPending ? 1 : 0, static_cast<int>(letGo), static_cast<int>(gKept.size()));
+	if (committed)
+		KFCResultTree::Rebuild();
+	PMString status(outSummary);
+	status.SetTranslatable(kFalse);
+	if (letGo > 0)
+	{
+		status.Append(" The oldest kept results were let go - ");
+		status.AppendNumber(KFCResultModel::kMaxKeptTiers);
+		status.Append(" are kept at most.");
+	}
+	KFCResultTree::ShowStatus(status);
+	return committed;
+}
+
+bool KFCResultHistory::TierHoldsObjects(int32 tier)
+{
+	if (tier < 0)
+		return KFCResults()->ListHoldsObjects();
+	return tier < static_cast<int32>(gKept.size()) && gKept[static_cast<size_t>(tier)].holdsObjects;
+}
+
 namespace
 {
 	// One side of a tier's name: the words, cut at kLabelWordsMax where a character may be cut (KFCSafeCut).
@@ -587,15 +641,25 @@ int32 KFCResultHistory::KeptTierCount()
 
 PMString KFCResultHistory::LiveTierLabel()
 {
+	PMString label("Results");
+	label.SetTranslatable(kFalse);
 	if (gLive.set != 0 && gLive.set == KFCResults()->GetResultSetId() && !gLive.label.IsEmpty())
 	{
 		PMString layer;
 		KFCResults()->GetSearchLayer(layer);	// Find Objects on Active Layer's (empty for any other list)
-		return WithScope(gLive.label, KFCResults()->GetSearchScope(), layer);	// "[Text/Story] ..." - the list's own Search:
+		label = WithScope(gLive.label, KFCResults()->GetSearchScope(), layer);	// "[Text/Story] ..." - the list's own Search:
 	}
-	PMString unnamed("Results");
-	unnamed.SetTranslatable(kFalse);
-	return unnamed;
+	// A NARROWED LIST'S CONDITIONS, after the name - drawn for Search:'s reason (the narrow-down spec's N4: "[Text/Book]
+	// F:"cat" C:"dog" / In Tables / Pages 1-5").
+	PMString narrow;
+	KFCResults()->GetNarrowWords(narrow);
+	if (!narrow.IsEmpty())
+	{
+		label.Append(" / ");
+		label.Append(narrow);
+	}
+	label.SetTranslatable(kFalse);
+	return label;
 }
 
 int32 KFCResultHistory::LiveTierPosition()

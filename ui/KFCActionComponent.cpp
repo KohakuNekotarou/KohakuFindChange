@@ -263,6 +263,59 @@ int32 SpecialOpOf(const ActionID& action)
 	return kKFCSpecialNone;
 }
 
+// THE ITEMS OF A TIER HEADING'S NARROW DOWN (docs/superpowers/specs/2026-10-18-kfc-narrow-down-design.md N2): each stands for
+// one KFCNarrowKind (KFCModelTypes.h) - one door for them all in DoAction (DoNarrow) and one in UpdateActionStates (the grey).
+const struct NarrowAction
+{
+	uint32	action;
+	int32	kind;
+} kNarrowActions[] =
+{
+	{ kKFCNarrowInTablesActionID, kKFCNarrowInTables },
+	{ kKFCNarrowInFootnotesActionID, kKFCNarrowInFootnotes },
+	{ kKFCNarrowInEndnotesActionID, kKFCNarrowInEndnotes },
+	{ kKFCNarrowPagesActionID, kKFCNarrowPages },
+	{ kKFCNarrowOnPasteboardActionID, kKFCNarrowOnPasteboard },
+	{ kKFCNarrowFramesActionID, kKFCNarrowFrames },
+};
+
+// The condition an action stands for - kKFCNarrowNone for any other action.
+int32 NarrowKindOf(const ActionID& action)
+{
+	for (size_t k = 0; k < sizeof(kNarrowActions) / sizeof(kNarrowActions[0]); ++k)
+		if (kNarrowActions[k].action == static_cast<uint32>(action.Get()))
+			return kNarrowActions[k].kind;
+	return kKFCNarrowNone;
+}
+
+// Is it a condition only a text row can meet (In Tables, In Footnotes, In Endnotes, Frames of These Matches - the spec's
+// N2: greyed over a tier of object rows, kept on the menu)? (The model's own question is KFCNarrow::IsTextOnly - the UI half
+// does not link the model's code.)
+bool NarrowIsTextOnly(int32 kind)
+{
+	return kind == kKFCNarrowInTables || kind == kKFCNarrowInFootnotes || kind == kKFCNarrowInEndnotes
+		|| kind == kKFCNarrowFrames;
+}
+
+// A TIER HEADING'S NARROW DOWN: the tier right-clicked - a grey one switched to first, as Search These Results Again
+// switches (a refusal says why on the status line) - narrowed by the condition into a new tier (KFCResultHistory::Narrow:
+// the tiers carried as a search carries them, the status line). No tier row (the action pressed by its ActionID): nothing.
+void DoNarrow(int32 kind, IPMUnknown* widget)
+{
+	int32 tier = -1;
+	if (KFCJump::IsLanding() || KFCResultTree::RefusedWhileRunning() || !RightClickedTier(widget, tier))
+		return;
+	if (tier >= 0)
+	{
+		NodeID liveRow;
+		if (!KFCResultHistory::SwitchToKeptRow(tier, -1, liveRow))
+			return;
+	}
+	const KFCNarrowStep step(kind);
+	PMString summary;
+	(void)KFCResultHistory::Narrow(step, summary);
+}
+
 // THE LAYER THE LAYERS PANEL HAS ACTIVE in the front document, by its name (Move to Active Layer - the spec's E11: the
 // author's "the layer selected in the Layers panel"). Asked the way the panel's own menu finds its target layer
 // (layerpanel/LayerPanelMenuComponent.cpp, QueryTargetLayer: ILayerUIUtils::QueryContextActiveLayer). false = none - no
@@ -684,6 +737,10 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			const int32 op = SpecialOpOf(actionID);
 			if (op != kKFCSpecialNone)
 				DoSpecial(ac, op, widget);
+			// A tier heading's Narrow Down - one door for its items (NarrowKindOf's table, DoNarrow).
+			const int32 narrow = NarrowKindOf(actionID);
+			if (narrow != kKFCNarrowNone)
+				DoNarrow(narrow, widget);
 			break;
 		}
 	}
@@ -1008,6 +1065,19 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 			}
 			default:
 			{
+				// A tier heading's Narrow Down: over a tier's row - a condition only a text row can meet greyed over a tier of
+				// object rows (the spec's N2 - kept on the menu, SET-11). Its other refusals (no query of its own, a document
+				// or book not open, a part of a document's Object tab Selection) said on the status line, as Search These
+				// Results Again's are.
+				const int32 narrow = NarrowKindOf(action);
+				if (narrow != kKFCNarrowNone)
+				{
+					int32 tier = -1;
+					const bool enable = RightClickedTier(widget, tier)
+						&& !(NarrowIsTextOnly(narrow) && KFCResultHistory::TierHoldsObjects(tier));
+					listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
+					break;
+				}
 				// An object row's other Special Operations: while the row - or one of the rows selected together with it - can
 				// take the operation (CanSpecialAny - their doors, read only: greyed when none can, kept on the menu - SET-11);
 				// Move to Active Layer also wants a layer active in the front document. What the write refuses it says on the

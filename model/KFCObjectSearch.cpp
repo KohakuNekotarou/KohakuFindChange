@@ -239,9 +239,11 @@ UID SpreadOf(const UIDRef& item)
 // InDesign's search finds is listed only when it stands on that layer (KFCPageItemFacts::DocLayerOf: a group's member on
 // its group's, an item in text on its anchor frame's); kInvalidUID = every match. The matching stays InDesign's own: the
 // walk is the same, and only what it lists is narrowed.
+// narrow (Narrow Down - the spec's N3): a narrowed list's conditions - an item that does not meet them is passed over as
+// one off the layer is, before the list's limit counts it; nil = every match.
 WalkEnd WalkDoc(IFindChangeService* svc, IObjectWalker* shared, const UIDRef& docRef, const UIDList* items, size_t limit,
 	std::vector<KFCResultModel::Hit>& outHits, bool& outCapped, bool fromSearchScope, KFCProgressBar& bar, int32 barBase,
-	UID onLayer)
+	UID onLayer, const KFCNarrow::Filter* narrow)
 {
 	IDataBase* const db = docRef.GetDataBase();
 	if (db == nil || svc == nil || shared == nil)
@@ -294,13 +296,28 @@ WalkEnd WalkDoc(IFindChangeService* svc, IObjectWalker* shared, const UIDRef& do
 				return kWalkCancelled;
 			continue;
 		}
+		// NOT MEETING A NARROWED LIST'S CONDITIONS (narrow): built to be asked, then passed over as an item off the layer is -
+		// the limit below counts only the rows that pass.
+		KFCResultModel::Hit hit;
+		const bool built = (narrow != nil);
+		if (built)
+			BuildObjectHit(docRef, current.GetUID(), hit);
+		if (narrow != nil && !narrow->KeepObject(hit))
+		{
+			KFC_DIAG_LOG("NARROWOBJ item=%u pb=%d page=%s - passed over", current.GetUID().Get(), hit.onPasteboard ? 1 : 0,
+				hit.pageString.GetUTF8String().c_str());
+			progress.Listed(SpreadOf(current));
+			if (bar.WasCancelled(kFalse) != kFalse)
+				return kWalkCancelled;
+			continue;
+		}
 		if (outHits.size() >= limit)
 		{
 			outCapped = true;
 			return kWalkDone;
 		}
-		KFCResultModel::Hit hit;
-		BuildObjectHit(docRef, current.GetUID(), hit);
+		if (!built)
+			BuildObjectHit(docRef, current.GetUID(), hit);
 		outHits.push_back(std::move(hit));
 		// CANCEL IS ASKED HERE, AT EVERY ITEM LISTED. The bar first, then the question (DocProgress says why both).
 		// kFalse = no global error state.
@@ -889,7 +906,7 @@ bool KFCObjectSearch::ReadItemPlace(const UIDRef& docRef, UID item, KFCResultMod
 
 void KFCObjectSearch::CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBook, bool allDocuments,
 	int32 selectionScope, std::vector<KFCBookScope::SkippedChapter>& unopenable, KFCSearchEngine::CollectTally& out,
-	int32 reserved, const PMString& layer)
+	int32 reserved, const PMString& layer, const KFCNarrow::Filter* narrow)
 {
 	out = KFCSearchEngine::CollectTally();
 	InterfacePtr<IFindChangeService> svc(CreateFindChangeService());
@@ -924,7 +941,16 @@ void KFCObjectSearch::CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targ
 		const int32 barEnd = static_cast<int32>(targets.size()) * kDocSpan;
 		KFCProgressBar bar(title, 0, barEnd, kTrue, kTrue);
 		bar.DisableChildProgressBars(kTrue);
-		const int32 room = KFCResultModel::kKFCCollectHitLimit - reserved;	// the row eye's kept rows keep theirs
+		int32 objectLimit = KFCResultModel::kKFCCollectHitLimit;
+#ifdef KFC_DIAG
+		// (Test builds only) Fault value object-limit (%TEMP%\kbs-diag-fault-object-limit holding a number): the list's limit
+		// for this walk set to it - the narrow-down plan's M6, the object lists' new limit measured (300 / 500 / 1000 objects:
+		// the search and the special operations timed) before it is chosen.
+		const int diagLimit = KFCDiagFaultValue("object-limit", 0, 0);
+		if (diagLimit > 0)
+			objectLimit = diagLimit;
+#endif
+		const int32 room = objectLimit - reserved;	// the row eye's kept rows keep theirs
 		const size_t limit = static_cast<size_t>(room > 0 ? room : 0);
 		for (size_t i = 0; i < targets.size(); ++i)
 		{
@@ -966,7 +992,7 @@ void KFCObjectSearch::CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targ
 			std::vector<KFCResultModel::Hit> hits;
 			bool capped = false;
 			const WalkEnd end = WalkDoc(svc, shared, docRef, items, limit - static_cast<size_t>(out.total), hits, capped,
-				fromSearchScope, bar, barBase, onLayer);
+				fromSearchScope, bar, barBase, onLayer, narrow);
 			// A book's chapter goes back now, closed on the spot (the text search's reason: one chapter of ours at a time).
 			if (fromBook && !KFCBookScope::HandBackHeldDocNow(docRef))
 				out.unclosed.push_back(targets[i].shortName);
@@ -993,7 +1019,7 @@ void KFCObjectSearch::CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targ
 }
 
 bool KFCObjectSearch::WalkOneDocument(const UIDRef& docRef, const PMString& name, size_t limit,
-	std::vector<KFCResultModel::Hit>& outHits, bool& outCapped, bool& outCancelled, UID onLayer)
+	std::vector<KFCResultModel::Hit>& outHits, bool& outCapped, bool& outCancelled, UID onLayer, const KFCNarrow::Filter* narrow)
 {
 	outHits.clear();
 	outCapped = false;
@@ -1013,7 +1039,7 @@ bool KFCObjectSearch::WalkOneDocument(const UIDRef& docRef, const PMString& name
 		bar.SetPosition(0);
 		// The whole document, from the top - Search: as the search had it is a whole document's (the caller refuses one
 		// over part of a document).
-		end = WalkDoc(svc, shared, docRef, nil, limit, outHits, outCapped, false, bar, 0, onLayer);
+		end = WalkDoc(svc, shared, docRef, nil, limit, outHits, outCapped, false, bar, 0, onLayer, narrow);
 		if (end == kWalkDone && bar.WasCancelled(kFalse))
 			end = kWalkCancelled;
 		bar.SetPosition(kDocSpan);

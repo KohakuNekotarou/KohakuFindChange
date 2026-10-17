@@ -58,6 +58,13 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCCreateOutlinesMenuKey,	"Create Outlines",
                 kKFCRestoreOriginalMenuKey,	"Restore from Copy",
                 kKFCClearRowsMenuKey,			"Clear from Results",
+                kKFCNarrowDownSubmenuKey,		"Narrow Down",
+                kKFCNarrowInTablesMenuKey,		"In Tables",
+                kKFCNarrowInFootnotesMenuKey,	"In Footnotes",
+                kKFCNarrowInEndnotesMenuKey,	"In Endnotes",
+                kKFCNarrowPagesMenuKey,			"Pages...",
+                kKFCNarrowOnPasteboardMenuKey,	"On Pasteboard",
+                kKFCNarrowFramesMenuKey,		"Frames of These Matches",
                 // An object row's other Special Operations - InDesign's own English command names.
                 kKFCFillFramePropMenuKey,			"Fill Frame Proportionally",
                 kKFCContentProportionalMenuKey,		"Fit Content Proportionally",
