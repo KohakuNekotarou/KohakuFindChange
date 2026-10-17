@@ -56,18 +56,21 @@ namespace KFCResultModel
 		kCopyNone = 0,			// no Replace of the list has written the row (or one restored it since)
 		kCopyKept,				// a copy is kept (HitCopy::store / story)
 		kCopyOutsideMainText,	// its match is in a table cell, a footnote or a note - outside the story's primary thread
-		kCopyCutsHyperlink,		// its match cuts a hyperlink or cross-reference source part-way
+		kCopyTouchesHyperlink,	// its match touches a hyperlink or cross-reference source - in it, around it or across its
+								// edge (InDesign's replace keeps a source on what it writes: a copy put back makes a second)
 		kCopyRestHoldsObject,	// the rest of its paragraph, which the copy would run on over, holds an object, a marker or
 								// a hyperlink
+		kCopyParagraphFormat,	// its Replace set paragraph formatting: a copy of the match does not put a paragraph's
+								// attributes back (measured live, R13 / R13b)
 		kCopyFailed				// the copy could not be taken
 	};
 
 	/** THE COPY A ROW'S REPLACE TOOK OF THE TEXT IT WROTE OVER (KFCCopyStore - the spec's C4 and C6), taken just before the
 	    write (KFCReplaceEngine's ReplaceRowsNow) and given to the row once the write has gone through (SetHitCopy): the
-	    match, or - a match holding a paragraph return, or a Change side that sets paragraph formatting - the match run on
-	    to just before the return of the paragraph it ends in, so a paste puts that paragraph's own attributes back on the
-	    return it meets. What Restore Original puts back (KFCReplaceEngine::RestoreHits). Copied with the row - a tier, an
-	    Undo step, a backup - so the copy it names comes back with it. */
+	    match, or - a match holding a paragraph return - the match run on to just before the return of the paragraph it
+	    ends in, so a paste puts that paragraph's own attributes back on the return it meets. What Restore Original puts
+	    back (KFCReplaceEngine::RestoreHits). Copied with the row - a tier, an Undo step, a backup - so the copy it names
+	    comes back with it. */
 	struct HitCopy
 	{
 		uint32	store;		// the copy store's number (KFCCopyStore - 0 = none)

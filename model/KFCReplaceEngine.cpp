@@ -1465,8 +1465,8 @@ uint64 TextHash(ITextModel* model, TextIndex start, TextIndex end)
 }
 
 // DOES THE CHANGE SIDE SET PARAGRAPH FORMATTING - a paragraph style, or a paragraph attribute in Change Format, on the tab
-// the write is stated in? Its Replace then changes the paragraphs the rows stand in, so their copies run on to the
-// paragraph's return (the spec's C4 - my addition to the author's call (2) of 2026-10-06, which named the returns).
+// the write is stated in? Its Replace then changes the paragraphs the rows stand in, which a copy of the match does not
+// put back (TakeRowCopy - measured live, R13 / R13b).
 bool ChangeSideTouchesParagraphs(IDataBase* db)
 {
 	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
@@ -1486,14 +1486,25 @@ bool ChangeSideTouchesParagraphs(IDataBase* db)
 }
 
 // THE COPY ONE ROW'S REPLACE TAKES - of [start, end) of its story, as the doors before the write have just found it. Run on
-// to just before the return of the paragraph the match ends in when the match holds a return, or the Change side sets
-// paragraph formatting (`paragraphChange`): a paste ending there puts that paragraph's own attributes back on the return
-// it meets and leaves the next paragraph alone - "copy up to the return, paste up to the return" (measured in KT,
-// docs/ai-notes/private-scrap-store-2026-10-06.md; a return copied or pasted on its own broke the paragraph after it).
+// to just before the return of the paragraph the match ends in when the match holds a return: a paste ending there puts
+// that paragraph's own attributes back on the return it meets and leaves the next paragraph alone - "copy up to the
+// return, paste up to the return" (measured in KT, docs/ai-notes/private-scrap-store-2026-10-06.md; a return copied or
+// pasted on its own broke the paragraph after it). The paragraph the match starts in keeps the attributes it has - the
+// merged paragraph's, its own first paragraph's when the Change side sets no paragraph formatting.
+// A ROW WHOSE CHANGE SIDE SETS PARAGRAPH FORMATTING (`paragraphChange`) KEEPS NO COPY (measured live, 2026-10-17): inside
+// one paragraph (R13), the copy run on to the return put the text back and left the paragraph style the Replace set - a
+// paragraph's attributes come back only with the whole paragraph in the copy, head to return, and a copy of the whole
+// paragraph would collide with every other row replaced in it (each copy holding the others' text from before them);
+// over a return (R13b), the paragraph the match starts in kept the style - a paste's first paragraph takes the attributes
+// of the paragraph it is pasted into.
 // NONE is taken - the row says why - for a match outside the story's primary thread (a table cell's, a footnote's or a
-// note's: a copy run across threads crashed InDesign), one that cuts a hyperlink source part-way (put back, its text is
-// not in the link again - measured), and a run-on rest holding an object, a marker or a hyperlink (pasted again over
-// itself, such a thing is made anew - another name, or two of it - measured).
+// note's: a copy run across threads crashed InDesign), one that touches a hyperlink or cross-reference source in any way,
+// and a run-on rest holding an object, a marker or a hyperlink (pasted again over itself, such a thing is made anew -
+// another name, or two of it - measured). THE HYPERLINK, MEASURED LIVE (2026-10-17, R7): a source that is the match
+// itself survives InDesign's replace on what it wrote ("linkCat" over "dog"), and the copy put back over that brought a
+// second link ("linkCat 1" on "cat") and left the first with its source's text gone - two links, one broken; one the match
+// cuts part-way is not over the text put back (10-06). A source around the match, or inside it, is the same question
+// unmeasured - kept out with them.
 KFCResultModel::HitCopy TakeRowCopy(const UIDRef& storyRef, TextIndex start, TextIndex end, bool paragraphChange)
 {
 	KFCResultModel::HitCopy copy;
@@ -1511,8 +1522,13 @@ KFCResultModel::HitCopy TakeRowCopy(const UIDRef& storyRef, TextIndex start, Tex
 		for (TextIndex i = start; i < end && !holdsReturn && !it.IsNull(); ++i, ++it)
 			holdsReturn = ((*it).GetValue() == kTextChar_CR);
 	}
+	if (paragraphChange)
+	{
+		copy.whyNot = KFCResultModel::kCopyParagraphFormat;
+		return copy;
+	}
 	TextIndex copyEnd = end;
-	if (holdsReturn || paragraphChange)
+	if (holdsReturn)
 	{
 		copyEnd = primary;		// the last paragraph's: up to the story's own return
 		TextIterator it(model, end);
@@ -1537,15 +1553,16 @@ KFCResultModel::HitCopy TakeRowCopy(const UIDRef& storyRef, TextIndex start, Tex
 			}
 		}
 	}
-	// HYPERLINK AND CROSS-REFERENCE SOURCES - text ranges, not characters (IHyperlinkUtils.h): one crossing the match's
-	// edge, and any in or around the run-on rest.
+	// HYPERLINK AND CROSS-REFERENCE SOURCES - text ranges, not characters (IHyperlinkUtils.h): any the match touches - one
+	// inside it or across its edge (GetRangeContainedHyperlinks, all of them), one around it (IsRangeContainedByAHyperlink)
+	// - and any in or around the run-on rest. (A zero-width match's copy is empty: nothing of a link goes with it.)
 	Utils<IHyperlinkUtils> links;
 	if (links)
 	{
-		if (end > start && links->GetRangeContainedHyperlinks(model, start, end,
-			IHyperlinkUtils::ContainedHyperlink_PartialRangeOnly).size() != 0)
+		if (end > start && (links->GetRangeContainedHyperlinks(model, start, end).size() != 0
+			|| links->IsRangeContainedByAHyperlink(model, start, end).GetLogicalID() != kInvalidSBOSID))
 		{
-			copy.whyNot = KFCResultModel::kCopyCutsHyperlink;
+			copy.whyNot = KFCResultModel::kCopyTouchesHyperlink;
 			return copy;
 		}
 		if (copyEnd > end)
@@ -2094,10 +2111,12 @@ const char* RestoreSentence(RestoreRefusal why, int32 whyNoCopy)
 			{
 				case KFCResultModel::kCopyOutsideMainText:
 					return "no copy was kept when this row was replaced - its match is in a table cell, a footnote or a note.";
-				case KFCResultModel::kCopyCutsHyperlink:
-					return "no copy was kept when this row was replaced - its match cuts a hyperlink or cross-reference part-way.";
+				case KFCResultModel::kCopyTouchesHyperlink:
+					return "no copy was kept when this row was replaced - its match touches a hyperlink or cross-reference.";
 				case KFCResultModel::kCopyRestHoldsObject:
 					return "no copy was kept when this row was replaced - the rest of its paragraph holds an object, a marker or a hyperlink.";
+				case KFCResultModel::kCopyParagraphFormat:
+					return "no copy was kept when this row was replaced - its replace set paragraph formatting, which a copy of the match alone cannot put back.";
 				case KFCResultModel::kCopyFailed:
 					return "no copy could be kept when this row was replaced.";
 				default:
