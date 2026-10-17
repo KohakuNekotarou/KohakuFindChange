@@ -159,6 +159,14 @@
                    Restore from Copy（2026-10-17＝REP-38・最初の名前 Restore Original）
   （物の行）       Replace
                    Special Operations ▸ Create Outlines（2026-10-17＝OBJ-19）
+                                        ─
+                                        Fitting ▸ / Arrange ▸ / Transform ▸
+                                        ─
+                                        Lock・Unlock・Hide・Show
+                                        ─
+                                        Move to Active Layer・Clear Object Style Overrides
+                                        ─
+                                        Delete（2026-10-17 夜＝OBJ-20）
   ストーリーの行   Search This Story Again
                    Select All Rows
   文書の行         Search This Document Again

@@ -16,6 +16,7 @@
   1.4.0 から**オブジェクトの行の Replace** も（物の指紋の前・後で見分ける＝OBJ-11）。オブジェクトのクエリだけのクエリ連続実行は、ストーリーの版が動かないので追いかけない（OBJ-11）。（1.4.0・17-objects.md）
   1.4.0 から**まとめて選んだ行の置換**（REP-36）も ―― 何個の文書にまたがっても1段で、どの文書の Ctrl+Z でも全部の文書の行が戻る（書いた文書ぜんぶのストーリーの版で見分ける）。（1.4.0）
   2026-10-17 から**物の行の Create Outlines**（OBJ-19）も ―― 元の枠が消える書き込みなので、取り消しは「元の枠が書く前の指紋で戻ったか」、やり直しは「元の枠がまた無くなったか」で見分ける。メッセージ欄は `Undo: Create Outlines - the rows are back as they were before it.`／`Redo: Create Outlines - ...`。
+  2026-10-17 夜から**物の行のほかの特殊操作**（OBJ-20＝Fitting・Arrange・Transform・Lock／Unlock・Hide／Show・Move to Active Layer・Clear Object Style Overrides・Delete）も ―― 物の指紋の前・後で見分ける（Delete は Create Outlines と同じく「物がまた無くなったか」）。**Arrange だけは指紋が動かない**（重なり順は物でなく親が持つ）ので、その段に限って物の**重なりの位置**（親の子の中の何番目か）の前・後も見る。メッセージ欄は `Undo: <操作名> - the rows are back as they were before it.`（例 `Undo: Send to Back - ...`）。文書をまたいだ1段（ブックの章）は、どちらの章の Ctrl+Z でも本体が両方を戻し、行も全部戻る（2026-10-17 実測）。
   2026-10-17 から**文字の行の Restore from Copy**（REP-38・最初の名前 Restore Original）も ―― 取り消すと行は `Changed` に戻り（写しの印も戻る＝もう一度戻せる）、やり直すと戻した姿。メッセージ欄は `Undo: Restore from Copy - the rows are back as they were before it.`／`Redo: Restore from Copy - ...`。
   Change All in Book (No List) は一覧が無いときだけ走り、一覧を作らないので、追いかけるものが無い（文書は Ctrl+Z で戻る）。
   （Change Checked・ストーリーと文書の行の Replace・Replace Again・Reject Change・Accept Change・Accept All Changes by KohakuFindChange は 2026-10-06 に外した。）
