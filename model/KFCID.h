@@ -99,6 +99,10 @@ DECLARE_PMID(kClassIDSpace, kKFCSaveAsDocResponderBoss, kKFCPrefix + 25)
 // (docs/superpowers/plans/2026-10-14-kfc-row-focus-undo.md D1). Never persisted: a focus lives in memory only.
 // + 26: the next after the highest spent.
 DECLARE_PMID(kClassIDSpace, kKFCRowFocusBoss, kKFCPrefix + 26)
+// KFC's own copy store (KFCCopyStore.cpp - docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md C5): a data
+// exchange controller whose scrap database holds the text a row's Replace is about to write over, for its Restore
+// Original. Made with CreateObject, never registered with the clipboard or a drag. + 27: the next after the highest spent.
+DECLARE_PMID(kClassIDSpace, kKFCCopyStoreBoss, kKFCPrefix + 27)
 
 
 // InterfaceIDs:
@@ -172,6 +176,8 @@ DECLARE_PMID(kImplementationIDSpace, kKFCSaveAsDocResponderImpl, kKFCPrefix + 44
 DECLARE_PMID(kImplementationIDSpace, kKFCBoundaryImpl, kKFCPrefix + 45)
 // The row focus's IID_ITEXTFOCUS (KFCRowFocus.cpp). + 46: the next after the highest spent.
 DECLARE_PMID(kImplementationIDSpace, kKFCRowFocusImpl, kKFCPrefix + 46)
+// The copy store's IID_IDATAEXCHANGECONTROLLER (KFCCopyStore.cpp). + 47: the next after the highest spent.
+DECLARE_PMID(kImplementationIDSpace, kKFCCopyStoreImpl, kKFCPrefix + 47)
 
 
 // StringKeys - the model half's (KFC_enUS.fr): what Edit > Undo calls a KFC write. Every other key is the UI

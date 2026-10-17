@@ -173,6 +173,8 @@
 //    query-scope-refuse  KFCQueryScope (a row operation under its list's query - the tier switch v2) refuses once every
 //                check has passed: the refusal's whole path - the sequence aborted, Find/Change put back, nothing done -
 //                tried on demand (the v2 spec's section 5, item 7). One-shot.
+//    copy-fail  KFCCopyStore::Take keeps no copy: a row's Replace goes through all the same, and that row's Restore
+//                Original says no copy could be kept (docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md C3, R16)
 //
 //  AND TIMERS: KFC_CLOCK / KFC_SPENT add up the milliseconds a stretch of code takes, and KFCDiagPhase
 //  writes "PHASE <name> begin" and "PHASE <name> end <ms>" around a scope - all of it nothing without KFC_DIAG.

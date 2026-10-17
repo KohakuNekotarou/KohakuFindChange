@@ -67,6 +67,7 @@
 
 // Project includes:
 #include "KFCBookScope.h"		// ForgetHeldDoc
+#include "KFCCopyStore.h"		// DocumentClosing - the copy store of a closing document
 #include "KFCDiag.h"			// KFC_DIAG_LOG - which way a close went, in a test build (compiled out of a shipping one)
 #include "KFCDiagWrittenDocs.h"	// KFC_DIAG_DOC_CLOSING - a test build's written-document check (nothing in a shipping one)
 #include "KFCHitMarker.h"		// ForgetDoc - the jump marker lets go of a closing document
@@ -131,6 +132,11 @@ static void LetGoOfClosingDocument(const UIDRef& closingDocRef)
 	// FindFormatHasChanged tells databases apart by address, and this one's can be handed to the next document opened
 	// (KFCSearchEngine::ForgetSearchedFindFormatOf).
 	KFCSearchEngine::ForgetSearchedFindFormatOf(closingDocRef.GetDataBase());
+
+	// The copy store of the closing document (Restore Original) lets go of its address: one never saved is let go whole -
+	// no row can reach that document again - and a saved one's keeps the file it is found again by
+	// (KFCCopyStore::DocumentClosing).
+	KFCCopyStore::DocumentClosing(closingDocRef.GetDataBase());
 }
 
 void KFCCloseDocResponder::Respond(ISignalMgr* signalMgr)

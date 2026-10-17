@@ -42,6 +42,7 @@
 #include "PlugInModel_UIAttributes.h"
 #include "TextID.h"			// kGlobalTextAdornmentServiceImpl / IID_IGLOBALTEXTADORNMENT - the jump marker
 #include "DocumentID.h"		// kBeforeCloseDocSignalRespServiceImpl / kAfterOpenDocSignalRespServiceImpl / kAfterSaveAsDocSignalRespServiceImpl - the close-, open- and save-as-document responders
+#include "DragDropID.h"		// IID_IDATAEXCHANGECONTROLLER - the copy store
 
 // Project includes:
 #include "KFCID.h"
@@ -271,6 +272,20 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 		kTextFocusBoss,
 		{
 			IID_ITEXTFOCUS, kKFCRowFocusImpl,
+		}
+	},
+
+	/** KFC's own copy store (KFCCopyStore.cpp - docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md C5): a
+	 *  data exchange controller whose scrap database holds the text a row's Replace is about to write over, for its
+	 *  Restore Original. kInvalidClass, the shape of KIDMCP's task-start store (kKIDMCPTaskStoreBoss): made by name with
+	 *  CreateObject2 and never registered with the clipboard or a drag, so nothing else looks it up.
+	 */
+	Class
+	{
+		kKFCCopyStoreBoss,
+		kInvalidClass,
+		{
+			IID_IDATAEXCHANGECONTROLLER, kKFCCopyStoreImpl,
 		}
 	},
 
