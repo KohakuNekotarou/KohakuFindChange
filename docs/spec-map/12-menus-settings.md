@@ -13,6 +13,7 @@
   ```
   Open Find/Change...
   Find in Document
+  Find Objects on Active Layer
   Change All in Book (No List)
   Clear Results
   Run Saved Queries...
@@ -34,7 +35,7 @@
 
   2行目の名前は範囲で変わる（`Find in Book`／`Find in Document`／`Find in Story` など＝SET-03。上の絵は Book Scope OFF・検索: ドキュメントのとき）。
   `Book Scope` から `Translucent Panel` までの8つはトグルで、ON のとき左にチェックの印が付く（最初は `Hide Previous Chapter` だけ ON＝SET-23）。トグルの並びは ABC 順（2026-10-14 の作者の並べ替え）。
-  （`Change Checked` と `Show Changes by KohakuFindChange` は 2026-10-06 に外した。`Run Saved Queries...` と `Find/Change Selected Documents (Book)` は 2026-10-07 に足した＝第16章・SCOPE-26〜。`Run Saved Queries...` は同じ日の夜に `Clear Results` の下へ1つ下げた＝作者の依頼。2026-10-14 に作者がトグルの区画を並べ替えた＝それまでは `Keep Previous Results` が `Hide Previous Chapter` の上・窓のトグルは `Translucent Find/Change`・`Minimizable Find/Change`・`Translucent Panel`・`Remember Book Panel Placement` の順。同じ日に `Keep Previous Results` を外した＝パネルの Find はいつも段を積む（SET-24・ROW-39）。）
+  （`Change Checked` と `Show Changes by KohakuFindChange` は 2026-10-06 に外した。`Run Saved Queries...` と `Find/Change Selected Documents (Book)` は 2026-10-07 に足した＝第16章・SCOPE-26〜。`Run Saved Queries...` は同じ日の夜に `Clear Results` の下へ1つ下げた＝作者の依頼。2026-10-14 に作者がトグルの区画を並べ替えた＝それまでは `Keep Previous Results` が `Hide Previous Chapter` の上・窓のトグルは `Translucent Find/Change`・`Minimizable Find/Change`・`Translucent Panel`・`Remember Book Panel Placement` の順。同じ日に `Keep Previous Results` を外した＝パネルの Find はいつも段を積む（SET-24・ROW-39）。`Find Objects on Active Layer` は 2026-10-17 夜に Find の下へ足した＝OBJ-21。）
   - 訂正: 2026-10-08＝最後の項目は、それまで SDK 共通の文字列で `About this plug-in...` と出ていた（この地図の表記と食い違っていた）。作者「英語として正しい方で」→ほかの項目と同じく語頭を大文字にし、ハイフンの後ろも大文字の `About This Plug-In...`（InDesign のメニューバーの `Plug-Ins`・このパネルのまとまり `Kohaku Plug-Ins` と同じ）。KFC 専用のキー `kKFCAboutThisPlugInMenuKey`（SDK のキーは自作のプラグイン全部が共有するので値を変えない）。
 
 - **SET-02** ★`Find in …`・`Change All in Book (No List)`・`Clear Results`・`Run Saved Queries...` の間に区切り線は無い（探すことと、一覧を使わない置換と、その前の片付けが1つのまとまり）。
@@ -64,6 +65,7 @@
 - **SET-05** `Find in …` ＝範囲に対象が無い（Book Scope ON でブックが無い・章の無いブック／OFF で文書が無い）か、検索と置換のタブが Colour のとき灰色（FIND-17）。
   `Change All in Book (No List)` ＝Book Scope が OFF・対象のブックが無い・パネルにヒットの行がある・タブが Colour・検索する文字も形式も無い（Object タブでは Find Object Format も検索のオブジェクトスタイルも空）とき灰色（REP-33・OBJ-13）。
   （1.4.0・17-objects.md＝1.3 までは、どちらも Object のタブでも灰色だった。）
+  `Find Objects on Active Layer` ＝`Find in …` の灰色の条件に加えて、検索と置換のタブが Object でないとき・前面の文書の Layers パネルにレイヤーが無いとき灰色（OBJ-21・2026-10-17 夜）。
   `Clear Results` ＝ヒットの行が無いとき灰色（0件のブックの行だけのときも・REP-34）。ただし段を積んでいる間（ROW-39）は、ヒットの行が無くても押せる（2026-10-14）。
   置換の文字は見ない（空でも「一致を消す」としてやれる）。
   `Run Saved Queries...` ＝走っている間（SET-04）のほかは灰色にならない（文書が無くても・結果が出ていても押せる＝QRY-02）。
@@ -126,7 +128,8 @@
 
 ## 4. キーボードショートカット
 
-- **SET-13** ★ショートカットを割り当てられるのは**5つだけ** ―― `Open Find/Change...`・`Find in …`・`Change All in Book (No List)`・`Run Saved Queries...`・`Clear Results`
+- **SET-13** ★ショートカットを割り当てられるのは**6つだけ** ―― `Open Find/Change...`・`Find in …`・`Find Objects on Active Layer`・`Change All in Book (No List)`・`Run Saved Queries...`・`Clear Results`
+  （`Find Objects on Active Layer` は 2026-10-17 夜に足した＝Find と同じ扱い・私の判断＝⬜作者の確認待ち・OBJ-21。）
   （2026-09-27 に検索、10-01 に Open Find/Change＝作者の決定。10-06 の設計（第5版）で Change All in Book と Clear Results を足し、Change Checked と Show Changes を外した。
   10-07 に Run Saved Queries... を足した（作者の依頼）。`Find/Change Selected Documents (Book)` は Book Scope と同じく割り当てない。
   行の置換はショートカットでなく Return キー＝F17）。
