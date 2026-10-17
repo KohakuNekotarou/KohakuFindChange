@@ -6,7 +6,7 @@
 //
 //  AN OBJECT ROW'S OTHER SPECIAL OPERATIONS (docs/superpowers/specs/2026-10-17-kfc-object-special-operations-design.md -
 //  the author, 2026-10-17: Fitting, Arrange, Transform, Lock / Unlock, Hide / Show, Move to Active Layer, Clear Object
-//  Style Overrides, Delete, Run Script over the selected rows' objects). InDesign's own Object menu commands work on a
+//  Style Overrides, Delete over the selected rows' objects). InDesign's own Object menu commands work on a
 //  selection, one spread; the object list spans spreads and documents, so the rows selected together are written
 //  wherever they stand - by InDesign's own Facades, each asked first whether it can (its Can... - E4), in ONE undo step
 //  the panel follows. Create Outlines' shape (KFCObjectOutline.h): the doors row by row, one write, the rows marked, the

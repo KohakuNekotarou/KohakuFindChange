@@ -54,6 +54,9 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCHowTo.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCSpecialDialogs.cpp">
+         <Filter>Source Files</Filter>
+      </ClCompile>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCIconTip.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
@@ -100,6 +103,9 @@
          <Filter>Source Files</Filter>
       </ClCompile>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultEyeEH.cpp">
+         <Filter>Source Files</Filter>
+      </ClCompile>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultEyeDrag.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCQueryRowEH.cpp">
@@ -219,6 +225,9 @@
          <Filter>Header Files</Filter>
       </ClInclude>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCResultTree.h">
+         <Filter>Header Files</Filter>
+      </ClInclude>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCResultEye.h">
          <Filter>Header Files</Filter>
       </ClInclude>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCResultHistory.h">

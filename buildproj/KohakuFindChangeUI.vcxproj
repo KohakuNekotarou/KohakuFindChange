@@ -229,6 +229,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCAppBarSearchEnter.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCHitMarkerView.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCHowTo.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCSpecialDialogs.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCIconTip.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCJump.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCMarkerExpiryIdleTask.cpp"/>
@@ -245,6 +246,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultHistory.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultNodeEH.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultEyeEH.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultEyeDrag.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultNodeObserver.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCQueryRowEH.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultTreeController.cpp"/>
@@ -293,6 +295,7 @@
       <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCResultNodeID.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCDiagHiddenDocs.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCResultTree.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCResultEye.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCResultHistory.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCUIFactoryList.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCUIID.h"/>

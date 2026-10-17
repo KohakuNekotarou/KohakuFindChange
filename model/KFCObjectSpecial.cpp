@@ -76,7 +76,7 @@ struct OpInfo
 	const char*	stepKey;		// the Edit menu's name of its undo step (a key - KFC_enUS.fr)
 	WriteKind	kind;
 	bool		order;			// its write moves no fingerprint, only the item's place in its stack (Arrange - E6)
-	bool		ready;			// written in this stage (Move, Scale, Rotate, Shear and Run Script come with their dialogs)
+	bool		ready;			// written now (an operation listed ahead of its stage is refused as not available yet)
 	const char*	notApplicable;	// InDesign's own question said no: the words a count of such rows reads
 };
 
@@ -106,11 +106,10 @@ const OpInfo kOps[] =
 	{ kKFCSpecialMoveToLayer,			"Move to Active Layer",					kKFCMoveToLayerStepKey,			kWriteBatch,	false,	true,	"cannot be moved" },
 	{ kKFCSpecialClearStyleOverrides,	"Clear Object Style Overrides",			kKFCClearStyleOverridesStepKey,	kWriteBatch,	false,	true,	"no object style" },
 	{ kKFCSpecialDelete,				"Delete",								kKFCDeleteStepKey,				kWriteGone,		false,	true,	"cannot be deleted" },
-	{ kKFCSpecialMove,					"Move",									kKFCMoveStepKey,				kWriteEach,		false,	false,	"cannot be moved" },
-	{ kKFCSpecialScale,					"Scale",								kKFCScaleStepKey,				kWriteEach,		false,	false,	"cannot be scaled" },
-	{ kKFCSpecialRotate,				"Rotate",								kKFCRotateStepKey,				kWriteEach,		false,	false,	"cannot be rotated" },
-	{ kKFCSpecialShear,					"Shear",								kKFCShearStepKey,				kWriteEach,		false,	false,	"cannot be sheared" },
-	{ kKFCSpecialRunScript,				"Run Script",							kKFCRunScriptStepKey,			kWriteBatch,	false,	false,	"" },
+	{ kKFCSpecialMove,					"Move",									kKFCMoveStepKey,				kWriteEach,		false,	true,	"cannot be moved" },
+	{ kKFCSpecialScale,					"Scale",								kKFCScaleStepKey,				kWriteEach,		false,	true,	"cannot be scaled" },
+	{ kKFCSpecialRotate,				"Rotate",								kKFCRotateStepKey,				kWriteEach,		false,	true,	"cannot be rotated" },
+	{ kKFCSpecialShear,					"Shear",								kKFCShearStepKey,				kWriteEach,		false,	true,	"cannot be sheared" },
 };
 
 const OpInfo* FindOp(int32 op)
@@ -284,8 +283,29 @@ Refusal CheckLayerMove(const KFCSpecialParams& params, const UIDRef& docRef, UID
 	return (spreadLayer->GetDocLayerUID() == target) ? kRefusedOnLayer : kRefusedNone;
 }
 
-// INDESIGN'S OWN QUESTION FOR THE OPERATION, of one item (E4) - its Can..., the one its menu item is enabled by.
-Refusal AskInDesign(const OpInfo& info, const KFCSpecialParams& params, const UIDRef& docRef, UID item)
+// ARRANGE'S QUESTION, OF A SPREAD'S ITEMS TOGETHER - as InDesign asks it of a selection: the items move together, their
+// order among themselves kept, so an item already at the back stays among them. (Asked one item at a time, the backmost of
+// four was left out "at the back already" and the other three went behind it, where InDesign's own Send to Back over the
+// four leaves them as they are - measured live, 2026-10-17 night.)
+bool CanArrange(int32 op, const UIDList& items)
+{
+	Utils<Facade::IArrangeFacade> arrange;
+	if (!arrange)
+		return false;
+	switch (op)
+	{
+		case kKFCSpecialBringToFront:	return arrange->CanBringToFront(items, kInvalidUID) != kFalse;
+		case kKFCSpecialBringForward:	return arrange->CanBringForward(items) != kFalse;
+		case kKFCSpecialSendBackward:	return arrange->CanSendBackward(items) != kFalse;
+		case kKFCSpecialSendToBack:		return arrange->CanSendToBack(items, kInvalidUID) != kFalse;
+		default:						return false;
+	}
+}
+
+// INDESIGN'S OWN QUESTION FOR THE OPERATION, of one item (E4) - its Can..., the one its menu item is enabled by. forWrite:
+// asked for the write, where an Arrange row is not asked alone - its spread's items are asked together (CanArrange, in the
+// write); the menu's grey asks each row.
+Refusal AskInDesign(const OpInfo& info, const KFCSpecialParams& params, const UIDRef& docRef, UID item, bool forWrite)
 {
 	IDataBase* const db = docRef.GetDataBase();
 	UIDList one(db, item);
@@ -314,16 +334,10 @@ Refusal AskInDesign(const OpInfo& info, const KFCSpecialParams& params, const UI
 		case kKFCSpecialBringForward:
 		case kKFCSpecialSendBackward:
 		case kKFCSpecialSendToBack:
-		{
-			Utils<Facade::IArrangeFacade> arrange;
-			if (!arrange)
-				break;
-			if (info.op == kKFCSpecialBringToFront)			can = arrange->CanBringToFront(one, kInvalidUID) != kFalse;
-			else if (info.op == kKFCSpecialBringForward)	can = arrange->CanBringForward(one) != kFalse;
-			else if (info.op == kKFCSpecialSendBackward)	can = arrange->CanSendBackward(one) != kFalse;
-			else											can = arrange->CanSendToBack(one, kInvalidUID) != kFalse;
+			if (forWrite)
+				return kRefusedNone;		// asked with the spread's other items (CanArrange, in the write)
+			can = CanArrange(info.op, one);
 			break;
-		}
 		case kKFCSpecialRotate90CW:
 		case kKFCSpecialRotate90CCW:
 		case kKFCSpecialRotate180:
@@ -447,7 +461,20 @@ Refusal CheckItem(const OpInfo& info, const KFCSpecialParams& params, int32 chap
 		return kRefusedLockedLayer;
 	if (info.op != kKFCSpecialUnlock && KFCPageItemFacts::IsPageItemLockedForEdit(db, outItem))
 		return kRefusedLocked;
-	return AskInDesign(info, params, outDoc, outItem);
+	return AskInDesign(info, params, outDoc, outItem, reach);
+}
+
+// SHEAR ON ITS AXIS - the Shear dialog's Axis, as InDesign's own (KFCSpecialParams::y: 0 Horizontal, 1 Vertical). Horizontal
+// is Transform::SkewBy; Vertical skews the other way round - the x left as it is, the y moved with it (PMMatrix's
+// SkewVertical), with SkewBy's own sign for the left-handed coordinates (TransformTypes.h: SkewHorizontal(-degrees)). Its
+// direction was measured against InDesign's own Shear dialog with the Vertical axis (the live test of 2026-10-17).
+Transform::TransformValue ShearBy(const KFCSpecialParams& params)
+{
+	if (params.y < 0.5)
+		return Transform::SkewBy(params.x);
+	PMMatrix m;
+	m.SkewVertical(-params.x);
+	return Transform::TransformBy(m);
 }
 
 // TRANSFORM EACH ITEM ABOUT ITS OWN CENTRE (E5) - the official shape (codesnippets/SnpTransformPageItems.cpp:
@@ -554,7 +581,7 @@ ErrorCode WriteDocument(const OpInfo& info, const KFCSpecialParams& params, cons
 		case kKFCSpecialMove:			return TransformEach(items, Transform::TranslateBy(params.x, params.y));
 		case kKFCSpecialScale:			return TransformEach(items, Transform::ScaleBy(params.x / 100.0, params.y / 100.0));
 		case kKFCSpecialRotate:			return TransformEach(items, Transform::RotateBy(params.x));
-		case kKFCSpecialShear:			return TransformEach(items, Transform::SkewBy(params.x));
+		case kKFCSpecialShear:			return TransformEach(items, ShearBy(params));
 		case kKFCSpecialRedefineScaling:
 		{
 			Utils<Facade::ITransformFacade> transform;
@@ -808,8 +835,17 @@ bool KFCObjectSpecial::SpecialRows(int32 op, const KFCRowsByChapter& rows, const
 		std::vector<UIDList> bySpread;
 		SpreadGroups(db, chapter.todo, bySpread);
 		ErrorCode done = kSuccess;
+		std::set<UID> askedOut;		// an Arrange spread InDesign would not move together: its items, counted here once
 		for (size_t s = 0; s < bySpread.size() && done == kSuccess; ++s)
 		{
+			// ARRANGE: the spread's items asked together, as a selection is (CanArrange) - not one by one.
+			if (info.order && !CanArrange(info.op, bySpread[s]))
+			{
+				counts[kRefusedNotApplicable] += bySpread[s].Length();
+				for (int32 i = 0; i < bySpread[s].Length(); ++i)
+					askedOut.insert(bySpread[s][i]);
+				continue;
+			}
 			done = WriteDocument(info, params, chapter.docRef, bySpread[s]);
 			if (done == kSuccess && ErrorUtils::PMGetGlobalErrorCode() != kSuccess)
 				done = ErrorUtils::PMGetGlobalErrorCode();
@@ -824,6 +860,8 @@ bool KFCObjectSpecial::SpecialRows(int32 op, const KFCRowsByChapter& rows, const
 		// WHAT IT CHANGED (E7), read in the step: an item it left as it was is counted, not marked.
 		for (size_t k = 0; k < chapter.todo.size(); ++k)
 		{
+			if (askedOut.count(chapter.todo[k].second) > 0)
+				continue;		// (counted above)
 			if (!WriteChanged(info, db, chapter.todo[k].second, chapter.prints[k], chapter.printLengths[k], chapter.orders[k]))
 			{
 				++counts[kRefusedUnchanged];

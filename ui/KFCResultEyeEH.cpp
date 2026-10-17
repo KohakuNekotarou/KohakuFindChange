@@ -15,6 +15,11 @@
 //  replaced, outlined, or given a special operation (the author, 2026-10-17 evening: an eye on a row not written only kept
 //  a match since deleted as Missing): on any other row the column is empty and its clicks are the row's too (selected,
 //  jumped to).
+//  A PRESS THAT BECOMES A DRAG TRACES THE COLUMN (the author, 2026-10-17 night: "like the Layers panel"): the Layers
+//  panel's own eye (open/components/layerpanel/LayerEyeDragDropSourceEH.cpp) - IsUserStartingDrag (IEventUtils) tells a
+//  press that moves from one that is let go, and the first starts a drag the eyes it passes over answer
+//  (KFCResultEyeDrag.cpp).
+//  The row's facts, asked by the drag too, are KFCResultEye's (KFCResultEye.h).
 //
 //========================================================================================
 
@@ -22,17 +27,25 @@
 
 // Interface includes:
 #include "IControlView.h"
+#include "IDragDropController.h"	// StartDrag - the trace
+#include "IDragDropSource.h"		// WillDrag - only a written row's eye starts one (KFCResultEyeDrag.cpp)
+#include "IEvent.h"
+#include "IEventUtils.h"			// IsUserStartingDrag - a press that moves, told from one let go (EventUtilities.h's
+									// own, inside ID_DEPRECATED, says to use this instead)
 #include "ITreeNodeIDData.h"		// the row's NodeID, on the row widget this icon sits in
 #include "IWidgetParent.h"			// the icon -> its row
+#include "ISession.h"
 
 // General includes:
 #include "CEventHandler.h"
 #include "IconRsrcDefs.h"			// kEyeballIcon, kNoIcon
 #include "SysControlIds.h"			// kApplicationRsrcPluginID - the eyeball is the application's icon
+#include "Utils.h"					// Utils<IEventUtils>
 
 // Project includes:
 #include "KFCUIID.h"
 #include "KFCModelAccess.h"			// KFCResults() - the model half's door
+#include "KFCResultEye.h"
 #include "KFCResultNodeID.h"
 #include "KFCResultTree.h"			// ShowStatus, TakeKeyboard
 
@@ -47,11 +60,6 @@ public:
 	virtual bool16 ButtonDblClk(IEvent* e);
 
 private:
-	/** The live hit row this icon sits in - false for a kept tier's row, or none. */
-	bool LiveHitRow(int32& outChapter, int32& outHit) const;
-	/** ...one KFC has written (replaced, outlined, or given a special operation): the only rows with an eye to turn.
-	    outRow = its display. */
-	bool WrittenRow(int32& outChapter, int32& outHit, KFCResultModel::RowDisplay& outRow) const;
 	/** The eye turned: the model told, the icon drawn, the status line, the keyboard to the list. kFalse = not a written
 	    live hit row's eye - the click is the row's. */
 	bool16 Turn();
@@ -59,10 +67,14 @@ private:
 
 CREATE_PMINTERFACE(KFCResultEyeEH, kKFCResultEyeEHImpl)
 
-bool KFCResultEyeEH::LiveHitRow(int32& outChapter, int32& outHit) const
+//========================================================================================
+// The row's facts (KFCResultEye.h) - asked by this click and by the drag
+//========================================================================================
+
+bool KFCResultEye::LiveHitRow(const IPMUnknown* eye, int32& outChapter, int32& outHit, NodeID* outNode)
 {
 	outChapter = outHit = -1;
-	InterfacePtr<const IWidgetParent> parent(this, UseDefaultIID());
+	InterfacePtr<const IWidgetParent> parent(eye, UseDefaultIID());
 	if (parent == nil)
 		return false;
 	InterfacePtr<ITreeNodeIDData> row(static_cast<ITreeNodeIDData*>(parent->QueryParentFor(IID_ITREENODEIDDATA)));
@@ -73,31 +85,50 @@ bool KFCResultEyeEH::LiveHitRow(int32& outChapter, int32& outHit) const
 		return false;
 	outChapter = node->GetChapter();
 	outHit = node->GetHit();
+	if (outNode != nil)
+		*outNode = row->Get();
 	return true;
 }
 
-bool KFCResultEyeEH::WrittenRow(int32& outChapter, int32& outHit, KFCResultModel::RowDisplay& outRow) const
+bool KFCResultEye::IsWritten(const KFCResultModel::RowDisplay& row)
 {
-	return LiveHitRow(outChapter, outHit) && KFCResults()->GetHitRow(outChapter, outHit, outRow)
-		&& (outRow.replaced || outRow.special != kKFCSpecialNone);
+	return row.replaced || row.special != kKFCSpecialNone;
 }
+
+bool KFCResultEye::WrittenRow(const IPMUnknown* eye, int32& outChapter, int32& outHit, KFCResultModel::RowDisplay& outRow,
+							  NodeID* outNode)
+{
+	return LiveHitRow(eye, outChapter, outHit, outNode) && KFCResults()->GetHitRow(outChapter, outHit, outRow)
+		&& IsWritten(outRow);
+}
+
+void KFCResultEye::Draw(IControlView* eye, bool kept, bool now)
+{
+	if (eye == nil)
+		return;
+	eye->SetRsrcID(kept ? kEyeballIcon : kNoIcon);
+	eye->SetRsrcPluginID(kApplicationRsrcPluginID);
+	if (now)
+		eye->ForceRedraw();
+	else
+		eye->Invalidate();
+}
+
+//========================================================================================
+// The click
+//========================================================================================
 
 bool16 KFCResultEyeEH::Turn()
 {
 	int32 chapter = -1, hit = -1;
 	KFCResultModel::RowDisplay row;
-	if (!WrittenRow(chapter, hit, row))
+	if (!KFCResultEye::WrittenRow(this, chapter, hit, row))
 		return kFalse;		// a kept tier's row (ROW-42), or one KFC has not written: its click is the row's
 	const bool kept = !row.kept;
 	if (!KFCResults()->SetHitKept(chapter, hit, kept))
 		return kTrue;
 	InterfacePtr<IControlView> view(this, UseDefaultIID());
-	if (view != nil)
-	{
-		view->SetRsrcID(kept ? kEyeballIcon : kNoIcon);
-		view->SetRsrcPluginID(kApplicationRsrcPluginID);
-		view->Invalidate();
-	}
+	KFCResultEye::Draw(view, kept, false);
 	// "P1(2)  kept when searching again" - the row named by its locator, as the list reads it.
 	PMString words(row.locator);
 	words.SetTranslatable(kFalse);
@@ -108,8 +139,32 @@ bool16 KFCResultEyeEH::Turn()
 	return kTrue;
 }
 
-bool16 KFCResultEyeEH::LButtonDn(IEvent* /*e*/)
+bool16 KFCResultEyeEH::LButtonDn(IEvent* e)
 {
+	int32 chapter = -1, hit = -1;
+	KFCResultModel::RowDisplay row;
+	if (!KFCResultEye::WrittenRow(this, chapter, hit, row))
+		return kFalse;		// the row's click (Turn says why)
+	// A PRESS THAT MOVES IS A TRACE (LayerEyeDragDropSourceEH::LButtonDn): the drag the eyes it passes over answer, the
+	// first of them this one (KFCResultEyeDrag.cpp). IsUserStartingDrag waits for the mouse to move or the button to come
+	// up - a press let go where it was is a click, and turns this eye alone, as before. (The Layers panel calls the
+	// deprecated global of the same name; IEventUtils is the one its header points to.)
+	InterfacePtr<IDragDropSource> dragSource(this, IID_IDRAGDROPSOURCE);
+	Utils<IEventUtils> eventUtils;		// asked before it is used: QueryUtilInterface has no nil guard (memory utils-boss-facade-access)
+	bool16 isPatientUser = kFalse;
+	if (dragSource != nil && eventUtils && dragSource->WillDrag(e) && eventUtils->IsUserStartingDrag(e, isPatientUser))
+	{
+		InterfacePtr<IDragDropController> ddController(GetExecutionContextSession(), IID_IDRAGDROPCONTROLLER);
+		if (ddController != nil)
+		{
+			// Returns with the drag over ("upon return, the drag will have completed" - IDragDropController.h); it takes
+			// the release, so LButtonUp does not come for this press (LayerEyeDragDropSourceEH: "StartDrag will swallow
+			// the mouse up").
+			(void)ddController->StartDrag(dragSource, e);
+			KFCResultEye::DragEnded(this);
+			return kTrue;
+		}
+	}
 	return Turn();
 }
 
@@ -119,7 +174,7 @@ bool16 KFCResultEyeEH::LButtonUp(IEvent* /*e*/)
 	// written gave its press to the row: its release goes there too.
 	int32 chapter = -1, hit = -1;
 	KFCResultModel::RowDisplay row;
-	return WrittenRow(chapter, hit, row) ? kTrue : kFalse;
+	return KFCResultEye::WrittenRow(this, chapter, hit, row) ? kTrue : kFalse;
 }
 
 bool16 KFCResultEyeEH::ButtonDblClk(IEvent* /*e*/)

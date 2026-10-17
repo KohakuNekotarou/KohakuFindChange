@@ -51,6 +51,7 @@
 #include "KFCPanelState.h"		// "Save Panel Settings" - write the settings toggles to our own file
 #include "KFCBookPanelPlacement.h"	// "Remember Book Panel Placement" - InDesign's own Book panel
 #include "KFCQueryDialog.h"		// "Run Saved Queries..." - the query dialog
+#include "KFCSpecialDialogs.h"	// Move... / Scale... / Rotate... / Shear... - their values asked first
 #include "KFCDiagHiddenDocs.h"		// the hidden-document check after an action - test builds only
 
 /** Implements IActionComponent; performs the actions that are executed when the plug-in's
@@ -229,6 +230,10 @@ const struct SpecialAction
 	{ kKFCMoveToLayerActionID, kKFCSpecialMoveToLayer },
 	{ kKFCClearStyleOverridesActionID, kKFCSpecialClearStyleOverrides },
 	{ kKFCDeleteActionID, kKFCSpecialDelete },
+	{ kKFCMoveActionID, kKFCSpecialMove },
+	{ kKFCScaleActionID, kKFCSpecialScale },
+	{ kKFCRotateActionID, kKFCSpecialRotate },
+	{ kKFCShearActionID, kKFCSpecialShear },
 };
 
 // The special operation an action stands for - kKFCSpecialNone for any other action.
@@ -261,13 +266,15 @@ bool ActiveLayerName(IActiveContext* ac, PMString& outName)
 
 // AN OBJECT ROW'S SPECIAL OPERATION: the row the menu was popped over - or the rows selected together, when it is one of
 // them (RowsOfRightClick, as Replace and Create Outlines) - written where they stand (KFCResultTree::SpecialRows). Move to
-// Active Layer takes the active layer's name with it (ActiveLayerName). No object row (the action pressed by its ActionID):
-// nothing.
+// Active Layer takes the active layer's name with it (ActiveLayerName); Move, Scale, Rotate and Shear their values, asked
+// first (KFCSpecialDialogs - the spec's E12): Cancel writes nothing and says nothing, a value that would change nothing
+// (0 and 0, 100%, 0 degrees) is said rather than written. No object row (the action pressed by its ActionID): nothing.
 void DoSpecial(IActiveContext* ac, int32 op, IPMUnknown* widget)
 {
 	int32 chapter = -1, hit = -1;
 	if (!RightClickedHit(widget, chapter, hit) || KFCResults()->GetHitItem(chapter, hit) == kInvalidUID)
 		return;
+	const KFCRowsByChapter rows(KFCResultTree::RowsOfRightClick(chapter, hit));
 	KFCSpecialParams params;
 	if (op == kKFCSpecialMoveToLayer && !ActiveLayerName(ac, params.text))
 	{
@@ -276,7 +283,25 @@ void DoSpecial(IActiveContext* ac, int32 op, IPMUnknown* widget)
 		KFCResultTree::ShowStatus(why);
 		return;
 	}
-	(void)KFCResultTree::SpecialRows(op, KFCResultTree::RowsOfRightClick(chapter, hit), params);
+	if (op == kKFCSpecialMove || op == kKFCSpecialScale || op == kKFCSpecialRotate || op == kKFCSpecialShear)
+	{
+		PMString why;
+		if (!KFCSpecialDialogs::AskTransformValues(op, params, why))
+		{
+			if (!why.IsEmpty())
+				KFCResultTree::ShowStatus(why);
+			return;
+		}
+		if (KFCSpecialDialogs::NothingToDo(op, params))
+		{
+			PMString none(KFCSpecialDialogs::OpName(op));
+			none.Append(": the values change nothing - no object was written.");
+			none.SetTranslatable(kFalse);
+			KFCResultTree::ShowStatus(none);
+			return;
+		}
+	}
+	(void)KFCResultTree::SpecialRows(op, rows, params);
 }
 }
 

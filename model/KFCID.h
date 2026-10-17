@@ -225,7 +225,6 @@ DECLARE_PMID(kImplementationIDSpace, kKFCCopyStoreImpl, kKFCPrefix + 47)
 #define kKFCScaleStepKey					kKFCStringPrefix "kKFCScaleStepKey"
 #define kKFCRotateStepKey					kKFCStringPrefix "kKFCRotateStepKey"
 #define kKFCShearStepKey					kKFCStringPrefix "kKFCShearStepKey"
-#define kKFCRunScriptStepKey				kKFCStringPrefix "kKFCRunScriptStepKey"
 #define kKFCRunQueriesStepKey		kKFCStringPrefix "kKFCRunQueriesStepKey"	// the query run's undo step (KFCQuerySequence)
 #define kKFCChangeAllStepKey		kKFCStringPrefix "kKFCChangeAllStepKey"	// Change All in Book (No List)'s undo step (KFCChangeAll)
 

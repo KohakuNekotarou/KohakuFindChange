@@ -102,6 +102,9 @@ DECLARE_PMID(kClassIDSpace, kKFCQueryRowTextWidgetBoss, kKFCUIPrefix + 28)
 // THE ROW EYE (docs/superpowers/specs/2026-10-17-kfc-row-eye-keep-design.md): a hit row's eye - an icon button with a
 // click handler of its own (KFCResultEyeEH).
 DECLARE_PMID(kClassIDSpace, kKFCResultEyeWidgetBoss, kKFCUIPrefix + 29)
+// ...and its TRACE - a drag over the column (KFCResultEyeDrag.cpp): the drag's data exchange handler, the Layers panel's
+// kLayerEyeDEHandlerBoss in shape. + 30: the next after the highest spent.
+DECLARE_PMID(kClassIDSpace, kKFCResultEyeDEHandlerBoss, kKFCUIPrefix + 30)
 
 
 // InterfaceIDs:
@@ -205,6 +208,11 @@ DECLARE_PMID(kImplementationIDSpace, kKFCQueryContentsHandlerImpl, kKFCUIPrefix 
 DECLARE_PMID(kImplementationIDSpace, kKFCQueryRowTipImpl, kKFCUIPrefix + 51)
 // The row eye's click (KFCResultEyeEH.cpp).
 DECLARE_PMID(kImplementationIDSpace, kKFCResultEyeEHImpl, kKFCUIPrefix + 52)
+// The row eye's trace (KFCResultEyeDrag.cpp): the drag's data exchange handler, the eye as the drag's source, and every
+// eye as its target. + 53 ... + 55: the next after the highest spent.
+DECLARE_PMID(kImplementationIDSpace, kKFCResultEyeDEHandlerImpl, kKFCUIPrefix + 53)
+DECLARE_PMID(kImplementationIDSpace, kKFCResultEyeDragSourceImpl, kKFCUIPrefix + 54)
+DECLARE_PMID(kImplementationIDSpace, kKFCResultEyeDropTargetImpl, kKFCUIPrefix + 55)
 
 
 // ActionIDs:
@@ -393,6 +401,12 @@ DECLARE_PMID(kActionIDSpace, kKFCSpecialSep2ActionID, kKFCUIPrefix + 83)
 DECLARE_PMID(kActionIDSpace, kKFCSpecialSep3ActionID, kKFCUIPrefix + 84)
 DECLARE_PMID(kActionIDSpace, kKFCSpecialSep4ActionID, kKFCUIPrefix + 85)
 DECLARE_PMID(kActionIDSpace, kKFCTransformSep2ActionID, kKFCUIPrefix + 86)
+// ...Transform with a value asked first (the spec's E12 - a dialog of KFCSpecialDialogs), and the rule under them.
+DECLARE_PMID(kActionIDSpace, kKFCMoveActionID, kKFCUIPrefix + 87)
+DECLARE_PMID(kActionIDSpace, kKFCScaleActionID, kKFCUIPrefix + 88)
+DECLARE_PMID(kActionIDSpace, kKFCRotateActionID, kKFCUIPrefix + 89)
+DECLARE_PMID(kActionIDSpace, kKFCShearActionID, kKFCUIPrefix + 90)
+DECLARE_PMID(kActionIDSpace, kKFCTransformSep1ActionID, kKFCUIPrefix + 91)
 
 
 // WidgetIDs:
@@ -545,6 +559,10 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 #define kKFCMoveToLayerMenuKey				kKFCStringPrefix "kKFCMoveToLayerMenuKey"
 #define kKFCClearStyleOverridesMenuKey		kKFCStringPrefix "kKFCClearStyleOverridesMenuKey"
 #define kKFCDeleteMenuKey					kKFCStringPrefix "kKFCDeleteMenuKey"
+#define kKFCMoveMenuKey						kKFCStringPrefix "kKFCMoveMenuKey"
+#define kKFCScaleMenuKey					kKFCStringPrefix "kKFCScaleMenuKey"
+#define kKFCRotateMenuKey					kKFCStringPrefix "kKFCRotateMenuKey"
+#define kKFCShearMenuKey					kKFCStringPrefix "kKFCShearMenuKey"
 // ...and the names of their submenus (kKFCFittingSubmenuPath below - the plain words are InDesign's own keys).
 #define kKFCFittingSubmenuKey				kKFCStringPrefix "kKFCFittingSubmenuKey"
 #define kKFCArrangeSubmenuKey				kKFCStringPrefix "kKFCArrangeSubmenuKey"
@@ -736,8 +754,13 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 #define kKFCBringForwardMenuItemPosition		2.0
 #define kKFCSendBackwardMenuItemPosition		3.0
 #define kKFCSendToBackMenuItemPosition			4.0
-// Transform: the turns and flips, a rule, then the two that put a transformation back (the ones asking a value come at
-// 1.0 - 4.5, with their own rule).
+// Transform: the four asking a value (InDesign's own Object > Transform order), a rule, the turns and flips, a rule, then
+// the two that put a transformation back.
+#define kKFCMoveMenuItemPosition				1.0
+#define kKFCScaleMenuItemPosition				2.0
+#define kKFCRotateMenuItemPosition				3.0
+#define kKFCShearMenuItemPosition				4.0
+#define kKFCTransformSep1MenuItemPosition		4.5
 #define kKFCRotate90CWMenuItemPosition			5.0
 #define kKFCRotate90CCWMenuItemPosition			6.0
 #define kKFCRotate180MenuItemPosition			7.0

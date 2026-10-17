@@ -125,15 +125,15 @@ enum KFCSpecialOp
 	kKFCSpecialScale,
 	kKFCSpecialRotate,
 	kKFCSpecialShear,
-	// a script of the user's run over each row's object
-	kKFCSpecialRunScript,
+	// (No "Run Script on the rows' objects": dropped - the author, 2026-10-17 night, the spec's E13.)
 	kKFCSpecialOpCount
 };
 
 /** WHAT A SPECIAL OPERATION IS GIVEN besides its rows (IKFCRuns::SpecialRows). x, y: Move - the horizontal and vertical
     distances in points (right and down positive); Scale - the horizontal and vertical percentages; Rotate, Shear - the
-    angle in degrees in x (counter-clockwise positive, as InDesign's dialogs have it). text: Move to Active Layer - the
-    layer's name; Run Script - the script. */
+    angle in degrees in x (counter-clockwise positive, as InDesign's dialogs have it); Shear - its axis in y, 0 Horizontal
+    and 1 Vertical (the Shear dialog's Axis, as InDesign's own - 2026-10-17). text: Move to Active Layer - the layer's
+    name. */
 struct KFCSpecialParams
 {
 	double		x;

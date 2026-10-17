@@ -31,6 +31,9 @@ REGISTER_PMINTERFACE(KFCRowData, kKFCRowDataImpl)
 REGISTER_PMINTERFACE(KFCMarkerExpiryTask, kKFCMarkerExpiryIdleTaskImpl)
 REGISTER_PMINTERFACE(KFCResultNodeEH, kKFCResultNodeEHImpl)
 REGISTER_PMINTERFACE(KFCResultEyeEH, kKFCResultEyeEHImpl)
+REGISTER_PMINTERFACE(KFCResultEyeDEHandler, kKFCResultEyeDEHandlerImpl)
+REGISTER_PMINTERFACE(KFCResultEyeDragSource, kKFCResultEyeDragSourceImpl)
+REGISTER_PMINTERFACE(KFCResultEyeDropTarget, kKFCResultEyeDropTargetImpl)
 // ...and the row's observer: a row closed takes the rows selected under it out of the selection.
 REGISTER_PMINTERFACE(KFCResultNodeObserver, kKFCResultNodeObserverImpl)
 // The result LIST's own handler: up / down arrows that open the row they land on. A boss in the

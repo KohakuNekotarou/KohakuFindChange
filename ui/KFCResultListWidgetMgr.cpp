@@ -1327,7 +1327,6 @@ const char* KFCResultTree::SpecialRowWord(int32 op)
 		case kKFCSpecialShear:					return "Sheared";
 		case kKFCSpecialClearStyleOverrides:	return "Cleared";
 		case kKFCSpecialDelete:					return "Deleted";
-		case kKFCSpecialRunScript:				return "Scripted";
 		default:								return "";
 	}
 }

@@ -40,6 +40,7 @@
 #include "IconStyleDefs.h"	// kIconNoCentering / kIconRaisedLook - the expander's icon attributes
 #include "TipsID.h"			// IID_ITIP - the tooltips on the panel's illustration and on the query dialog's rows
 #include "XMLParserID.h"	// IID_ISAXCONTENTHANDLER - the query dialog's reading of a saved query's file
+#include "DragDropID.h"		// IID_IDRAGDROPSOURCE / IID_IDRAGDROPTARGET / IID_IDATAEXCHANGEHANDLER - the row eye's trace
 
 // Project includes:
 #include "KFCUIID.h"
@@ -237,6 +238,27 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 		kIconSuiteWidgetBoss,
 		{
 			IID_IEVENTHANDLER, kKFCResultEyeEHImpl,
+			/* ...and its TRACE (the author, 2026-10-17 night: "like the Layers panel"): the eye is a drag's source and every
+			   eye its target, as the Layers panel's kLayerPanelEyeballBoss is (LayerPanelClass.fr) - KFCResultEyeDrag.cpp.
+			   kIconSuiteWidgetBoss carries neither (inspect_ui boss, 2026-10-17), so nothing inherited is replaced. */
+			IID_IDRAGDROPSOURCE, kKFCResultEyeDragSourceImpl,
+			IID_IDRAGDROPTARGET, kKFCResultEyeDropTargetImpl,
+		}
+	},
+
+	/*
+	 * THE TRACE'S DATA EXCHANGE HANDLER (KFCResultEyeDrag.cpp): the drag's flavor, and the first eye's state - the Layers
+	 * panel's kLayerEyeDEHandlerBoss (LayerPanelClass.fr), whose IUIDData held a layer; a row is held by the trace itself.
+	 * Found by the data exchange controller through its IDataExchangeHandler - the Layers panel's has no service either.
+	 */
+	Class
+	{
+		kKFCResultEyeDEHandlerBoss,
+		kInvalidClass,
+		{
+			IID_IDATAEXCHANGEHANDLER, kKFCResultEyeDEHandlerImpl,
+			IID_IBOOLDATA, kBoolDataImpl,			// the first eye's state: kept or not
+			IID_IPMPERSIST, kPMPersistImpl,
 		}
 	},
 
@@ -857,10 +879,36 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCSendToBackMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// Transform: the turns and flips, a rule, the two that put a transformation back.
+		// Transform: the four asking a value (a dialog first - KFCSpecialDialogs), a rule, the turns and flips, a rule, the
+		// two that put a transformation back.
 		0,
 		kKFCTransformSubmenuPath kSDKDefDelimitMenuPath
 		kKFCTransformSubmenuPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCMoveActionID,
+		kKFCTransformSubmenuPath
+		kKFCMoveMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCScaleActionID,
+		kKFCTransformSubmenuPath
+		kKFCScaleMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCRotateActionID,
+		kKFCTransformSubmenuPath
+		kKFCRotateMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCShearActionID,
+		kKFCTransformSubmenuPath
+		kKFCShearMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCTransformSep1ActionID,
+		kKFCTransformSubmenuPath kSDKDefDelimiterAndSeparatorPath,
+		kKFCTransformSep1MenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		kKFCRotate90CWActionID,
@@ -1326,6 +1374,42 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKFCActionComponentBoss,
 		kKFCSendToBackActionID,
 		kKFCSendToBackMenuKey,
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCMoveActionID,
+		kKFCMoveMenuKey,
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCScaleActionID,
+		kKFCScaleMenuKey,
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCRotateActionID,
+		kKFCRotateMenuKey,
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCShearActionID,
+		kKFCShearMenuKey,
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,

@@ -84,7 +84,8 @@ DECLARE_PMID(kInterfaceIDSpace, IID_IKFCUIBOUNDARY, kKFCPrefix + 14)
 // find its own in the UI half takes it for no UI half.
 // kKFCBoundaryRevision GOES UP BY ONE whenever a door gains, loses or reorders a method, or a type that crosses changes
 // its layout; kKFCVersion is in the stamp too, so two releases never pass for one.
-#define kKFCBoundaryRevision	"13"
+#define kKFCBoundaryRevision	"14"		// 14: KFCSpecialParams::y is Shear's axis too (2026-10-17) - the layout is the same,
+										// but a half that does not read it would shear the other way without a word
 #define kKFCBoundaryStamp		kKFCVersion "/" kKFCBoundaryRevision
 
 #endif // __KFCBoundaryID_h__
