@@ -46,6 +46,7 @@
 #include "TreeNodeTraverser.h"		// the rows in the order they are drawn
 
 #include <algorithm>
+#include <map>						// the rows' open state across Clear from Results' rebuild (LeftAs)
 #include <vector>
 
 // Project includes:
@@ -54,6 +55,7 @@
 #include "KFCModelAccess.h"			// GetHitItem - what a row is
 #include "KFCResultNodeID.h"
 #include "KFCResultTree.h"
+#include "KFCResultHistory.h"		// ViewTopRow / HoldScrollForNextRebuild - Clear from Results keeps the view
 #include "KFCDiag.h"				// the select-all-expand-once and list-landing-guard-off fault switches - test builds only
 
 namespace
@@ -355,6 +357,192 @@ bool KFCResultTree::CanSelectAllRows(const NodeID& row)
 	NodeIDList first;
 	CollectHitRows(adapter, row, first, 1);
 	return !first.empty();
+}
+
+namespace
+{
+// THE LIVE LIST AS THE PERSON LEFT IT, across the rebuild Clear from Results makes (KFCResultTree::ClearRows): the rows that go
+// give every row after them in their story another place - a row's NodeID is its chapter, its story group and its hit, and a
+// story row's is its group's place - so the tree is made anew, and this puts back what the rebuild's own rules would change.
+// A document row by its chapter (its place stays); a story row, and the row at the top of the view, by the hit rows under it;
+// the rows selected by their chapter and hit.
+struct LeftAs
+{
+	bool									bookOpen;	// the book row (a book's list)
+	std::map<int32, bool>					documents;	// chapter -> open
+	std::map<std::pair<int32, int32>, bool>	stories;	// (chapter, a hit row under it) -> its story row open
+	std::vector<RowRef>						selected;	// the hit rows selected
+	NodeID									top;		// the row at the top of the view - as it is, for a row no clear moves
+	int32									topChapter;	// ...a row of the live list's documents: its chapter (-1 = not one)
+	int32									topHit;		// ...a hit row's hit (-1 = a story or document row)
+	std::vector<int32>						topStory;	// ...the hit rows of the story it is of, or is (empty = none)
+	LeftAs() : bookOpen(true), topChapter(-1), topHit(-1) {}
+};
+
+void NoteLeftAs(ITreeViewController* controller, ITreeViewMgr* treeMgr, LeftAs& out)
+{
+	if (KFCResults()->IsFromBook())
+		out.bookOpen = (treeMgr->IsNodeExpanded(KFCResultNodeID::CreateBook()) != kFalse);
+	const int32 chapters = KFCResults()->GetDisplayChapterCount();
+	for (int32 n = 0; n < chapters; ++n)
+	{
+		const int32 c = KFCResults()->GetShownChapter(n);
+		out.documents[c] = (treeMgr->IsNodeExpanded(KFCResultNodeID::Create(c)) != kFalse);
+		const int32 groups = KFCResults()->GetDisplayFontCount(c);
+		for (int32 g = 0; g < groups; ++g)
+		{
+			const bool open = (treeMgr->IsNodeExpanded(KFCResultNodeID::CreateFont(c, g)) != kFalse);
+			const int32 rows = KFCResults()->GetDisplayFontHitCount(c, g);
+			for (int32 k = 0; k < rows; ++k)
+				out.stories[std::make_pair(c, KFCResults()->GetFontGroupHit(c, g, k))] = open;
+		}
+	}
+	NodeIDList selected;
+	controller->GetSelectedItems(selected);
+	for (size_t k = 0; k < selected.size(); ++k)
+	{
+		const RowRef row(RowOf(selected[k]));
+		if (row.chapter >= 0)
+			out.selected.push_back(row);
+	}
+	out.top = KFCResultHistory::ViewTopRow();
+	TreeNodePtr<KFCResultNodeID> topID(out.top);
+	if (topID == nil || topID->IsKeptRow() || topID->IsTierRow() || topID->GetChapter() < 0)
+		return;		// a tier's own row, a grey tier's row, the book row: no clear moves them
+	out.topChapter = topID->GetChapter();
+	int32 group = topID->GetFont();
+	if (topID->IsHitRow())
+	{
+		out.topHit = topID->GetHit();
+		group = KFCResults()->GetHitFontGroup(out.topChapter, out.topHit);
+	}
+	const int32 rows = (group >= 0) ? KFCResults()->GetDisplayFontHitCount(out.topChapter, group) : 0;
+	for (int32 k = 0; k < rows; ++k)
+		out.topStory.push_back(KFCResults()->GetFontGroupHit(out.topChapter, group, k));
+}
+
+// A hit row the list still shows: its place under its story row, or among its document's object rows, is one (-1 for a row
+// taken off - KFCResultModel::BuildFontGroups).
+bool ShowsHit(int32 chapterIdx, int32 hitIdx)
+{
+	return KFCResults()->GetHitFontGroupPos(chapterIdx, hitIdx) >= 0;
+}
+
+// The row at the top of the view again: the same row while the list shows it; a hit row taken off - its story row, while a
+// row of the story stays; then its document row; then the live list's own row - the nearest row above it that stands.
+NodeID TopAgain(const LeftAs& left)
+{
+	if (left.topChapter < 0)
+		return left.top;
+	const int32 c = left.topChapter;
+	if (left.topHit >= 0 && ShowsHit(c, left.topHit))
+		return NodeID(KFCResultNodeID::Create(c, left.topHit));
+	for (size_t k = 0; k < left.topStory.size(); ++k)
+	{
+		const int32 group = KFCResults()->GetHitFontGroup(c, left.topStory[k]);
+		if (group >= 0 && ShowsHit(c, left.topStory[k]))
+			return NodeID(KFCResultNodeID::CreateFont(c, group));
+	}
+	if (KFCResults()->GetShownChapterPos(c) >= 0)
+		return NodeID(KFCResultNodeID::Create(c));
+	return KFCResultHistory::IsStacking() ? NodeID(KFCResultNodeID::CreateLiveTier()) : NodeID();
+}
+
+// ...and put back after the rebuild: every row opened or closed as noted (each story row by a row of its that stays), the
+// view's top row at the top again, and the rows selected that the list still shows selected again - announced once, by the
+// last; the page is not moved (the rows were selected already).
+void PutBackLeftAs(ITreeViewController* controller, ITreeViewMgr* treeMgr, const LeftAs& left)
+{
+	if (KFCResults()->IsFromBook() && !left.bookOpen)
+		treeMgr->CollapseNode(KFCResultNodeID::CreateBook(), kFalse);
+	const int32 chapters = KFCResults()->GetDisplayChapterCount();
+	for (int32 n = 0; n < chapters; ++n)
+	{
+		const int32 c = KFCResults()->GetShownChapter(n);
+		const int32 groups = KFCResults()->GetDisplayFontCount(c);
+		for (int32 g = 0; g < groups; ++g)
+		{
+			const std::map<std::pair<int32, int32>, bool>::const_iterator s =
+				left.stories.find(std::make_pair(c, KFCResults()->GetFontGroupHit(c, g, 0)));
+			if (s == left.stories.end())
+				continue;
+			const NodeID row(KFCResultNodeID::CreateFont(c, g));
+			if (s->second)
+				treeMgr->ExpandNode(row, kFalse);
+			else
+				treeMgr->CollapseNode(row, kFalse);
+		}
+		const std::map<int32, bool>::const_iterator d = left.documents.find(c);
+		if (d == left.documents.end())
+			continue;
+		const NodeID row(KFCResultNodeID::Create(c));
+		if (d->second)
+			treeMgr->ExpandNode(row, kFalse);
+		else
+			treeMgr->CollapseNode(row, kFalse);
+	}
+	const NodeID top(TopAgain(left));
+	if (top.IsValid())
+		treeMgr->ScrollToNode(top, ITreeViewMgr::eScrollToTop);
+	std::vector<NodeID> again;
+	for (size_t k = 0; k < left.selected.size(); ++k)
+		if (ShowsHit(left.selected[k].chapter, left.selected[k].hit))
+			again.push_back(NodeID(KFCResultNodeID::Create(left.selected[k].chapter, left.selected[k].hit)));
+	controller->DeselectAll(kFalse /*notifyOfChange*/, kTrue /*changeHilite*/);
+	for (size_t k = 0; k < again.size(); ++k)
+		(void)controller->Select(again[k], (k + 1 == again.size()) ? kTrue : kFalse /*announced once, by the last*/, kTrue);
+	// The run's moving end, while it is still a row of the list (Shift+Up / Shift+Down go on from there).
+	if (gRunEnd.chapter >= 0 && !ShowsHit(gRunEnd.chapter, gRunEnd.hit))
+		gRunEnd = again.empty() ? RowRef() : RowOf(again.back());
+}
+}	// anonymous namespace
+
+bool KFCResultTree::ClearRows(const KFCRowsByChapter& rows)
+{
+	if (KFCJump::IsLanding() || RefusedWhileRunning() || KFCRowCount(rows) == 0)
+		return false;
+	InterfacePtr<ITreeViewController> controller(QueryListController());
+	InterfacePtr<ITreeViewMgr> treeMgr(controller, UseDefaultIID());
+	LeftAs left;
+	if (controller != nil && treeMgr != nil)
+		NoteLeftAs(controller, treeMgr, left);
+	const int32 cleared = KFCResults()->ClearRows(rows);
+	// The tree made anew - the rows after the ones that went have other places (LeftAs) - with the view left where it is
+	// (the rebuild does not bring the live list's own row to the top), and then put back as the person left it.
+	if (controller != nil && treeMgr != nil)
+	{
+		KFCResultHistory::HoldScrollForNextRebuild();
+		Rebuild();
+		PutBackLeftAs(controller, treeMgr, left);
+	}
+	PMString status("Cleared ");
+	status.AppendNumber(cleared);
+	status.Append(cleared == 1 ? " row from the results." : " rows from the results.");
+	status.SetTranslatable(kFalse);
+	ShowStatus(status);
+	return cleared > 0;
+}
+
+bool KFCResultTree::RowsUnder(const NodeID& row, KFCRowsByChapter& out)
+{
+	out.clear();
+	InterfacePtr<ITreeViewController> controller(QueryListController());
+	InterfacePtr<ITreeViewHierarchyAdapter> adapter(controller, UseDefaultIID());
+	if (controller == nil || adapter == nil || !row.IsValid())
+		return false;
+	NodeIDList rows;
+	CollectHitRows(adapter, row, rows);
+	for (size_t k = 0; k < rows.size(); ++k)
+	{
+		TreeNodePtr<KFCResultNodeID> nodeID(rows[k]);
+		if (nodeID == nil)
+			continue;
+		// A document's rows are drawn together, under its row: a new chapter starts a new group (GetSelectedHitRows' rule).
+		if (out.empty() || out.back().chapter != nodeID->GetChapter())
+			out.push_back(KFCChapterRows(nodeID->GetChapter()));
+		out.back().hits.push_back(nodeID->GetHit());
+	}
+	return !out.empty();
 }
 
 bool KFCResultTree::SelectAllRows(const NodeID& row)

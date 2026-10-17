@@ -410,6 +410,11 @@ DECLARE_PMID(kActionIDSpace, kKFCTransformSep1ActionID, kKFCUIPrefix + 91)
 // FIND OBJECTS ON ACTIVE LAYER (the panel menu, under Find - the spec's E14, the author's S3 "the same layer"): the Object
 // tab's search kept to the objects on the Layers panel's layer. + 92: the next after the highest spent.
 DECLARE_PMID(kActionIDSpace, kKFCFindOnActiveLayerActionID, kKFCUIPrefix + 92)
+// CLEAR FROM RESULTS (docs/superpowers/specs/2026-10-18-kfc-clear-from-results-design.md K2): the rows of a hit, object, story or
+// document row taken off the list - and the rule above it, one id for the four menus (+ 93, + 94: the next after the highest
+// spent).
+DECLARE_PMID(kActionIDSpace, kKFCClearFromResultsActionID, kKFCUIPrefix + 93)
+DECLARE_PMID(kActionIDSpace, kKFCClearRowsSepActionID, kKFCUIPrefix + 94)
 
 
 // WidgetIDs:
@@ -533,6 +538,9 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 #define kKFCCreateOutlinesMenuKey	kKFCStringPrefix "kKFCCreateOutlinesMenuKey"
 // ...and a text row's Restore Original (measured against every other key - key_collisions.py).
 #define kKFCRestoreOriginalMenuKey	kKFCStringPrefix "kKFCRestoreOriginalMenuKey"
+// ...and Clear from Results - a hit, object, story or document row's. NOT "kKFCClearFromResultsMenuKey": the length and the
+// character sum of kKFCClearTierResultsMenuKey ("From" and "Tier" add up alike - key_collisions.py, 2026-10-18).
+#define kKFCClearRowsMenuKey		kKFCStringPrefix "kKFCClearRowsMenuKey"
 // ...and an object row's other Special Operations - InDesign's own English command names ("Degrees" for the degree sign: the
 // string table is ASCII) (measured against every other key - key_collisions.py).
 #define kKFCFillFramePropMenuKey			kKFCStringPrefix "kKFCFillFramePropMenuKey"
@@ -732,6 +740,10 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 #define kKFCObjectReplaceMenuItemPosition		1.0
 #define kKFCSpecialOpsSubmenuPosition			2.0
 #define kKFCCreateOutlinesMenuItemPosition		1.0
+// Clear from Results last in the hit, object, story and document rows' menus, under a rule (the clear-from-results spec's K2):
+// the one item that takes rows away - from the list, not from the document.
+#define kKFCClearRowsSepMenuItemPosition		20.0
+#define kKFCClearFromResultsMenuItemPosition	21.0
 // ...and in Special Operations after it (the spec's E2 - InDesign's Object menu's order): a rule; the Fitting, Arrange and
 // Transform submenus; a rule; Lock, Unlock, Hide, Show; a rule; Move to Active Layer, Clear Object Style Overrides; a rule;
 // Delete last (the strongest - it can be undone, but it takes the object away).

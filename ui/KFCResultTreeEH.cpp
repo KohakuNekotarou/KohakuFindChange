@@ -22,7 +22,8 @@
 //       the keyboard alone walks the rows and replaces where the match is right. SHIFT+RETURN
 //       replaces it and goes on to the next row below that can be replaced (the author's call -
 //       InDesign's own Change/Find for the list) - see GoOnToNextReplaceableRow.
-//       Rows selected together are replaced together.
+//       Rows selected together are replaced together. CTRL+RETURN takes them off the list instead
+//       (Clear from Results) and lands on the row below - see ClearThenLand.
 //    4. SHIFT+DOWN / SHIFT+UP GROW OR SHRINK A RUN OF HIT ROWS selected together, the page
 //       following - see HandleUpDownKey and KFCResultTreeController.cpp.
 //
@@ -41,9 +42,9 @@
 //  before, and the next Return wrote a row it did not show). The left / right expand / collapse
 //  keys stay stock.
 //
-//  Shift+Return has no stock move to lean on - it skips rows - so it walks, but through the tree's
-//  OWN hierarchy adapter (KFCResultListAdapter, what the tree view builds its rows from), never the
-//  model's counts: it can only reach a row the tree has.
+//  Shift+Return and Ctrl+Return have no stock move to lean on - they skip rows - so they walk, but through
+//  the tree's OWN hierarchy adapter (KFCResultListAdapter, what the tree view builds its rows from), never
+//  the model's counts: they can only reach a row the tree has.
 //
 //  NOTE: THIS CLASS ONLY EXISTS IF SOMETHING ASKS FOR IT. Interface implementations are created on
 //  first QueryInterface, so naming it in KFCUI.fr is not enough - a row click's key-focus hand-off
@@ -77,6 +78,8 @@
 #include "Utils.h"					// Utils<IEventUtils>
 
 #include <chrono>					// a Return's hold on the keyboard - how long at most (gHolding)
+#include <set>						// the rows Ctrl+Return takes off the list - passed over by the row it lands on
+#include <utility>					// std::pair - a row as its chapter and hit
 #include <vector>					// the rows above the one Shift+Return goes on to, opened top down
 
 // Project includes:
@@ -180,33 +183,31 @@ NodeID NextRowInTreeOrder(const ITreeViewHierarchyAdapter* adapter, const NodeID
 	}
 }
 
-// SHIFT+RETURN GOES ON (the author's call - InDesign's own Change/Find, "replace, then find the next", for the list).
-// After the row it wrote, the next HIT row below it that can be replaced is selected, brought into view and landed
-// on the way the arrows land on a row (StockMoveThenLand): its action - the jump, and a GREP row's Preview Text - then the
-// keyboard taken back. Rows that cannot be replaced are stepped over (already replaced, locked, not a match of Find/Change:
-// KFCRuns()->CanReplaceHit, the question the row menu greys Replace by), and a closed row above the one landed on is opened
-// - a book search brings its chapters up closed. false = no such row below: the selection stays where it is.
-bool GoOnToNextReplaceableRow(ITreeViewController* controller, const NodeID& from)
+// The row before `from` in the order the rows are drawn - NextRowInTreeOrder's reverse: the last row under the row before it
+// among its siblings (its last child's last child ...), else the row above it. An invalid NodeID before the first row.
+NodeID RowBeforeInTreeOrder(const ITreeViewHierarchyAdapter* adapter, const NodeID& from)
 {
-	InterfacePtr<const ITreeViewHierarchyAdapter> adapter(controller, UseDefaultIID());
-	InterfacePtr<ITreeViewMgr> treeMgr(controller, UseDefaultIID());
-	if (adapter == nil || treeMgr == nil)
-		return false;
-	NodeID next = from;
-	int32 chapterIdx = -1, hitIdx = -1;
-	for (;;)
-	{
-		next = NextRowInTreeOrder(adapter, next);
-		TreeNodePtr<KFCResultNodeID> nodeID(next);
-		if (nodeID == nil)
-			return false;
-		if (nodeID->IsHitRow() && KFCRuns()->CanReplaceHit(nodeID->GetChapter(), nodeID->GetHit()))
-		{
-			chapterIdx = nodeID->GetChapter();
-			hitIdx = nodeID->GetHit();
-			break;
-		}
-	}
+	TreeNodePtr<KFCResultNodeID> nodeID(from);
+	if (nodeID == nil || nodeID->IsRoot())
+		return NodeID();
+	const NodeID parent(adapter->GetParentNode(from));
+	if (!parent.IsValid())
+		return NodeID();
+	const int32 at = adapter->GetChildIndex(parent, from);
+	if (at <= 0)
+		return parent;
+	NodeID node(adapter->GetNthChild(parent, at - 1));
+	for (int32 n = adapter->GetNumChildren(node); n > 0; n = adapter->GetNumChildren(node))
+		node = NodeID(adapter->GetNthChild(node, n - 1));
+	return node;
+}
+
+// A HIT ROW SELECTED, BROUGHT INTO VIEW AND LANDED ON the way the arrows land on a row (StockMoveThenLand): its action - the
+// jump, and a GREP row's Preview Text - then the keyboard taken back; a closed row above it opened first - a book search
+// brings its chapters up closed. Shift+Return's next row (GoOnToNextReplaceableRow) and Ctrl+Return's (ClearThenLand).
+void LandOnRow(ITreeViewController* controller, const ITreeViewHierarchyAdapter* adapter, ITreeViewMgr* treeMgr,
+	const NodeID& next, int32 chapterIdx, int32 hitIdx)
+{
 	// Every row above it open, top down, so the tree draws it. (ExpandNode on an open row is a harmless no-op -
 	// StockMoveThenLand leans on the same.)
 	std::vector<NodeID> above;
@@ -237,7 +238,81 @@ bool GoOnToNextReplaceableRow(ITreeViewController* controller, const NodeID& fro
 	}
 	// The landing fronted a document window, which took the keyboard with it - as after the arrows.
 	(void)KFCResultTree::TakeKeyboard();
-	return true;
+}
+
+// SHIFT+RETURN GOES ON (the author's call - InDesign's own Change/Find, "replace, then find the next", for the list).
+// After the row it wrote, the next HIT row below it that can be replaced is selected, brought into view and landed on
+// (LandOnRow). Rows that cannot be replaced are stepped over (already replaced, locked, not a match of Find/Change:
+// KFCRuns()->CanReplaceHit, the question the row menu greys Replace by). false = no such row below: the selection stays where
+// it is.
+bool GoOnToNextReplaceableRow(ITreeViewController* controller, const NodeID& from)
+{
+	InterfacePtr<const ITreeViewHierarchyAdapter> adapter(controller, UseDefaultIID());
+	InterfacePtr<ITreeViewMgr> treeMgr(controller, UseDefaultIID());
+	if (adapter == nil || treeMgr == nil)
+		return false;
+	NodeID next = from;
+	for (;;)
+	{
+		next = NextRowInTreeOrder(adapter, next);
+		TreeNodePtr<KFCResultNodeID> nodeID(next);
+		if (nodeID == nil)
+			return false;
+		if (nodeID->IsHitRow() && KFCRuns()->CanReplaceHit(nodeID->GetChapter(), nodeID->GetHit()))
+		{
+			LandOnRow(controller, adapter, treeMgr, next, nodeID->GetChapter(), nodeID->GetHit());
+			return true;
+		}
+	}
+}
+
+// CTRL+RETURN TAKES THE SELECTED ROWS OFF THE LIST (docs/superpowers/specs/2026-10-18-kfc-clear-from-results-design.md K4):
+// through the right-click Clear from Results' own door (KFCResultTree::ClearRows), then the hit row just below the lowest of
+// them is landed on (LandOnRow) - the one just above the highest when none is below, and none when the list has no other
+// row. That row is found before the rows go and kept as its chapter and hit: a NodeID holds its story group's place too,
+// which moves when a story before it loses its last row. Only the live list's rows are walked - a tier's own row ends the
+// walk (the grey tiers are drawn below or above it).
+void ClearThenLand(ITreeViewController* controller, const KFCRowsByChapter& rows)
+{
+	InterfacePtr<const ITreeViewHierarchyAdapter> adapter(controller, UseDefaultIID());
+	InterfacePtr<ITreeViewMgr> treeMgr(controller, UseDefaultIID());
+	if (adapter == nil || treeMgr == nil || rows.empty() || rows.back().hits.empty() || rows.front().hits.empty())
+		return;
+	std::set<std::pair<int32, int32> > going;
+	for (size_t c = 0; c < rows.size(); ++c)
+		for (size_t k = 0; k < rows[c].hits.size(); ++k)
+			going.insert(std::make_pair(rows[c].chapter, rows[c].hits[k]));
+	int32 landChapter = -1, landHit = -1;
+	const auto stays = [&](const NodeID& node) -> int
+	{
+		// 1 = a hit row that stays (landed on), -1 = the end of the live list's rows, 0 = walk on.
+		TreeNodePtr<KFCResultNodeID> nodeID(node);
+		if (nodeID == nil || nodeID->IsRoot() || nodeID->IsTierRow())
+			return -1;
+		if (!nodeID->IsHitRow() || going.count(std::make_pair(nodeID->GetChapter(), nodeID->GetHit())) > 0)
+			return 0;
+		landChapter = nodeID->GetChapter();
+		landHit = nodeID->GetHit();
+		return 1;
+	};
+	int found = 0;
+	for (NodeID next(KFCResultNodeID::Create(rows.back().chapter, rows.back().hits.back())); found == 0; )
+	{
+		next = NextRowInTreeOrder(adapter, next);
+		found = stays(next);
+	}
+	if (found < 0)
+	{
+		found = 0;
+		for (NodeID before(KFCResultNodeID::Create(rows.front().chapter, rows.front().hits.front())); found == 0; )
+		{
+			before = RowBeforeInTreeOrder(adapter, before);
+			found = stays(before);
+		}
+	}
+	(void)KFCResultTree::ClearRows(rows);
+	if (found > 0)
+		LandOnRow(controller, adapter, treeMgr, NodeID(KFCResultNodeID::Create(landChapter, landHit)), landChapter, landHit);
 }
 
 // RETURN, OR THE KEYPAD'S ENTER: the key the list and its filter act on, asked the same way at every step of it - the
@@ -254,8 +329,10 @@ bool IsReturnKey(const VirtualKey& key)
 // replaced), the list keeps the keyboard, and the key is taken whole. kFalse = not a Return this list acts on: the caller
 // passes it on.
 // WITH SHIFT, the same, and then - only when the row was written - on to the next row below that can be
-// replaced (GoOnToNextReplaceableRow); with none below, the status line says so after its own sentence. Ctrl and Alt
-// still make it not a Return of ours.
+// replaced (GoOnToNextReplaceableRow); with none below, the status line says so after its own sentence.
+// WITH CTRL, the rows are taken off the list instead - Clear from Results - and the row below landed on (ClearThenLand -
+// docs/superpowers/specs/2026-10-18-kfc-clear-from-results-design.md K4). Alt, and Ctrl with Shift, still make it not a
+// Return of ours.
 //  - The KeyCmd a Return's character makes next is removed, first - the official shape for a list that acts on Return
 //    (open/components/spellpanel/SpellListBoxEH.cpp, KeyDown), through IEventUtils (EventUtilities.h asks to be replaced
 //    by it, and the interface's own note is this case: "when we handle the KeyDown and want to remove the following
@@ -267,10 +344,13 @@ bool IsReturnKey(const VirtualKey& key)
 //    on another it cannot. Hence the filter: a Return taken there never reaches the widget layer at all.
 bool16 TakeReturn(IEvent* e, ITreeViewController* controller)
 {
-	if (!IsReturnKey(e->GetVirtualKey()) || e->CmdKeyDown() || e->OptionAltKeyDown())
+	if (!IsReturnKey(e->GetVirtualKey()) || e->OptionAltKeyDown())
+		return kFalse;
+	const bool clear = e->CmdKeyDown() ? true : false;		// Ctrl (Windows' CmdKeyDown): Clear from Results
+	if (clear && e->ShiftKeyDown())
 		return kFalse;
 	KFC_DIAG_HIDDEN_DOCS_CHECK("return");		// (test builds only - a document left with no window when the Return is over)
-	const bool goOn = e->ShiftKeyDown() ? true : false;
+	const bool goOn = (!clear && e->ShiftKeyDown()) ? true : false;
 	if (controller == nil)
 		return kFalse;
 	// The rows this Return writes: the hit row selected - or the rows selected together (the author's calls - object
@@ -303,6 +383,15 @@ bool16 TakeReturn(IEvent* e, ITreeViewController* controller)
 	if (gWalking || KFCJump::IsLanding())
 	{
 		HoldAfterReturn();
+		return kTrue;
+	}
+	// CTRL: the rows off the list, the row below landed on - and the keyboard kept by the list, as after a write (below).
+	if (clear)
+	{
+		ClearThenLand(controller, rows);
+		(void)KFCResultTree::TakeKeyboard();
+		HoldAfterReturn();
+		KFC_DIAG_LOG("RETFOCUS Ctrl+Return done focus=%s", KFCResultTree::DiagKeyFocus().c_str());
 		return kTrue;
 	}
 	PMString status;

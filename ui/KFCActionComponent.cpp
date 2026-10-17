@@ -183,6 +183,23 @@ NodeID SelectAllRowsTarget(IPMUnknown* widget)
 	return NodeID();
 }
 
+// THE ROWS CLEAR FROM RESULTS TAKES OFF THE LIST (docs/superpowers/specs/2026-10-18-kfc-clear-from-results-design.md K3): the
+// hit row right-clicked - every row selected together when it is one of them (RowsOfRightClick, as Replace) - or every hit row
+// under the story or document row right-clicked (RowsUnder - Select All Rows' walk). false = none of those rows, or none under
+// it. The menu's grey state and the action ask it - one answer for both.
+bool ClearTargetRows(IPMUnknown* widget, KFCRowsByChapter& out)
+{
+	out.clear();
+	int32 chapter = -1, hit = -1, group = -1;
+	if (RightClickedHit(widget, chapter, hit))
+		out = KFCResultTree::RowsOfRightClick(chapter, hit);
+	else if (RightClickedStory(widget, chapter, group))
+		(void)KFCResultTree::RowsUnder(KFCResultNodeID::CreateFont(chapter, group), out);
+	else if (RightClickedDocument(widget, chapter))
+		(void)KFCResultTree::RowsUnder(KFCResultNodeID::Create(chapter), out);
+	return KFCRowCount(out) > 0;
+}
+
 // The TIER whose own row was right-clicked (v2 R9) - a grey one's number, or -1 for the live tier - while the list still
 // has it. false for any other row, and for none.
 bool RightClickedTier(IPMUnknown* widget, int32& outTier)
@@ -650,6 +667,17 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			break;
 		}
 
+		case kKFCClearFromResultsActionID:
+		{
+			// Clear from Results (the clear-from-results spec's K3): the rows of the row it was popped over taken off the list
+			// (ClearTargetRows) - the document is not touched. No such row (the action pressed by its ActionID): do nothing.
+			// Ctrl+Return on the selected hit rows clears through the same door (KFCResultTreeEH's TakeReturn).
+			KFCRowsByChapter rows;
+			if (ClearTargetRows(widget, rows))
+				(void)KFCResultTree::ClearRows(rows);
+			break;
+		}
+
 		default:
 		{
 			// An object row's other Special Operations - one door for them all (SpecialOpOf's table, DoSpecial).
@@ -966,6 +994,15 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 				int32 chapter = -1, hit = -1;
 				const bool enable = RightClickedHit(widget, chapter, hit)
 					&& KFCResultTree::CanRestoreAny(KFCResultTree::RowsOfRightClick(chapter, hit));
+				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
+				break;
+			}
+			case kKFCClearFromResultsActionID:
+			{
+				// A hit, object, story or document row's menu: Clear from Results over such a row with a hit row to take off (a
+				// run standing greys everything, above) - a document row Search This Document Again left at (0/0) has none.
+				KFCRowsByChapter rows;
+				const bool enable = ClearTargetRows(widget, rows);
 				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 				break;
 			}

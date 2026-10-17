@@ -134,6 +134,14 @@ namespace KFCResultHistory
 	/** Did a switch ask the rebuild to leave the view where it is (v2 - the row clicked stays where it was)? Asked once:
 	    the answer is taken. False = the rebuild brings the live tier to the top, as after a search. */
 	bool TakeScrollHold();
+	/** ...and a rebuild asked to leave the view where it is by anything else that draws the list anew with nothing of it
+	    moved but the rows it took away (Clear from Results - KFCResultTree::ClearRows): the next rebuild's TakeScrollHold answers
+	    true. The caller puts the view back itself - and calls this only while the panel shows the list (else no rebuild draws
+	    it and takes the answer). */
+	void HoldScrollForNextRebuild();
+	/** THE ROW AT THE TOP OF THE LIST'S VIEW (the row widget standing highest) - invalid when no row is drawn (an empty list,
+	    the panel closed). What a rebuild that keeps the view puts back at the top (a switch, Clear from Results). */
+	NodeID_rv ViewTopRow();
 
 	// ----- the tier switch (docs/superpowers/specs/2026-10-14-kfc-tier-switch-v2-design.md section 3-4) -----
 

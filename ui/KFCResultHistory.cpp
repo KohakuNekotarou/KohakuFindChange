@@ -752,6 +752,16 @@ bool KFCResultHistory::TakeScrollHold()
 	return hold;
 }
 
+void KFCResultHistory::HoldScrollForNextRebuild()
+{
+	gScrollHold = true;
+}
+
+NodeID_rv KFCResultHistory::ViewTopRow()
+{
+	return ShownTop();
+}
+
 bool KFCResultHistory::QueryReadsAsTier(uint32 set, PMString& outName)
 {
 	outName.Clear();

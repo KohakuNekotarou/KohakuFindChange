@@ -795,6 +795,50 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCSearchTierAgainMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// ----- Clear from Results: the hit, object, story and document rows' menus (docs/superpowers/specs/2026-10-18-kfc-clear-from-results-design.md K2) -----
+		// Last, under a rule (one rule id for the four menus, as Select All Rows takes one action id for three): a hit or object row's
+		// rows - the rows selected together when it is one of them - or every hit row under a story or document row, taken off the
+		// list (KFCResultTree::ClearRows). The document is not touched.
+		kKFCClearRowsSepActionID,
+		kKFCResultHitMenuName kSDKDefDelimiterAndSeparatorPath,
+		kKFCClearRowsSepMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCClearFromResultsActionID,
+		kKFCResultHitMenuName
+		kKFCClearFromResultsMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCClearRowsSepActionID,
+		kKFCResultObjectMenuName kSDKDefDelimiterAndSeparatorPath,
+		kKFCClearRowsSepMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCClearFromResultsActionID,
+		kKFCResultObjectMenuName
+		kKFCClearFromResultsMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCClearRowsSepActionID,
+		kKFCResultStoryMenuName kSDKDefDelimiterAndSeparatorPath,
+		kKFCClearRowsSepMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCClearFromResultsActionID,
+		kKFCResultStoryMenuName
+		kKFCClearFromResultsMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCClearRowsSepActionID,
+		kKFCResultDocumentMenuName kSDKDefDelimiterAndSeparatorPath,
+		kKFCClearRowsSepMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCClearFromResultsActionID,
+		kKFCResultDocumentMenuName
+		kKFCClearFromResultsMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 		// ----- An OBJECT row's right-click menu (the author, 2026-10-17) -----
 		// Popped by KFCResultNodeEH::RButtonDn over an object row (the Object tab's): its Replace - the hit rows' own action -
 		// and Special Operations > Create Outlines (KFCObjectOutline): the row's object outlined - or the rows' selected
@@ -1555,6 +1599,17 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKFCActionComponentBoss,
 		kKFCDeleteActionID,
 		kKFCDeleteMenuKey,
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// Clear from Results - a hit, object, story or document row's right-click menu (docs/superpowers/specs/2026-10-18-kfc-clear-from-results-design.md).
+		// kCustomEnabling: UpdateActionStates greys it when it comes with no such row (pressed by ID), or while a run is up.
+		kKFCActionComponentBoss,
+		kKFCClearFromResultsActionID,
+		kKFCClearRowsMenuKey,			// "Clear from Results"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,

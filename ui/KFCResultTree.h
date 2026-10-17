@@ -169,6 +169,18 @@ namespace KFCResultTree
 	    disabled rather than doing nothing; InDesign leaves a disabled item out of a right-click menu). */
 	bool CanSelectAllRows(const NodeID& row);
 
+	/** EVERY HIT ROW UNDER `row` - a story, document or book row's - by document, in the order drawn: the rows Select All Rows
+	    walks (closed rows too). Clear from Results on a story or document row takes these off the list. out is emptied first;
+	    false = none under it. */
+	bool RowsUnder(const NodeID& row, KFCRowsByChapter& out);
+
+	/** CLEAR FROM RESULTS (docs/superpowers/specs/2026-10-18-kfc-clear-from-results-design.md - a hit, object, story or document
+	    row's right-click menu, and Ctrl+Return on the selected hit rows): the rows taken off the list by the model
+	    (KFCResults()->ClearRows - the document is not touched, and no Undo step is made), the tree made anew with every row the
+	    person opened or closed as it was and the view where it stood, and the status line ("Cleared 3 rows from the results.").
+	    Not under a landing or a run. True = a row went. */
+	bool ClearRows(const KFCRowsByChapter& rows);
+
 	/** A ROW CLOSED OVER SELECTED ROWS (KFCResultNodeObserver - the author's call O7-2b): the rows selected under
 	    `closedRow` taken out of the selection - a selected row is a drawn row, as Select All Rows keeps it (Return and the
 	    right-click Replace write the selection in the order drawn: they left the hidden rows selected and unwritten while

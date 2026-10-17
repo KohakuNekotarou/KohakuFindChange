@@ -57,6 +57,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCSearchTierAgainMenuKey,	"Search These Results Again",
                 kKFCCreateOutlinesMenuKey,	"Create Outlines",
                 kKFCRestoreOriginalMenuKey,	"Restore from Copy",
+                kKFCClearRowsMenuKey,			"Clear from Results",
                 // An object row's other Special Operations - InDesign's own English command names.
                 kKFCFillFramePropMenuKey,			"Fill Frame Proportionally",
                 kKFCContentProportionalMenuKey,		"Fit Content Proportionally",
