@@ -112,13 +112,20 @@ private:
 //    snapshot, while a fill-colour search whose last find was on page 2 ended with nothing selected (obj-list-basic passed
 //    by that, not by the snapshot). So the UI half is asked first, and clears the selection after the snapshot when
 //    nothing was selected;
+//  - THE DOCUMENTS BEHIND THE FRONT ONE, given back too (IKFCUIServices::SnapshotBackgroundSelections - measured 2026-10-18:
+//    the walks select what they find in every document with a window, and an All Documents search with nothing selected
+//    anywhere left the last item it found selected in the document behind; the snapshot is the front view's alone);
 //  - the shared walker, aimed at the front document again (O7).
 // Made before the walks' bar (whose events can come in while it stands) and after the page items Search: = Selection
 // names are read.
 class WalkAftercare
 {
 public:
-	WalkAftercare() : fUi(KFCQueryUIServices()), fNothingSelected(fUi != nil && !fUi->HasAnySelection()) {}
+	WalkAftercare() : fUi(KFCQueryUIServices()), fNothingSelected(fUi != nil && !fUi->HasAnySelection())
+	{
+		if (fUi != nil)
+			fUi->SnapshotBackgroundSelections();
+	}
 	~WalkAftercare()
 	{
 		fKeep.GiveBack();
@@ -128,6 +135,8 @@ public:
 #endif
 		if (fNothingSelected)
 			fUi->ClearSelection();
+		if (fUi != nil)
+			fUi->RestoreBackgroundSelections();
 		KFCObjectSearch::AimSharedWalkerAtFront();
 	}
 private:

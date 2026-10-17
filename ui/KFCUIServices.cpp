@@ -25,6 +25,14 @@
 #include "ISelectionUtils.h"	// QueryActiveLayoutHitTestSuite
 #include "ISelectionManager.h"	// ActiveSelectionExists - SelectionExists by the CSB's class
 #include "TextEditorID.h"		// kTextSelectionBoss
+#include "IActiveContext.h"		// GetContextDocument - which document is in front (the background selections)
+#include "IApplication.h"		// QueryDocumentList - the documents behind the front one
+#include "IDocument.h"
+#include "IDocumentList.h"
+#include "ILayoutSelectionSuite.h"	// SelectPageItems - a background document's items selected again
+#include "ILayoutViewUtils.h"	// GetAllLayoutViews - a document's layout views, front or behind
+#include "IControlView.h"		// ...which it hands back as control views
+#include "PersistUtils.h"		// ::GetDataBase - a document's database
 
 // General includes:
 #include "CmdUtils.h"
@@ -100,6 +108,74 @@ namespace
 		ISelectionManager* const selectionManager = selectionUtils->GetActiveSelection();
 		return selectionManager != nil
 			&& selectionManager->SelectionExists(csb, ISelectionManager::kAnySelection) != kFalse;
+	}
+
+	// ----- THE SELECTIONS OF THE DOCUMENTS BEHIND THE FRONT ONE (IKFCUIServices::SnapshotBackgroundSelections) -----
+
+	/** One document's selection as an object search found it: its page items, or nothing, or something else. */
+	struct BackSelection
+	{
+		IDataBase*	db;			// compared with the open documents' before anything reads it (a document closed since is gone)
+		UIDList		items;		// the page items selected then - none: nothing, or `other`
+		bool		other;		// something that is not page items was selected then - text, a table's cells
+		BackSelection() : db(nil), other(false) {}
+	};
+	std::vector<BackSelection> gBackSelections;
+
+	/** The selection manager of a document's layout view - the first of its views, front or behind: the official way to
+	    reach a selection that is not the active one (KCM's QuerySelectionManagerFor, KCMStoryJump.cpp - after Adobe's
+	    trackers and SnpManipulateStructureView.cpp). AddRef'ed; nil for a document with no layout window. */
+	ISelectionManager* QueryDocSelectionManager(IDataBase* db)
+	{
+		Utils<ILayoutViewUtils> viewUtils;
+		Utils<ISelectionUtils> selectionUtils;
+		if (db == nil || !viewUtils || !selectionUtils)
+			return nil;
+		K2Vector<IControlView*> views;
+		viewUtils->GetAllLayoutViews(views, nil, db);
+		for (size_t i = 0; i < views.size(); ++i)
+			if (views[i] != nil)
+				return selectionUtils->QueryViewSelectionManager(views[i]);
+		return nil;
+	}
+
+	/** The page items a selection manager holds, standoffs stripped (GetSelectedPageItems' chain, for a given manager). */
+	UIDList SelectedItemsOf(ISelectionManager* manager, IDataBase* db)
+	{
+		UIDList items(db);
+		Utils<ISelectionUtils> selectionUtils;
+		if (manager == nil || !selectionUtils)
+			return items;
+		InterfacePtr<ILayoutHitTestSuite> hitSuite(selectionUtils->QueryLayoutHitTestSuite(manager));
+		InterfacePtr<IConcreteSelection> concrete(hitSuite, UseDefaultIID());
+		InterfacePtr<ILayoutTarget> target(concrete, UseDefaultIID());
+		if (target != nil)
+			items = target->GetUIDList(kStripStandoffs);
+		return items;
+	}
+
+	/** The front document's database - the active context's (IActiveContext::GetContextDocument, the one question KFC's UI
+	    half asks it with); nil with none. */
+	IDataBase* FrontDocDB()
+	{
+		IActiveContext* const context = GetExecutionContextSession()->GetActiveContext();
+		IDocument* const doc = (context != nil) ? context->GetContextDocument() : nil;
+		return (doc != nil) ? ::GetDataBase(doc) : nil;
+	}
+
+	/** Is this database an open document's now? Compared, never dereferenced (a closed document's pointer dangles). */
+	bool IsOpenDocDB(IDataBase* db)
+	{
+		InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
+		InterfacePtr<IDocumentList> docs((app != nil) ? app->QueryDocumentList() : nil);
+		const int32 count = (docs != nil) ? docs->GetDocCount() : 0;
+		for (int32 d = 0; d < count; ++d)
+		{
+			IDocument* const doc = docs->GetNthDoc(d);
+			if (doc != nil && ::GetDataBase(doc) == db)
+				return true;
+		}
+		return false;
 	}
 }
 
@@ -243,6 +319,74 @@ public:
 		PMString say(words);
 		say.SetTranslatable(kFalse);
 		KFCResultTree::ShowStatus(say);
+	}
+
+	virtual void SnapshotBackgroundSelections()
+	{
+		gBackSelections = std::vector<BackSelection>();
+		IDataBase* const front = FrontDocDB();
+		InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
+		InterfacePtr<IDocumentList> docs((app != nil) ? app->QueryDocumentList() : nil);
+		const int32 count = (docs != nil) ? docs->GetDocCount() : 0;
+		for (int32 d = 0; d < count; ++d)
+		{
+			IDocument* const doc = docs->GetNthDoc(d);
+			IDataBase* const db = (doc != nil) ? ::GetDataBase(doc) : nil;
+			if (db == nil || db == front)
+				continue;		// the front view's selection is the snapshot's (KFCObjectSearch's SelectionKeeper)
+			InterfacePtr<ISelectionManager> manager(QueryDocSelectionManager(db));
+			if (manager == nil)
+				continue;		// no layout window: a walk selects nothing there to give back
+			BackSelection kept;
+			kept.db = db;
+			kept.items = SelectedItemsOf(manager, db);
+			kept.other = kept.items.Length() == 0
+				&& manager->SelectionExists(kInvalidClass, ISelectionManager::kAnySelection) != kFalse;
+			gBackSelections.push_back(kept);
+		}
+	}
+
+	virtual void RestoreBackgroundSelections()
+	{
+		for (size_t k = 0; k < gBackSelections.size(); ++k)
+		{
+			const BackSelection& kept = gBackSelections[k];
+			if (!IsOpenDocDB(kept.db))
+				continue;
+			InterfacePtr<ISelectionManager> manager(QueryDocSelectionManager(kept.db));
+			if (manager == nil)
+				continue;
+			// A selection is no change to the document - the guard is SelectItem's (KFCJump.cpp), for the same reason.
+			IDataBase::SaveRestoreModifiedState dirtyGuard(kept.db);
+			const UIDList now = SelectedItemsOf(manager, kept.db);
+			if (kept.items.Length() > 0)
+			{
+				// THE ITEMS SELECTED THEN, selected again - the ones still there - when the walks changed them.
+				UIDList again(kept.db);
+				for (int32 i = 0; i < kept.items.Length(); ++i)
+					if (kept.db->IsValidUID(kept.items[i]))
+						again.Append(kept.items[i]);
+				if (again == now)
+					continue;
+				InterfacePtr<ILayoutSelectionSuite> layoutSuite(Utils<ISelectionUtils>()->QueryLayoutSelectionSuite(manager));
+				manager->DeselectAll(nil);
+				if (layoutSuite != nil && again.Length() > 0)
+					layoutSuite->SelectPageItems(again, Selection::kReplace, Selection::kDontScrollLayoutSelection);
+			}
+			else if (!kept.other)
+			{
+				// NOTHING SELECTED THEN: whatever a walk selected, taken away.
+				if (manager->SelectionExists(kInvalidClass, ISelectionManager::kAnySelection) != kFalse)
+					manager->DeselectAll(nil);
+			}
+			else if (now.Length() > 0)
+			{
+				// TEXT OR CELLS SELECTED THEN - not read back here: the items a walk selected over them taken away, rather
+				// than left selected for the next key to act on.
+				manager->DeselectAll(nil);
+			}
+		}
+		gBackSelections = std::vector<BackSelection>();		// a fresh one: the storage goes too
 	}
 };
 
