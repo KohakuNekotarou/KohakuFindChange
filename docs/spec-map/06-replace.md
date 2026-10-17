@@ -242,7 +242,7 @@
   **ハイパーリンク**＝リンクの中の一致・リンクの端をまたぐ一致・一致の中のリンクは、戻したときにリンク1本（名前・行き先そのまま・範囲も置換の前）になる（C15＝貼り付けが作る重複を消し、元の範囲を付け直す）。
   まとめて選んだ行の1つなら、選んだ行すべて（置換していない行は数えて残す）。同じ段落の2行は、どちらの順で置換していても周回で両方戻る。置換の後に同じストーリーの別の所を直していても、行のフォーカス（JMP の自前のフォーカス）で追った今の場所に戻す。
   押せる＝写しを持つ置換済みの文字の行（`Changed`）があるとき・**灰色＝置換していない行と写しの無い行だけのとき**（作者「実行できないときは色を変えられるとうれしい」・SET-11）。物の行のメニューには無い（OBJ-19 のメニュー）。
-  戻すと＝`Changed` が消え、目玉は置換の前の状態（ROW-45）、Replace がまた押せる。取り消しの1段（Edit メニューの名前 `Restore from Copy`）＝Ctrl+Z で `Changed` に戻り、Redo で戻した姿（UNDO-02）。写しは消えない（Ctrl+Z の後にまた戻せる）。
+  戻すと＝`Changed` が消え、目玉は外れる（ROW-45）、Replace がまた押せる。取り消しの1段（Edit メニューの名前 `Restore from Copy`）＝Ctrl+Z で `Changed` に戻り、Redo で戻した姿（UNDO-02）。写しは消えない（Ctrl+Z の後にまた戻せる）。
   **写しを取らない**（行は灰色・押せば理由を言う）＝表のセル・脚注・ノートの中の一致／**一致がアンカー付き・インラインの物を含む**（作者「UID が変わるのが問題」＝写しで戻すと別の UID の物になる）／**貼り付けがリンクの元の文字を丸ごと置き換える形**（一致そのものがリンクの元・広げた後ろにリンク・一致の端に接したリンク＝付け直しで InDesign が落ちた）と相互参照／広げる後ろに物の文字や印がある／写せなかった。
   押した後に断る（行はそのまま・何行なら数えて言う）＝置換で書いた文字を後で直した `edited since`・広げた後ろが変わった `rest of paragraph changed`・ストーリーを追えない `not followed`・ロック `locked`・文書を開けない。閉じたブックの章は、置換と同じく窓なしで開いて戻し、窓を出す。
   文＝`Restored ID:262 #3.`／`Restored 2 of 3 rows: ID:262 #1, ID:262 #3. Left as they were: 1 edited since.`／`Restored 3 rows in 2 documents: a.indd ID:262 #1; b.indd ID:270 #1.`／1行の断り `Restore from Copy: <理由>`（例 `Restore from Copy: no copy was kept when this row was replaced - its match holds an anchored object, which a copy would put back as a new object (a new ID).`）。

@@ -11,7 +11,9 @@
 //  drawn anew. The press, its release and a double click's second press are all taken here, so a click on the eye
 //  neither selects the row nor jumps (KFCResultNodeEH does both on the release); every click turns the eye once (a
 //  double click twice, as every click of this list is one click). A kept tier's row (grey) is not a hit row: its eye is
-//  disabled and its clicks go to the row, which switches to its tier (ROW-42).
+//  disabled and its clicks go to the row, which switches to its tier (ROW-42). AN EYE IS A WRITTEN ROW'S - one KFC has
+//  replaced or outlined (the author, 2026-10-17 evening: an eye on a row not written only kept a match since deleted as
+//  Missing): on any other row the column is empty and its clicks are the row's too (selected, jumped to).
 //
 //========================================================================================
 
@@ -46,8 +48,10 @@ public:
 private:
 	/** The live hit row this icon sits in - false for a kept tier's row, or none. */
 	bool LiveHitRow(int32& outChapter, int32& outHit) const;
-	/** The eye turned: the model told, the icon drawn, the status line, the keyboard to the list. kFalse = not a live
-	    hit row's eye - the click is the row's. */
+	/** ...one KFC has written (replaced or outlined): the only rows with an eye to turn. outRow = its display. */
+	bool WrittenRow(int32& outChapter, int32& outHit, KFCResultModel::RowDisplay& outRow) const;
+	/** The eye turned: the model told, the icon drawn, the status line, the keyboard to the list. kFalse = not a written
+	    live hit row's eye - the click is the row's. */
 	bool16 Turn();
 };
 
@@ -70,14 +74,17 @@ bool KFCResultEyeEH::LiveHitRow(int32& outChapter, int32& outHit) const
 	return true;
 }
 
+bool KFCResultEyeEH::WrittenRow(int32& outChapter, int32& outHit, KFCResultModel::RowDisplay& outRow) const
+{
+	return LiveHitRow(outChapter, outHit) && KFCResults()->GetHitRow(outChapter, outHit, outRow) && outRow.replaced;
+}
+
 bool16 KFCResultEyeEH::Turn()
 {
 	int32 chapter = -1, hit = -1;
-	if (!LiveHitRow(chapter, hit))
-		return kFalse;		// a kept tier's row: its click is the row's (ROW-42)
 	KFCResultModel::RowDisplay row;
-	if (!KFCResults()->GetHitRow(chapter, hit, row))
-		return kTrue;
+	if (!WrittenRow(chapter, hit, row))
+		return kFalse;		// a kept tier's row (ROW-42), or one KFC has not written: its click is the row's
 	const bool kept = !row.kept;
 	if (!KFCResults()->SetHitKept(chapter, hit, kept))
 		return kTrue;
@@ -105,9 +112,11 @@ bool16 KFCResultEyeEH::LButtonDn(IEvent* /*e*/)
 
 bool16 KFCResultEyeEH::LButtonUp(IEvent* /*e*/)
 {
-	// The release of a press taken above: taken too, or the row's handler would select the row and jump.
+	// The release of a press taken above: taken too, or the row's handler would select the row and jump. A row not
+	// written gave its press to the row: its release goes there too.
 	int32 chapter = -1, hit = -1;
-	return LiveHitRow(chapter, hit) ? kTrue : kFalse;
+	KFCResultModel::RowDisplay row;
+	return WrittenRow(chapter, hit, row) ? kTrue : kFalse;
 }
 
 bool16 KFCResultEyeEH::ButtonDblClk(IEvent* /*e*/)

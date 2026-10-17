@@ -162,7 +162,10 @@ namespace KFCResultModel
 		bool		kept;		// THE ROW EYE (docs/superpowers/specs/2026-10-17-kfc-row-eye-keep-design.md): on = the row
 								// stays when its story or document is searched again, found or not (MergeKeptRows). A
 								// replace turns it on (MarkHitReplaced, MarkItemReplaced); the eye's click turns it either
-								// way (SetHitKept). Copied whole with the row - a tier, an Undo step, a backup.
+								// way (SetHitKept) - on a row KFC has WRITTEN only (replaced or outlined - the author,
+								// 2026-10-17 evening: an eye on a row not written only kept a match since deleted as
+								// Missing); its Restore Original turns it off. Copied whole with the row - a tier, an
+								// Undo step, a backup.
 		ChangeOutcome outcome;	// why this row was NOT replaced (kOutcomeNone = it was, or was never
 								// reached at all). The locator shows it as a word.
 		// (No per-hit change count that lets the replace take an unedited story on trust and skip the
@@ -181,8 +184,6 @@ namespace KFCResultModel
 		PMString	replacedText;
 		// --- the copy its replace took (Restore Original - docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md) ---
 		HitCopy		copy;		// given once its Replace has gone through (SetHitCopy); taken off by its Restore Original
-		bool		keptBeforeReplace;	// the row eye as it was before its Replace turned it on (MarkHitReplaced) - what its
-										// Restore Original puts back (the spec's C10)
 		// The first characters of the match's STORY: what a story row of
 		// the tree reads, taken when the hit is built - the search closes a chapter it opened as soon
 		// as it has walked it, so the story cannot be read again when the tree draws.
@@ -216,7 +217,7 @@ namespace KFCResultModel
 		Hit() : pageIndex(-1), isOverset(false), isLocked(false), isHidden(false),
 				fontGroup(-1), fontGroupPos(-1), storyUID(kInvalidUID),
 				textStart(kInvalidTextIndex), textEnd(kInvalidTextIndex), matchHash(0),
-				replaced(false), outlined(false), kept(false), outcome(kOutcomeNone), keptBeforeReplace(false),
+				replaced(false), outlined(false), kept(false), outcome(kOutcomeNone),
 				pageOrdinal(0), storyOrdinal(-1),
 				itemUID(kInvalidUID), onPasteboard(false), isMaster(false), isGrouped(false), isInline(false),
 				isAnchored(false), itemPrint(0), itemPrintLength(0) {}
@@ -508,7 +509,8 @@ namespace KFCResultModel
 	bool GetHitRow(int32 chapterIdx, int32 hitIdx, RowDisplay& out);
 
 	/** THE ROW EYE'S CLICK (KFCResultEyeEH, through IKFCResults::SetHitKept): the row's eye on or off. Not a change to
-	    the document - no Undo step, no backup. false = no such row. */
+	    the document - no Undo step, no backup. false = no such row, or an eye turned on on a row KFC has not written
+	    (replaced or outlined - the author, 2026-10-17 evening). */
 	bool SetHitKept(int32 chapterIdx, int32 hitIdx, bool kept);
 
 	/** How many rows of a chapter have their eye on - of one story, or of the whole chapter (story = kInvalidUID): the
@@ -620,7 +622,7 @@ namespace KFCResultModel
 	bool GetHitCopy(int32 chapterIdx, int32 hitIdx, HitCopy& outCopy);
 
 	/** A ROW ITS RESTORE ORIGINAL PUT BACK (KFCReplaceEngine::RestoreHits - the spec's C10): no longer replaced (its Replace
-	    offered again), its eye as it was before its Replace (Hit::keptBeforeReplace), what it wrote and its copy
+	    offered again), its eye off (a row not written keeps none - Hit::kept), what it wrote and its copy
 	    forgotten, its place the text put back - [start, end) of storyUID - and nothing said about it (kOutcomeNone). Backed
 	    up first, so an Undo puts the replaced row back, copy and all. The caller reads its line again (RereadRowText). */
 	void MarkHitRestored(int32 chapterIdx, int32 hitIdx, UID storyUID, TextIndex start, TextIndex end);
