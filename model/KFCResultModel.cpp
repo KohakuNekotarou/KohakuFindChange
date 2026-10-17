@@ -941,6 +941,7 @@ void KFCResultModel::MarkHitReplaced(int32 chapterIdx, int32 hitIdx, UID newStor
 	h.textStart = newStart;
 	h.textEnd = newEnd;
 	h.replaced = true;
+	h.keptBeforeReplace = h.kept;	// what its Restore Original puts back (docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md C10)
 	h.kept = true;		// ...and its eye on (the row eye, E2 - the author's call)
 	// (The locator is not built again: nothing it says is changed by a replace - the page, the ordinal, overset,
 	// hidden and locked come from the search, and an outcome is set where the replace sets one.)
@@ -982,6 +983,46 @@ void KFCResultModel::SetHitSegments(int32 chapterIdx, int32 hitIdx, const PMStri
 	// AND the hash, in the same call. See the header for why the two cannot be set
 	// apart from one another.
 	h.matchHash = newMatchHash;
+}
+
+void KFCResultModel::SetHitCopy(int32 chapterIdx, int32 hitIdx, const HitCopy& copy)
+{
+	Hit* h = HitAt(chapterIdx, hitIdx);
+	if (h == nil)
+		return;
+	BackUpRow(chapterIdx, hitIdx, *h);
+	h->copy = copy;
+}
+
+bool KFCResultModel::GetHitCopy(int32 chapterIdx, int32 hitIdx, HitCopy& outCopy)
+{
+	const Hit* h = HitAt(chapterIdx, hitIdx);
+	if (h == nil)
+		return false;
+	outCopy = h->copy;
+	return true;
+}
+
+void KFCResultModel::MarkHitRestored(int32 chapterIdx, int32 hitIdx, UID storyUID, TextIndex start, TextIndex end)
+{
+	Hit* hp = HitAt(chapterIdx, hitIdx);
+	if (hp == nil)
+		return;
+	Hit& h = *hp;
+	BackUpRow(chapterIdx, hitIdx, h);
+	// The row as it was before its Replace (the spec's C10): a match to replace again, its eye as it was then - the line
+	// and the hash are read again from the text put back by the caller (RereadRowText), the page words kept as the
+	// Replace kept them (MarkHitReplaced).
+	h.replaced = false;
+	h.outlined = false;
+	h.kept = h.keptBeforeReplace;
+	h.replacedText.Clear();
+	h.copy = HitCopy();
+	h.storyUID = storyUID;
+	h.textStart = start;
+	h.textEnd = end;
+	h.outcome = kOutcomeNone;
+	BuildHitLocator(h);
 }
 
 // The page words of a row that names its page - a text row's and an object row's alike (BuildHitLocator): "P<page>",

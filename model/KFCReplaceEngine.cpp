@@ -22,6 +22,8 @@
 #include "ITextWalkerScope.h"
 #include "ITextWalkerSelectionUtils.h"	// TextWalkerSelections_CriticalSection
 #include "IWalkerScopeFactoryUtils.h"
+#include "IAttrReport.h"			// IsParagraphAttribute - a Change side that sets paragraph formatting (TakeRowCopy)
+#include "IHyperlinkUtils.h"		// hyperlink sources a copy would cut or carry (TakeRowCopy) - source/open/interfaces/layout
 
 // General includes:
 #include "TextWalkerServiceProviderID.h"	// kFindTextCmdBoss / kTWReplaceTextCmdBoss / kFindChangeClientBoss
@@ -34,6 +36,9 @@
 #include "WideString.h"			// GrepQueryHoldsLineStart: the query read as code points
 #include "PreferenceUtils.h"		// QuerySessionPreferences
 #include "Utils.h"
+#include "AttributeBossList.h"		// the Change side's attributes (TakeRowCopy)
+#include "TextChar.h"				// kTextChar_CR, the table's characters (TakeRowCopy)
+#include "textiterator.h"			// a range read character by character (TakeRowCopy, TextHash)
 
 #include <map>
 #include <set>
@@ -51,6 +56,7 @@
 #include "KFCBookScope.h"		// reopening a chapter the user closed since the search
 #include "KFCUndoFollow.h"		// every write recorded, so that the panel follows its Undo and Redo
 #include "KFCObjectReplace.h"	// an object row's Replace
+#include "KFCCopyStore.h"		// the copies a row's Replace takes and its Restore Original puts back
 #ifdef KFC_DIAG
 #include "ITextFocusManager.h"	// how many foci a story carries while it is written (WALKSTEP) - test builds only
 #include "IFrameList.h"			// whether its frames stand damaged around a find (WALKSTEP) - test builds only
@@ -1402,6 +1408,147 @@ KFCReplaceEngine::DocsAfterWrite::~DocsAfterWrite()
 // whole. greyed = the rows selected with them whose Replace was greyed, counted by reason (WhyGreyed - all 0 for one row's
 // Replace): one row's sentences are its own ("this row", "the match"); several rows' say "a selected row", and the rows
 // left are counted by their reason.
+// ======================================================================================================
+// THE COPIES A ROW'S REPLACE TAKES, FOR ITS RESTORE ORIGINAL (docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md
+// C3 / C4): taken after every door of the write and before its step opens (ReplaceRowsNow), into the document's copy
+// store (KFCCopyStore) - nothing of it is in the document's undo step - and given to the rows once the write has gone
+// through (KFCResultModel::SetHitCopy). Put back by RestoreHits, below.
+// ======================================================================================================
+namespace
+{
+
+// A RANGE'S TEXT AS ONE NUMBER - FNV-1a over its code points, its length mixed in (KFCUndoFollow.cpp's StoryTextHash's
+// shape; 0 never comes out): what a copy's run-on rest is checked by before Restore Original pastes over it.
+uint64 TextHash(ITextModel* model, TextIndex start, TextIndex end)
+{
+	uint64 hash = 14695981039346656037ULL;
+	if (model != nil && end > start)
+	{
+		TextIterator it(model, start);
+		for (TextIndex i = start; i < end && !it.IsNull(); ++i, ++it)
+		{
+			const uint32 ch = static_cast<uint32>((*it).GetValue());
+			for (int32 b = 0; b < 4; ++b)
+			{
+				hash ^= static_cast<uint64>((ch >> (b * 8)) & 0xFF);
+				hash *= 1099511628211ULL;
+			}
+		}
+	}
+	hash ^= static_cast<uint64>(end - start);
+	return (hash != 0) ? hash : 1;
+}
+
+// DOES THE CHANGE SIDE SET PARAGRAPH FORMATTING - a paragraph style, or a paragraph attribute in Change Format, on the tab
+// the write is stated in? Its Replace then changes the paragraphs the rows stand in, so their copies run on to the
+// paragraph's return (the spec's C4 - my addition to the author's call (2) of 2026-10-06, which named the returns).
+bool ChangeSideTouchesParagraphs(IDataBase* db)
+{
+	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
+	if (db == nil || opts == nil)
+		return false;
+	const IFindChangeOptions::SearchMode mode = opts->GetSearchMode();
+	if (opts->GetChangeParaStyle(db, mode, kFalse) != kInvalidUID)
+		return true;
+	const AttributeBossList* attrs = opts->GetChangeAttributeBossList(db, mode, kFalse);
+	for (int32 i = 0; attrs != nil && i < attrs->CountBosses(); ++i)
+	{
+		InterfacePtr<const IAttrReport> report(static_cast<const IAttrReport*>(attrs->QueryBossN(i, IID_IATTRREPORT)));
+		if (report != nil && report->IsParagraphAttribute())
+			return true;
+	}
+	return false;
+}
+
+// THE COPY ONE ROW'S REPLACE TAKES - of [start, end) of its story, as the doors before the write have just found it. Run on
+// to just before the return of the paragraph the match ends in when the match holds a return, or the Change side sets
+// paragraph formatting (`paragraphChange`): a paste ending there puts that paragraph's own attributes back on the return
+// it meets and leaves the next paragraph alone - "copy up to the return, paste up to the return" (measured in KT,
+// docs/ai-notes/private-scrap-store-2026-10-06.md; a return copied or pasted on its own broke the paragraph after it).
+// NONE is taken - the row says why - for a match outside the story's primary thread (a table cell's, a footnote's or a
+// note's: a copy run across threads crashed InDesign), one that cuts a hyperlink source part-way (put back, its text is
+// not in the link again - measured), and a run-on rest holding an object, a marker or a hyperlink (pasted again over
+// itself, such a thing is made anew - another name, or two of it - measured).
+KFCResultModel::HitCopy TakeRowCopy(const UIDRef& storyRef, TextIndex start, TextIndex end, bool paragraphChange)
+{
+	KFCResultModel::HitCopy copy;
+	InterfacePtr<ITextModel> model(storyRef, UseDefaultIID());
+	// The primary thread's text: [0, primary) - its last return, the story's, stands at `primary`.
+	const int32 primary = (model != nil) ? model->GetPrimaryStoryThreadSpan() - 1 : -1;
+	if (model == nil || start < 0 || end < start || end > primary)
+	{
+		copy.whyNot = KFCResultModel::kCopyOutsideMainText;
+		return copy;
+	}
+	bool holdsReturn = false;
+	{
+		TextIterator it(model, start);
+		for (TextIndex i = start; i < end && !holdsReturn && !it.IsNull(); ++i, ++it)
+			holdsReturn = ((*it).GetValue() == kTextChar_CR);
+	}
+	TextIndex copyEnd = end;
+	if (holdsReturn || paragraphChange)
+	{
+		copyEnd = primary;		// the last paragraph's: up to the story's own return
+		TextIterator it(model, end);
+		for (TextIndex i = end; i < primary && !it.IsNull(); ++i, ++it)
+		{
+			if ((*it).GetValue() == kTextChar_CR)
+			{
+				copyEnd = i;
+				break;
+			}
+		}
+		// The run-on rest: no character an object or a marker stands on (KFCResultModel::IsMarkerNotShown - the ones a
+		// row does not show - and a table's two).
+		TextIterator r(model, end);
+		for (TextIndex i = end; i < copyEnd && !r.IsNull(); ++i, ++r)
+		{
+			const UTF32TextChar c = *r;
+			if (KFCResultModel::IsMarkerNotShown(c) || c.GetValue() == kTextChar_Table || c.GetValue() == kTextChar_TableContinued)
+			{
+				copy.whyNot = KFCResultModel::kCopyRestHoldsObject;
+				return copy;
+			}
+		}
+	}
+	// HYPERLINK AND CROSS-REFERENCE SOURCES - text ranges, not characters (IHyperlinkUtils.h): one crossing the match's
+	// edge, and any in or around the run-on rest.
+	Utils<IHyperlinkUtils> links;
+	if (links)
+	{
+		if (end > start && links->GetRangeContainedHyperlinks(model, start, end,
+			IHyperlinkUtils::ContainedHyperlink_PartialRangeOnly).size() != 0)
+		{
+			copy.whyNot = KFCResultModel::kCopyCutsHyperlink;
+			return copy;
+		}
+		if (copyEnd > end)
+		{
+			const TextRangeReference around = links->IsRangeContainedByAHyperlink(model, end, copyEnd);
+			if (links->GetRangeContainedHyperlinks(model, end, copyEnd).size() != 0 || around.GetLogicalID() != kInvalidSBOSID)
+			{
+				copy.whyNot = KFCResultModel::kCopyRestHoldsObject;
+				return copy;
+			}
+		}
+	}
+	KFCCopyStore::CopyRef taken;
+	if (!KFCCopyStore::Take(storyRef, start, copyEnd, taken))
+	{
+		copy.whyNot = KFCResultModel::kCopyFailed;
+		return copy;
+	}
+	copy.store = taken.store;
+	copy.story = taken.story;
+	copy.rest = copyEnd - end;
+	copy.restHash = (copy.rest > 0) ? TextHash(model, end, copyEnd) : 0;
+	copy.whyNot = KFCResultModel::kCopyKept;
+	return copy;
+}
+
+}	// anonymous namespace
+
 struct ChapterWrite
 {
 	int32			chapterIdx;
@@ -1555,6 +1702,29 @@ static bool ReplaceRowsNow(std::vector<ChapterWrite>& chapters,
 				c.writtenStories.insert(story);
 		}
 	}
+	// THE COPIES RESTORE ORIGINAL PUTS BACK (the spec's C3 / C4 - TakeRowCopy): every row to write, copied now - after every
+	// door, at the places they have just confirmed, and before the step opens, so nothing of it is in the document's undo
+	// step. A row with none is written all the same (its Restore Original says why); each row takes its copy once the
+	// write has gone through (SetHitCopy, below).
+	std::vector<std::vector<std::pair<int32, KFCResultModel::HitCopy> > > copies(chapters.size());
+	for (size_t k = 0; k < chapters.size(); ++k)
+	{
+		const ChapterWrite& c = chapters[k];
+		IDataBase* const db = c.docRef.GetDataBase();
+		const bool paragraphChange = ChangeSideTouchesParagraphs(db);
+		for (std::set<int32>::const_iterator r = c.rows.begin(); r != c.rows.end(); ++r)
+		{
+			UID story = kInvalidUID;
+			TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
+			uint64 hash = 0;
+			KFCResultModel::HitCopy copy;
+			if (db != nil && KFCResultModel::GetHitMatchIdentity(c.chapterIdx, *r, story, start, end, hash) && story != kInvalidUID)
+				copy = TakeRowCopy(UIDRef(db, story), start, end, paragraphChange);
+			else
+				copy.whyNot = KFCResultModel::kCopyFailed;
+			copies[k].push_back(std::make_pair(*r, copy));
+		}
+	}
 
 	ChapterOutcome total;		// every chapter's, added up (ChapterOutcome::Add)
 	bool ok = false;
@@ -1664,6 +1834,11 @@ static bool ReplaceRowsNow(std::vector<ChapterWrite>& chapters,
 		NoteStoryVersions(c.chapterIdx, c.docRef.GetDataBase(), c.writtenStories);	// the next Replace finds it as KFC left it
 		// (The written stories' foci were put on the rows' places inside the step, above.)
 	}
+	// Each row written takes the copy taken for it (the spec's C6) - inside the row backup, so the Undo of this Replace puts
+	// the row's earlier copy back with it.
+	for (size_t k = 0; k < chapters.size(); ++k)
+		for (size_t r = 0; r < copies[k].size(); ++r)
+			KFCResultModel::SetHitCopy(chapters[k].chapterIdx, copies[k][r].first, copies[k][r].second);
 	// Kept AFTER the versions are noted - they are the "after" an Undo's "before" is put back over.
 	recorder.Keep();
 	for (size_t k = 0; k < chapters.size(); ++k)

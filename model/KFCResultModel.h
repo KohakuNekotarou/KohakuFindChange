@@ -49,6 +49,35 @@ namespace KFCResultModel
 	    never this number. */
 	const int32 kKFCCollectHitLimit = 300;
 
+	/** WHY A ROW'S REPLACE KEPT NO COPY (HitCopy::whyNot - docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md
+	    C4): what the row's Restore Original says when it has none to put back. */
+	enum CopyWhyNot
+	{
+		kCopyNone = 0,			// no Replace of the list has written the row (or one restored it since)
+		kCopyKept,				// a copy is kept (HitCopy::store / story)
+		kCopyOutsideMainText,	// its match is in a table cell, a footnote or a note - outside the story's primary thread
+		kCopyCutsHyperlink,		// its match cuts a hyperlink or cross-reference source part-way
+		kCopyRestHoldsObject,	// the rest of its paragraph, which the copy would run on over, holds an object, a marker or
+								// a hyperlink
+		kCopyFailed				// the copy could not be taken
+	};
+
+	/** THE COPY A ROW'S REPLACE TOOK OF THE TEXT IT WROTE OVER (KFCCopyStore - the spec's C4 and C6), taken just before the
+	    write (KFCReplaceEngine's ReplaceRowsNow) and given to the row once the write has gone through (SetHitCopy): the
+	    match, or - a match holding a paragraph return, or a Change side that sets paragraph formatting - the match run on
+	    to just before the return of the paragraph it ends in, so a paste puts that paragraph's own attributes back on the
+	    return it meets. What Restore Original puts back (KFCReplaceEngine::RestoreHits). Copied with the row - a tier, an
+	    Undo step, a backup - so the copy it names comes back with it. */
+	struct HitCopy
+	{
+		uint32	store;		// the copy store's number (KFCCopyStore - 0 = none)
+		UID		story;		// the copy's story in that store
+		int32	rest;		// how far the copy runs on past the match, in text model positions (0 = the match alone)
+		uint64	restHash;	// that run-on text as it read when the copy was taken (KFCReplaceEngine.cpp's TextHash)
+		int32	whyNot;		// CopyWhyNot - kCopyKept when the copy is kept
+		HitCopy() : store(0), story(kInvalidUID), rest(0), restHash(0), whyNot(kCopyNone) {}
+	};
+
 	/** One match on one line of one chapter. The three text segments are the line split around
 	    the match; the jump anchors point back at the exact occurrence. */
 	struct Hit
@@ -126,6 +155,10 @@ namespace KFCResultModel
 		// matchText): a replaced row that an edit has moved is looked for again by it
 		// (KFCSearchEngine::LocateRow). Empty until the row is replaced.
 		PMString	replacedText;
+		// --- the copy its replace took (Restore Original - docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md) ---
+		HitCopy		copy;		// given once its Replace has gone through (SetHitCopy); taken off by its Restore Original
+		bool		keptBeforeReplace;	// the row eye as it was before its Replace turned it on (MarkHitReplaced) - what its
+										// Restore Original puts back (the spec's C10)
 		// The first characters of the match's STORY: what a story row of
 		// the tree reads, taken when the hit is built - the search closes a chapter it opened as soon
 		// as it has walked it, so the story cannot be read again when the tree draws.
@@ -159,7 +192,8 @@ namespace KFCResultModel
 		Hit() : pageIndex(-1), isOverset(false), isLocked(false), isHidden(false),
 				fontGroup(-1), fontGroupPos(-1), storyUID(kInvalidUID),
 				textStart(kInvalidTextIndex), textEnd(kInvalidTextIndex), matchHash(0),
-				replaced(false), outlined(false), kept(false), outcome(kOutcomeNone), pageOrdinal(0), storyOrdinal(-1),
+				replaced(false), outlined(false), kept(false), outcome(kOutcomeNone), keptBeforeReplace(false),
+				pageOrdinal(0), storyOrdinal(-1),
 				itemUID(kInvalidUID), onPasteboard(false), isMaster(false), isGrouped(false), isInline(false),
 				isAnchored(false), itemPrint(0), itemPrintLength(0) {}
 	};
@@ -545,6 +579,18 @@ namespace KFCResultModel
 	bool SetStoryLead(int32 chapterIdx, UID storyUID, const PMString& lead);
 	/** False when the row is not replaced, or the index is out of range. */
 	bool GetHitWrittenText(int32 chapterIdx, int32 hitIdx, PMString& outWrittenText);
+
+	/** THE COPY A ROW'S REPLACE TOOK (HitCopy - KFCReplaceEngine's ReplaceRowsNow, once the write has gone through): backed
+	    up like every change a write makes, so the Undo of that Replace puts the row's earlier copy back with it. */
+	void SetHitCopy(int32 chapterIdx, int32 hitIdx, const HitCopy& copy);
+	/** The row's copy (HitCopy). false = index out of range. */
+	bool GetHitCopy(int32 chapterIdx, int32 hitIdx, HitCopy& outCopy);
+
+	/** A ROW ITS RESTORE ORIGINAL PUT BACK (KFCReplaceEngine::RestoreHits - the spec's C10): no longer replaced (its Replace
+	    offered again), its eye as it was before its Replace (Hit::keptBeforeReplace), what it wrote and its copy
+	    forgotten, its place the text put back - [start, end) of storyUID - and nothing said about it (kOutcomeNone). Backed
+	    up first, so an Undo puts the replaced row back, copy and all. The caller reads its line again (RereadRowText). */
+	void MarkHitRestored(int32 chapterIdx, int32 hitIdx, UID storyUID, TextIndex start, TextIndex end);
 
 	/** A chapter's document binding and file. The replace pass works chapter at a time, so it
 	    needs this without going through a hit. false = index out of range. */
