@@ -475,6 +475,37 @@ namespace
 			words.Remove(0, digits + 2);
 		return words;
 	}
+
+	// THE SCOPE IN A TIER'S HEADING (the author, 2026-10-17 evening: "[Text/Story] - easy to read"): the Search: the list was
+	// searched with, in Find/Change's own words, after the tab inside the name's first brackets - "[Text]" drawn
+	// "[Text/Story]", the query dialog's "1  [GREP]" "1  [GREP/Book]". DRAWN, NOT KEPT IN THE NAME: the name is what a row
+	// operation reads the query against (QueryReadsAsTier - QueryLabel made again from Find/Change), and Search: is not part
+	// of the query stated back. A name with no brackets ("Results") is drawn as it is.
+	PMString WithScope(const PMString& name, KFCResultModel::SearchScopeKind scope)
+	{
+		PMString out(name);
+		out.SetTranslatable(kFalse);
+		const char* words = nil;
+		switch (scope)
+		{
+			case KFCResultModel::kScopeDocument:		words = "Document"; break;
+			case KFCResultModel::kScopeBook:			words = "Book"; break;
+			case KFCResultModel::kScopeAllDocuments:	words = "All Documents"; break;
+			case KFCResultModel::kScopeStory:			words = "Story"; break;
+			case KFCResultModel::kScopeToEndOfStory:	words = "To End of Story"; break;
+			case KFCResultModel::kScopeSelection:		words = "Selection"; break;
+			default:									break;
+		}
+		const CharCounter open = out.IndexOfWChar(UTF32TextChar('['), 0);
+		const CharCounter close = (open >= 0) ? out.IndexOfWChar(UTF32TextChar(']'), open + 1) : -1;
+		if (words == nil || close < 0)
+			return out;
+		PMString scoped("/");
+		scoped.SetTranslatable(kFalse);
+		scoped.Append(words);
+		out.Insert(scoped, close);
+		return out;
+	}
 }
 
 PMString KFCResultHistory::QueryLabel()
@@ -549,11 +580,7 @@ int32 KFCResultHistory::KeptTierCount()
 PMString KFCResultHistory::LiveTierLabel()
 {
 	if (gLive.set != 0 && gLive.set == KFCResults()->GetResultSetId() && !gLive.label.IsEmpty())
-	{
-		PMString named(gLive.label);
-		named.SetTranslatable(kFalse);
-		return named;
-	}
+		return WithScope(gLive.label, KFCResults()->GetSearchScope());		// "[Text/Story] ..." - the list's own Search:
 	PMString unnamed("Results");
 	unnamed.SetTranslatable(kFalse);
 	return unnamed;
@@ -719,9 +746,10 @@ bool KFCResultHistory::QueryReadsAsTier(uint32 set, PMString& outName)
 	outName.SetTranslatable(kFalse);
 	// THE LIVE LIST (v2: a row operation on it states its query when Find/Change is on another one - KFCQueryScope): its
 	// name, as LiveTierLabel draws it - a list no search here named has none to read the query against.
+	// (outName as the row draws it - its scope after the tab, WithScope; the query is read against the name as it is kept.)
 	if (set != 0 && set == gLive.set && gLive.set == KFCResults()->GetResultSetId())
 	{
-		outName = gLive.label;
+		outName = LiveTierLabel();
 		outName.SetTranslatable(kFalse);
 		if (gLive.label.IsEmpty())
 			return false;
@@ -730,7 +758,7 @@ bool KFCResultHistory::QueryReadsAsTier(uint32 set, PMString& outName)
 	for (size_t k = 0; k < gKept.size(); ++k)
 		if (gKept[k].set == set)
 		{
-			outName = gKept[k].name;
+			outName = gKept[k].head.IsEmpty() ? gKept[k].name : gKept[k].head;
 			outName.SetTranslatable(kFalse);
 			if (gKept[k].name.IsEmpty())
 				return false;		// no search here named that list: nothing to read the query against
@@ -751,7 +779,9 @@ bool KFCResultHistory::ClearTier(int32 tier)
 		if (tier >= KeptTierCount())
 			return false;
 		set = gKept[static_cast<size_t>(tier)].set;
-		name = gKept[static_cast<size_t>(tier)].name;
+		name = gKept[static_cast<size_t>(tier)].head;		// as its row draws it - its scope after the tab (WithScope)
+		if (name.IsEmpty())
+			name = gKept[static_cast<size_t>(tier)].name;
 		if (name.IsEmpty())
 			name = PMString("Results");
 	}

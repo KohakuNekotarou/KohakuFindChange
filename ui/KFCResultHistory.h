@@ -89,7 +89,9 @@ namespace KFCResultHistory
 	/** How many tiers are kept. */
 	int32 KeptTierCount();
 
-	/** The live tier's name: the label of the search that made the list the model holds, or "Results" for a list KFC did not
+	/** The live tier's name as its row draws it: the label of the search that made the list the model holds, with the
+	    Search: it was searched with after the tab ("[Text/Story] F:..." - the author, 2026-10-17 evening: "easy to read";
+	    drawn, not kept in the name, which QueryReadsAsTier reads the query against), or "Results" for a list KFC did not
 	    name (one an Undo put back, say). */
 	PMString LiveTierLabel();
 
