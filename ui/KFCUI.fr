@@ -2007,8 +2007,8 @@ resource KFCResultNodeWidget(kKFCResultHitNodeWidgetRsrcID + index_enUS)
 			kKFCResultEyeWidgetID,				// WidgetId
 			kEyeballIcon,						// RsrcId: InDesign's own eyeball (IconRsrcDefs.h) - per row, the widget
 			kApplicationRsrcPluginID,			// manager sets it or kNoIcon; the application's icon
-			kBindNone,							// Frame binding (the widget manager places it)
-			Frame(34, 1, 50, 17),				// Frame (left, top, right, bottom)
+			kBindNone,							// Frame binding (the widget manager places it - in the row's expander zone)
+			Frame(2, 1, 18, 17),				// Frame (left, top, right, bottom)
 			kTrue, kTrue,						// Visible, Enabled
 			kStyledIconSuiteFlushedButtonType,	// flat - no raised look, as a panel row's icon
 			0,									// no associated widget
@@ -2017,7 +2017,7 @@ resource KFCResultNodeWidget(kKFCResultHitNodeWidgetRsrcID + index_enUS)
 		(
 			kKFCResultTextWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
 			kBindLeft | kBindRight,			// Frame binding: take the rest of the row
-			Frame(50, 1, 292, 17),			// Frame (indented; the widget manager re-places it)
+			Frame(26, 1, 292, 17),			// Frame (indented; the widget manager re-places it)
 			kTrue, kTrue,					// Visible, Enabled
 			"",								// Panel name
 			{

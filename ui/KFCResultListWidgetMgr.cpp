@@ -103,9 +103,8 @@ namespace
 	// levels already use, which makes the whole tree one even staircase (the author's call - "make it a nice
 	// staircase").
 	const PMReal kHitCellStep = 8.0;
-	// THE ROW EYE (docs/superpowers/specs/2026-10-17-kfc-row-eye-keep-design.md): the eye's column at the start of a hit
-	// row's content, the row's text after it (as the check box's was until 10-06).
-	const PMReal kEyeZone = 16.0;
+	// (THE ROW EYE has no column of its own: it stands in the hit row's expander zone, under the arrow of the row above -
+	//  LayOutHitRow says why.)
 	// A BOOK row sits above the documents when the results came from a book search, and its
 	// children step right by this much. 8px, not a full expander zone: the horizontal room in this
 	// panel is short, and half a zone is enough to read the hierarchy. A document search has no book row
@@ -416,16 +415,19 @@ private:
 		const PMReal rowRight = widget->GetFrame().Width() - kRowInset;
 		const PMReal xStart = kRowInset + kExpanderZone + kHitExtraIndent + shift;
 
-		// THE ROW EYE (docs/superpowers/specs/2026-10-17-kfc-row-eye-keep-design.md): at the start of the row's content - one
-		// step right of the row above (kHitCellStep), where the staircase puts it - the eyeball while the row is kept and
-		// nothing while it is not. A kept tier's eye is disabled: drawn as it was kept, its clicks the row's (a switch to its
-		// tier - ROW-42).
+		// THE ROW EYE (docs/superpowers/specs/2026-10-17-kfc-row-eye-keep-design.md) - IN THE ROW'S EXPANDER ZONE (the author,
+		// 2026-10-18: since the eye came the rows "sit too far right when searching - put them where they were", and the eye
+		// "in line with the arrow"): a hit row has no arrow of its own, and that zone is the very one its document or story
+		// row draws its arrow in (the same shift, one level up), so the eye stands under that arrow and takes no room from the
+		// text. The eyeball while the row is kept, nothing while it is not. (10-17 to 10-18 it had a column of its own after
+		// the zone, and every row's text moved right by it - kept or not.) A kept tier's eye is disabled: drawn as it was
+		// kept, its clicks the row's (a switch to its tier - ROW-42).
 		IControlView* eye = rowData->FindWidget(kKFCResultEyeWidgetID);
 		if (eye != nil)
 		{
 			PMRect eyeFrame = eye->GetFrame();
-			eyeFrame.Left(xStart + kHitCellStep);
-			eyeFrame.Right(xStart + kHitCellStep + kEyeZone);
+			eyeFrame.Left(xStart - kExpanderZone);
+			eyeFrame.Right(xStart);
 			eye->SetFrame(eyeFrame);
 			eye->SetRsrcID(look.kept ? kEyeballIcon : kNoIcon);
 			eye->SetRsrcPluginID(kApplicationRsrcPluginID);
@@ -440,8 +442,8 @@ private:
 		if (cell == nil)
 			return;
 		PMRect frame = cell->GetFrame();
-		// One step right of the row above (kHitCellStep) - the staircase the levels make - and past the eye's column.
-		frame.Left(xStart + kHitCellStep + kEyeZone);
+		// One step right of the row above (kHitCellStep) - the staircase the levels make; the eye is in the zone before it.
+		frame.Left(xStart + kHitCellStep);
 		frame.Right(rowRight);
 		cell->SetFrame(frame);
 
