@@ -69,26 +69,27 @@ bool GetFramePageString(const UIDRef& docRef, UID frameUID, PMString& outPage, i
 	if (db == nil)
 		return false;
 
-	// ITextUtils::GetPageUIDRef is the purpose-built lookup - its contract is "the page the given
-	// textFrame is on" - and everything that reaches this function IS a text frame, since it comes
-	// from IParcelList::GetParcelFrameUID.
-	UID pageUID = Utils<ITextUtils>()->GetPageUIDRef(UIDRef(db, frameUID)).GetUID();
-
-	// Fall back to the general page-item lookup, which answers for anything in the hierarchy.
+	// THE PAGE THE FRAME STANDS ON, as the object rows ask it (KFCObjectSearch::ReadItemPlace): ILayoutUtils::GetOwnerPageUID -
+	// the page holding most of its area, and the SPREAD's UID when it is on no page. It climbs the hierarchy itself, so the
+	// UID IParcelList::GetParcelFrameUID gives (the item the text is composed into) answers for its frame, and grouped,
+	// inline and anchored frames read their owner page. (Until 2026-10-18 ITextUtils::GetPageUIDRef was asked first: it
+	// counts a page's BLEED as the page, so a frame standing in the bleed off page 1 - the default 3 mm - read "P1" while its
+	// object row, the DOM's parentPage and the Pages panel say pasteboard. The author's call: the text rows say "PB" too.)
 	//
-	// That fallback is also what keeps a PASTEBOARD hit readable, and it is deliberate: a frame that
-	// sits on no page makes GetOwnerPageUID return the SPREAD's UID, and GetPageString takes a
-	// spread UID too and spells it "PB" (IPageList.h:131, "Given a page UID (or spread UID)"). A
-	// match out on the pasteboard should say where it is rather than drop out of the list, so this
-	// does NOT check that the UID is a kPageBoss before using it. (Code that wants real pages only
-	// has to verify with db->GetClass - see KCM's KCMFramePageUID (KCMCore.cpp), which does exactly that.)
-	if (pageUID == kInvalidUID)
-	{
-		InterfacePtr<IHierarchy> frameHier(db, frameUID, UseDefaultIID());
-		if (frameHier == nil)
-			return false;
+	// The spread's UID is deliberate: GetPageString takes a spread UID too and spells it "PB" (IPageList.h:131, "Given a page
+	// UID (or spread UID)"). A match out on the pasteboard should say where it is rather than drop out of the list, so this
+	// does NOT check that the UID is a kPageBoss before using it. (Code that wants real pages only has to verify with
+	// db->GetClass - see KCM's KCMFramePageUID (KCMCore.cpp), which does exactly that.)
+	UID pageUID = kInvalidUID;
+	InterfacePtr<IHierarchy> frameHier(db, frameUID, UseDefaultIID());
+	if (frameHier != nil)
 		pageUID = Utils<ILayoutUtils>()->GetOwnerPageUID(frameHier);
-	}
+
+	// A frame outside the hierarchy (no IHierarchy - ITextUtils::QueryForHierarchyMember names text on a path as the one
+	// that needs converting) is asked through ITextUtils::GetPageUIDRef, whose contract is "the page the given textFrame or
+	// OwnedItem is on".
+	if (pageUID == kInvalidUID)
+		pageUID = Utils<ITextUtils>()->GetPageUIDRef(UIDRef(db, frameUID)).GetUID();
 	if (pageUID == kInvalidUID)
 		return false;
 

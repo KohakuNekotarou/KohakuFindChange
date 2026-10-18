@@ -87,6 +87,7 @@
 #include "KFCResultNodeID.h"
 #include "KFCJump.h"
 #include "KFCResultTree.h"		// ReplaceRows - Return on hit rows; ExtendSelection - Shift+Up / Shift+Down
+#include "KFCResultHistory.h"	// IsStacking / HasLiveList - Home and End keep to the live tier
 #include "KFCModelAccess.h"		// KFCRuns()->CanReplaceHit - which row Shift+Return goes on to
 #include "KFCDiag.h"			// KFC_DIAG_LOG - the RETFOCUS trace, test builds only
 #include "KFCDiagHiddenDocs.h"	// the hidden-document check after an arrow or a Return - test builds only
@@ -738,6 +739,41 @@ bool16 KFCResultTreeEH::StockMoveThenLand(IEvent* e, const VirtualKey& key)
 	// happen (an empty list, or already at the end) and there is nothing to open or run.
 	NodeIDList selected;
 	controller->GetSelectedItems(selected);
+
+	// HOME AND END KEEP TO THE LIVE TIER (the author's call, 2026-10-18). While the results are in tiers the stock Home
+	// reached the list's first row - the live tier's own row, or a grey tier's, which is never selected - and stopped there,
+	// the page left on the row before; End reached a grey tier's row whenever the live tier is not the last (the tiers do not
+	// move - ROW-42). Home goes on to the first row under the live tier's own row, End to the last row drawn under it, and
+	// the landing below runs there as on any row. A closed live tier keeps its own row (nothing under it is drawn).
+	if ((key == kVirtualHomeKey || key == kVirtualEndKey) && !e->ShiftKeyDown() && !e->CmdKeyDown() && !e->OptionAltKeyDown()
+		&& KFCResultHistory::IsStacking() && KFCResultHistory::HasLiveList())
+	{
+		InterfacePtr<const ITreeViewHierarchyAdapter> adapter(controller, UseDefaultIID());
+		if (adapter != nil)
+		{
+			NodeID edge(KFCResultNodeID::CreateLiveTier());
+			if (key == kVirtualHomeKey)
+			{
+				if (treeMgr->IsNodeExpanded(edge) && adapter->GetNumChildren(edge) > 0)
+					edge = NodeID(adapter->GetNthChild(edge, 0));
+			}
+			else
+			{
+				for (int32 n = adapter->GetNumChildren(edge); n > 0 && treeMgr->IsNodeExpanded(edge); n = adapter->GetNumChildren(edge))
+					edge = NodeID(adapter->GetNthChild(edge, n - 1));
+			}
+			if (edge.IsValid() && !(selected.size() == 1 && selected[0] == edge))
+			{
+				// The official re-selection (LandOnRow): Select alone does not move a selection.
+				controller->DeselectAll(kFalse /*notifyOfChange*/, kTrue /*changeHilite*/);
+				(void)controller->Select(edge, kTrue /*notifyOfChange*/, kTrue /*changeHilite*/);
+				treeMgr->ScrollToNode(edge, ITreeViewMgr::eScrollIntoView);
+				selected.clear();
+				controller->GetSelectedItems(selected);
+			}
+		}
+	}
+
 	if (selected.empty() && before.size() == 1)
 	{
 		// THE MOVE MET A ROW THAT IS NEVER SELECTED - a tier's row or a kept row (the stacked results' spec, section 3-5):
