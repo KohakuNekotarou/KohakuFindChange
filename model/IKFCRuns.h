@@ -148,7 +148,8 @@ public:
 	    document not open now answers true). */
 	virtual bool CanSpecialHit(int32 op, int32 chapterIdx, int32 hitIdx) = 0;
 	/** = KFCSearchEngine::SearchBookOnLayer (appended) - the panel menu's Find Objects on Active Layer: SearchBook on the
-	    Object tab, its rows kept to the objects on each document's layer of that name. */
+	    Object tab, its rows kept to the objects on each document's layer of that name. NO CALLER SINCE 2026-10-18 (the
+	    command moved into Narrow Down as On Active Layer - a KFCNarrowStep): kept for its slot, to go in a tidy-up. */
 	virtual int32 SearchBookOnLayer(const PMString& layer, PMString& outSummary) = 0;
 	/** = KFCSearchEngine::NarrowList (appended) - a tier heading's Narrow Down: the live list's own search run once more over
 	    what it searched, with its conditions and `step`, into a new list (a new tier). False = refused, nothing changed

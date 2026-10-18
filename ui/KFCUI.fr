@@ -599,12 +599,8 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCSearchBookMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// Find Objects on Active Layer: the same search on the Object tab, its rows kept to the objects on the Layers
-		// panel's layer (the spec's E14). Greyed off the Object tab and with no document in front.
-		kKFCFindOnActiveLayerActionID,
-		kKFCTargetMenuPath
-		kKFCFindOnActiveLayerMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
+		// (Find Objects on Active Layer stood here - the spec's E14 - until 2026-10-18: the author moved it into a tier
+		//  heading's Narrow Down as On Active Layer, text tiers too.)
 
 		// Change All in Book (No List): InDesign's own Change All over the book's chapters, no list (KFCChangeAll).
 		// Greyed with Book Scope off (F18 - a document's Change All is InDesign's own dialog's).
@@ -800,12 +796,7 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCSelectAllRowsMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// ...and the book row's Copy Rows under a rule of its own: every row of the list (the copy-results spec).
-		kKFCClearRowsSepActionID,
-		kKFCResultBookMenuName kSDKDefDelimiterAndSeparatorPath,
-		kKFCClearRowsSepMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
+		// ...and the book row's Copy Rows: every row of the list (the copy-results spec).
 		kKFCCopyRowsActionID,
 		kKFCResultBookMenuName
 		kKFCCopyRowsMenuItemPosition,
@@ -856,11 +847,6 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCNarrowInEndnotesMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		kKFCNarrowSep1ActionID,
-		kKFCNarrowDownSubmenuPath kSDKDefDelimiterAndSeparatorPath,
-		kKFCNarrowSep1MenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
 		kKFCNarrowPagesActionID,
 		kKFCNarrowDownSubmenuPath
 		kKFCNarrowPagesMenuItemPosition,
@@ -871,33 +857,25 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCNarrowOnPasteboardMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		kKFCNarrowSep2ActionID,
-		kKFCNarrowDownSubmenuPath kSDKDefDelimiterAndSeparatorPath,
-		kKFCNarrowSep2MenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
 		kKFCNarrowFramesActionID,
 		kKFCNarrowDownSubmenuPath
 		kKFCNarrowFramesMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// ----- Clear from Results: the hit, object, story and document rows' menus (docs/superpowers/specs/2026-10-18-kfc-clear-from-results-design.md K2) -----
-		// Last, under a rule (one rule id for the four menus, as Select All Rows takes one action id for three): a hit or object row's
-		// rows - the rows selected together when it is one of them - or every hit row under a story or document row, taken off the
-		// list (KFCResultTree::ClearRows). The document is not touched.
-		kKFCClearRowsSepActionID,
-		kKFCResultHitMenuName kSDKDefDelimiterAndSeparatorPath,
-		kKFCClearRowsSepMenuItemPosition,
+		// On Active Layer (the author, 2026-10-18 - Find Objects on Active Layer moved off the panel menu, text tiers too): the
+		// tier's rows kept to the front document's active layer, by its name (KFCNarrow - a text row by its frame's layer).
+		kKFCNarrowOnLayerActionID,
+		kKFCNarrowDownSubmenuPath
+		kKFCNarrowOnLayerMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// ----- Clear from Results: the hit, object, story and document rows' menus (docs/superpowers/specs/2026-10-18-kfc-clear-from-results-design.md K2) -----
+		// (In abc order with the rest since 2026-10-18 - the positions in KFCUIID.h; until then last, under a rule): a hit or object row's
+		// rows - the rows selected together when it is one of them - or every hit row under a story or document row, taken off the
+		// list (KFCResultTree::ClearRows). The document is not touched.
 		kKFCClearFromResultsActionID,
 		kKFCResultHitMenuName
 		kKFCClearFromResultsMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
-		kKFCClearRowsSepActionID,
-		kKFCResultObjectMenuName kSDKDefDelimiterAndSeparatorPath,
-		kKFCClearRowsSepMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		kKFCClearFromResultsActionID,
@@ -905,19 +883,9 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCClearFromResultsMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		kKFCClearRowsSepActionID,
-		kKFCResultStoryMenuName kSDKDefDelimiterAndSeparatorPath,
-		kKFCClearRowsSepMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
 		kKFCClearFromResultsActionID,
 		kKFCResultStoryMenuName
 		kKFCClearFromResultsMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
-		kKFCClearRowsSepActionID,
-		kKFCResultDocumentMenuName kSDKDefDelimiterAndSeparatorPath,
-		kKFCClearRowsSepMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		kKFCClearFromResultsActionID,
@@ -925,7 +893,7 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCClearFromResultsMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// ----- Copy Rows: the same four menus, under the same rule, above Clear from Results (the copy-results spec) -----
+		// ----- Copy Rows: the same four menus (the copy-results spec) -----
 		// The rows Clear from Results would take off - the row's, the rows selected together, a story's or a document's - as text
 		// on the clipboard (KFCCopyResults::CopyLiveRows). Nothing is taken away.
 		kKFCCopyRowsActionID,
@@ -969,14 +937,9 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// ----- The other Special Operations (docs/superpowers/specs/2026-10-17-kfc-object-special-operations-design.md E2) -----
-		// After InDesign's own Object menu: a rule under Create Outlines; the Fitting, Arrange and Transform submenus; a rule;
-		// Lock, Unlock, Hide, Show; a rule; Move to Active Layer, Clear Object Style Overrides; a rule; Delete. Each item's
-		// action stands for one KFCSpecialOp (KFCActionComponent.cpp's table) - the rows' objects written where they stand.
-		kKFCSpecialSep1ActionID,
-		kKFCSpecialOpsSubmenuPath kSDKDefDelimiterAndSeparatorPath,
-		kKFCSpecialSep1MenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
+		// In abc order since 2026-10-18 (the author's call - the positions in KFCUIID.h; until then InDesign's own Object menu's,
+		// with rules). Each item's action stands for one KFCSpecialOp (KFCActionComponent.cpp's table) - the rows' objects
+		// written where they stand.
 		// Fitting (a submenu one level down: the same idiom).
 		0,
 		kKFCFittingSubmenuPath kSDKDefDelimitMenuPath
@@ -1039,8 +1002,8 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCSendToBackMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// Transform: the four asking a value (a dialog first - KFCSpecialDialogs), a rule, the turns and flips, a rule, the
-		// two that put a transformation back.
+		// Transform: the four asking a value (a dialog first - KFCSpecialDialogs), the turns and flips, the two that put a
+		// transformation back - in abc order.
 		0,
 		kKFCTransformSubmenuPath kSDKDefDelimitMenuPath
 		kKFCTransformSubmenuPosition,
@@ -1064,11 +1027,6 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCShearActionID,
 		kKFCTransformSubmenuPath
 		kKFCShearMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
-		kKFCTransformSep1ActionID,
-		kKFCTransformSubmenuPath kSDKDefDelimiterAndSeparatorPath,
-		kKFCTransformSep1MenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		kKFCRotate90CWActionID,
@@ -1096,11 +1054,6 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCFlipVerticalMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		kKFCTransformSep2ActionID,
-		kKFCTransformSubmenuPath kSDKDefDelimiterAndSeparatorPath,
-		kKFCTransformSep2MenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
 		kKFCRedefineScalingActionID,
 		kKFCTransformSubmenuPath
 		kKFCRedefineScalingMenuItemPosition,
@@ -1112,11 +1065,6 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// Lock, Unlock, Hide, Show.
-		kKFCSpecialSep2ActionID,
-		kKFCSpecialOpsSubmenuPath kSDKDefDelimiterAndSeparatorPath,
-		kKFCSpecialSep2MenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
 		kKFCLockActionID,
 		kKFCSpecialOpsSubmenuPath
 		kKFCLockMenuItemPosition,
@@ -1138,11 +1086,6 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// Move to Active Layer, Clear Object Style Overrides.
-		kKFCSpecialSep3ActionID,
-		kKFCSpecialOpsSubmenuPath kSDKDefDelimiterAndSeparatorPath,
-		kKFCSpecialSep3MenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
 		kKFCMoveToLayerActionID,
 		kKFCSpecialOpsSubmenuPath
 		kKFCMoveToLayerMenuItemPosition,
@@ -1153,12 +1096,7 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCClearStyleOverridesMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// Delete, last.
-		kKFCSpecialSep4ActionID,
-		kKFCSpecialOpsSubmenuPath kSDKDefDelimiterAndSeparatorPath,
-		kKFCSpecialSep4MenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
+		// Delete.
 		kKFCDeleteActionID,
 		kKFCSpecialOpsSubmenuPath
 		kKFCDeleteMenuItemPosition,
@@ -1230,17 +1168,8 @@ resource ActionDef (kSDKDefActionResourceID)
 		kInvalidInterfaceID,
 		kSDKDefVisibleInKBSCEditorFlag,
 
-		// Find Objects on Active Layer (the spec's E14). kCustomEnabling: UpdateActionStates greys it off the Object tab, with
-		// no document in front or no layer active there, and with nothing to search (Find's own test). In the Keyboard
-		// Shortcuts editor under Palette Menus, like Find.
-		kKFCActionComponentBoss,
-		kKFCFindOnActiveLayerActionID,
-		kKFCFindOnActiveLayerMenuKey,	// "Find Objects on Active Layer"
-		kKFCPanelMenuActionArea,
-		kNormalAction,
-		kCustomEnabling|kDisableIfLowMem,
-		kInvalidInterfaceID,
-		kSDKDefVisibleInKBSCEditorFlag,
+		// (Find Objects on Active Layer's stood here - in the Keyboard Shortcuts editor under Palette Menus - until 2026-10-18:
+		//  Narrow Down > On Active Layer now, a tier heading's item, offered no key.)
 
 
 		kKFCActionComponentBoss,
@@ -1808,6 +1737,17 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKFCActionComponentBoss,
 		kKFCNarrowFramesActionID,
 		kKFCNarrowFramesMenuKey,	// "Frames of These Matches"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// On Active Layer (2026-10-18 - the panel menu's Find Objects on Active Layer moved here, text tiers too). kCustomEnabling:
+		// greyed with no layer active in the front document's Layers panel, as Move to Active Layer is.
+		kKFCActionComponentBoss,
+		kKFCNarrowOnLayerActionID,
+		kKFCNarrowOnLayerMenuKey,	// "On Active Layer"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,

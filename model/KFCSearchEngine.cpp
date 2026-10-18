@@ -79,6 +79,7 @@
 #include <map>						// the per-frame cache one document's walk keeps (FrameFacts)
 #include <memory>					// std::unique_ptr - a Search: walk's dirty guards, one per open document
 #include <set>						// the rows a write is handed, the stories it meets
+#include <functional>				// std::function - a Narrow Down's check put to the list's documents (AskListDocuments)
 
 // Project includes:
 #include "KFCSearchEngine.h"
@@ -390,8 +391,10 @@ struct FrameFacts
 	bool		isLocked;
 	bool		onPasteboard;	// the page named is a spread ("PB") - the frame is out on the pasteboard (Narrow Down)
 	UID			pageUID;		// the page (or spread) named (Narrow Down's Pages)
+	UID			layer;			// the frame's document layer (Narrow Down's On Active Layer)
 
-	FrameFacts() : pageIndex(-1), hasPage(false), isHidden(false), isLocked(false), onPasteboard(false), pageUID(kInvalidUID) {}
+	FrameFacts() : pageIndex(-1), hasPage(false), isHidden(false), isLocked(false), onPasteboard(false), pageUID(kInvalidUID),
+		layer(kInvalidUID) {}
 };
 
 // Keyed by story as well as frame. kInvalidUID stands for "no frame", which matches in two
@@ -418,6 +421,7 @@ const FrameFacts& LookUpFrame(const UIDRef& docRef, const UIDRef& storyRef, UID 
 		facts.pageUID = kInvalidUID;
 	}
 	facts.pageString.SetTranslatable(kFalse);
+	facts.layer = (frameUID != kInvalidUID) ? KFCPageItemFacts::DocLayerOf(docRef.GetDataBase(), frameUID) : kInvalidUID;
 	facts.isHidden = IsFrameHidden(docRef.GetDataBase(), frameUID);
 	facts.isLocked = !KFCSearchEngine::IsFrameEditable(storyRef, frameUID);
 	return cache.insert(std::make_pair(key, facts)).first->second;
@@ -842,6 +846,7 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 
 	outHit.frameOnPasteboard = facts->onPasteboard;	// the frame the row names its page after - out on the pasteboard
 	outHit.pageUID = facts->pageUID;				// ...and its page (Narrow Down's Pages)
+	outHit.frameLayer = facts->layer;				// ...and its layer (Narrow Down's On Active Layer)
 	outHit.pageString = facts->pageString;		// empty when the frame has no page
 	outHit.pageString.SetTranslatable(kFalse);
 	outHit.pageIndex = facts->pageIndex;		// -1 then, which sorts the hit to the end
@@ -3586,6 +3591,21 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 		chapterNotes.AppendNumber(narrowFilter.NoFrameCount());
 		chapterNotes.Append(" match(es) in overset text have no frame.");
 	}
+	// (AN ON ACTIVE LAYER list: the documents that had rows to ask and no layer of the name - named, as Find Objects on Active
+	//  Layer named them, OBJ-21.)
+	if (!narrowFilter.NoLayerDocs().empty())
+	{
+		chapterNotes.Append(" No layer named \"");
+		chapterNotes.Append(narrowFilter.LayerName());
+		chapterNotes.Append("\" in: ");
+		for (size_t d = 0; d < narrowFilter.NoLayerDocs().size(); ++d)
+		{
+			if (d > 0)
+				chapterNotes.Append(", ");
+			chapterNotes.Append(narrowFilter.NoLayerDocs()[d]);
+		}
+		chapterNotes.Append(".");
+	}
 	AppendUnsearchableNote(chapterNotes, tally.unsearchable);
 	AppendSearchErrorNote(chapterNotes, tally.brokeOff);
 	KFCBookScope::AppendUnopenableNote(chapterNotes, unopenable);
@@ -5054,6 +5074,37 @@ bool KFCSearchEngine::SearchDocumentAgain(int32 chapterIdx, PMString& outStatus)
 // KFCQueryScope): its document, its book, or the documents open now; its rows replaced in place. See the header.
 namespace
 {
+// A NARROW DOWN'S CHECK BEFORE ANYTHING IS WALKED, put to the list's documents open now (a book's chapter has what another
+// has not, so one that answers yes is enough), else to the front document (a list that found nothing searches it): Pages...'
+// range readable, On Active Layer's layer there. outAsked = some document was asked - a list whose documents are all closed
+// (a book's chapters, handed back) asks none, and is walked, each chapter answering for itself. One reading of "the list's
+// documents" for both (memory one-question-one-place).
+bool AskListDocuments(const std::function<bool(const UIDRef&)>& ask, bool& outAsked)
+{
+	outAsked = false;
+	for (int32 c = 0; c < KFCResultModel::GetChapterCount(); ++c)
+	{
+		UIDRef docRef;
+		IDFile file;
+		if (!KFCResultModel::GetChapterLocation(c, docRef, file))
+			continue;
+		UIDRef open(docRef);
+		if (!((docRef.GetDataBase() != nil || KFCBookScope::ChapterHasFile(file)) && KFCBookScope::FindOpenChapterDoc(file, open))
+			|| open.GetDataBase() == nil)
+			continue;
+		outAsked = true;
+		if (ask(open))
+			return true;
+	}
+	IDocument* const front = KFCBookScope::ActiveDocument();
+	if (!outAsked && KFCResultModel::GetChapterCount() == 0 && front != nil)
+	{
+		outAsked = true;
+		return ask(::GetUIDRef(front));
+	}
+	return false;
+}
+
 // SEARCH THESE RESULTS AGAIN AND NARROW DOWN, ONE BODY (KFCSearchEngine::SearchListAgain / NarrowList): the live list's own
 // search run once more over what it searched, with its query and its conditions (a narrowed list's - KFCNarrow) - and, for a
 // Narrow Down (`step`), the new condition after them and the result put into a new list (AgainTarget::newTier - the spec's
@@ -5102,34 +5153,42 @@ bool SearchListOnceMore(const KFCNarrowStep* step, PMString& outStatus)
 				outStatus.Append("no pages were given - nothing was searched.");
 				return false;
 			}
-			bool read = false, readable = false;
-			for (int32 c = 0; c < KFCResultModel::GetChapterCount() && !readable; ++c)
-			{
-				UIDRef docRef;
-				IDFile file;
-				if (!KFCResultModel::GetChapterLocation(c, docRef, file))
-					continue;
-				UIDRef open(docRef);
-				if (!((docRef.GetDataBase() != nil || KFCBookScope::ChapterHasFile(file)) && KFCBookScope::FindOpenChapterDoc(file, open))
-					|| open.GetDataBase() == nil)
-					continue;
+			bool read = false;
+			const bool readable = AskListDocuments([&](const UIDRef& doc) {
 				std::set<UID> named;
-				read = true;
-				readable = (KFCNarrow::ReadPageRange(open.GetDataBase(), pages, named) == ITextDataValidation::kNoError);
-			}
-			IDocument* const front = KFCBookScope::ActiveDocument();
-			if (!read && KFCResultModel::GetChapterCount() == 0 && front != nil)
-			{
-				std::set<UID> named;
-				read = true;
-				readable = (KFCNarrow::ReadPageRange(::GetDataBase(front), pages, named) == ITextDataValidation::kNoError);
-			}
+				return KFCNarrow::ReadPageRange(doc.GetDataBase(), pages, named) == ITextDataValidation::kNoError; }, read);
 			if (read && !readable)
 			{
 				outStatus.Append(lead);
 				outStatus.Append("\"");
 				outStatus.Append(pages);
 				outStatus.Append("\" is not a page range in any document - nothing was searched.");
+				return false;
+			}
+		}
+		// ON ACTIVE LAYER (Find Objects on Active Layer moved into Narrow Down - the author, 2026-10-18): the layer the front
+		// document's Layers panel had active, by its name. NO DOCUMENT WITH A LAYER OF THE NAME IS REFUSED BEFORE ANYTHING IS
+		// WALKED, as an unreadable page range is - asked of the same documents (AskListDocuments); a chapter with none lists
+		// nothing and is named after the walk (KFCNarrow::Filter::NoLayerDocs - as the command named it, OBJ-21).
+		if (step->kind == kKFCNarrowOnLayer)
+		{
+			PMString layer(step->layer);
+			layer.SetTranslatable(kFalse);
+			if (layer.IsEmpty())
+			{
+				outStatus.Append(lead);
+				outStatus.Append("no layer is active - bring a document forward and pick its layer in the Layers panel.");
+				return false;
+			}
+			bool asked = false;
+			const bool found = AskListDocuments([&](const UIDRef& doc) {
+				return KFCPageItemFacts::DocLayerNamed(doc, layer) != kInvalidUID; }, asked);
+			if (asked && !found)
+			{
+				outStatus.Append(lead);
+				outStatus.Append("no document of these results has a layer named \"");
+				outStatus.Append(layer);
+				outStatus.Append("\" - nothing was searched.");
 				return false;
 			}
 		}

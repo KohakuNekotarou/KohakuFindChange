@@ -12,6 +12,7 @@
 
 // Interface includes:
 #include "IDataBase.h"
+#include "IDocument.h"				// GetName - a document with no layer of the name, said by name (LayerOf)
 #include "IGraphicFrameData.h"		// the frame the person selects - FrameOwner
 #include "IHierarchy.h"
 #include "IPageList.h"				// PageRangeStringToUIDList - Pages...' range, read in a document
@@ -19,14 +20,18 @@
 #include "ITextStoryThread.h"		// GetDictUID - the thread's owner
 
 // General includes:
+#include "FileUtils.h"				// SysFileToPMString - a document's identity (DocKey)
 #include "TablesID.h"				// kTableModelBoss - a table's cells are its threads
 #include "TextID.h"					// kFootnoteReferenceBoss, kEndnoteStoryBoss
 #include "UIDList.h"
 #include "Utils.h"
 
+#include <cstdio>
+
 // Project includes:
 #include "KFCDiag.h"			// NARROWFACT - a test build's trace of the facts read
 #include "KFCNarrow.h"
+#include "KFCPageItemFacts.h"	// DocLayerOf / DocLayerNamed - On Active Layer's layer, Move to Active Layer's reading
 
 void KFCNarrow::ReadTextPlace(const UIDRef& storyRef, TextIndex at, KFCResultModel::Hit& io)
 {
@@ -119,6 +124,7 @@ PMString KFCNarrow::StepWords(const KFCNarrowStep& step)
 		case kKFCNarrowPages:			words.Append("Pages "); words.Append(step.pages); break;
 		case kKFCNarrowOnPasteboard:	words.Append("On Pasteboard"); break;
 		case kKFCNarrowFrames:			words.Append("Frames of These Matches"); break;
+		case kKFCNarrowOnLayer:			words.Append("On Active Layer (\""); words.Append(step.layer); words.Append("\")"); break;
 		default:						words.Append("?"); break;
 	}
 	return words;
@@ -151,7 +157,56 @@ bool KFCNarrow::Filter::MakesFrames() const
 
 bool KFCNarrow::Filter::FirstFrame(IDataBase* db, UID frame) const
 {
-	return fFrames.insert(std::make_pair(db, frame)).second;
+	return fFrames.insert(std::make_pair(DocKey(db), frame)).second;
+}
+
+std::string KFCNarrow::Filter::DocKey(IDataBase* db)
+{
+	if (db == nil)
+		return std::string();
+	const IDFile* file = db->GetSysFile();
+	if (file != nil)
+		return "f:" + FileUtils::SysFileToPMString(*file).GetUTF8String();
+	char address[32] = {};
+	std::snprintf(address, sizeof(address), "p:%p", static_cast<void*>(db));
+	return address;
+}
+
+PMString KFCNarrow::Filter::LayerName() const
+{
+	for (size_t k = 0; k < fSteps.size(); ++k)
+		if (fSteps[k].kind == kKFCNarrowOnLayer)
+		{
+			PMString name(fSteps[k].layer);
+			name.SetTranslatable(kFalse);
+			return name;
+		}
+	PMString none;
+	none.SetTranslatable(kFalse);
+	return none;
+}
+
+UID KFCNarrow::Filter::LayerOf(size_t k, IDataBase* db) const
+{
+	const std::pair<size_t, std::string> key(k, DocKey(db));
+	std::map<std::pair<size_t, std::string>, UID>::const_iterator known = fLayers.find(key);
+	if (known != fLayers.end())
+		return known->second;
+	const UID layer = (db != nil) ? KFCPageItemFacts::DocLayerNamed(UIDRef(db, db->GetRootUID()), fSteps[k].layer) : kInvalidUID;
+	fLayers[key] = layer;
+	// A DOCUMENT WITH NO LAYER OF THE NAME lists nothing - said by name on the status line, as Find Objects on Active Layer said
+	// it (the spec's OBJ-21: "kfc-layer-b.indd: no layer named "Images"").
+	if (layer == kInvalidUID && db != nil)
+	{
+		InterfacePtr<IDocument> doc(db, db->GetRootUID(), UseDefaultIID());
+		PMString name;
+		if (doc != nil)
+			doc->GetName(name);
+		name.SetTranslatable(kFalse);
+		if (!name.IsEmpty())
+			fNoLayerDocs.push_back(name);
+	}
+	return layer;
 }
 
 bool KFCNarrow::Filter::KeepText(const KFCResultModel::Hit& hit, IDataBase* db) const
@@ -173,8 +228,8 @@ bool KFCNarrow::Filter::KeepObject(const KFCResultModel::Hit& hit, IDataBase* db
 
 const std::set<UID>& KFCNarrow::Filter::PagesOf(size_t k, IDataBase* db) const
 {
-	const std::pair<size_t, IDataBase*> key(k, db);
-	std::map<std::pair<size_t, IDataBase*>, std::set<UID> >::const_iterator known = fPages.find(key);
+	const std::pair<size_t, std::string> key(k, DocKey(db));
+	std::map<std::pair<size_t, std::string>, std::set<UID> >::const_iterator known = fPages.find(key);
 	if (known != fPages.end())
 		return known->second;
 	std::set<UID>& pages = fPages[key];
@@ -194,6 +249,17 @@ bool KFCNarrow::Filter::Meets(size_t k, const KFCResultModel::Hit& hit, bool obj
 		// THE PAGE THE ROW NAMES, in the range as the row's document reads it (N5): an overset text row by its "+" page, an
 		// object row by its own; a row on a parent page or the pasteboard is in no such range.
 		case kKFCNarrowPages:			return hit.pageUID != kInvalidUID && PagesOf(k, db).count(hit.pageUID) > 0;
+		// THE LAYER OF THE NAME in the row's document (On Active Layer - Find Objects on Active Layer moved here, 2026-10-18): an
+		// object row by its item's own layer (a group's member by its group's, an item in text by its anchor frame's - as the
+		// command read it); a text row by its frame's - the frame its page is named after, the "+" frame for an overset match
+		// (Hit::frameLayer), as On Pasteboard and Pages read the place a text row stands.
+		case kKFCNarrowOnLayer:
+		{
+			const UID want = LayerOf(k, db);
+			if (want == kInvalidUID)
+				return false;
+			return objectRow ? (KFCPageItemFacts::DocLayerOf(db, hit.itemUID) == want) : (hit.frameLayer == want);
+		}
 		default:						return true;	// (Frames is a turn, not a test)
 	}
 }

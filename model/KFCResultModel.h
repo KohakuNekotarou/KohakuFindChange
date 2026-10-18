@@ -198,6 +198,9 @@ namespace KFCResultModel
 		UID			pageUID;	// the page the row names (a text row's frame's - the "+" frame's for an overset match -, an object
 								// row's owner page), kInvalidUID for none: Narrow Down's Pages asks it of the range read in the
 								// row's document (a parent page or a spread - the pasteboard - is never in a range read so)
+		UID			frameLayer;	// a TEXT row's frame's document layer - the same frame pageUID is read off (the "+" frame for an
+								// overset match) - kInvalidUID for none: Narrow Down's On Active Layer (KFCPageItemFacts::DocLayerOf,
+								// read once a frame - FrameFacts). An object row's item is asked its own layer.
 		ChangeOutcome outcome;	// why this row was NOT replaced (kOutcomeNone = it was, or was never
 								// reached at all). The locator shows it as a word.
 		// (No per-hit change count that lets the replace take an unedited story on trust and skip the
@@ -250,7 +253,8 @@ namespace KFCResultModel
 				fontGroup(-1), fontGroupPos(-1), storyUID(kInvalidUID),
 				textStart(kInvalidTextIndex), textEnd(kInvalidTextIndex), matchHash(0),
 				replaced(false), outlined(false), special(0), kept(false), cleared(false), inTable(false),
-				inFootnote(false), inEndnote(false), frameOnPasteboard(false), matchFrame(kInvalidUID), pageUID(kInvalidUID), outcome(kOutcomeNone),
+				inFootnote(false), inEndnote(false), frameOnPasteboard(false), matchFrame(kInvalidUID), pageUID(kInvalidUID),
+				frameLayer(kInvalidUID), outcome(kOutcomeNone),
 				pageOrdinal(0), storyOrdinal(-1),
 				itemUID(kInvalidUID), onPasteboard(false), isMaster(false), isGrouped(false), isInline(false),
 				isAnchored(false), itemPrint(0), itemPrintLength(0) {}

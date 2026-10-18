@@ -113,7 +113,8 @@ public:
 	/** = KFCResultModel::SetHitKept (appended) - the row eye's click: a row's eye on or off. false = no such row. */
 	virtual bool SetHitKept(int32 chapterIdx, int32 hitIdx, bool kept) = 0;
 	/** = KFCResultModel::GetSearchLayer (appended) - the layer Find Objects on Active Layer kept the list to (empty for any
-	    other list): a tier's heading names it. */
+	    other list): a tier's heading names it. EMPTY FOR EVERY LIST SINCE 2026-10-18 (the command moved into Narrow Down as
+	    On Active Layer - its layer is a narrowing step's, in GetNarrowWords): kept for its slot, to go in a tidy-up. */
 	virtual void GetSearchLayer(PMString& out) = 0;
 	/** = KFCResultModel::NarrowWords (appended) - a narrowed list's conditions in words ("In Tables / Pages 1-5"; empty for
 	    any other list): a tier's heading names them after its name. */

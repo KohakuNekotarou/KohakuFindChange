@@ -408,8 +408,9 @@ DECLARE_PMID(kActionIDSpace, kKFCRotateActionID, kKFCUIPrefix + 89)
 DECLARE_PMID(kActionIDSpace, kKFCShearActionID, kKFCUIPrefix + 90)
 DECLARE_PMID(kActionIDSpace, kKFCTransformSep1ActionID, kKFCUIPrefix + 91)
 // FIND OBJECTS ON ACTIVE LAYER (the panel menu, under Find - the spec's E14, the author's S3 "the same layer"): the Object
-// tab's search kept to the objects on the Layers panel's layer. + 92: the next after the highest spent.
-DECLARE_PMID(kActionIDSpace, kKFCFindOnActiveLayerActionID, kKFCUIPrefix + 92)
+// tab's search kept to the objects on the Layers panel's layer. + 92. RETIRED 2026-10-18 (the author moved it into a tier
+// heading's Narrow Down as On Active Layer, text tiers too - kKFCNarrowOnLayerActionID) - never reuse.
+//DECLARE_PMID(kActionIDSpace, kKFCFindOnActiveLayerActionID, kKFCUIPrefix + 92)
 // CLEAR FROM RESULTS (docs/superpowers/specs/2026-10-18-kfc-clear-from-results-design.md K2): the rows of a hit, object, story or
 // document row taken off the list - and the rule above it, one id for the four menus (+ 93, + 94: the next after the highest
 // spent).
@@ -431,6 +432,9 @@ DECLARE_PMID(kActionIDSpace, kKFCNarrowFramesActionID, kKFCUIPrefix + 102)
 DECLARE_PMID(kActionIDSpace, kKFCCopyResultsActionID, kKFCUIPrefix + 103)
 DECLARE_PMID(kActionIDSpace, kKFCCopyRowsActionID, kKFCUIPrefix + 104)
 DECLARE_PMID(kActionIDSpace, kKFCCopyTheseResultsActionID, kKFCUIPrefix + 105)
+// NARROW DOWN > ON ACTIVE LAYER (the author, 2026-10-18: Find Objects on Active Layer moved off the panel menu into Narrow
+// Down, text tiers too): the tier's rows kept to the front document's active layer, by its name. + 106.
+DECLARE_PMID(kActionIDSpace, kKFCNarrowOnLayerActionID, kKFCUIPrefix + 106)
 
 
 // WidgetIDs:
@@ -566,6 +570,7 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 #define kKFCNarrowPagesMenuKey			kKFCStringPrefix "kKFCNarrowPagesMenuKey"
 #define kKFCNarrowOnPasteboardMenuKey	kKFCStringPrefix "kKFCNarrowOnPasteboardMenuKey"
 #define kKFCNarrowFramesMenuKey			kKFCStringPrefix "kKFCNarrowFramesMenuKey"
+#define kKFCNarrowOnLayerMenuKey		kKFCStringPrefix "kKFCNarrowOnLayerMenuKey"		// "On Active Layer" (2026-10-18)
 // ...and Copy Results: the panel menu's, a row's Copy Rows, a tier heading's Copy These Results (measured against every
 // other key - key_collisions.py).
 #define kKFCCopyResultsMenuKey			kKFCStringPrefix "kKFCCopyResultsMenuKey"
@@ -616,8 +621,6 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 #define kKFCHowToMenuKey				kKFCStringPrefix "kKFCHowToMenuKey"
 // "Open Find/Change...".
 #define kKFCOpenFindChangeMenuKey		kKFCStringPrefix "kKFCOpenFindChangeMenuKey"
-// "Find Objects on Active Layer" - a name that stays put (a script finds it by its name, as Move to Active Layer's).
-#define kKFCFindOnActiveLayerMenuKey	kKFCStringPrefix "kKFCFindOnActiveLayerMenuKey"
 // "Run Saved Queries..." - and the query dialog's own words: its title, the two lists' headings, the four
 // buttons between them, Find, Run and Close. English in every UI language, like the rest of the flyout.
 #define kKFCRunSavedQueriesMenuKey		kKFCStringPrefix "kKFCRunSavedQueriesMenuKey"
@@ -722,8 +725,7 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 // Open Find/Change... leads the block: open the dialog, type the query, then search.
 #define kKFCOpenFindChangeMenuItemPosition	0.5
 #define kKFCSearchBookMenuItemPosition		1.0
-// Find Objects on Active Layer right under Find - the same search, kept to a layer (the spec's E14).
-#define kKFCFindOnActiveLayerMenuItemPosition	1.05
+// (Find Objects on Active Layer stood under Find, at 1.05 - retired 2026-10-18: Narrow Down > On Active Layer now.)
 // Change All in Book (No List) under Find, then Clear Results (the spec's section 4).
 #define kKFCChangeAllMenuItemPosition		1.1
 #define kKFCClearResultsMenuItemPosition	1.25
@@ -760,88 +762,71 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 #define kKFCHowToMenuItemPosition			10.5
 #define kKFCAboutThisMenuItemPosition		11.0
 
-// The hit row's menu: Replace, then a text row's Restore Original under it, then its Special Operations submenu (Create
-// Outlines in it - kKFCCreateOutlinesMenuItemPosition, as the object row's).
-#define kKFCReplaceHitMenuItemPosition		0.5
-#define kKFCRestoreOriginalMenuItemPosition	1.0
-#define kKFCHitSpecialOpsSubmenuPosition	2.0
-// The story row's menu: Search This Story Again.
-#define kKFCSearchStoryAgainMenuItemPosition	0.5
-// The document row's menu: Search This Document Again.
-#define kKFCSearchDocumentAgainMenuItemPosition	0.5
-// Select All Rows: after the row's own Search ... Again on a story or document row; alone on the book row's menu.
-#define kKFCSelectAllRowsMenuItemPosition		1.0
-// A tier's own row's menu: Search These Results Again, the Narrow Down submenu, then Clear These Results (the narrow-down
-// spec's N1: the searches above, the one that takes away last).
-#define kKFCSearchTierAgainMenuItemPosition	0.5
-#define kKFCNarrowDownSubmenuPosition		0.75
-#define kKFCClearTheseResultsMenuItemPosition	1.0
-// ...and in Narrow Down (N2): In Tables, In Footnotes, In Endnotes; a rule; Pages..., On Pasteboard; a rule; Frames of These
-// Matches.
-#define kKFCNarrowInTablesMenuItemPosition		1.0
-#define kKFCNarrowInFootnotesMenuItemPosition	2.0
-#define kKFCNarrowInEndnotesMenuItemPosition	3.0
-#define kKFCNarrowSep1MenuItemPosition			3.5
-#define kKFCNarrowPagesMenuItemPosition			4.0
-#define kKFCNarrowOnPasteboardMenuItemPosition	5.0
-#define kKFCNarrowSep2MenuItemPosition			5.5
-#define kKFCNarrowFramesMenuItemPosition		6.0
-// An object row's menu: Replace, then the Special Operations submenu, Create Outlines in it.
-#define kKFCObjectReplaceMenuItemPosition		1.0
-#define kKFCSpecialOpsSubmenuPosition			2.0
-#define kKFCCreateOutlinesMenuItemPosition		1.0
-// Clear from Results last in the hit, object, story and document rows' menus, under a rule (the clear-from-results spec's K2):
-// the one item that takes rows away - from the list, not from the document.
-#define kKFCClearRowsSepMenuItemPosition		20.0
-#define kKFCClearFromResultsMenuItemPosition	21.0
-// Copy Rows under the same rule, above Clear from Results (it takes nothing away); on the book row's menu under a rule of its
-// own after Select All Rows. A tier heading's Copy These Results above its Clear These Results.
-#define kKFCCopyRowsMenuItemPosition			20.5
-#define kKFCCopyTheseResultsMenuItemPosition	0.875
-// ...and in Special Operations after it (the spec's E2 - InDesign's Object menu's order): a rule; the Fitting, Arrange and
-// Transform submenus; a rule; Lock, Unlock, Hide, Show; a rule; Move to Active Layer, Clear Object Style Overrides; a rule;
-// Delete last (the strongest - it can be undone, but it takes the object away).
-#define kKFCSpecialSep1MenuItemPosition			1.5
-#define kKFCFittingSubmenuPosition				2.0
-#define kKFCArrangeSubmenuPosition				3.0
-#define kKFCTransformSubmenuPosition			4.0
-#define kKFCSpecialSep2MenuItemPosition			4.5
-#define kKFCLockMenuItemPosition				5.0
-#define kKFCUnlockMenuItemPosition				5.1
-#define kKFCHideMenuItemPosition				5.2
-#define kKFCShowMenuItemPosition				5.3
-#define kKFCSpecialSep3MenuItemPosition			5.5
-#define kKFCMoveToLayerMenuItemPosition			6.0
-#define kKFCClearStyleOverridesMenuItemPosition	6.1
-#define kKFCSpecialSep4MenuItemPosition			7.5
-#define kKFCDeleteMenuItemPosition				8.0
-// Fitting, in InDesign's own order.
-#define kKFCFillFramePropMenuItemPosition		1.0
-#define kKFCFitContentPropMenuItemPosition		2.0
-#define kKFCContentAwareFitMenuItemPosition		3.0
-#define kKFCFitFrameToContentMenuItemPosition	4.0
-#define kKFCFitContentToFrameMenuItemPosition	5.0
-#define kKFCCenterContentMenuItemPosition		6.0
-// Arrange.
-#define kKFCBringToFrontMenuItemPosition		1.0
-#define kKFCBringForwardMenuItemPosition		2.0
-#define kKFCSendBackwardMenuItemPosition		3.0
-#define kKFCSendToBackMenuItemPosition			4.0
-// Transform: the four asking a value (InDesign's own Object > Transform order), a rule, the turns and flips, a rule, then
-// the two that put a transformation back.
-#define kKFCMoveMenuItemPosition				1.0
-#define kKFCScaleMenuItemPosition				2.0
-#define kKFCRotateMenuItemPosition				3.0
-#define kKFCShearMenuItemPosition				4.0
-#define kKFCTransformSep1MenuItemPosition		4.5
-#define kKFCRotate90CWMenuItemPosition			5.0
-#define kKFCRotate90CCWMenuItemPosition			6.0
-#define kKFCRotate180MenuItemPosition			7.0
-#define kKFCFlipHorizontalMenuItemPosition		8.0
-#define kKFCFlipVerticalMenuItemPosition		9.0
-#define kKFCTransformSep2MenuItemPosition		9.5
-#define kKFCRedefineScalingMenuItemPosition		10.0
-#define kKFCClearTransformationsMenuItemPosition	11.0
+// THE RIGHT-CLICK MENUS OF THE ROWS AND THE TIER HEADINGS, IN ABC ORDER (the author, 2026-10-18: "sort the menus on the
+// panel's rows in abc order"): every item ONE position by its NAME, the same number wherever it appears - so each menu,
+// holding a few of them, comes out in abc order whichever it is (a hit, object, story, document or book row; a tier
+// heading) - and no rules between them. Each submenu is in abc order within itself. (Until that day each menu followed its
+// spec: the searches first and the one that takes away last under a rule; Special Operations InDesign's Object menu's order.)
+#define kKFCClearFromResultsMenuItemPosition	1.0		// Clear from Results
+#define kKFCClearTheseResultsMenuItemPosition	2.0		// Clear These Results
+#define kKFCCopyRowsMenuItemPosition			3.0		// Copy Rows
+#define kKFCCopyTheseResultsMenuItemPosition	4.0		// Copy These Results
+#define kKFCNarrowDownSubmenuPosition			5.0		// Narrow Down >
+#define kKFCReplaceHitMenuItemPosition			6.0		// Replace (a hit row's)
+#define kKFCObjectReplaceMenuItemPosition		6.0		// Replace (an object row's - the same action)
+#define kKFCRestoreOriginalMenuItemPosition		7.0		// Restore from Copy
+#define kKFCSearchTierAgainMenuItemPosition		8.0		// Search These Results Again
+#define kKFCSearchDocumentAgainMenuItemPosition	9.0		// Search This Document Again
+#define kKFCSearchStoryAgainMenuItemPosition	10.0	// Search This Story Again
+#define kKFCSelectAllRowsMenuItemPosition		11.0	// Select All Rows
+#define kKFCHitSpecialOpsSubmenuPosition		12.0	// Special Operations > (a text row's)
+#define kKFCSpecialOpsSubmenuPosition			12.0	// Special Operations > (an object row's)
+// (The rules those menus had - kKFCClearRowsSepActionID, kKFCNarrowSep1/2ActionID, kKFCSpecialSep1-4ActionID,
+//  kKFCTransformSep1/2ActionID - are drawn no more; their ActionIDs stay spent.)
+// Narrow Down, in abc order.
+#define kKFCNarrowFramesMenuItemPosition		1.0		// Frames of These Matches
+#define kKFCNarrowInEndnotesMenuItemPosition	2.0		// In Endnotes
+#define kKFCNarrowInFootnotesMenuItemPosition	3.0		// In Footnotes
+#define kKFCNarrowInTablesMenuItemPosition		4.0		// In Tables
+#define kKFCNarrowOnLayerMenuItemPosition		5.0		// On Active Layer
+#define kKFCNarrowOnPasteboardMenuItemPosition	6.0		// On Pasteboard
+#define kKFCNarrowPagesMenuItemPosition			7.0		// Pages...
+// Special Operations, in abc order (an object row's whole; a text row's holds Create Outlines alone).
+#define kKFCArrangeSubmenuPosition				1.0		// Arrange >
+#define kKFCClearStyleOverridesMenuItemPosition	2.0		// Clear Object Style Overrides
+#define kKFCCreateOutlinesMenuItemPosition		3.0		// Create Outlines
+#define kKFCDeleteMenuItemPosition				4.0		// Delete
+#define kKFCFittingSubmenuPosition				5.0		// Fitting >
+#define kKFCHideMenuItemPosition				6.0		// Hide
+#define kKFCLockMenuItemPosition				7.0		// Lock
+#define kKFCMoveToLayerMenuItemPosition			8.0		// Move to Active Layer
+#define kKFCShowMenuItemPosition				9.0		// Show
+#define kKFCTransformSubmenuPosition			10.0	// Transform >
+#define kKFCUnlockMenuItemPosition				11.0	// Unlock
+// Fitting, in abc order.
+#define kKFCCenterContentMenuItemPosition		1.0		// Center Content
+#define kKFCContentAwareFitMenuItemPosition		2.0		// Content-Aware Fit
+#define kKFCFillFramePropMenuItemPosition		3.0		// Fill Frame Proportionally
+#define kKFCFitContentPropMenuItemPosition		4.0		// Fit Content Proportionally
+#define kKFCFitContentToFrameMenuItemPosition	5.0		// Fit Content to Frame
+#define kKFCFitFrameToContentMenuItemPosition	6.0		// Fit Frame to Content
+// Arrange, in abc order.
+#define kKFCBringForwardMenuItemPosition		1.0		// Bring Forward
+#define kKFCBringToFrontMenuItemPosition		2.0		// Bring to Front
+#define kKFCSendBackwardMenuItemPosition		3.0		// Send Backward
+#define kKFCSendToBackMenuItemPosition			4.0		// Send to Back
+// Transform, in abc order - by the characters, as a sort reads them: "Rotate 180" before "Rotate 90", both before "Rotate...".
+#define kKFCClearTransformationsMenuItemPosition	1.0		// Clear Transformations
+#define kKFCFlipHorizontalMenuItemPosition		2.0		// Flip Horizontal
+#define kKFCFlipVerticalMenuItemPosition		3.0		// Flip Vertical
+#define kKFCMoveMenuItemPosition				4.0		// Move...
+#define kKFCRedefineScalingMenuItemPosition		5.0		// Redefine Scaling as 100%
+#define kKFCRotate180MenuItemPosition			6.0		// Rotate 180 Degrees
+#define kKFCRotate90CWMenuItemPosition			7.0		// Rotate 90 Degrees Clockwise
+#define kKFCRotate90CCWMenuItemPosition			8.0		// Rotate 90 Degrees Counter-clockwise
+#define kKFCRotateMenuItemPosition				9.0		// Rotate...
+#define kKFCScaleMenuItemPosition				10.0	// Scale...
+#define kKFCShearMenuItemPosition				11.0	// Shear...
 
 
 // View (kViewRsrcType) resource IDs for the result tree's row widgets. Offset from the panel's own

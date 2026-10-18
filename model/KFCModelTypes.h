@@ -100,6 +100,7 @@ enum KFCNarrowKind
 	kKFCNarrowPages,			// the row's page in a range of pages (`pages` - the print dialog's way of writing one)
 	kKFCNarrowOnPasteboard,		// the item, or the match's frame, out on the pasteboard
 	kKFCNarrowFrames,			// the frames holding the matches, one object row each
+	kKFCNarrowOnLayer,			// the item, or the match's frame, on a layer of a name (`layer` - On Active Layer, 2026-10-18)
 	kKFCNarrowKindCount
 };
 
@@ -107,6 +108,9 @@ struct KFCNarrowStep
 {
 	int32		kind;		// a KFCNarrowKind
 	PMString	pages;		// kKFCNarrowPages: the range as typed ("1-5, 8"); empty for every other kind
+	PMString	layer;		// kKFCNarrowOnLayer: the layer's name - the front document's active layer when it was pressed (the
+							// author's call, 2026-10-18: Find Objects on Active Layer moved into Narrow Down, text tiers too);
+							// another document's layer of the same name. Empty for every other kind
 
 	KFCNarrowStep() : kind(kKFCNarrowNone) {}
 	explicit KFCNarrowStep(int32 k) : kind(k) {}

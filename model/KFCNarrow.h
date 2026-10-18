@@ -24,9 +24,8 @@
 
 #include <map>
 #include <set>
+#include <string>
 #include <utility>
-
-#include <set>
 #include <vector>
 
 namespace KFCNarrow
@@ -75,16 +74,32 @@ namespace KFCNarrow
 		    that asks of an object (those after a Frames step, or every one of an Object tab's list)? */
 		bool KeepObject(const KFCResultModel::Hit& hit, IDataBase* db) const;
 
+		/** ON ACTIVE LAYER'S LAYER: the name of the list's first On Active Layer step (empty for none) - and the documents that
+		    had a row to ask and no layer of that name (their names, in the order met: the status line says them). */
+		PMString LayerName() const;
+		const std::vector<PMString>& NoLayerDocs() const { return fNoLayerDocs; }
+
 	private:
 		bool Meets(size_t k, const KFCResultModel::Hit& hit, bool objectRow, IDataBase* db) const;
 		/** Step k's page range as document db reads it - read once a document (ReadPageRange): a document that cannot read
 		    it lists nothing for it. */
 		const std::set<UID>& PagesOf(size_t k, IDataBase* db) const;
+		/** Step k's layer in document db - its layer of the step's name, looked up once a document; kInvalidUID when it has none
+		    (its rows are not kept, and its name is noted - NoLayerDocs). */
+		UID LayerOf(size_t k, IDataBase* db) const;
+		// THE CACHES ARE KEYED BY A DOCUMENT'S IDENTITY, NOT ITS IDataBase* (2026-10-18): a book's run opens its chapters one at
+		//  a time and closes each before the next with kProcess (KFCBookScope::HandBackHeldDocNow), so a chapter opened after
+		//  another was closed can be given the closed one's address - and chapters made alike share page and frame UIDs (three
+		//  of them measured: page 243, frame 272 in each). Identity is the document's file (memory uidref-reuse-after-close);
+		//  a document with no file (never saved - never one of a run's chapters, so never closed under a run) by its address.
+		static std::string DocKey(IDataBase* db);
 		std::vector<KFCNarrowStep>	fSteps;
 		size_t						fFramesAt;		// the index of the Frames step - fSteps.size() when there is none
-		mutable std::map<std::pair<size_t, IDataBase*>, std::set<UID> >	fPages;		// PagesOf's reading, by step and document
-		mutable std::set<std::pair<IDataBase*, UID> >	fFrames;	// the frames made rows (FirstFrame)
+		mutable std::map<std::pair<size_t, std::string>, std::set<UID> >	fPages;		// PagesOf's reading, by step and document
+		mutable std::map<std::pair<size_t, std::string>, UID>			fLayers;	// LayerOf's reading, by step and document
+		mutable std::set<std::pair<std::string, UID> >	fFrames;	// the frames made rows (FirstFrame)
 		mutable int32									fNoFrame;	// the matches with no frame (NoteNoFrame)
+		mutable std::vector<PMString>					fNoLayerDocs;	// the documents with no layer of the name (LayerOf)
 	};
 
 	/** Is this a condition only a text row can meet (In Tables / In Footnotes / In Endnotes / Frames of These Matches)? */

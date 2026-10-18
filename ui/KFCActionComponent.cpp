@@ -32,7 +32,6 @@
 #include "IActionStateList.h"	// UpdateActionStates: the items' states, check marks and names
 #include "IApplication.h"		// QueryActionManager
 #include "IDocumentLayer.h"		// GetName - Move to Active Layer's layer
-#include "IFindChangeOptions.h"	// kObjectSearch - Find Objects on Active Layer runs on the Object tab only
 #include "ILayerUIUtils.h"		// QueryContextActiveLayer - the layer the Layers panel has active (its own menu's target)
 #include "ITreeNodeIDData.h"	// the row a right-click menu was popped over - its widget's NodeID
 #include "FindChangeID.h"		// kFindDialogActionID - Edit > Find/Change
@@ -296,7 +295,10 @@ const struct NarrowAction
 	{ kKFCNarrowPagesActionID, kKFCNarrowPages },
 	{ kKFCNarrowOnPasteboardActionID, kKFCNarrowOnPasteboard },
 	{ kKFCNarrowFramesActionID, kKFCNarrowFrames },
+	{ kKFCNarrowOnLayerActionID, kKFCNarrowOnLayer },		// On Active Layer (Find Objects on Active Layer moved here, 2026-10-18)
 };
+
+bool ActiveLayerName(IActiveContext* ac, PMString& outName);	// (below - Move to Active Layer's reading, On Active Layer's too)
 
 // The condition an action stands for - kKFCNarrowNone for any other action.
 int32 NarrowKindOf(const ActionID& action)
@@ -319,13 +321,22 @@ bool NarrowIsTextOnly(int32 kind)
 // A TIER HEADING'S NARROW DOWN: the tier right-clicked - a grey one switched to first, as Search These Results Again
 // switches (a refusal says why on the status line) - narrowed by the condition into a new tier (KFCResultHistory::Narrow:
 // the tiers carried as a search carries them, the status line). No tier row (the action pressed by its ActionID): nothing.
-void DoNarrow(int32 kind, IPMUnknown* widget)
+void DoNarrow(IActiveContext* ac, int32 kind, IPMUnknown* widget)
 {
 	int32 tier = -1;
 	if (KFCJump::IsLanding() || KFCResultTree::RefusedWhileRunning() || !RightClickedTier(widget, tier))
 		return;
-	// PAGES...: the range asked FIRST (KFCSpecialDialogs - the spec's N5) - Cancel changes nothing, a grey tier not switched to.
 	KFCNarrowStep step(kind);
+	// ON ACTIVE LAYER: the front document's Layers panel layer, by its name (ActiveLayerName - Find Objects on Active Layer's
+	// and Move to Active Layer's reading), taken now - each document of the tier is searched on its layer of that name.
+	if (kind == kKFCNarrowOnLayer && !ActiveLayerName(ac, step.layer))
+	{
+		PMString why("Narrow Down: no layer is active - bring a document forward and pick its layer in the Layers panel.");
+		why.SetTranslatable(kFalse);
+		KFCResultTree::ShowStatus(why);
+		return;
+	}
+	// PAGES...: the range asked FIRST (KFCSpecialDialogs - the spec's N5) - Cancel changes nothing, a grey tier not switched to.
 	if (kind == kKFCNarrowPages)
 	{
 		PMString why;
@@ -484,27 +495,8 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			break;
 		}
 
-		case kKFCFindOnActiveLayerActionID:
-		{
-			// FIND OBJECTS ON ACTIVE LAYER (the spec's E14 - the author's S3, "the same layer"): Find's search through the same
-			// door (KFCResultHistory::Find - kept as a tier above the list it replaces), on the Object tab, its rows kept to
-			// the objects on the front document's Layers panel layer - by its name (ActiveLayerName, Move to Active Layer's
-			// reading), so each document of an All Documents or book search is searched on its layer of that name. Not while
-			// a landing is under way - Find's reason (KFCJump::IsLanding).
-			if (KFCJump::IsLanding())
-				break;
-			PMString layer;
-			PMString summary;
-			if (!ActiveLayerName(ac, layer))
-			{
-				summary.SetTranslatable(kFalse);
-				summary.Append("Find Objects on Active Layer: no layer is active in the Layers panel - open a document.");
-				KFCResultTree::ShowStatus(summary);
-				break;
-			}
-			(void)KFCResultHistory::Find(KFCResultHistory::QueryLabel(), summary, nil, &layer);
-			break;
-		}
+		// (FIND OBJECTS ON ACTIVE LAYER stood here - the panel menu's, 2026-10-17 - until 2026-10-18: the author moved it into a
+		//  tier heading's Narrow Down as On Active Layer, text tiers too - DoNarrow.)
 
 		case kKFCChangeAllActionID:
 		{
@@ -813,7 +805,7 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			// A tier heading's Narrow Down - one door for its items (NarrowKindOf's table, DoNarrow).
 			const int32 narrow = NarrowKindOf(actionID);
 			if (narrow != kKFCNarrowNone)
-				DoNarrow(narrow, widget);
+				DoNarrow(ac, narrow, widget);
 			break;
 		}
 	}
@@ -903,18 +895,6 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 				// (CanSearchTab).
 				const bool canRun = haveTarget
 					&& KFCRuns()->CanSearchTab(KFCRuns()->CurrentSearchMode());
-				listToUpdate->SetNthActionState(i, canRun ? kEnabledAction : kDisabled_Unselected);
-				break;
-			}
-			case kKFCFindOnActiveLayerActionID:
-			{
-				// Find Objects on Active Layer (the spec's E14): Find's test, on the Object tab only - the rows it keeps are
-				// page items - and with a layer active in the front document's Layers panel (the name each document's layer
-				// is found by). The name stays put (Move to Active Layer's rule): a script finds it by its name.
-				PMString layer;
-				const bool canRun = haveTarget
-					&& KFCRuns()->CurrentSearchMode() == IFindChangeOptions::kObjectSearch
-					&& ActiveLayerName(ac, layer);
 				listToUpdate->SetNthActionState(i, canRun ? kEnabledAction : kDisabled_Unselected);
 				break;
 			}
@@ -1166,12 +1146,15 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 				// object rows (the spec's N2 - kept on the menu, SET-11). Its other refusals (no query of its own, a document
 				// or book not open, a part of a document's Object tab Selection) said on the status line, as Search These
 				// Results Again's are.
+				// On Active Layer also wants a layer active in the front document (Move to Active Layer's test).
 				const int32 narrow = NarrowKindOf(action);
 				if (narrow != kKFCNarrowNone)
 				{
 					int32 tier = -1;
+					PMString layer;
 					const bool enable = RightClickedTier(widget, tier)
-						&& !(NarrowIsTextOnly(narrow) && KFCResultHistory::TierHoldsObjects(tier));
+						&& !(NarrowIsTextOnly(narrow) && KFCResultHistory::TierHoldsObjects(tier))
+						&& (narrow != kKFCNarrowOnLayer || ActiveLayerName(ac, layer));
 					listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 					break;
 				}

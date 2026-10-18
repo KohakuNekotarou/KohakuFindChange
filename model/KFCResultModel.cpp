@@ -380,6 +380,7 @@ PMString KFCResultModel::NarrowWords()
 			case kKFCNarrowPages:			words.Append("Pages "); words.Append(step.pages); break;
 			case kKFCNarrowOnPasteboard:	words.Append("On Pasteboard"); break;
 			case kKFCNarrowFrames:			words.Append("Frames"); break;
+			case kKFCNarrowOnLayer:			words.Append("Layer: "); words.Append(step.layer); break;
 			default:						words.Append("?"); break;
 		}
 	}
