@@ -13,7 +13,7 @@
 //  installed by Arm and taken out by DisarmAndLog, and only in a build with KFC_DIAG, and only while the fault
 //  switch perf-commands is on (KFCDiag.h). It counts every command InDesign processes - by class, its name kept
 //  from the first one seen - and never refuses one (kCmdNotHandled on every path, as KIDMCP's KIDMCPCmdWatch).
-//  Without KFC_DIAG the three functions do nothing; the boss and its implementation stay in the plug-in but are
+//  Without KFC_DIAG the two functions do nothing; the boss and its implementation stay in the plug-in but are
 //  never created (KFC.fr: a resource cannot follow the test build's define, and a boss named there with no
 //  implementation behind it would fail to load).
 //
@@ -27,8 +27,6 @@ namespace KFCDiagCommands
 	/** Start counting - true when this call started it (false without KFC_DIAG, with the switch off, or when already
 	    counting). */
 	bool Arm();
-	/** Commands processed since Arm (0 when not counting). */
-	int Count();
 	/** Write "COMMANDS <what> total=<n> <class name>=<count> ..." (the most frequent first) and stop counting. */
 	void DisarmAndLog(const char* what);
 

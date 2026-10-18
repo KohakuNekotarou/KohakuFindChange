@@ -201,7 +201,7 @@
 #include <io.h>							// _access_s (KFCDiagFault)
 #include <chrono>
 #include <mutex>
-#include <string>						// KFCDiagFaultText
+#include <string>						// KFCDiagFaultBytes, Text and Lines
 #include <thread>
 #include <vector>						// KFCDiagFaultLines
 #include "PerformanceStats.h"			// InDesign's own counters (KFCDiagPerf) - guide vol2-16
@@ -280,10 +280,9 @@ inline void KFCDiagFaultOff(const char* name)
 		(void)remove(path);
 }
 
-// The fault switch <name>'s file as text (UTF-8, its first line - a CR or LF ends it, a BOM is passed over) - false when
-// the switch is off or its file is empty. (qd-order-file names the file the query dialog's Save Order...
-// and Load Order... use instead of asking through Windows' dialogs, which a test cannot press.)
-inline bool KFCDiagFaultText(const char* name, std::string& out)
+// The fault switch <name>'s file as it is - up to 64 KB, a UTF-8 BOM passed over - what KFCDiagFaultText and
+// KFCDiagFaultLines read. False when the switch is off.
+inline bool KFCDiagFaultBytes(const char* name, std::string& out)
 {
 	out.clear();
 	char path[600] = { 0 };
@@ -292,14 +291,24 @@ inline bool KFCDiagFaultText(const char* name, std::string& out)
 	FILE* f = nullptr;
 	if (fopen_s(&f, path, "rb") != 0 || f == nullptr)
 		return false;
-	char buffer[1024];
+	char buffer[512];
 	size_t got = 0;
-	while ((got = fread(buffer, 1, sizeof(buffer), f)) > 0)
+	while (out.size() < 65536 && (got = fread(buffer, 1, sizeof(buffer), f)) > 0)
 		out.append(buffer, got);
 	fclose(f);
 	if (out.size() >= 3 && static_cast<unsigned char>(out[0]) == 0xEF && static_cast<unsigned char>(out[1]) == 0xBB
 		&& static_cast<unsigned char>(out[2]) == 0xBF)
 		out.erase(0, 3);
+	return true;
+}
+
+// The fault switch <name>'s file as text (UTF-8, its first line - a CR or LF ends it, a BOM is passed over) - false when
+// the switch is off or its file is empty. (qd-order-file names the file the query dialog's Save Order...
+// and Load Order... use instead of asking through Windows' dialogs, which a test cannot press.)
+inline bool KFCDiagFaultText(const char* name, std::string& out)
+{
+	if (!KFCDiagFaultBytes(name, out))
+		return false;
 	const size_t end = out.find_first_of("\r\n");
 	if (end != std::string::npos)
 		out.erase(end);
@@ -312,21 +321,9 @@ inline bool KFCDiagFaultText(const char* name, std::string& out)
 inline bool KFCDiagFaultLines(const char* name, std::vector<std::string>& out)
 {
 	out.clear();
-	char path[600] = { 0 };
-	if (!KFCDiagFaultPath(name, path))
-		return false;
-	FILE* f = nullptr;
-	if (fopen_s(&f, path, "rb") != 0 || f == nullptr)
-		return false;
 	std::string text;
-	char buffer[512];
-	size_t got = 0;
-	while ((got = fread(buffer, 1, sizeof(buffer), f)) > 0 && text.size() < 65536)
-		text.append(buffer, got);
-	fclose(f);
-	if (text.size() >= 3 && static_cast<unsigned char>(text[0]) == 0xEF && static_cast<unsigned char>(text[1]) == 0xBB
-		&& static_cast<unsigned char>(text[2]) == 0xBF)
-		text.erase(0, 3);
+	if (!KFCDiagFaultBytes(name, text))
+		return false;
 	std::string line;
 	text.push_back('\n');
 	for (size_t i = 0; i < text.size(); ++i)

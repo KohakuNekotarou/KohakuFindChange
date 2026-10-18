@@ -127,18 +127,6 @@ bool KFCDiagCommands::Arm()
 #endif
 }
 
-int KFCDiagCommands::Count()
-{
-#ifdef KFC_DIAG
-	if (gInstalled == nil)
-		return 0;			// not counting - gTotal keeps the last run's total until the next Arm
-	std::lock_guard<std::mutex> lock(gMutex);
-	return gTotal;
-#else
-	return 0;
-#endif
-}
-
 void KFCDiagCommands::DisarmAndLog(const char* what)
 {
 #ifdef KFC_DIAG

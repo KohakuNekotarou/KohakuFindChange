@@ -24,13 +24,12 @@
 #include "PMString.h"
 #include "SDKFileHelper.h"
 
-#include <chrono>
 #include <string>
 #include <vector>
 
 // Project includes:
 #include "KFCBookScope.h"			// IsDocStillOpen - a document asked about without following its address
-#include "KFCDiag.h"				// KFC_DIAG_LOG
+#include "KFCDiag.h"				// KFC_DIAG_LOG, KFCDiagNowMs
 #include "KFCDiagWrittenDocs.h"
 
 namespace
@@ -67,11 +66,6 @@ namespace
 
 	// The checks standing now: one inside another (a Replace of several rows that is one row's) is checked with the outer.
 	int32 gDepth = 0;
-
-	double NowMs()
-	{
-		return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now().time_since_epoch()).count();
-	}
 
 	// The document's name and file, and that file's last write time - read now, the document open. The time is the
 	// SDK's (FileUtils::GetModificationDate - the product asks it whether the file on disk changed, InCopyDocUtils.cpp)
@@ -183,7 +177,7 @@ void KFCDiagWrittenDocs::NoteWrite(const UIDRef& docRef)
 
 void KFCDiagWrittenDocs::NoteCloseAsked(const UIDRef& docRef)
 {
-	const double now = NowMs();
+	const double now = KFCDiagNowMs();
 	for (size_t i = gAsked.size(); i-- > 0;)
 	{
 		if (now - gAsked[i].atMs > kAskedWindowMs || gAsked[i].doc == docRef)
@@ -202,7 +196,7 @@ void KFCDiagWrittenDocs::NoteCloseAsked(const UIDRef& docRef)
 
 void KFCDiagWrittenDocs::Closing(const UIDRef& docRef)
 {
-	const double now = NowMs();
+	const double now = KFCDiagNowMs();
 	bool askedByKFC = false;
 	double askedMsAgo = -1.0;
 	for (size_t i = gAsked.size(); i-- > 0;)

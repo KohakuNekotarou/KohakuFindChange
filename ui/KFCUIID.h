@@ -394,37 +394,37 @@ DECLARE_PMID(kActionIDSpace, kKFCShowActionID, kKFCUIPrefix + 78)
 DECLARE_PMID(kActionIDSpace, kKFCMoveToLayerActionID, kKFCUIPrefix + 79)
 DECLARE_PMID(kActionIDSpace, kKFCClearStyleOverridesActionID, kKFCUIPrefix + 80)
 DECLARE_PMID(kActionIDSpace, kKFCDeleteActionID, kKFCUIPrefix + 81)
-// ...and the rules between their groups: in Special Operations (under Create Outlines, above Lock, above Move to Active
-// Layer, above Delete) and in Transform (above Redefine Scaling as 100%).
-DECLARE_PMID(kActionIDSpace, kKFCSpecialSep1ActionID, kKFCUIPrefix + 82)
-DECLARE_PMID(kActionIDSpace, kKFCSpecialSep2ActionID, kKFCUIPrefix + 83)
-DECLARE_PMID(kActionIDSpace, kKFCSpecialSep3ActionID, kKFCUIPrefix + 84)
-DECLARE_PMID(kActionIDSpace, kKFCSpecialSep4ActionID, kKFCUIPrefix + 85)
-DECLARE_PMID(kActionIDSpace, kKFCTransformSep2ActionID, kKFCUIPrefix + 86)
-// ...Transform with a value asked first (the spec's E12 - a dialog of KFCSpecialDialogs), and the rule under them.
+// RETIRED (never reuse): the rules between their groups, + 82 ... + 86 and + 91 below - in Special Operations and in
+// Transform. The row menus have had no rules since they went into abc order (Menu item positions below).
+//DECLARE_PMID(kActionIDSpace, kKFCSpecialSep1ActionID, kKFCUIPrefix + 82)
+//DECLARE_PMID(kActionIDSpace, kKFCSpecialSep2ActionID, kKFCUIPrefix + 83)
+//DECLARE_PMID(kActionIDSpace, kKFCSpecialSep3ActionID, kKFCUIPrefix + 84)
+//DECLARE_PMID(kActionIDSpace, kKFCSpecialSep4ActionID, kKFCUIPrefix + 85)
+//DECLARE_PMID(kActionIDSpace, kKFCTransformSep2ActionID, kKFCUIPrefix + 86)
+// ...Transform with a value asked first (the spec's E12 - a dialog of KFCSpecialDialogs).
 DECLARE_PMID(kActionIDSpace, kKFCMoveActionID, kKFCUIPrefix + 87)
 DECLARE_PMID(kActionIDSpace, kKFCScaleActionID, kKFCUIPrefix + 88)
 DECLARE_PMID(kActionIDSpace, kKFCRotateActionID, kKFCUIPrefix + 89)
 DECLARE_PMID(kActionIDSpace, kKFCShearActionID, kKFCUIPrefix + 90)
-DECLARE_PMID(kActionIDSpace, kKFCTransformSep1ActionID, kKFCUIPrefix + 91)
+//DECLARE_PMID(kActionIDSpace, kKFCTransformSep1ActionID, kKFCUIPrefix + 91)	// retired (above) - never reuse
 // FIND OBJECTS ON ACTIVE LAYER (the panel menu, under Find - the spec's E14, the author's S3 "the same layer"): the Object
 // tab's search kept to the objects on the Layers panel's layer. + 92. RETIRED 2026-10-18 (the author moved it into a tier
 // heading's Narrow Down as On Active Layer, text tiers too - kKFCNarrowOnLayerActionID) - never reuse.
 //DECLARE_PMID(kActionIDSpace, kKFCFindOnActiveLayerActionID, kKFCUIPrefix + 92)
 // CLEAR FROM RESULTS (docs/superpowers/specs/2026-10-18-kfc-clear-from-results-design.md K2): the rows of a hit, object, story or
-// document row taken off the list - and the rule above it, one id for the four menus (+ 93, + 94: the next after the highest
-// spent).
+// document row taken off the list (+ 93: the next after the highest spent). + 94 was the rule above it in the four
+// menus - retired with the row menus' other rules (above) - never reuse.
 DECLARE_PMID(kActionIDSpace, kKFCClearFromResultsActionID, kKFCUIPrefix + 93)
-DECLARE_PMID(kActionIDSpace, kKFCClearRowsSepActionID, kKFCUIPrefix + 94)
-// NARROW DOWN (docs/superpowers/specs/2026-10-18-kfc-narrow-down-design.md N1, N2): a tier heading's submenu - its items in
-// their order and its two rules (+ 95 ... + 102).
+//DECLARE_PMID(kActionIDSpace, kKFCClearRowsSepActionID, kKFCUIPrefix + 94)
+// NARROW DOWN (docs/superpowers/specs/2026-10-18-kfc-narrow-down-design.md N1, N2): a tier heading's submenu, its
+// items + 95 ... + 102 - + 98 and + 101, its two rules, retired with the row menus' other rules (above): never reuse.
 DECLARE_PMID(kActionIDSpace, kKFCNarrowInTablesActionID, kKFCUIPrefix + 95)
 DECLARE_PMID(kActionIDSpace, kKFCNarrowInFootnotesActionID, kKFCUIPrefix + 96)
 DECLARE_PMID(kActionIDSpace, kKFCNarrowInEndnotesActionID, kKFCUIPrefix + 97)
-DECLARE_PMID(kActionIDSpace, kKFCNarrowSep1ActionID, kKFCUIPrefix + 98)
+//DECLARE_PMID(kActionIDSpace, kKFCNarrowSep1ActionID, kKFCUIPrefix + 98)
 DECLARE_PMID(kActionIDSpace, kKFCNarrowPagesActionID, kKFCUIPrefix + 99)
 DECLARE_PMID(kActionIDSpace, kKFCNarrowOnPasteboardActionID, kKFCUIPrefix + 100)
-DECLARE_PMID(kActionIDSpace, kKFCNarrowSep2ActionID, kKFCUIPrefix + 101)
+//DECLARE_PMID(kActionIDSpace, kKFCNarrowSep2ActionID, kKFCUIPrefix + 101)
 DECLARE_PMID(kActionIDSpace, kKFCNarrowFramesActionID, kKFCUIPrefix + 102)
 // COPY RESULTS (docs/superpowers/specs/2026-10-18-kfc-copy-results-progress-share-design.md): the panel menu's (every row of
 // the live list), a row's Copy Rows (the rows Clear from Results would take off; the book row's: every row) and a tier
@@ -785,8 +785,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 #define kKFCSelectAllRowsMenuItemPosition		11.0	// Select All Rows
 #define kKFCHitSpecialOpsSubmenuPosition		12.0	// Special Operations > (a text row's)
 #define kKFCSpecialOpsSubmenuPosition			12.0	// Special Operations > (an object row's)
-// (The rules those menus had - kKFCClearRowsSepActionID, kKFCNarrowSep1/2ActionID, kKFCSpecialSep1-4ActionID,
-//  kKFCTransformSep1/2ActionID - are drawn no more; their ActionIDs stay spent.)
+// (The rules those menus had are drawn no more: their ActionIDs - + 82 ... + 86, + 91, + 94, + 98, + 101 - are
+//  retired in the ActionIDs above.)
 // Narrow Down, in abc order.
 #define kKFCNarrowFramesMenuItemPosition		1.0		// Frames of These Matches
 #define kKFCNarrowInEndnotesMenuItemPosition	2.0		// In Endnotes
