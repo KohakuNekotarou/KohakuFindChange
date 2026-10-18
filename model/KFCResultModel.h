@@ -852,8 +852,9 @@ namespace KFCResultModel
 	    (BuildFontGroups, Hit::storyOrdinal), and the story's version recorded (storyVersion - the story as KFC knows it
 	    now). The rows' places in the list change, so whatever indexes them is let go: a kept write's rows (the layout
 	    generation moves - KFCUndoFollow drops it, UNDO-14), the row backup, the chapter's text foci (attached again,
-	    KFCRowFoci). With no row left in the chapter it is shown empty (Chapter::shownEmpty), as ReplaceChapterRows
-	    leaves one. Returns the story's row count now; -1 = no such chapter. */
+	    KFCRowFoci). With no row left that the list shows - a row taken off it (Hit::cleared) does not count - it is
+	    shown empty (Chapter::shownEmpty), as ReplaceChapterRows leaves one. Returns the story's row count now; -1 = no
+	    such chapter. */
 	int32 ReplaceStoryRows(int32 chapterIdx, UID story, std::vector<Hit>& storyHits, uint32 storyVersion,
 		int32* outStayed = nil);
 

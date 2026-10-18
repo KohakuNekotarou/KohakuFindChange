@@ -149,6 +149,9 @@
 //    ordinal-runs  KFCResultModel.cpp's NumberHitsWithinPages takes a run of one pageIndex for one page, the old way: the
 //                rows of two parent pages (and the pasteboard's) are numbered as one page's, and a parent page's rows with
 //                another place's between them are not numbered (row-ordinal-pageless-armed)
+//    shown-empty-raw  KFCResultModel.cpp's ReplaceStoryRows counts a row taken off the list (Clear from Results) as a
+//                row, the old way: a document whose other stories' rows were all taken off loses its row when its last
+//                story is searched again with nothing found (dr-story-zero-keeps-row-cleared-armed)
 //    look-again-list-limit  KFCSearchEngine.cpp's CollectStoryHits walks a story only as far as the list's limit (300
 //                matches) and takes a walk cut there for a whole one, the old way: a row whose match stands past its story's
 //                300th is called missing when it is looked for again (look-again-past-limit-armed)

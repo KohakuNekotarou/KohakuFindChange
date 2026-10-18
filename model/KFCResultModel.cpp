@@ -1519,10 +1519,12 @@ int32 KFCResultModel::ReplaceStoryRows(int32 chapterIdx, UID story, std::vector<
 	OrderHitsByPage(hits);
 	c->hits.swap(hits);
 	c->storyVersions[story] = storyVersion;
-	// ITS LAST STORY SEARCHED AGAIN AND NOTHING FOUND: the document's row stays, (0/0), as Search This Document Again leaves
-	// one (the author's call: the same reason holds - it can be searched again after the next edit). The story's own row
-	// goes with its rows (a story group is built from the rows).
-	c->shownEmpty = c->hits.empty();
+	// ITS LAST STORY SEARCHED AGAIN AND NOTHING FOUND: the document's row stays, (0/0), as Search This Document Again
+	// leaves one (the author's call: the same reason holds - it can be searched again after the next edit). The story's
+	// own row goes with its rows (a story group is built from the rows). LAST AS THE LIST SHOWS IT: the other stories'
+	// rows taken off it (Clear from Results - Hit::cleared) stay in the chapter, and count for nothing (ShownRows). (A
+	// test build's fault switch: any row counts, the old way - case dr-story-zero-keeps-row-cleared-armed.)
+	c->shownEmpty = KFC_DIAG_FAULT("shown-empty-raw") ? c->hits.empty() : (ShownRows(c->hits) == 0);
 	// THE ROWS' PLACES IN THE LIST CHANGED: indexed again, and whatever names them by index let go, the chapter's foci
 	// back on them (RowsLaidOutAgain).
 	RowsLaidOutAgain(chapterIdx, *c);
@@ -1567,7 +1569,7 @@ int32 KFCResultModel::ReplaceChapterRows(int32 chapterIdx, std::vector<Hit>& doc
 	std::vector<Hit>().swap(docHits);
 	c->storyVersions.swap(storyVersions);
 	storyVersions.clear();
-	c->shownEmpty = c->hits.empty();
+	c->shownEmpty = (ShownRows(c->hits) == 0);		// as ReplaceStoryRows asks it (no row taken off comes in here)
 	RowsLaidOutAgain(chapterIdx, *c);
 	return static_cast<int32>(c->hits.size());
 }
