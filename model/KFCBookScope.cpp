@@ -1521,6 +1521,13 @@ std::vector<int32> KFCBookScope::ProgressBases(const std::vector<uint64>& sizes,
 	for (size_t i = 1; i <= n; ++i)
 		if (bases[i] <= bases[i - 1] && bases[i - 1] < total)
 			bases[i] = bases[i - 1] + 1;
+#ifdef KFC_DIAG
+	// (Test builds only) the sizes read and the stretches dealt - what a live test of the bar checks.
+	std::string said;
+	for (size_t i = 0; i < n && i < 40; ++i)
+		said += (i ? " " : "") + std::to_string(sizes[i]) + ">" + std::to_string(bases[i + 1] - bases[i]);
+	KFC_DIAG_LOG("PROGSHARE total=%d targets=%d size>stretch: %s", static_cast<int>(total), static_cast<int>(n), said.c_str());
+#endif
 	return bases;
 }
 
