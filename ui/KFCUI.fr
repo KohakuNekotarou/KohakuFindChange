@@ -23,7 +23,7 @@
 #include "ObjectModelTypes.fh"
 #include "ShuksanID.h"
 #include "ActionID.h"
-#include "CommandID.h"			// IID_ICOMMANDINTERCEPTOR - the Book panel's command watch
+#include "CommandID.h"			// IID_ICOMMANDINTERCEPTOR (the Book panel's command watch), IID_IBOOLDATA (eye trace)
 #include "WorkspaceID.h"
 #include "WidgetID.h"
 #include "BuildNumber.h"
@@ -37,7 +37,7 @@
 #include "DialogLayoutID.h"	// IID_IEVEINFO / kFixedSizeEVEInfoImpl - the query dialog's "Runs on:" line
 #include "TreeViewDefs.h"	// kHideRootNode etc. - the result tree list
 #include "IconRsrcDefs.h"	// kTreeBranchCollapsed/ExpandedRsrcID - the tree's expander arrows; kEyeballIcon - the row eye
-#include "IconStyleDefs.h"	// kIconNoCentering / kIconRaisedLook - the expander's icon attributes
+#include "IconStyleDefs.h"	// kIconNoCentering / kIconRaisedLook and the icon buttons' looks (pictures, row eye)
 #include "TipsID.h"			// IID_ITIP - the tooltips on the panel's illustration and on the query dialog's rows
 #include "XMLParserID.h"	// IID_ISAXCONTENTHANDLER - the query dialog's reading of a saved query's file
 #include "DragDropID.h"		// IID_IDRAGDROPSOURCE / IID_IDRAGDROPTARGET / IID_IDATAEXCHANGEHANDLER - the row eye's trace
@@ -160,7 +160,7 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 			/*
 			 * Roll-over (ported from KCM): while the "Translucent Panel" toggle is ON, the panel goes
 			 * back to solid with the pointer on it. Verified over the whole panel area in KCM.
-			 * Note that IMouseRollOver has no usage example anywhere in the SDK; besides this AddIn
+			 * Note that IMouseRollOver has no usage example anywhere in the SDK; besides this line
 			 * it needs CREATE_PMINTERFACE *and* an entry in KFCUIFactoryList.h - a missing factory
 			 * entry fails completely silently. Implementation: KFCPanelAlpha.cpp.
 			 */
@@ -202,12 +202,12 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 			   (KFCResultTreeController.cpp). Persistent, as the stock one it replaces is (CREATE_PERSIST_PMINTERFACE - a
 			   non-persistent implementation over an inherited persistent one fails as the resource is read). */
 			IID_ITREEVIEWCONTROLLER, kKFCResultTreeControllerImpl,
-			/* Extends the stock handler so the up / down arrows OPEN the row they land on and run
-			   that row's action - see KFCResultTreeEH.cpp. A book search comes up with every
-			   chapter closed, and the stock keys walk visible rows only.
-			   NOTE: this line alone does not create the handler. Implementations are made on first
-			   QueryInterface, and the first to ask is a row click's key-focus hand-off (KFCResultNodeEH,
-			   through KFCResultTree::TakeKeyboard). */
+			/* The list's own keys over the stock handler, listed at the head of KFCResultTreeEH.cpp - the arrows among
+			   them open a closed row they land on and run its action (a book search's chapters come up closed, and the
+			   stock keys walk visible rows only).
+			   NOTE: this line alone does not create the handler; it is made on its first QueryInterface -
+			   the framework's as an event reaches the list, or KFC's own as it hands the list the keyboard
+			   (KFCResultTree::TakeKeyboard). */
 			IID_IEVENTHANDLER, kKFCResultTreeEHImpl,
 		}
 	},
@@ -238,9 +238,9 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 		kIconSuiteWidgetBoss,
 		{
 			IID_IEVENTHANDLER, kKFCResultEyeEHImpl,
-			/* ...and its TRACE (the author, 2026-10-17 night: "like the Layers panel"): the eye is a drag's source and every
+			/* ...and its TRACE (the author: "like the Layers panel"): the eye is a drag's source and every
 			   eye its target, as the Layers panel's kLayerPanelEyeballBoss is (LayerPanelClass.fr) - KFCResultEyeDrag.cpp.
-			   kIconSuiteWidgetBoss carries neither (inspect_ui boss, 2026-10-17), so nothing inherited is replaced. */
+			   kIconSuiteWidgetBoss carries neither (KIDMCP's inspect_ui boss), so nothing inherited is replaced. */
 			IID_IDRAGDROPSOURCE, kKFCResultEyeDragSourceImpl,
 			IID_IDRAGDROPTARGET, kKFCResultEyeDropTargetImpl,
 		}
@@ -465,8 +465,8 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	/*
 	 * Run Saved Queries... (docs/superpowers/specs/_done/2026-10-07-kfc-query-dialog-and-selected-documents-design.md):
 	 * the query dialog. Our controller fills it on every open (the run order it shows is the session's - KFCQueryOrder);
-	 * our observer hears the buttons (the four between the lists, Clear, Save Order... and Load Order...) and the two
-	 * lists' selections. The observer REPLACES the stock
+	 * our observer hears every button but Run and Close, and the two lists' selections (KFCQueryDialog.cpp's
+	 * AutoAttach names them). The observer REPLACES the stock
 	 * CDialogObserver that kDialogBoss carries, and calls it first, so OK (Run), Cancel (Close) and the close box keep
 	 * working - basicdialog's BscDlgDialogObserver is the same shape.
 	 */
@@ -583,7 +583,7 @@ resource MenuDef (kSDKDefMenuResourceID)
 		// separators' names are in the order they were added, not the order they appear in - the
 		// first one written was the rule above About, which is why it is Separator1 down at 10.0.
 
-		// --- Block 1: the commands - Find/Change, the search, and the two that write to the documents ---
+		// --- Block 1: the commands (each below; their order is the positions in KFCUIID.h) ---
 
 		// Open Find/Change... (the author's call): InDesign's own Find/Change dialog, opened from here -
 		// with no document open as well, where the Edit menu greys it out. Open, type the query, then search.
@@ -598,9 +598,6 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCTargetMenuPath
 		kKFCSearchBookMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
-
-		// (Find Objects on Active Layer stood here - the spec's E14 - until 2026-10-18: the author moved it into a tier
-		//  heading's Narrow Down as On Active Layer, text tiers too.)
 
 		// Change All in Book (No List): InDesign's own Change All over the book's chapters, no list (KFCChangeAll).
 		// Greyed with Book Scope off (F18 - a document's Change All is InDesign's own dialog's).
@@ -623,13 +620,13 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// Run Saved Queries...: the query dialog - saved queries put in an order and run with InDesign's own
-		// Change All, one after another (KFCQueryDialog.cpp). Last in the block, under Clear Results (the author's call).
+		// Change All, one after another (KFCQueryDialog.cpp). Last in the block (the author's call).
 		kKFCRunSavedQueriesActionID,
 		kKFCTargetMenuPath
 		kKFCRunSavedQueriesMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// (Block 2 - Find Missing Glyphs and Find Overset - is gone: the Book panel's preflight reports both.)
+		// (No block 2: Find Missing Glyphs and Find Overset are the Book panel's preflight's - the author's call.)
 
 		// Separator between Run Saved Queries... and the toggles.
 		kKFCSeparator3ActionID,
@@ -637,7 +634,7 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCSeparator3MenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// --- Block 3: the check-mark toggles, in alphabetical order (the author's arrangement, 2026-10-14 - the
+		// --- Block 3: the check-mark toggles, in alphabetical order (the author's arrangement - the
 		// positions and the reason Book Scope comes first are in KFCUIID.h) ---
 
 		// Book Scope: toggle (check mark). ON = the whole book, OFF = what Edit > Find/Change's Search:
@@ -659,8 +656,6 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCTargetMenuPath
 		kKFCHidePrevChapterMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
-
-		// (Keep Previous Results stood here for a day - retired: every Find keeps its tiers now, KFCUIID.h.)
 
 		// Link the Application Bar's Search Field to This Panel: toggle (check mark). Return in the search
 		// field of InDesign's application bar searches with this panel. *Windows only. KFCAppBarSearchEnter.h.
@@ -802,7 +797,7 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCCopyRowsMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// ----- A tier's own row's right-click menu (v2 R9 - the author's call) -----
+		// ----- A tier's own row's right-click menu (the author's call) -----
 		// Popped by KFCResultNodeEH::RButtonDn over a tier's row: Clear These Results lets that tier alone go - a grey one, or
 		// the live list (KFCResultHistory::ClearTier).
 		kKFCClearTheseResultsActionID,
@@ -817,7 +812,7 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCCopyTheseResultsMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// ...and Search These Results Again (the author, 10-14 night): that tier's own search run once more - a grey one
+		// ...and Search These Results Again (the author's call): that tier's own search run once more - a grey one
 		// switched to first (KFCResultTree::SearchListAgain).
 		kKFCSearchTierAgainActionID,
 		kKFCResultTierMenuName
@@ -862,8 +857,8 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCNarrowFramesMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// On Active Layer (the author, 2026-10-18 - Find Objects on Active Layer moved off the panel menu, text tiers too): the
-		// tier's rows kept to the front document's active layer, by its name (KFCNarrow - a text row by its frame's layer).
+		// On Active Layer (the author's call: off the panel menu, text tiers too): the tier's rows kept to the front
+		// document's active layer, by its name (KFCNarrow - a text row by its frame's layer).
 		kKFCNarrowOnLayerActionID,
 		kKFCNarrowDownSubmenuPath
 		kKFCNarrowOnLayerMenuItemPosition,
@@ -916,7 +911,7 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCCopyRowsMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// ----- An OBJECT row's right-click menu (the author, 2026-10-17) -----
+		// ----- An OBJECT row's right-click menu (the author's call) -----
 		// Popped by KFCResultNodeEH::RButtonDn over an object row (the Object tab's): its Replace - the hit rows' own action -
 		// and Special Operations > Create Outlines (KFCObjectOutline): the row's object outlined - or the rows' selected
 		// together, when it is one of them - wherever they stand, across spreads and documents.
@@ -1002,7 +997,7 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCSendToBackMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// Transform: the four asking a value (a dialog first - KFCSpecialDialogs), the turns and flips, the two that put a
+		// Transform: those asking a value (a dialog first - KFCSpecialDialogs), the turns and flips, those putting a
 		// transformation back - in abc order.
 		0,
 		kKFCTransformSubmenuPath kSDKDefDelimitMenuPath
@@ -1168,10 +1163,6 @@ resource ActionDef (kSDKDefActionResourceID)
 		kInvalidInterfaceID,
 		kSDKDefVisibleInKBSCEditorFlag,
 
-		// (Find Objects on Active Layer's stood here - in the Keyboard Shortcuts editor under Palette Menus - until 2026-10-18:
-		//  Narrow Down > On Active Layer now, a tier heading's item, offered no key.)
-
-
 		kKFCActionComponentBoss,
 		kKFCScopeBookActionID,
 		kKFCBookScopeMenuKey,			// "Book Scope" (toggle, check mark)
@@ -1199,7 +1190,7 @@ resource ActionDef (kSDKDefActionResourceID)
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
 
-		// Translucent Panel. kCustomEnabling for the check mark, like the two toggles above - and for
+		// Translucent Panel. kCustomEnabling for the check mark, like the toggles above - and for
 		// nothing else: it is deliberately NOT greyed out while the panel is docked, where it has no
 		// visible effect (the author's call, as in KCM). Pressing it there sets the flag,
 		// which applies the moment the panel floats again, and the status line says so rather than
@@ -1311,7 +1302,7 @@ resource ActionDef (kSDKDefActionResourceID)
 		kInvalidInterfaceID,
 		kSDKDefVisibleInKBSCEditorFlag,
 
-		// Replace - a hit row's right-click menu (the one write from the list - spec F16).
+		// Replace - a hit row's and an object row's right-click menu.
 		// kCustomEnabling: UpdateActionStates greys it by the row the menu is over.
 		kKFCActionComponentBoss,
 		kKFCReplaceHitActionID,
@@ -1356,7 +1347,7 @@ resource ActionDef (kSDKDefActionResourceID)
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
 
-		// Clear These Results - a tier's own row's right-click menu (v2 R9 - the author's call).
+		// Clear These Results - a tier's own row's right-click menu (the author's call).
 		// kCustomEnabling: UpdateActionStates greys it when it comes with no tier row (pressed by ID) or while a run is up.
 		kKFCActionComponentBoss,
 		kKFCClearTheseResultsActionID,
@@ -1367,7 +1358,7 @@ resource ActionDef (kSDKDefActionResourceID)
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
 
-		// Search These Results Again - a tier's own row's right-click menu (the author, 10-14 night). kCustomEnabling, as
+		// Search These Results Again - a tier's own row's right-click menu (the author's call). kCustomEnabling, as
 		// Clear These Results.
 		kKFCActionComponentBoss,
 		kKFCSearchTierAgainActionID,
@@ -1378,7 +1369,7 @@ resource ActionDef (kSDKDefActionResourceID)
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
 
-		// Create Outlines - an object row's Special Operations (the author, 10-17). kCustomEnabling: an object row's alone.
+		// Create Outlines - a hit or object row's Special Operations. kCustomEnabling: grey when none can be outlined.
 		kKFCActionComponentBoss,
 		kKFCCreateOutlinesActionID,
 		kKFCCreateOutlinesMenuKey,	// "Create Outlines"
@@ -1656,7 +1647,7 @@ resource ActionDef (kSDKDefActionResourceID)
 
 		// Copy Results - the panel menu's (docs/superpowers/specs/2026-10-18-kfc-copy-results-progress-share-design.md).
 		// kCustomEnabling: greyed with no row to copy. In the Keyboard Shortcuts editor under Palette Menus, like Clear Results
-		// (the author's call, 2026-10-18 - the spec map's SET-13).
+		// (the author's call - the spec map's SET-13).
 		kKFCActionComponentBoss,
 		kKFCCopyResultsActionID,
 		kKFCCopyResultsMenuKey,			// "Copy Results"
@@ -1743,8 +1734,8 @@ resource ActionDef (kSDKDefActionResourceID)
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
 
-		// On Active Layer (2026-10-18 - the panel menu's Find Objects on Active Layer moved here, text tiers too). kCustomEnabling:
-		// greyed with no layer active in the front document's Layers panel, as Move to Active Layer is.
+		// On Active Layer (off the panel menu, text tiers too - the author's call). kCustomEnabling: greyed with no
+		// layer active in the front document's Layers panel, as Move to Active Layer is.
 		kKFCActionComponentBoss,
 		kKFCNarrowOnLayerActionID,
 		kKFCNarrowOnLayerMenuKey,	// "On Active Layer"
@@ -2181,10 +2172,10 @@ resource KFCResultNodeWidget(kKFCResultChapterNodeWidgetRsrcID + index_enUS)
 };
 
 /*
- * One HIT row of the result tree: the match's line in the custom multi-colour text cell
- * (KFCColorTextView highlights the matched part). No expander (a leaf); the widget manager
- * indents the cell one expander zone deeper than the chapter row's text at apply time, so this
- * frame is only the default state.
+ * One HIT row of the result tree: its eye (the widget manager draws it, or nothing, in the row's expander zone)
+ * and the match's line in the custom multi-colour text cell (KFCColorTextView highlights the matched part). No
+ * expander (a leaf); the widget manager places both at apply time (KFCResultListWidgetMgr's LayOutHitRow), so
+ * these frames are only the default state.
  */
 resource KFCResultNodeWidget(kKFCResultHitNodeWidgetRsrcID + index_enUS)
 {

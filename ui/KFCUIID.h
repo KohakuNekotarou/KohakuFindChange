@@ -407,9 +407,10 @@ DECLARE_PMID(kActionIDSpace, kKFCScaleActionID, kKFCUIPrefix + 88)
 DECLARE_PMID(kActionIDSpace, kKFCRotateActionID, kKFCUIPrefix + 89)
 DECLARE_PMID(kActionIDSpace, kKFCShearActionID, kKFCUIPrefix + 90)
 //DECLARE_PMID(kActionIDSpace, kKFCTransformSep1ActionID, kKFCUIPrefix + 91)	// retired (above) - never reuse
-// FIND OBJECTS ON ACTIVE LAYER (the panel menu, under Find - the spec's E14, the author's S3 "the same layer"): the Object
-// tab's search kept to the objects on the Layers panel's layer. + 92. RETIRED (the author moved it into a tier
-// heading's Narrow Down as On Active Layer, text tiers too - kKFCNarrowOnLayerActionID) - never reuse.
+// FIND OBJECTS ON ACTIVE LAYER (the panel menu, under Find - the author: "the same layer";
+// docs/superpowers/specs/2026-10-17-kfc-object-special-operations-design.md E14): the Object tab's search kept to
+// the objects on the Layers panel's layer. + 92. RETIRED (the author moved it into a tier heading's Narrow Down as
+// On Active Layer, text tiers too - kKFCNarrowOnLayerActionID) - never reuse.
 //DECLARE_PMID(kActionIDSpace, kKFCFindOnActiveLayerActionID, kKFCUIPrefix + 92)
 // CLEAR FROM RESULTS (docs/superpowers/specs/2026-10-18-kfc-clear-from-results-design.md K2): the rows of a hit, object, story or
 // document row taken off the list (+ 93: the next after the highest spent). + 94 was the rule above it in the four
@@ -713,7 +714,7 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 //
 // The flyout, as KFCUI.fr lays it out (the author's arrangement):
 //    0.5 - 1.3    the commands: Open Find/Change..., Find in <scope>, Change All in Book (No List), Clear Results,
-//                 Run Saved Queries... (the two that write to the DOCUMENTS among them)
+//                 Copy Results, Run Saved Queries... (the two that write to the DOCUMENTS among them)
 //   ---- 2.0
 //    2.2 - 2.9    the check-mark toggles (Block 3 below)
 //   ---- 3.0
@@ -723,9 +724,9 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 // Positions that a new order allowed to stay were left where they were, so only the items that
 // actually moved carry new numbers.
 
-// Block 1 - the search, then Change All in Book (No List) and Clear Results with no rule between (the
-// author's call), then a rule. The scope the search runs on is set by Book Scope (Change All runs on the book
-// alone - F18).
+// Block 1 - the search, then Change All in Book (No List), Clear Results, Copy Results and Run Saved Queries...
+// with no rule between (the author's call), then a rule. The scope the search runs on is set by Book Scope
+// (Change All runs on the book alone - F18).
 // Open Find/Change... leads the block: open the dialog, type the query, then search.
 #define kKFCOpenFindChangeMenuItemPosition	0.5
 #define kKFCSearchBookMenuItemPosition		1.0
@@ -734,10 +735,10 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 #define kKFCClearResultsMenuItemPosition	1.25
 // Copy Results under Clear Results: the list's rows as text on the clipboard (the copy-results spec).
 #define kKFCCopyResultsMenuItemPosition		1.27
-// Run Saved Queries... last in the block, under Clear Results (the author's call): the other command that writes with
-// InDesign's Change All and leaves no list.
+// Run Saved Queries... last in the block (the author's call): the other command that writes with InDesign's Change
+// All and leaves no list.
 #define kKFCRunSavedQueriesMenuItemPosition	1.3
-// (Block 2 - the two scans - is gone.)
+// (No block 2: the scans are the Book panel's preflight's - the author's call.)
 #define kKFCSeparator3MenuItemPosition		2.0
 
 // Block 3 - the check-mark toggles, 2.2 to 2.9, in alphabetical order (the author's arrangement). That
