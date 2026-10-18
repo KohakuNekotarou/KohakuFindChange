@@ -425,6 +425,12 @@ DECLARE_PMID(kActionIDSpace, kKFCNarrowPagesActionID, kKFCUIPrefix + 99)
 DECLARE_PMID(kActionIDSpace, kKFCNarrowOnPasteboardActionID, kKFCUIPrefix + 100)
 DECLARE_PMID(kActionIDSpace, kKFCNarrowSep2ActionID, kKFCUIPrefix + 101)
 DECLARE_PMID(kActionIDSpace, kKFCNarrowFramesActionID, kKFCUIPrefix + 102)
+// COPY RESULTS (docs/superpowers/specs/2026-10-18-kfc-copy-results-progress-share-design.md): the panel menu's (every row of
+// the live list), a row's Copy Rows (the rows Clear from Results would take off; the book row's: every row) and a tier
+// heading's Copy These Results - the rows as text on the clipboard (KFCCopyResults). + 103 ... + 105.
+DECLARE_PMID(kActionIDSpace, kKFCCopyResultsActionID, kKFCUIPrefix + 103)
+DECLARE_PMID(kActionIDSpace, kKFCCopyRowsActionID, kKFCUIPrefix + 104)
+DECLARE_PMID(kActionIDSpace, kKFCCopyTheseResultsActionID, kKFCUIPrefix + 105)
 
 
 // WidgetIDs:
@@ -560,6 +566,11 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 #define kKFCNarrowPagesMenuKey			kKFCStringPrefix "kKFCNarrowPagesMenuKey"
 #define kKFCNarrowOnPasteboardMenuKey	kKFCStringPrefix "kKFCNarrowOnPasteboardMenuKey"
 #define kKFCNarrowFramesMenuKey			kKFCStringPrefix "kKFCNarrowFramesMenuKey"
+// ...and Copy Results: the panel menu's, a row's Copy Rows, a tier heading's Copy These Results (measured against every
+// other key - key_collisions.py).
+#define kKFCCopyResultsMenuKey			kKFCStringPrefix "kKFCCopyResultsMenuKey"
+#define kKFCCopyRowsMenuKey				kKFCStringPrefix "kKFCCopyRowsMenuKey"
+#define kKFCCopyTierResultsMenuKey		kKFCStringPrefix "kKFCCopyTierResultsMenuKey"
 // ...and an object row's other Special Operations - InDesign's own English command names ("Degrees" for the degree sign: the
 // string table is ASCII) (measured against every other key - key_collisions.py).
 #define kKFCFillFramePropMenuKey			kKFCStringPrefix "kKFCFillFramePropMenuKey"
@@ -716,6 +727,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 // Change All in Book (No List) under Find, then Clear Results (the spec's section 4).
 #define kKFCChangeAllMenuItemPosition		1.1
 #define kKFCClearResultsMenuItemPosition	1.25
+// Copy Results under Clear Results: the list's rows as text on the clipboard (the copy-results spec).
+#define kKFCCopyResultsMenuItemPosition		1.27
 // Run Saved Queries... last in the block, under Clear Results (the author's call): the other command that writes with
 // InDesign's Change All and leaves no list.
 #define kKFCRunSavedQueriesMenuItemPosition	1.3
@@ -781,6 +794,10 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 // the one item that takes rows away - from the list, not from the document.
 #define kKFCClearRowsSepMenuItemPosition		20.0
 #define kKFCClearFromResultsMenuItemPosition	21.0
+// Copy Rows under the same rule, above Clear from Results (it takes nothing away); on the book row's menu under a rule of its
+// own after Select All Rows. A tier heading's Copy These Results above its Clear These Results.
+#define kKFCCopyRowsMenuItemPosition			20.5
+#define kKFCCopyTheseResultsMenuItemPosition	0.875
 // ...and in Special Operations after it (the spec's E2 - InDesign's Object menu's order): a rule; the Fitting, Arrange and
 // Transform submenus; a rule; Lock, Unlock, Hide, Show; a rule; Move to Active Layer, Clear Object Style Overrides; a rule;
 // Delete last (the strongest - it can be undone, but it takes the object away).

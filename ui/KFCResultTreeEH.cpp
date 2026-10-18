@@ -91,6 +91,7 @@
 #include "KFCDiag.h"			// KFC_DIAG_LOG - the RETFOCUS trace, test builds only
 #include "KFCDiagHiddenDocs.h"	// the hidden-document check after an arrow or a Return - test builds only
 #include "KFCPanelAlpha.h"		// KFCPanelHasSystemKeyboard - the keyboard frame's second question
+#include "KFCCopyResults.h"		// Ctrl+C - the selected rows as text on the clipboard (TakeCopy)
 #ifdef KFC_DIAG
 #include <windows.h>			// CaptureStackBackTrace - who takes the keyboard (DiagCallers), test builds only
 #include <cstdio>
@@ -786,6 +787,46 @@ bool16 KFCResultTreeEH::StockMoveThenLand(IEvent* e, const VirtualKey& key)
 // (KFCResultTree::ReplaceRows - nothing happens when none can be replaced). Any other key, a modified Return, or
 // Return on a story / document / book row goes to the stock handler. Only while the TREE holds the keyboard - typing
 // in a document never comes here.
+// CTRL+C ON THE SELECTED ROWS (docs/superpowers/specs/2026-10-18-kfc-copy-results-progress-share-design.md): the hit rows
+// selected copied as text, as their Copy Rows copies them (KFCCopyResults::CopyLiveRows) - and the key taken whole, as a
+// Return is (TakeReturn): its KeyCmd removed (RemoveNextKeyCmd), so InDesign's own Edit > Copy - which would copy the
+// document's selection instead - does not run as well. Ctrl+C with no hit row selected in the list, or with Alt or Shift,
+// is not ours: passed on. Held down: copied once.
+namespace
+{
+bool IsCopyKey(IEvent* e)
+{
+	if (!e->CmdKeyDown() || e->OptionAltKeyDown() || e->ShiftKeyDown())
+		return false;
+	const VirtualKey key(e->GetVirtualKey());
+	return key == VirtualKey(static_cast<SysChar>('C')) || key == VirtualKey(static_cast<SysChar>('c'));
+}
+
+bool16 TakeCopy(IEvent* e)
+{
+#ifdef KFC_DIAG
+	// (Test builds only) every Ctrl key the list or its filter is asked about - the character and the key code - so the trace
+	// says which form a Ctrl+C arrives in.
+	if (e->CmdKeyDown())
+		KFC_DIAG_LOG("COPYKEY ctrl key char=%u dvcode=%u copy=%d", static_cast<unsigned>(e->GetVirtualKey().GetChar()),
+			static_cast<unsigned>(e->GetVirtualKey().GetDVKeyCode()), IsCopyKey(e) ? 1 : 0);
+#endif
+	if (!IsCopyKey(e))
+		return kFalse;
+	KFCRowsByChapter rows;
+	if (!KFCResultTree::GetSelectedHitRows(rows))
+		return kFalse;
+	Utils<IEventUtils>()->RemoveNextKeyCmd(e);
+	if (e->IsRepeatKey())
+		return kTrue;
+	PMString status;
+	(void)KFCCopyResults::CopyLiveRows(rows, status);
+	KFCResultTree::ShowStatus(status);
+	KFC_DIAG_LOG("COPYKEY Ctrl+C copied focus=%s", KFCResultTree::DiagKeyFocus().c_str());
+	return kTrue;
+}
+}	// anonymous namespace
+
 bool16 KFCResultTreeEH::KeyDown(IEvent* e)
 {
 	gHolding = false;		// any key ends a previous Return's hold; this one may start a new one (TakeReturn)
@@ -796,6 +837,9 @@ bool16 KFCResultTreeEH::KeyDown(IEvent* e)
 	// does not - the filter off the stack - with only the hold to keep the keyboard (TakeReturn).
 	InterfacePtr<ITreeViewController> controller(this, UseDefaultIID());
 	if (TakeReturn(e, controller))
+		return kTrue;
+	// (Ctrl+C - see TakeCopy - when the filter did not get it first.)
+	if (TakeCopy(e))
 		return kTrue;
 	return TreeViewEventHandler::KeyDown(e);
 }
@@ -825,7 +869,8 @@ public:
 #endif
 
 private:
-	bool fTook;		// this filter took the Return now going through - its KeyCmd and KeyUp are taken too
+	bool		fTook;		// this filter took the key now going through - its KeyCmd and KeyUp are taken too
+	VirtualKey	fTookKey;	// ...that key: a Return, or Ctrl+C's C (TakeCopy)
 };
 
 CREATE_PMINTERFACE(KFCReturnFilterEH, kKFCReturnFilterEHImpl)
@@ -834,7 +879,9 @@ bool16 KFCReturnFilterEH::KeyDown(IEvent* e)
 {
 	fTook = false;
 	// Every key the application dispatches passes here while the filter is on the stack, so the cheap question first.
-	if (!IsReturnKey(e->GetVirtualKey()))
+	// (A Return - or Ctrl+C on the selected rows: TakeCopy.)
+	const bool copy = IsCopyKey(e);
+	if (!IsReturnKey(e->GetVirtualKey()) && !copy)
 		return kFalse;
 	// Only while the result list holds the keyboard - a Return anywhere else (a document, a dialog) is not ours. ASKED AS THE
 	// KEYBOARD FRAME ASKS IT (KFCResultTree::ListHoldsKeyboard - the spec map's PNL-20): InDesign's holder AND the window
@@ -862,26 +909,38 @@ bool16 KFCReturnFilterEH::KeyDown(IEvent* e)
 			KFCResultTree::DiagKeyFocus().c_str());
 		return kFalse;
 	}
+	if (copy)
+	{
+		if (!TakeCopy(e))
+			return kFalse;
+		fTook = true;
+		fTookKey = e->GetVirtualKey();
+		return kTrue;
+	}
 	InterfacePtr<ITreeViewController> controller(listView, UseDefaultIID());
 	if (!TakeReturn(e, controller))
 		return kFalse;
 	fTook = true;
+	fTookKey = e->GetVirtualKey();
 	KFC_DIAG_LOG("RETFOCUS filter took the Return focus=%s", KFCResultTree::DiagKeyFocus().c_str());
 	return kTrue;
 }
 
 bool16 KFCReturnFilterEH::KeyCmd(IEvent* e)
 {
-	return (fTook && IsReturnKey(e->GetVirtualKey())) ? kTrue : kFalse;
+	return (fTook && e->GetVirtualKey() == fTookKey) ? kTrue : kFalse;
 }
 
 bool16 KFCReturnFilterEH::KeyUp(IEvent* e)
 {
-	if (!fTook || !IsReturnKey(e->GetVirtualKey()))
+	if (!fTook || !(e->GetVirtualKey() == fTookKey))
 		return kFalse;
 	fTook = false;
-	gHolding = false;		// the Return is over; the keyboard is the user's to move again (gHolding)
-	KFC_DIAG_LOG("RETFOCUS filter took the Return's KeyUp focus=%s", KFCResultTree::DiagKeyFocus().c_str());
+	if (IsReturnKey(fTookKey))
+	{
+		gHolding = false;		// the Return is over; the keyboard is the user's to move again (gHolding)
+		KFC_DIAG_LOG("RETFOCUS filter took the Return's KeyUp focus=%s", KFCResultTree::DiagKeyFocus().c_str());
+	}
 	return kTrue;
 }
 

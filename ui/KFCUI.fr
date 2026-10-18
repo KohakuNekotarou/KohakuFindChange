@@ -619,6 +619,13 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCClearResultsMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// Copy Results (docs/superpowers/specs/2026-10-18-kfc-copy-results-progress-share-design.md): every row of the live list as
+		// text on the clipboard - a line of column names, a tab between columns (KFCCopyResults - the Links panel's Copy Info).
+		kKFCCopyResultsActionID,
+		kKFCTargetMenuPath
+		kKFCCopyResultsMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 		// Run Saved Queries...: the query dialog - saved queries put in an order and run with InDesign's own
 		// Change All, one after another (KFCQueryDialog.cpp). Last in the block, under Clear Results (the author's call).
 		kKFCRunSavedQueriesActionID,
@@ -793,12 +800,30 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCSelectAllRowsMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// ...and the book row's Copy Rows under a rule of its own: every row of the list (the copy-results spec).
+		kKFCClearRowsSepActionID,
+		kKFCResultBookMenuName kSDKDefDelimiterAndSeparatorPath,
+		kKFCClearRowsSepMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCCopyRowsActionID,
+		kKFCResultBookMenuName
+		kKFCCopyRowsMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 		// ----- A tier's own row's right-click menu (v2 R9 - the author's call) -----
 		// Popped by KFCResultNodeEH::RButtonDn over a tier's row: Clear These Results lets that tier alone go - a grey one, or
 		// the live list (KFCResultHistory::ClearTier).
 		kKFCClearTheseResultsActionID,
 		kKFCResultTierMenuName
 		kKFCClearTheseResultsMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		// ...and Copy These Results above it (the copy-results spec): that tier's rows as text on the clipboard - a grey tier's
+		// as its copy holds them (KFCCopyResults::CopyTier).
+		kKFCCopyTheseResultsActionID,
+		kKFCResultTierMenuName
+		kKFCCopyTheseResultsMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// ...and Search These Results Again (the author, 10-14 night): that tier's own search run once more - a grey one
@@ -898,6 +923,29 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCClearFromResultsActionID,
 		kKFCResultDocumentMenuName
 		kKFCClearFromResultsMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		// ----- Copy Rows: the same four menus, under the same rule, above Clear from Results (the copy-results spec) -----
+		// The rows Clear from Results would take off - the row's, the rows selected together, a story's or a document's - as text
+		// on the clipboard (KFCCopyResults::CopyLiveRows). Nothing is taken away.
+		kKFCCopyRowsActionID,
+		kKFCResultHitMenuName
+		kKFCCopyRowsMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCCopyRowsActionID,
+		kKFCResultObjectMenuName
+		kKFCCopyRowsMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCCopyRowsActionID,
+		kKFCResultStoryMenuName
+		kKFCCopyRowsMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCCopyRowsActionID,
+		kKFCResultDocumentMenuName
+		kKFCCopyRowsMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// ----- An OBJECT row's right-click menu (the author, 2026-10-17) -----
@@ -1671,6 +1719,39 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKFCActionComponentBoss,
 		kKFCClearFromResultsActionID,
 		kKFCClearRowsMenuKey,			// "Clear from Results"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// Copy Results - the panel menu's (docs/superpowers/specs/2026-10-18-kfc-copy-results-progress-share-design.md).
+		// kCustomEnabling: greyed with no row to copy. Not offered for a shortcut: the list of those is the author's (the spec
+		// map's SET-13) - to be asked.
+		kKFCActionComponentBoss,
+		kKFCCopyResultsActionID,
+		kKFCCopyResultsMenuKey,			// "Copy Results"
+		kKFCPanelMenuActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// Copy Rows - a hit, object, story, document or book row's right-click menu. kCustomEnabling: greyed when it comes with no
+		// such row (pressed by ID) or with no row to copy.
+		kKFCActionComponentBoss,
+		kKFCCopyRowsActionID,
+		kKFCCopyRowsMenuKey,			// "Copy Rows"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// Copy These Results - a tier's own row's right-click menu. kCustomEnabling: greyed with no tier row or no row to copy.
+		kKFCActionComponentBoss,
+		kKFCCopyTheseResultsActionID,
+		kKFCCopyTierResultsMenuKey,		// "Copy These Results"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,

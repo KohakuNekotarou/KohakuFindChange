@@ -57,6 +57,9 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCSpecialDialogs.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCCopyResults.cpp">
+         <Filter>Source Files</Filter>
+      </ClCompile>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCIconTip.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>

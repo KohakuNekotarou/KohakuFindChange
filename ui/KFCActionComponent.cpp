@@ -53,6 +53,7 @@
 #include "KFCBookPanelPlacement.h"	// "Remember Book Panel Placement" - InDesign's own Book panel
 #include "KFCQueryDialog.h"		// "Run Saved Queries..." - the query dialog
 #include "KFCSpecialDialogs.h"	// Move... / Scale... / Rotate... / Shear... - their values asked first
+#include "KFCCopyResults.h"		// Copy Results / Copy Rows / Copy These Results - the rows as text on the clipboard
 #include "KFCDiagHiddenDocs.h"		// the hidden-document check after an action - test builds only
 
 /** Implements IActionComponent; performs the actions that are executed when the plug-in's
@@ -198,6 +199,24 @@ bool ClearTargetRows(IPMUnknown* widget, KFCRowsByChapter& out)
 	else if (RightClickedDocument(widget, chapter))
 		(void)KFCResultTree::RowsUnder(KFCResultNodeID::Create(chapter), out);
 	return KFCRowCount(out) > 0;
+}
+
+// THE ROWS COPY ROWS COPIES (docs/superpowers/specs/2026-10-18-kfc-copy-results-progress-share-design.md): the rows Clear from
+// Results would take off (ClearTargetRows) - and on the book row, every row of the list (outAll). false = neither, or no row
+// to copy. The menu's grey state and the action ask it - one answer for both.
+bool CopyTargetRows(IPMUnknown* widget, KFCRowsByChapter& out, bool& outAll)
+{
+	outAll = false;
+	if (ClearTargetRows(widget, out))
+		return true;
+	const NodeID node(RightClickedRow(widget));
+	TreeNodePtr<KFCResultNodeID> row(node);
+	if (row != nil && row->IsBookRow() && KFCResults()->IsFromBook() && KFCCopyResults::TierHasRows(-1))
+	{
+		outAll = true;
+		return true;
+	}
+	return false;
 }
 
 // The TIER whose own row was right-clicked (v2 R9) - a grey one's number, or -1 for the live tier - while the list still
@@ -744,6 +763,47 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			break;
 		}
 
+		case kKFCCopyResultsActionID:
+		{
+			// Copy Results (the copy-results spec): every row of the live list as text on the clipboard - the documents are
+			// not touched, nothing to undo. What it copied (or why nothing) on the status line.
+			PMString status;
+			(void)KFCCopyResults::CopyLiveList(status);
+			KFCResultTree::ShowStatus(status);
+			break;
+		}
+
+		case kKFCCopyRowsActionID:
+		{
+			// Copy Rows: the rows of the row it was popped over (CopyTargetRows) - the book row's, every row. No such row (the
+			// action pressed by its ActionID): do nothing.
+			KFCRowsByChapter rows;
+			bool all = false;
+			if (CopyTargetRows(widget, rows, all))
+			{
+				PMString status;
+				if (all)
+					(void)KFCCopyResults::CopyLiveList(status);
+				else
+					(void)KFCCopyResults::CopyLiveRows(rows, status);
+				KFCResultTree::ShowStatus(status);
+			}
+			break;
+		}
+
+		case kKFCCopyTheseResultsActionID:
+		{
+			// Copy These Results: the rows of the tier whose own row it was popped over - a grey tier's as its copy holds them.
+			int32 tier = -1;
+			if (RightClickedTier(widget, tier))
+			{
+				PMString status;
+				(void)KFCCopyResults::CopyTier(tier, status);
+				KFCResultTree::ShowStatus(status);
+			}
+			break;
+		}
+
 		default:
 		{
 			// An object row's other Special Operations - one door for them all (SpecialOpOf's table, DoSpecial).
@@ -1073,6 +1133,30 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 				// run standing greys everything, above) - a document row Search This Document Again left at (0/0) has none.
 				KFCRowsByChapter rows;
 				const bool enable = ClearTargetRows(widget, rows);
+				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
+				break;
+			}
+			case kKFCCopyResultsActionID:
+			{
+				// The panel menu's Copy Results: while the live list has a row (a run standing greys everything, above).
+				const bool enable = KFCCopyResults::TierHasRows(-1);
+				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
+				break;
+			}
+			case kKFCCopyRowsActionID:
+			{
+				// A row's Copy Rows: over a row with a row to copy (CopyTargetRows).
+				KFCRowsByChapter rows;
+				bool all = false;
+				const bool enable = CopyTargetRows(widget, rows, all);
+				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
+				break;
+			}
+			case kKFCCopyTheseResultsActionID:
+			{
+				// A tier's own row's Copy These Results: over a tier's row whose tier has a row.
+				int32 tier = -1;
+				const bool enable = RightClickedTier(widget, tier) && KFCCopyResults::TierHasRows(tier);
 				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 				break;
 			}
