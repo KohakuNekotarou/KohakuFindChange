@@ -13,9 +13,9 @@
   ```
   Open Find/Change...
   Find in Document
-  Find Objects on Active Layer
   Change All in Book (No List)
   Clear Results
+  Copy Results
   Run Saved Queries...
   ──────────
   Book Scope
@@ -35,7 +35,7 @@
 
   2行目の名前は範囲で変わる（`Find in Book`／`Find in Document`／`Find in Story` など＝SET-03。上の絵は Book Scope OFF・検索: ドキュメントのとき）。
   `Book Scope` から `Translucent Panel` までの8つはトグルで、ON のとき左にチェックの印が付く（最初は `Hide Previous Chapter` だけ ON＝SET-23）。トグルの並びは ABC 順（2026-10-14 の作者の並べ替え）。
-  （`Change Checked` と `Show Changes by KohakuFindChange` は 2026-10-06 に外した。`Run Saved Queries...` と `Find/Change Selected Documents (Book)` は 2026-10-07 に足した＝第16章・SCOPE-26〜。`Run Saved Queries...` は同じ日の夜に `Clear Results` の下へ1つ下げた＝作者の依頼。2026-10-14 に作者がトグルの区画を並べ替えた＝それまでは `Keep Previous Results` が `Hide Previous Chapter` の上・窓のトグルは `Translucent Find/Change`・`Minimizable Find/Change`・`Translucent Panel`・`Remember Book Panel Placement` の順。同じ日に `Keep Previous Results` を外した＝パネルの Find はいつも段を積む（SET-24・ROW-39）。`Find Objects on Active Layer` は 2026-10-17 夜に Find の下へ足した＝OBJ-21。）
+  （`Change Checked` と `Show Changes by KohakuFindChange` は 2026-10-06 に外した。`Run Saved Queries...` と `Find/Change Selected Documents (Book)` は 2026-10-07 に足した＝第16章・SCOPE-26〜。`Run Saved Queries...` は同じ日の夜に `Clear Results` の下へ1つ下げた＝作者の依頼。2026-10-14 に作者がトグルの区画を並べ替えた＝それまでは `Keep Previous Results` が `Hide Previous Chapter` の上・窓のトグルは `Translucent Find/Change`・`Minimizable Find/Change`・`Translucent Panel`・`Remember Book Panel Placement` の順。同じ日に `Keep Previous Results` を外した＝パネルの Find はいつも段を積む（SET-24・ROW-39）。`Find Objects on Active Layer` は 2026-10-17 夜に Find の下へ足した＝OBJ-21。`Copy Results` は 2026-10-18 に Clear Results の下へ足した＝ROW-48。同じ日の午後に `Find Objects on Active Layer` を外した＝段の見出しの Narrow Down ▸ On Active Layer へ移した（ROW-46）。）
   - 訂正: 2026-10-08＝最後の項目は、それまで SDK 共通の文字列で `About this plug-in...` と出ていた（この地図の表記と食い違っていた）。作者「英語として正しい方で」→ほかの項目と同じく語頭を大文字にし、ハイフンの後ろも大文字の `About This Plug-In...`（InDesign のメニューバーの `Plug-Ins`・このパネルのまとまり `Kohaku Plug-Ins` と同じ）。KFC 専用のキー `kKFCAboutThisPlugInMenuKey`（SDK のキーは自作のプラグイン全部が共有するので値を変えない）。
 
 - **SET-02** ★`Find in …`・`Change All in Book (No List)`・`Clear Results`・`Run Saved Queries...` の間に区切り線は無い（探すことと、一覧を使わない置換と、その前の片付けが1つのまとまり）。
@@ -128,7 +128,8 @@
 
 ## 4. キーボードショートカット
 
-- **SET-13** ★ショートカットを割り当てられるのは**7つだけ** ―― `Open Find/Change...`・`Find in …`・`Find Objects on Active Layer`・`Change All in Book (No List)`・`Run Saved Queries...`・`Clear Results`・`Copy Results`
+- **SET-13** ★ショートカットを割り当てられるのは**6つだけ** ―― `Open Find/Change...`・`Find in …`・`Change All in Book (No List)`・`Run Saved Queries...`・`Clear Results`・`Copy Results`
+  （`Find Objects on Active Layer` は 2026-10-18 午後に外れた＝パネルメニューから段の見出しの Narrow Down ▸ On Active Layer へ移した・Narrow Down は段の上でしか押せないので割り当てない＝ROW-46。ほかに本体の決まりで、ウィンドウメニューの `Kohaku Find/Change`〈パネルを出す〉も割り当てられる＝KIDMCP の `inspect_ui actions` の shortcuts の列で確かめた・2026-10-18。）
   （`Copy Results` は 2026-10-18 に足した＝作者の決定「だしましょう」。行の `Copy Rows`・段の `Copy These Results` は出さない＝押した行・段が要る。一覧の中の Ctrl+C は Copy Rows と同じ＝ショートカットの設定とは別。）
   （`Find Objects on Active Layer` は 2026-10-17 夜に足した＝Find と同じ扱い・私の判断＝2026-10-18 作者が承認「キーボードショートカットの件、有難うございます。」・OBJ-21。）
   （2026-09-27 に検索、10-01 に Open Find/Change＝作者の決定。10-06 の設計（第5版）で Change All in Book と Clear Results を足し、Change Checked と Show Changes を外した。

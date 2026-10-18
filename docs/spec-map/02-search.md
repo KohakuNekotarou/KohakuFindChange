@@ -157,6 +157,12 @@
   題はブックなら `Searching book...`、それ以外は `Searching...`。行には `Chapter 3 / 12 - ch03.indd`（All Documents は `Document 2 / 5 - …`）。
   - 訂正:
 
+- **FIND-29b** ★バーの幅は**対象の大きさで割る**（2026-10-18 作者「進捗バーを章の大きさで割る　やりましょう」・設計書 `docs/superpowers/specs/2026-10-18-kfc-copy-results-progress-share-design.md`）――
+  ブックの章は**ブックが控えている章のファイルの大きさ**（`IBookContent::GetSize`＝章を開かずに読める・DOM の `BookContent.size` と同じ値）、開いている文書（All Documents）は**ページ数**で、バーの全体を比で配る。読めない章は平均として数え、どの対象にも均等の4分の1の幅は残す（小さい章でもバーが動く）。バー全体の長さと行の文（`Chapter 3 / 12 - …`）は今までどおり。
+  対象＝ブックの検索（Find・Narrow Down・Search These Results Again）・All Documents・物の検索・Search This Story／Document Again の部分・Change All in Book (No List)・クエリの実行（クエリ1つの幅を文書の大きさで配る）。変わるのはバーの進み方だけ＝結果・文・取り消しは変わらない。
+  ✅ 実機（2026-10-18・テスト用ビルド・`work/note-scripts/2026-10-18-kfc-narrow/p1.ps1`・記録 `PROGSHARE`）＝章 909312／1667072／1138688 バイト → 7343／13462／9195（計 30000）・物の検索 734／1346／920（計 3000）・All Documents 1／12／3 ページ → 2449／22041／5510（1ページの文書は均等の4分の1まで上げた）。
+  - 訂正:
+
 - **FIND-30** バーの Cancel は、**一致のある次のストーリーへ移るとき**と**章と章の間**で聞く
   ★（2026-10-02 の決定＝「章の間だけ」と「バーが動くたび」の間を取った）。
   ⚠歩き手が KFC に戻ってくるのは一致を見つけたときだけなので、一致の無い長いストーリーを歩いている間は、次の一致まで止まらない。

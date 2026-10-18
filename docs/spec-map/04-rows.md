@@ -152,43 +152,36 @@
 - **ROW-31** メッセージ欄の `&` は**そのまま**出る（手で描いているので、`A&B.indd` が `AB.indd` にならない・2026-09-29 から）。
   - 訂正:
 
-- **ROW-32** ★右クリックのメニューは**4種類の行それぞれにある**（2026-10-11 の形）――
+- **ROW-32** ★右クリックのメニューは**4種類の行それぞれにある**（2026-10-11 の形）。★**どのメニューも項目は abc 順で、区切り線は無い**（2026-10-18 作者「パネルの行などにでるパネルメニュー、abc順にならべかえておいてほしい」＝同じ名前の項目はどのメニューでも同じ位置・サブメニューの中もそれぞれ abc 順＝ここまで私の判断・パネルのフライアウト〈SET-01〉はそのまま）――
 
   ```
-  ヒットの行       Replace
+  ヒットの行       Clear from Results（2026-10-18＝ROW-47）
+                   Copy Rows（2026-10-18＝ROW-48）
+                   Replace
                    Restore from Copy（2026-10-17＝REP-38・最初の名前 Restore Original）
                    Special Operations ▸ Create Outlines（文字の行・2026-10-18＝REP-39）
-                   ─
-                   Clear from Results（2026-10-18＝ROW-47）
-  （物の行）       Replace
-                   Special Operations ▸ Create Outlines（2026-10-17＝OBJ-19）
-                                        ─
-                                        Fitting ▸ / Arrange ▸ / Transform ▸
-                                        ─
-                                        Lock・Unlock・Hide・Show
-                                        ─
-                                        Move to Active Layer・Clear Object Style Overrides
-                                        ─
-                                        Delete（2026-10-17 夜＝OBJ-20）
-                   ─
-                   Clear from Results
-  ストーリーの行   Search This Story Again
+  （物の行）       Clear from Results
+                   Copy Rows
+                   Replace
+                   Special Operations ▸ Arrange ▸・Clear Object Style Overrides・Create Outlines（OBJ-19）・Delete・Fitting ▸・
+                                        Hide・Lock・Move to Active Layer・Show・Transform ▸・Unlock（OBJ-20）
+  ストーリーの行   Clear from Results
+                   Copy Rows
+                   Search This Story Again
                    Select All Rows
-                   ─
-                   Clear from Results
-  文書の行         Search This Document Again
+  文書の行         Clear from Results
+                   Copy Rows
+                   Search This Document Again
                    Select All Rows
-                   ─
-                   Clear from Results
-  ブックの行       Select All Rows
-  段の見出しの行   Search These Results Again（ROW-44）
-                   Narrow Down ▸ In Tables・In Footnotes・In Endnotes
-                                 ─
-                                 Pages...・On Pasteboard
-                                 ─
-                                 Frames of These Matches（2026-10-18＝ROW-46）
-                   Clear These Results（ROW-43）
+  ブックの行       Copy Rows
+                   Select All Rows
+  段の見出しの行   Clear These Results（ROW-43）
+                   Copy These Results（ROW-48）
+                   Narrow Down ▸ Frames of These Matches・In Endnotes・In Footnotes・In Tables・On Active Layer・On Pasteboard・Pages...（ROW-46）
+                   Search These Results Again（ROW-44）
   ```
+
+  （2026-10-18 午後の abc 順の前は、探す系を上に、一覧から外す Clear from Results を一番下の区切り線の後に、特殊操作は本体の Object メニューの並びと区切り線で並べていた。）
 
   （ヒットの行の Replace＝2026-10-06・F16／ストーリーの行＝2026-10-09＝REP-35／文書の行の Search This Document Again＝2026-10-10＝REP-37／Select All Rows とブックの行のメニュー＝2026-10-11＝ROW-38。どれも作者の依頼。）
   ヒットの行の Replace は、その行が**まとめて選んだ行の1つなら選んだ行すべて**、そうでなければその1行を置換する（REP-36）。選んだ行のどれも置換できないとき灰色で、メニューは灰色の Replace を見せて開く（SET-11・2026-10-17 から。それまでは開かなかった）。
@@ -306,21 +299,30 @@
   - 訂正:
 
 - **ROW-46** ★**Narrow Down**（段の見出しの行の右クリック・2026-10-18 作者の依頼＝設計書 `docs/superpowers/specs/2026-10-18-kfc-narrow-down-design.md`・作者の選択「後者」＝その段をもう一度探して、条件に合わない一致は歩きの途中で落とす）――
-  見出しのメニューは上から `Search These Results Again`・`Narrow Down ▸`・`Clear These Results`。サブメニュー＝`In Tables`・`In Footnotes`・`In Endnotes`／`Pages...`・`On Pasteboard`／`Frames of These Matches`（区切り2本）。
+  見出しのメニューとサブメニューの並びは abc 順（ROW-32・2026-10-18 午後から）＝サブメニュー `Frames of These Matches`・`In Endnotes`・`In Footnotes`・`In Tables`・`On Active Layer`・`On Pasteboard`・`Pages...`（区切りは無い。それまでは `In Tables`・`In Footnotes`・`In Endnotes`／`Pages...`・`On Pasteboard`／`Frames of These Matches` の区切り2本・見出しのメニューは探す系が上で Clear These Results が一番下）。
   押すと**その段の検索を、その段の条件に1つ足して回し、結果は新しい段**になる（元の段は灰色で残る＝ROW-40・ROW-41 の「残る」）。灰色の段の見出しから押すと、先にその段へ切り替わる（ROW-42）。条件は重ねられる（絞った段からもう一度絞る）。絞った段の見出しは**名前の後に条件**＝`[Text/Document] F:"cat" C:"dog" / In Tables  (0/1)`（名前そのものは変えない＝段の検算は名前で読む）。絞った段の Search These Results Again は条件ごと探す（ROW-44）。
   ★**上限（GEN-34）は条件に通った行で数える**＝歩きの途中で落とすので、本文に上限を超える一致があっても、表の中の一致だけで上限まで集まる。
-  条件＝`In Tables`（表のセルの中の一致）／`In Footnotes`（脚注の中）／`In Endnotes`（後注の中＝後注は文書の別のストーリー）／`Pages...`（ページの範囲＝先にダイアログ `Kohaku Find/Change - Narrow Down`・欄 `Pages:`・例 `e.g. 1-5, 8`・印刷ダイアログの範囲と同じ読み方＝`1-5, 8`・セクションの名前つき `Sec1:3`・絶対番号 `+3`・**各文書が自分のページ番号で読む**・行のページは一致の枠のページ）／`On Pasteboard`（一致の枠・物がペーストボードの上）／`Frames of These Matches`（一致をその枠の物の行にする＝OBJ-22）。
-  物の段（Object タブの一覧）では `In Tables`・`In Footnotes`・`In Endnotes`・`Frames of These Matches` が灰色（`Pages...` と `On Pasteboard` は使える）。
+  条件＝`In Tables`（表のセルの中の一致）／`In Footnotes`（脚注の中）／`In Endnotes`（後注の中＝後注は文書の別のストーリー）／`Pages...`（ページの範囲＝先にダイアログ `Kohaku Find/Change - Narrow Down`・欄 `Pages:`・例 `e.g. 1-5, 8`・印刷ダイアログの範囲と同じ読み方＝`1-5, 8`・セクションの名前つき `Sec1:3`・絶対番号 `+3`・**各文書が自分のページ番号で読む**・行のページは一致の枠のページ）／`On Pasteboard`（一致の枠・物がペーストボードの上）／`Frames of These Matches`（一致をその枠の物の行にする＝OBJ-22）／`On Active Layer`（2026-10-18 午後・下の★）。
+  物の段（Object タブの一覧）では `In Tables`・`In Footnotes`・`In Endnotes`・`Frames of These Matches` が灰色（`Pages...`・`On Pasteboard`・`On Active Layer` は使える）。
+  ★**On Active Layer**（2026-10-18 午後・作者「FindObjectのパネルメニューを[object]とかの行の絞り込みの検索の仕組みに変えたい」・文字の段にも＝作者が私のおすすめを選んだ＝OBJ-21 のパネルメニューの項目をここへ移した）＝押したときの**前面の文書の Layers パネルで選ばれているレイヤー**の名前で絞る（OBJ-21・Move to Active Layer と同じ読み方）。ほかの文書・ブックの章は**同じ名前のレイヤー**で絞り、その名前のレイヤーが無い文書は行が出ず、文の後ろに名前 ` No layer named "Images" in: ol2.indd.`（行を持っていた文書だけ）。物の行は物のレイヤー（グループの中の物はグループの・テキストの中の物はアンカーの枠の＝OBJ-21 と同じ）、**文字の行は一致の枠のレイヤー**（あふれた一致は「＋」の枠＝行に出ているページの枠・On Pasteboard と同じ読み方）。見出し `… / Layer: Images`・文 `Narrowed down (Layer: Images): 2 hit(s).`。重ねると両方（別のレイヤーで重ねると 0 件）。Search These Results Again もレイヤーごと。灰色＝前面の文書のレイヤーが読めないとき。断る＝`no layer is active - bring a document forward and pick its layer in the Layers panel.`／一覧の開いている文書のどれにもその名前のレイヤーが無い `no document of these results has a layer named "X" - nothing was searched.`（Pages... と同じく探す前に聞く）。「検索と置換」のタブは関係ない（段の検索の条件で探す＝OBJ-21 のように Object タブにしておく必要は無い）。キーボードショートカットには割り当てない（SET-13）。
+  ✅ 実機（2026-10-18 午後・テスト用ビルド・KIDMCP・`work/note-scripts/2026-10-18-kfc-narrow/o1.ps1`）＝文字の段 3→2（あふれた一致は「＋」の枠で残る）・見出し・Search These Results Again で2・別のレイヤーで重ねて0／物の段 4→3（グループの2つを含む）／All Documents でレイヤーの無い文書を名前で挙げた／行・段の見出し・5つのサブメニューが abc 順。
   メッセージ欄＝検索の文の頭に `Narrowed down (<条件>): `＝`Narrowed down (In Tables): 12 hit(s) in 3 of 5 chapter(s).`・0件 `Narrowed down (In Tables / On Pasteboard): No matches in document "nd1.indd".`・Cancel `Narrow Down: cancelled.`（一覧は押す前のまま）。
   断る（`Narrow Down: ` の後に・一覧はそのまま）＝文字だけの条件を物の段に `<条件> narrows text results - these are objects.`／ページが空 `no pages were given - nothing was searched.`／どの文書でも読めない範囲 `"2-x" is not a page range in any document - nothing was searched.`（探す前に、一覧の文書のうち開いているもので読む）／ほかは Search These Results Again と同じ断り（自分の条件を持たない段・閉じた文書・実行中など＝ROW-44）。ダイアログの Cancel は何もしない（メッセージ欄も変えない）。
   ✅ 実機（2026-10-18・テスト用ビルド・KIDMCP・`work/note-scripts/2026-10-18-kfc-narrow/n1.ps1`・`n2.ps1`）＝N-1〜N-4（表・脚注・後注・ペーストボード・重ねた条件・灰色の段から・物の段の灰色・絞った段の探し直し・Cancel・本文 310＋表 310 で表だけ 300 行）・Pages...（`2-3` で2行・`2-x` で断り・ダイアログの Cancel は何もしない・`5` で5ページ目の行とその枠のあふれの行・物の段）＝ノート `docs/ai-notes/kfc-narrow-clear-outlines-2026-10-18.md`。
   - 訂正:
 
-- **ROW-47** ★**Clear from Results**（ヒット・物・ストーリー・文書の行の右クリックの一番下・区切りの後＝2026-10-18 作者「検索結果の行を、消去したくなりますね」）と **Ctrl+Return**（作者「Ctrl＋リターンでその検索結果の行を消せるといいかも」・設計書 `docs/superpowers/specs/2026-10-18-kfc-clear-from-results-design.md`）――
+- **ROW-47** ★**Clear from Results**（ヒット・物・ストーリー・文書の行の右クリック＝abc 順で一番上〈ROW-32・2026-10-18 午後から。それまでは一番下・区切りの後〉・2026-10-18 作者「検索結果の行を、消去したくなりますね」）と **Ctrl+Return**（作者「Ctrl＋リターンでその検索結果の行を消せるといいかも」・設計書 `docs/superpowers/specs/2026-10-18-kfc-clear-from-results-design.md`）――
   行を**一覧から外すだけ**（文書は変えない・取り消しの段にならない）。ヒットの行（物の行）＝その行・まとめて選んだ行の1つなら選んだ行すべて／ストーリーの行＝その下の行全部とストーリーの行／文書の行＝その文書の行全部と文書の行（段の見出しは `(0/0)` で残る）。`(R/N)` も減る。メッセージ欄 `Cleared 1 row from the results.`／`Cleared 3 rows from the results.`。
   **Ctrl+Return**＝選んだヒットの行（物の行）を外し、**下の行を選んで飛ぶ**（一番下の行なら上の行）＝Return と同じくキーボードは一覧に残る（REP-32）。Ctrl+Shift+Return は何もしない。
   外した行は、それより前の置換の取り消し・やり直しでも戻らない（残った行の追いかけは今までどおり＝UNDO-02）。Search This Story／Document Again・Search These Results Again で探し直すと、まだ一致する所は行として戻る。外した行は段を切り替えて戻っても外れたまま。
-  ✅ 実機（2026-10-18・`k1.ps1`）＝1行・まとめて3行・ストーリーの行・文書の行・置換2つの後に1行外して Ctrl+Z／Redo（外した行は戻らない・段は置換の2つだけ）・Ctrl+Return（下の行が選ばれ文書の一致が選ばれる・最後の行は上へ・Ctrl+Shift+Return は何もしない）・探し直しで戻る・物の行（Ctrl+Return で下の物がレイアウトで選ばれる・灰色にしてから戻っても外れたまま）・4つのメニューの区切り。⬜まだ＝押したまま（キーの自動反復）・本文にキーボードがあるときの Ctrl+Return（KIDMCP の `send_input` が自動反復を作れない）。
+  ✅ 実機（2026-10-18・`k1.ps1`）＝1行・まとめて3行・ストーリーの行・文書の行・置換2つの後に1行外して Ctrl+Z／Redo（外した行は戻らない・段は置換の2つだけ）・Ctrl+Return（下の行が選ばれ文書の一致が選ばれる・最後の行は上へ・Ctrl+Shift+Return は何もしない）・探し直しで戻る・物の行（Ctrl+Return で下の物がレイアウトで選ばれる・灰色にしてから戻っても外れたまま）・4つのメニューの区切り。✅（2026-10-18 午後）押したまま＝KIDMCP の `send_input` の `CTRL+ENTER*3`（Windows と同じ自動反復の印・10-09 から有った）で外れたのは1行（`work/note-scripts/2026-10-18-kfc-narrow/km1.ps1`・記録 RETFOCUS の repeat=0 の後に repeat=1）。⬜まだ＝本文にキーボードがあるときの Ctrl+Return。
+  - 訂正:
+
+- **ROW-48** ★**Copy Results**（パネルメニュー・Clear Results の下）・**Copy Rows**（ヒット・物・ストーリー・文書・ブックの行の右クリック）・**Copy These Results**（段の見出しの右クリック）・**Ctrl+C**（2026-10-18 作者「Copy Results やりましょう」・設計書 `docs/superpowers/specs/2026-10-18-kfc-copy-results-progress-share-design.md`）――
+  行を**タブ区切りのテキストでクリップボードへ写す**（本体のリンクパネルの「選択したリンクの情報をコピー」と同じ形＝1行目に列の名前・列の間にタブ・行の間に改行）。列＝`Document`・`Page`・`Status`・`Text`。Page＝行の場所の語のまま（`P1(2)`・`P2 overset` など）／Status＝`Changed`・`Outlined`・特殊操作の語・`Missing` など（無ければ空）／Text＝行と同じ「前[一致]後」（本文のタブは »・改行は空白）・物の行は物の名前。一覧から外した行（ROW-47）は写さない。文書は変えない（取り消しの段にならない）。
+  Copy Results＝今の段の行全部／Copy Rows＝その行（まとめて選んだ行の1つなら選んだ行すべて・ストーリーと文書の行はその下の行全部・ブックの行は全部）／Copy These Results＝その段の行（灰色の段も）／Ctrl+C＝一覧にキーボードがあるとき選んだ行（Copy Rows と同じ・本体の「コピー」は走らない）。メッセージ欄 `Copied 4 rows to the clipboard.`（1行は `Copied 1 row to the clipboard.`）。灰色＝写す行が無いとき。
+  ★`Copy Results` はキーボードショートカットに割り当てられる（SET-13・2026-10-18 作者「だしましょう」）。
+  ✅ 実機（2026-10-18・テスト用ビルド・KIDMCP・`work/note-scripts/2026-10-18-kfc-narrow/c1.ps1`・`p1.ps1`）＝見出し＋4行の4列・»・置換した行の Changed・外した行は入らない・ストーリーの行で2行・文書の行で4行・灰色の段で4行・Ctrl+C で1行（本体のコピーで上書きされない）・ブックの行で16行。
   - 訂正:
 
 ---
