@@ -97,6 +97,16 @@ namespace
 		return shown;
 	}
 
+	// ...and how many of them a write of ours has written (Hit::replaced): what every replaced count counts.
+	int32 ReplacedRows(const std::vector<KFCResultModel::Hit>& hits)
+	{
+		int32 replaced = 0;
+		for (size_t i = 0; i < hits.size(); ++i)
+			if (hits[i].replaced && !hits[i].cleared)
+				++replaced;
+		return replaced;
+	}
+
 	// Does the tree show this chapter? Rows, or searched again with none (Chapter::shownEmpty) - the one question
 	// GetDisplayChapterCount, GetShownChapter and GetShownChapterPos ask. A chapter whose every row was taken off the list
 	// (Clear from Results) is not shown.
@@ -107,16 +117,27 @@ namespace
 
 	// THE INDEXES, ASKED IN ONE PLACE. A chapter, a row, a story group - or nil when an index
 	// is out of range, which is how a repaint racing a rebuild (or a stale node id) reads "nothing" rather
-	// than crashing. Every getter and setter below starts here.
+	// than crashing. Every getter and setter below starts here - ChapterAt / HitAt over the model's own chapters,
+	// ChapterIn / HitIn over the chapters given (a kept tier's list too - ApplyRowStepTo).
+	KFCResultModel::Chapter* ChapterIn(std::vector<KFCResultModel::Chapter>& chapters, int32 chapterIdx)
+	{
+		return (chapterIdx >= 0 && chapterIdx < static_cast<int32>(chapters.size())) ? &chapters[chapterIdx] : nil;
+	}
+
+	KFCResultModel::Hit* HitIn(std::vector<KFCResultModel::Chapter>& chapters, int32 chapterIdx, int32 hitIdx)
+	{
+		KFCResultModel::Chapter* c = ChapterIn(chapters, chapterIdx);
+		return (c != nil && hitIdx >= 0 && hitIdx < static_cast<int32>(c->hits.size())) ? &c->hits[hitIdx] : nil;
+	}
+
 	KFCResultModel::Chapter* ChapterAt(int32 chapterIdx)
 	{
-		return (chapterIdx >= 0 && chapterIdx < static_cast<int32>(gChapters.size())) ? &gChapters[chapterIdx] : nil;
+		return ChapterIn(gChapters, chapterIdx);
 	}
 
 	KFCResultModel::Hit* HitAt(int32 chapterIdx, int32 hitIdx)
 	{
-		KFCResultModel::Chapter* c = ChapterAt(chapterIdx);
-		return (c != nil && hitIdx >= 0 && hitIdx < static_cast<int32>(c->hits.size())) ? &c->hits[hitIdx] : nil;
+		return HitIn(gChapters, chapterIdx, hitIdx);
 	}
 
 	KFCResultModel::FontGroup* GroupAt(int32 chapterIdx, int32 groupIdx)
@@ -143,10 +164,11 @@ namespace
 		return v;
 	}
 
-	// Write a copied version back: recorded again, or taken off when there was none.
-	void PutVersionBack(const KFCResultModel::VersionCopy& v)
+	// Write a copied version back into the chapters it was copied from - the model's own, or a kept tier's list:
+	// recorded again, or taken off when there was none.
+	void PutVersionBack(std::vector<KFCResultModel::Chapter>& chapters, const KFCResultModel::VersionCopy& v)
 	{
-		KFCResultModel::Chapter* c = ChapterAt(v.chapter);
+		KFCResultModel::Chapter* c = ChapterIn(chapters, v.chapter);
 		if (c == nil)
 			return;		// the result set changed underneath - nothing to put it back into
 		if (v.had)
@@ -391,13 +413,8 @@ int32 KFCResultModel::ListLimit()
 bool KFCResultModel::ListHoldsObjects()
 {
 	// An Object tab search's list - its search mode (SetSearchMode keeps it as a plain int) - or a list a Frames of These
-	// Matches step made, found or empty.
-	if (gHeader.searchMode == static_cast<int32>(IFindChangeOptions::kObjectSearch))
-		return true;
-	for (size_t k = 0; k < gHeader.narrow.size(); ++k)
-		if (gHeader.narrow[k].kind == kKFCNarrowFrames)
-			return true;
-	return false;
+	// Matches step made, found or empty (ListIsFrames).
+	return gHeader.searchMode == static_cast<int32>(IFindChangeOptions::kObjectSearch) || ListIsFrames();
 }
 
 void KFCResultModel::CloseChapter(int32 chapterIdx, const IDFile* closedFile)
@@ -538,12 +555,6 @@ int32 KFCResultModel::GetHitCount(int32 chapterIdx)
 	return (c != nil) ? static_cast<int32>(c->hits.size()) : 0;
 }
 
-int32 KFCResultModel::GetShownHitCount(int32 chapterIdx)
-{
-	const Chapter* c = ChapterAt(chapterIdx);
-	return (c != nil) ? ShownRows(c->hits) : 0;
-}
-
 bool KFCResultModel::IsHitCleared(int32 chapterIdx, int32 hitIdx)
 {
 	const Hit* h = HitAt(chapterIdx, hitIdx);
@@ -575,7 +586,8 @@ int32 KFCResultModel::GetDisplayChapterCount()
 
 int32 KFCResultModel::GetDisplayHitCount(int32 chapterIdx)
 {
-	return GetShownHitCount(chapterIdx);
+	const Chapter* c = ChapterAt(chapterIdx);
+	return (c != nil) ? ShownRows(c->hits) : 0;
 }
 
 bool KFCResultModel::GetChapterDisplay(int32 chapterIdx, PMString& outName, int32& outHitCount)
@@ -689,13 +701,7 @@ bool KFCResultModel::GetFontDisplay(int32 chapterIdx, int32 fontIdx, PMString& o
 int32 KFCResultModel::GetChapterReplacedCount(int32 chapterIdx)
 {
 	const Chapter* c = ChapterAt(chapterIdx);
-	if (c == nil)
-		return 0;
-	int32 replaced = 0;
-	for (size_t i = 0; i < c->hits.size(); ++i)
-		if (c->hits[i].replaced && !c->hits[i].cleared)
-			++replaced;
-	return replaced;
+	return (c != nil) ? ReplacedRows(c->hits) : 0;
 }
 
 int32 KFCResultModel::GetFontReplacedCount(int32 chapterIdx, int32 fontIdx)
@@ -1601,7 +1607,7 @@ void KFCResultModel::RollBackRows()
 	// The recorded versions too - every caller records them only once its write has gone
 	// through, so there is normally nothing here.
 	for (size_t i = 0; i < gBackup.versions.size(); ++i)
-		PutVersionBack(gBackup.versions[i]);
+		PutVersionBack(gChapters, gBackup.versions[i]);
 
 	ForgetRowBackup();
 }
@@ -1646,18 +1652,26 @@ static void PutRowBack(KFCResultModel::Hit& h, const KFCResultModel::Hit& copy)
 		h.kept = false;
 }
 
+// A STEP'S ROWS AND RECORDED VERSIONS PUT ONTO A LIST'S CHAPTERS - the model's own (ApplyRowStep) or a kept tier's
+// (ApplyRowStepTo): a row or a chapter the list no longer has is passed over.
+static void PutStepOnto(std::vector<KFCResultModel::Chapter>& chapters, const KFCResultModel::RowStep& step, bool after)
+{
+	const std::vector<KFCResultModel::RowCopy>& rows = after ? step.after : step.before;
+	for (size_t i = 0; i < rows.size(); ++i)
+		if (KFCResultModel::Hit* h = HitIn(chapters, rows[i].chapter, rows[i].hit))
+			PutRowBack(*h, rows[i].row);
+	const std::vector<KFCResultModel::VersionCopy>& versions = after ? step.versionsAfter : step.versionsBefore;
+	for (size_t i = 0; i < versions.size(); ++i)
+		PutVersionBack(chapters, versions[i]);
+}
+
 void KFCResultModel::ApplyRowStep(const RowStep& step, bool after)
 {
-	const std::vector<RowCopy>& rows = after ? step.after : step.before;
-	for (size_t i = 0; i < rows.size(); ++i)
-		if (Hit* h = HitAt(rows[i].chapter, rows[i].hit))
-			PutRowBack(*h, rows[i].row);
-	const std::vector<VersionCopy>& versions = after ? step.versionsAfter : step.versionsBefore;
-	for (size_t i = 0; i < versions.size(); ++i)
-		PutVersionBack(versions[i]);
+	PutStepOnto(gChapters, step, after);
 	// The foci of the rows put back go back on their places (the text-focus spec's T7): an Undo or a Redo moves text
 	// without moving a focus, and these rows' stored places are exact now - the step is followed only when the story
 	// is at its version.
+	const std::vector<RowCopy>& rows = after ? step.after : step.before;
 	for (size_t i = 0; i < rows.size(); ++i)
 		KFCRowFoci::Reanchor(rows[i].chapter, rows[i].hit);
 }
@@ -1684,44 +1698,20 @@ void KFCResultModel::RestoreModelSnapshot(const ModelSnapshot& snapshot)
 
 void KFCResultModel::ApplyRowStepTo(ModelSnapshot& list, const RowStep& step, bool after)
 {
-	// ApplyRowStep's rows and versions, onto a list that is not the model's: indexes checked here, as ChapterAt / HitAt
-	// check them for the model's own; PutVersionBack's rule for a version (recorded again, or taken off).
-	const std::vector<RowCopy>& rows = after ? step.after : step.before;
-	for (size_t i = 0; i < rows.size(); ++i)
-	{
-		const RowCopy& r = rows[i];
-		if (r.chapter < 0 || r.chapter >= static_cast<int32>(list.chapters.size()))
-			continue;
-		std::vector<Hit>& hits = list.chapters[static_cast<size_t>(r.chapter)].hits;
-		if (r.hit >= 0 && r.hit < static_cast<int32>(hits.size()))
-			PutRowBack(hits[static_cast<size_t>(r.hit)], r.row);
-	}
-	const std::vector<VersionCopy>& versions = after ? step.versionsAfter : step.versionsBefore;
-	for (size_t i = 0; i < versions.size(); ++i)
-	{
-		const VersionCopy& v = versions[i];
-		if (v.chapter < 0 || v.chapter >= static_cast<int32>(list.chapters.size()))
-			continue;
-		std::map<UID, uint32>& recorded = list.chapters[static_cast<size_t>(v.chapter)].storyVersions;
-		if (v.had)
-			recorded[v.story] = v.version;
-		else
-			recorded.erase(v.story);
-	}
+	// ApplyRowStep's rows and versions (PutStepOnto), onto a list that is not the model's - no foci: a kept tier's are
+	// held while it is grey (KFCRowFoci::HandOver).
+	PutStepOnto(list.chapters, step, after);
 }
 
 void KFCResultModel::GetListCounts(const ModelSnapshot& list, int32& outReplaced, int32& outHits)
 {
-	// GetTotalHitCount's and GetTotalReplacedCount's count (GetChapterReplacedCount), over the list's own chapters.
+	// GetTotalHitCount's and GetTotalReplacedCount's counts (ShownRows, ReplacedRows), over the list's own chapters.
 	outReplaced = 0;
 	outHits = 0;
 	for (size_t c = 0; c < list.chapters.size(); ++c)
 	{
-		const std::vector<Hit>& hits = list.chapters[c].hits;
-		outHits += ShownRows(hits);
-		for (size_t i = 0; i < hits.size(); ++i)
-			if (hits[i].replaced && !hits[i].cleared)
-				++outReplaced;
+		outHits += ShownRows(list.chapters[c].hits);
+		outReplaced += ReplacedRows(list.chapters[c].hits);
 	}
 }
 

@@ -4536,7 +4536,8 @@ bool SearchPartsAgain(const PMString& lead, PMString& outStatus, const KFCSearch
 	// A Narrow Down's new list has the whole limit (nothing of the list it narrows comes along - N9).
 	int32 room = KFCResultModel::ListLimit() - KFCResultModel::GetTotalHitCount();
 	for (size_t k = 0; k < chapters.size(); ++k)
-		room += KFCResultModel::GetShownHitCount(chapters[k].chapter) - KFCResultModel::CountKeptRows(chapters[k].chapter, kInvalidUID);
+		room += KFCResultModel::GetDisplayHitCount(chapters[k].chapter)
+			- KFCResultModel::CountKeptRows(chapters[k].chapter, kInvalidUID);
 	if (again.newTier)
 		room = KFCResultModel::kKFCCollectHitLimit;		// (a list over part of a document is a text list - no Frames step yet)
 	bool capped = false, cancelled = false, walked = true;

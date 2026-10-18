@@ -26,13 +26,10 @@ class IDataBase;
 
 namespace KFCTierStore
 {
-	/** The most tiers kept - past it the oldest goes. The one number both halves read (KFCModelTypes.h). */
-	enum { kMaxTiers = KFCResultModel::kMaxKeptTiers };
-
 	/** AT A SEARCH'S COMMIT POINT, BEFORE THE LIST IS THROWN AWAY (KFCSearchEngine::SearchBook): the list kept as a tier -
 	    when it has a row, or a search made it (its query was copied: a search that found nothing is kept too) - with its
-	    result set and the book it was searched in, at its place in SEARCH ORDER (its result set's). Past kMaxTiers the
-	    oldest goes. */
+	    result set and the book it was searched in, at its place in SEARCH ORDER (its result set's). Past
+	    KFCResultModel::kMaxKeptTiers (KFCModelTypes.h - the one number both halves read) the oldest goes. */
 	void ParkCurrent();
 
 	/** The kept tiers' result sets, in search order - the oldest first. */

@@ -503,10 +503,6 @@ namespace KFCResultModel
 	    of its row indices. */
 	int32 GetHitCount(int32 chapterIdx);
 
-	/** The rows of chapter 'chapterIdx' the list still shows - none taken off it (Clear from Results): what its row counts,
-	    and the room a search again takes the list's limit with. */
-	int32 GetShownHitCount(int32 chapterIdx);
-
 	/** Was this row taken off the list (Hit::cleared)? false for an index out of range. */
 	bool IsHitCleared(int32 chapterIdx, int32 hitIdx);
 
@@ -523,8 +519,8 @@ namespace KFCResultModel
 	    not chapter nth. */
 	int32 GetDisplayChapterCount();
 
-	/** The number of rows the tree shows under chapter 'chapterIdx' - every row it holds (GetHitCount): the list never
-	    holds more than kKFCCollectHitLimit, so the tree has nothing to cut. */
+	/** The rows of chapter 'chapterIdx' the list still shows - none taken off it (Clear from Results): what the tree
+	    shows under the chapter, what its row counts, and the room a search again takes the list's limit with. */
 	int32 GetDisplayHitCount(int32 chapterIdx);
 
 	/** A chapter node's display: its name and its hit count. false = index out of range. */

@@ -46,6 +46,15 @@ namespace
 		return nil;
 	}
 
+	// IS THIS KEPT CHAPTER THAT DOCUMENT? By the chapter's file first, then its docRef (a chapter of an All Documents
+	// list has no file) - a UIDRef can outlive its document and name another one (memory uidref-reuse-after-close). The
+	// one lookup, for a closing document's chapters (ForgetDocument) and the Undo follow's (ChaptersOfDoc).
+	bool ChapterIsDoc(const KFCResultModel::Chapter& chapter, IDataBase* db)
+	{
+		UIDRef found = chapter.docRef;
+		return KFCBookScope::FindOpenChapterDoc(chapter.file, found) && found.GetDataBase() == db;
+	}
+
 	// The live list as a tier record - its rows, its result set, its book.
 	void TakeLive(TierRecord& out)
 	{
@@ -69,7 +78,7 @@ namespace
 		while (at < gTiers.size() && gTiers[at].set < tier.set)
 			++at;
 		gTiers.insert(gTiers.begin() + static_cast<std::ptrdiff_t>(at), std::move(tier));
-		while (gTiers.size() > static_cast<size_t>(KFCTierStore::kMaxTiers))
+		while (gTiers.size() > static_cast<size_t>(KFCResultModel::kMaxKeptTiers))
 			gTiers.erase(gTiers.begin());
 	}
 }	// anonymous namespace
@@ -150,10 +159,7 @@ void KFCTierStore::ForgetDocument(IDataBase* db)
 		std::vector<KFCResultModel::Chapter>& chapters = gTiers[t].list.chapters;
 		for (size_t c = 0; c < chapters.size(); ++c)
 		{
-			// By the chapter's file first, then its docRef (a chapter of an All Documents list has no file) - a UIDRef can
-			// outlive its document and name another one (memory uidref-reuse-after-close).
-			UIDRef found = chapters[c].docRef;
-			if (KFCBookScope::FindOpenChapterDoc(chapters[c].file, found) && found.GetDataBase() == db)
+			if (ChapterIsDoc(chapters[c], db))
 			{
 				KFCResultModel::EmptyChapter(chapters[c], db->GetSysFile());	// its file kept (Chapter::closedFile)
 				KFC_DIAG_LOG("TIER forget chapter=%d of set=%u", static_cast<int>(c), gTiers[t].set);
@@ -173,12 +179,8 @@ void KFCTierStore::ChaptersOfDoc(uint32 set, IDataBase* db, std::vector<int32>& 
 	if (tier == nil || db == nil)
 		return;
 	for (size_t c = 0; c < tier->list.chapters.size(); ++c)
-	{
-		// ForgetDocument's lookup - by file first, then by docRef.
-		UIDRef found = tier->list.chapters[c].docRef;
-		if (KFCBookScope::FindOpenChapterDoc(tier->list.chapters[c].file, found) && found.GetDataBase() == db)
+		if (ChapterIsDoc(tier->list.chapters[c], db))
 			out.push_back(static_cast<int32>(c));
-	}
 }
 
 bool KFCTierStore::HoldsSet(uint32 set)

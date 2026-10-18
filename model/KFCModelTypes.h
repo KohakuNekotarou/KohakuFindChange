@@ -60,7 +60,7 @@ namespace KFCResultModel
 	};
 
 	/** THE MOST TIERS KEPT (the author's call - 50 being too many searches to keep): past it the oldest goes. One
-	    number for both halves - the model keeps the tiers to it (KFCTierStore::kMaxTiers), the UI half names it when one
+	    number for both halves - the model keeps the tiers to it (KFCTierStore), the UI half names it when one
 	    goes (KFCResultHistory). */
 	enum { kMaxKeptTiers = 10 };
 
