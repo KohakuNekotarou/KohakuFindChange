@@ -128,7 +128,8 @@
 
 ## 4. キーボードショートカット
 
-- **SET-13** ★ショートカットを割り当てられるのは**6つだけ** ―― `Open Find/Change...`・`Find in …`・`Find Objects on Active Layer`・`Change All in Book (No List)`・`Run Saved Queries...`・`Clear Results`
+- **SET-13** ★ショートカットを割り当てられるのは**7つだけ** ―― `Open Find/Change...`・`Find in …`・`Find Objects on Active Layer`・`Change All in Book (No List)`・`Run Saved Queries...`・`Clear Results`・`Copy Results`
+  （`Copy Results` は 2026-10-18 に足した＝作者の決定「だしましょう」。行の `Copy Rows`・段の `Copy These Results` は出さない＝押した行・段が要る。一覧の中の Ctrl+C は Copy Rows と同じ＝ショートカットの設定とは別。）
   （`Find Objects on Active Layer` は 2026-10-17 夜に足した＝Find と同じ扱い・私の判断＝2026-10-18 作者が承認「キーボードショートカットの件、有難うございます。」・OBJ-21。）
   （2026-09-27 に検索、10-01 に Open Find/Change＝作者の決定。10-06 の設計（第5版）で Change All in Book と Clear Results を足し、Change Checked と Show Changes を外した。
   10-07 に Run Saved Queries... を足した（作者の依頼）。`Find/Change Selected Documents (Book)` は Book Scope と同じく割り当てない。

@@ -1726,8 +1726,8 @@ resource ActionDef (kSDKDefActionResourceID)
 		kSDKDefInvisibleInKBSCEditorFlag,
 
 		// Copy Results - the panel menu's (docs/superpowers/specs/2026-10-18-kfc-copy-results-progress-share-design.md).
-		// kCustomEnabling: greyed with no row to copy. Not offered for a shortcut: the list of those is the author's (the spec
-		// map's SET-13) - to be asked.
+		// kCustomEnabling: greyed with no row to copy. In the Keyboard Shortcuts editor under Palette Menus, like Clear Results
+		// (the author's call, 2026-10-18 - the spec map's SET-13).
 		kKFCActionComponentBoss,
 		kKFCCopyResultsActionID,
 		kKFCCopyResultsMenuKey,			// "Copy Results"
@@ -1735,7 +1735,7 @@ resource ActionDef (kSDKDefActionResourceID)
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
 		kInvalidInterfaceID,
-		kSDKDefInvisibleInKBSCEditorFlag,
+		kSDKDefVisibleInKBSCEditorFlag,
 
 		// Copy Rows - a hit, object, story, document or book row's right-click menu. kCustomEnabling: greyed when it comes with no
 		// such row (pressed by ID) or with no row to copy.
