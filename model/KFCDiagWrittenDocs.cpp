@@ -20,9 +20,8 @@
 #include "ISession.h"
 
 // General includes:
-#include "FileUtils.h"			// GetModificationDate - has the file been written since
+#include "FileUtils.h"			// GetModificationDate - has the file been written since; SysFileToPMString - its path
 #include "PMString.h"
-#include "SDKFileHelper.h"
 
 #include <string>
 #include <vector>
@@ -89,7 +88,7 @@ namespace
 		const IDFile* const file = db->GetSysFile();
 		if (file == nil)
 			return;
-		outPath = SDKFileHelper(*file).GetPath().GetUTF8String();
+		outPath = FileUtils::SysFileToPMString(*file).GetUTF8String();
 		if (outPath.empty())
 			return;
 		uint32 modified = 0;

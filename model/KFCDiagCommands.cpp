@@ -106,8 +106,7 @@ bool KFCDiagCommands::Arm()
 		return false;
 	ISession* const session = GetExecutionContextSession();
 	InterfacePtr<ICommandProcessor> processor(session != nil ? session->QueryCommandProcessor() : nil);
-	InterfacePtr<ICommandInterceptor> counter(
-		static_cast<ICommandInterceptor*>(::CreateObject(kKFCDiagCmdCountBoss, IID_ICOMMANDINTERCEPTOR)));
+	InterfacePtr<ICommandInterceptor> counter(::CreateObject2<ICommandInterceptor>(kKFCDiagCmdCountBoss));
 	if (processor == nil || counter == nil)
 	{
 		KFC_DIAG_LOG("COMMANDS could not arm (processor=%p counter=%p)", (void*)processor.get(), (void*)counter.get());
