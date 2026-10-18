@@ -11,7 +11,6 @@
 #include "VCPlugInHeaders.h"
 
 // Interface includes:
-#include "IApplication.h"		// QueryPanelManager
 #include "IControlView.h"		// a panel IS a control view - what GetPanelFromWidgetID hands back
 #include "IPanelControlData.h"	// FindWidget - reaching the illustration inside the panel
 #include "IPanelMgr.h"			// GetPanelFromWidgetID / GetPaletteRefContainingPanel
@@ -46,6 +45,7 @@ namespace GoToURLUtils
 #include "KFCPanelIcon.h"		// which illustration is showing, and which widgets are illustrations
 #include "KFCPanelAlpha.h"		// re-apply "Translucent Panel" when the panel is shown again
 #include "KFCPanelMetrics.h"	// how tall the message block has to be in this UI language
+#include "KFCBookPanelLookup.h"	// QueryPanelManager - the panel manager, nil once the session is gone
 #include "KFCPanelTitle.h"
 #include "KFCQueryDialog.h"		// KFCQueryDialogRefreshScope - the query dialog's Runs on: line follows the tab's scope
 #include "KFCResultTree.h"		// RestoreStatusOnPanelShow - the message the workspace persisted
@@ -70,23 +70,12 @@ const char* const kKFCPlainPanelName = kKFCDisplayName;
 /** Put a label on the panel's tab. Does nothing unless the panel exists and sits in a palette. */
 void SetTabLabel(const PMString& label)
 {
-	// THE SESSION CAN BE GONE DURING SHUTDOWN - KFCPanelAlpha.cpp says of the same function "can be
-	//   nil during shutdown" - so it is taken into a variable and checked, not dereferenced on the spot.
-	//   *Why this one matters and the dozen others do not: KFCPanelTitle::Restore is called from
-	//    the UI half's shutdown (KFCUIStartupShutdown) - it is the only entry here that runs during teardown.
-	//    The rest of this plug-in reaches the session from inside UI events (a click, a key, a
-	//    draw), where it is certainly alive.
-	//   (No failure has been seen: the tab is restored FIRST in Shutdown, "while the UI is still
-	//    standing". This makes the Shutdown path look like the other Shutdown path.)
-	ISession* session = GetExecutionContextSession();
-	if (session == nil)
-		return;
-
-	InterfacePtr<IApplication> app(session->QueryApplication());
-	if (app == nil)
-		return;
-
-	InterfacePtr<IPanelMgr> panelMgr(app->QueryPanelManager());
+	// THE SESSION CAN BE GONE DURING SHUTDOWN, and KFCPanelTitle::Restore is called from the UI half's shutdown
+	// (KFCUIStartupShutdown) - the one entry here that runs during teardown; the rest of this plug-in reaches the
+	// session from inside UI events (a click, a key, a draw), where it is certainly alive. QueryPanelManager asks
+	// for the session before it uses it and answers nil then. (No failure has been seen: the tab is restored FIRST
+	// in Shutdown, "while the UI is still standing".)
+	InterfacePtr<IPanelMgr> panelMgr(KFCBookPanelLookup::QueryPanelManager());
 	if (panelMgr == nil)
 		return;
 
