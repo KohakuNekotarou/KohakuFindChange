@@ -47,7 +47,7 @@
 #include "Utils.h"
 #include "AttributeBossList.h"		// the Change side's attributes (TakeRowCopy)
 #include "TextChar.h"				// kTextChar_CR, the table's characters (TakeRowCopy)
-#include "textiterator.h"			// a range read character by character (TakeRowCopy, TextHash)
+#include "textiterator.h"			// a range read character by character (TakeRowCopy)
 
 #include <algorithm>		// std::sort - Restore from Copy's rows in text order
 #include <map>
@@ -1452,28 +1452,6 @@ PMString RowName(int32 chapterIdx, int32 hitIdx)
 	return name;
 }
 
-// A RANGE'S TEXT AS ONE NUMBER - FNV-1a over its code points, its length mixed in (KFCUndoFollow.cpp's StoryTextHash's
-// shape; 0 never comes out): what a copy's run-on rest is checked by before Restore from Copy pastes over it.
-uint64 TextHash(ITextModel* model, TextIndex start, TextIndex end)
-{
-	uint64 hash = 14695981039346656037ULL;
-	if (model != nil && end > start)
-	{
-		TextIterator it(model, start);
-		for (TextIndex i = start; i < end && !it.IsNull(); ++i, ++it)
-		{
-			const uint32 ch = static_cast<uint32>((*it).GetValue());
-			for (int32 b = 0; b < 4; ++b)
-			{
-				hash ^= static_cast<uint64>((ch >> (b * 8)) & 0xFF);
-				hash *= 1099511628211ULL;
-			}
-		}
-	}
-	hash ^= static_cast<uint64>(end - start);
-	return (hash != 0) ? hash : 1;
-}
-
 // DOES THE CHANGE SIDE SET PARAGRAPH FORMATTING - a paragraph style, or a paragraph attribute in Change Format, on the tab
 // the write is stated in? Its Replace then changes the paragraphs the rows stand in, which a copy of the match does not
 // put back (TakeRowCopy - measured live, R13 / R13b).
@@ -1706,7 +1684,7 @@ KFCResultModel::HitCopy TakeRowCopy(const UIDRef& storyRef, TextIndex start, Tex
 	copy.store = taken.store;
 	copy.story = taken.story;
 	copy.rest = copyEnd - end;
-	copy.restHash = (copy.rest > 0) ? TextHash(model, end, copyEnd) : 0;
+	copy.restHash = (copy.rest > 0) ? KFCSearchEngine::TextHash(model, end, copyEnd) : 0;
 	copy.whyNot = KFCResultModel::kCopyKept;
 	return copy;
 }
@@ -2558,7 +2536,7 @@ bool RestoreInChapter(RestoreChapter& chapter, int32 (&counts)[kRestoreRefusalCo
 			// Its run-on rest as it was copied, the paragraph's return (or the story's end) right after it.
 			if (row.copy.rest > 0)
 			{
-				bool asCopied = (TextHash(model, at + written, pasteEnd) == row.copy.restHash);
+				bool asCopied = (KFCSearchEngine::TextHash(model, at + written, pasteEnd) == row.copy.restHash);
 				if (asCopied && pasteEnd < primary)
 				{
 					TextIterator it(model, pasteEnd);

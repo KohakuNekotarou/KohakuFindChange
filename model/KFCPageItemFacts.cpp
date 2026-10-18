@@ -470,6 +470,14 @@ int32 StackIndex(IDataBase* db, UID item)
 	return (parent != nil) ? parent->GetChildIndex(hier) : -1;
 }
 
+bool ItemIsThere(IDataBase* db, UID item)
+{
+	if (db == nil || item == kInvalidUID || !db->IsValidUID(item))
+		return false;
+	InterfacePtr<IHierarchy> hier(db, item, UseDefaultIID());
+	return hier != nil;
+}
+
 UID DocLayerOf(IDataBase* db, UID item)
 {
 	if (db == nil || item == kInvalidUID || !db->IsValidUID(item))

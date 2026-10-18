@@ -35,6 +35,7 @@
 #include <map>
 #include <vector>
 
+class ITextModel;			// TextHash
 class ITextWalker;			// AcquireWalker
 class ITextWalkerScope;		// ScopeHasNothingToWalk
 class ITextWalkerSelectionUtils;
@@ -445,6 +446,12 @@ namespace KFCSearchEngine
 	    past the story's end reads up to the end. The official one-call read (textiterator.h AppendToStringAndIncrement),
 	    as KCM (KCMTextWords.h WordsAt) and KESCL (KESCLFindInDoc.cpp MatchStillValid) read a range. */
 	PMString ReadText(const UIDRef& story, TextIndex at, int32 len);
+
+	/** A RANGE'S TEXT AS ONE NUMBER - FNV-1a, 64-bit, over each character's value (the match hash's constants), the
+	    range's length mixed in; never 0. [start, end) of model - nothing read for an empty range or a nil model. What a
+	    write compares later: Restore from Copy, a copy's run-on rest (KFCReplaceEngine); the Undo follow, a story whole
+	    besides its version (KFCUndoFollow's StoryTextHash). */
+	uint64 TextHash(ITextModel* model, TextIndex start, TextIndex end);
 
 	/** Give a row what [start, end) reads NOW - the three segments it paints and the hash of the
 	    whole match - in one KFCResultModel::SetHitSegments. For the callers that have just moved a

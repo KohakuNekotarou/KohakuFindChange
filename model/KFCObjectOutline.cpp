@@ -32,7 +32,7 @@
 #include "KFCID.h"				// kKFCCreateOutlinesStepKey - the Edit menu's name of the step
 #include "KFCObjectOutline.h"
 #include "KFCObjectSearch.h"	// IsOnSpread, Fingerprint
-#include "KFCPageItemFacts.h"	// IsPageItemLockedForEdit, IsFrameOnLockedLayer
+#include "KFCPageItemFacts.h"	// IsPageItemLockedForEdit, IsFrameOnLockedLayer, ItemIsThere
 #include "KFCReplaceEngine.h"	// the write's undo step (WriteStep) and what its documents are left as (DocsAfterWrite)
 #include "KFCResultModel.h"
 #include "KFCRunGuard.h"
@@ -197,10 +197,7 @@ bool KFCObjectOutline::CanOutlineHit(int32 chapterIdx, int32 hitIdx)
 	if (!KFCBookScope::FindOpenChapterDoc(file, docRef))
 		return true;		// not open now: pressing reaches it, and its doors say why when it cannot be outlined
 	IDataBase* const db = docRef.GetDataBase();
-	if (db == nil || !db->IsValidUID(item))
-		return false;
-	InterfacePtr<IHierarchy> hier(db, item, UseDefaultIID());
-	if (hier == nil || !KFCObjectSearch::IsOnSpread(UIDRef(db, item)))
+	if (!KFCPageItemFacts::ItemIsThere(db, item) || !KFCObjectSearch::IsOnSpread(UIDRef(db, item)))
 		return false;
 	if (KFCPageItemFacts::IsPageItemLockedForEdit(db, item) || KFCPageItemFacts::IsFrameOnLockedLayer(db, item))
 		return false;

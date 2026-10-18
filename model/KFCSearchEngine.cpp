@@ -70,7 +70,7 @@
 #include "IDataBase.h"				// SaveRestoreModifiedState
 #include "Utils.h"
 #include "WideString.h"
-#include "textiterator.h"			// ReadText - the official one-call read of a range
+#include "textiterator.h"			// ReadText - the official one-call read of a range; TextHash
 
 #include <vector>
 #include <utility>					// std::move - a finished chapter is handed to the model, not copied
@@ -2250,6 +2250,26 @@ PMString KFCSearchEngine::ReadText(const UIDRef& story, TextIndex at, int32 len)
 	PMString s(ReadStretch(model, at, len));
 	s.SetTranslatable(kFalse);
 	return s;
+}
+
+uint64 KFCSearchEngine::TextHash(ITextModel* model, TextIndex start, TextIndex end)
+{
+	uint64 hash = kKFCHashOffsetBasis;
+	if (model != nil && end > start)
+	{
+		TextIterator it(model, start);
+		for (TextIndex i = start; i < end && !it.IsNull(); ++i, ++it)
+		{
+			const uint32 ch = static_cast<uint32>((*it).GetValue());
+			for (int32 b = 0; b < 4; ++b)
+			{
+				hash ^= static_cast<uint64>((ch >> (b * 8)) & 0xFF);
+				hash *= kKFCHashPrime;
+			}
+		}
+	}
+	hash ^= static_cast<uint64>(end - start);	// the length too: a range cut short reads differently
+	return (hash != 0) ? hash : 1;
 }
 
 void KFCSearchEngine::RereadRowText(int32 chapterIdx, int32 hitIdx, const UIDRef& storyRef,

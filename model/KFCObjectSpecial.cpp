@@ -50,7 +50,7 @@
 #include "KFCObjectReplace.h"		// RowsTheWriteCanMove, FollowRowsTheWriteMoved - the other rows a write moves
 #include "KFCObjectSearch.h"		// IsOnSpread, Fingerprint, ReadItemPlace
 #include "KFCObjectSpecial.h"
-#include "KFCPageItemFacts.h"		// IsPageItemLockedForEdit, IsFrameOnLockedLayer, StackIndex
+#include "KFCPageItemFacts.h"		// IsPageItemLockedForEdit, IsFrameOnLockedLayer, StackIndex, ItemIsThere
 #include "KFCReplaceEngine.h"		// the write's undo step (WriteStep) and what its documents are left as (DocsAfterWrite)
 #include "KFCResultModel.h"
 #include "KFCRunGuard.h"
@@ -670,12 +670,7 @@ struct SpecialChapter
 // DID THE WRITE CHANGE THE ITEM (E7): gone (Delete), or its fingerprint moved - or, for Arrange, its place in its stack.
 bool WriteChanged(const OpInfo& info, IDataBase* db, UID item, uint64 printBefore, uint32 lengthBefore, int32 orderBefore)
 {
-	bool there = false;
-	if (db != nil && db->IsValidUID(item))
-	{
-		InterfacePtr<IHierarchy> hier(db, item, UseDefaultIID());
-		there = (hier != nil);
-	}
+	const bool there = KFCPageItemFacts::ItemIsThere(db, item);
 	if (info.kind == kWriteGone)
 		return !there;
 	if (!there)

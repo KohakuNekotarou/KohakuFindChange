@@ -99,7 +99,7 @@ namespace KFCResultModel
 		uint32	store;		// the copy store's number (KFCCopyStore - 0 = none)
 		UID		story;		// the copy's story in that store
 		int32	rest;		// how far the copy runs on past the match, in text model positions (0 = the match alone)
-		uint64	restHash;	// that run-on text as it read when the copy was taken (KFCReplaceEngine.cpp's TextHash)
+		uint64	restHash;	// that run-on text as it read when the copy was taken (KFCSearchEngine::TextHash)
 		int32	whyNot;		// CopyWhyNot - kCopyKept when the copy is kept
 		UID		paraStyle;	// the starting paragraph's style when the Replace sets paragraph formatting (kInvalidUID = not kept)
 		boost::shared_ptr<AttributeBossList> paraOverrides;	// ...and its own paragraph overrides then (nil = none)

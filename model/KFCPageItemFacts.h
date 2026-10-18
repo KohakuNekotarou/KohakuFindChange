@@ -45,6 +45,10 @@ namespace KFCPageItemFacts
 	    parent. */
 	int32 StackIndex(IDataBase* db, UID item);
 
+	/** IS THE ITEM IN ITS DOCUMENT - its UID valid there and a page item (it has a hierarchy). A write that takes an
+	    item away (Delete, Create Outlines) leaves its UID unused; an Undo puts it back. */
+	bool ItemIsThere(IDataBase* db, UID item);
+
 	/** THE DOCUMENT LAYER AN ITEM IS ON - the Layers panel's row: its spread layer's (a group's member, the group's), and
 	    for an item in text its anchor frame's (the hidden / locked tests above read it the same way). kInvalidUID when it
 	    cannot be told (an inline in overset text). */

@@ -12,7 +12,6 @@
 
 // Interface includes:
 #include "ICommand.h"
-#include "IHierarchy.h"				// ItemIsThere - an item a write took away
 #include "IDataBase.h"
 #include "IObserver.h"
 #include "ISubject.h"
@@ -25,9 +24,8 @@
 #include "IDFile.h"
 #include "IDThreadingPrimitives.h"	// IDThreading::IsMainThreadDomain - the gate in LazyUpdate
 #include "FileUtils.h"				// IsEqual - a frozen chapter found again by its file
-#include "ITextModel.h"				// StoryTextHash - the story's text, read whole
+#include "ITextModel.h"				// StoryTextHash - the story's length
 #include "IStoryList.h"				// RunRecorder::ReadStories - every text model of a query run's documents
-#include "textiterator.h"			// StoryTextHash
 #include "UIDList.h"
 
 #include <algorithm>		// std::find, std::remove_if, std::any_of - a closing document's part of the kept writes
@@ -43,7 +41,7 @@
 #include "KFCRunGuard.h"		// IsAnyRunning - nothing is followed while any run of ours (the replace among them) is up
 #include "KFCSearchEngine.h"	// ReadStoryVersion - a story's version
 #include "KFCObjectSearch.h"	// Fingerprint - an object row's item, before and after a write
-#include "KFCPageItemFacts.h"	// StackIndex - an item's place in its stack, before and after an Arrange
+#include "KFCPageItemFacts.h"	// StackIndex - an item's place in its stack, before and after an Arrange; ItemIsThere
 #include "KFCTierStore.h"		// the kept tiers: their writes are kept, and followed onto their copies (the tier switch)
 #include "KFCUndoFollow.h"
 
@@ -348,8 +346,9 @@ bool ShareDoc(const Step& a, const Step& b)
 	return false;
 }
 
-// A story's whole text - every thread, the deleted text Track Changes keeps included - as one number: FNV-1a, 64-bit,
-// over each character's value. 0 = it could not be read. What a Redo is asked besides the version (AllAt).
+// A story's whole text - every thread, the deleted text Track Changes keeps included - as one number
+// (KFCSearchEngine::TextHash over [0, TotalLength)). 0 = it could not be read. What a Redo is asked besides the
+// version (AllAt).
 uint64 StoryTextHash(IDataBase* db, UID story)
 {
 	if (db == nil || story == kInvalidUID || !db->IsValidUID(story))
@@ -357,20 +356,7 @@ uint64 StoryTextHash(IDataBase* db, UID story)
 	InterfacePtr<ITextModel> model(db, story, UseDefaultIID());
 	if (model == nil)
 		return 0;
-	uint64 hash = 14695981039346656037ULL;
-	const int32 total = model->TotalLength();
-	TextIterator it(model, 0);
-	for (int32 i = 0; i < total && !it.IsNull(); ++i, ++it)
-	{
-		const uint32 ch = static_cast<uint32>((*it).GetValue());
-		for (int32 b = 0; b < 4; ++b)
-		{
-			hash ^= static_cast<uint64>((ch >> (b * 8)) & 0xFF);
-			hash *= 1099511628211ULL;
-		}
-	}
-	hash ^= static_cast<uint64>(total);		// the length too: a story cut short reads differently
-	return (hash != 0) ? hash : 1;
+	return KFCSearchEngine::TextHash(model, 0, model->TotalLength());
 }
 
 // The stories the recording read that the write has moved, each with its version and text after it, onto the step - the
@@ -390,17 +376,8 @@ void TakeMovedStories(Step& step)
 	}
 }
 
-// The items the recording read that the write changed, each with its fingerprint after it, onto the step.
-// IS THE ITEM IN ITS DOCUMENT - a write that takes an item away (Create Outlines) leaves its UID unused, an Undo puts it
-// back.
-bool ItemIsThere(IDataBase* db, UID item)
-{
-	if (db == nil || item == kInvalidUID || !db->IsValidUID(item))
-		return false;
-	InterfacePtr<IHierarchy> hier(db, item, UseDefaultIID());
-	return hier != nil;
-}
-
+// The items the recording read that the write changed, each with its fingerprint after it, onto the step - an item the
+// write took away (Create Outlines) leaves its UID unused, an Undo puts it back (KFCPageItemFacts::ItemIsThere).
 void TakeMovedItems(Step& step)
 {
 	for (size_t k = 0; k < gRecording.items.size(); ++k)
@@ -413,7 +390,7 @@ void TakeMovedItems(Step& step)
 		{
 			// AN ITEM THE WRITE TOOK AWAY (Create Outlines - the frame replaced by its outlines, KFCObjectOutline): no print to
 			// read after it - its Undo brings the item back at "before", its Redo takes it away again (AllAt).
-			if (!ItemIsThere(m.now, m.item))
+			if (!KFCPageItemFacts::ItemIsThere(m.now, m.item))
 			{
 				m.afterGone = true;
 				m.after = 0;
@@ -457,7 +434,7 @@ bool AllAt(const Step& step, bool after)
 		// ...or, for an item the write took away (Create Outlines), gone again at "after" (a Redo).
 		if (after && m.afterGone)
 		{
-			if (ItemIsThere(m.now, m.item))
+			if (KFCPageItemFacts::ItemIsThere(m.now, m.item))
 				return false;
 			continue;
 		}
@@ -593,6 +570,15 @@ void WatchDoc(IDataBase* db)
 const char* WriteName(const Step& step)
 {
 	return step.whole ? "Run Queries" : (step.name != nil ? step.name : "Replace");
+}
+
+// A WRITE MADE ON A KEPT TIER'S LIST - a write of rows (a query run's whole set never names a tier: a run that goes
+// through lets the tiers go) of a result set that is not the live list's and that a tier holds (KFCTierStore - the tier
+// switch): its rows are numbered in that tier's copy. Asked by the follow (Follow) and by a closing document
+// (ForgetDocument).
+bool OnKeptTier(const Step& step)
+{
+	return !step.whole && step.resultSet != KFCResultModel::GetResultSetId() && KFCTierStore::HoldsSet(step.resultSet);
 }
 
 // Keep a write: the documents' histories it cut, and the old ones past the limit, go.
@@ -929,38 +915,28 @@ static void Follow()
 		if (pick == gSteps.size())
 			break;
 		Step& step = gSteps[pick];
-		// A WRITE MADE ON A KEPT TIER'S LIST (the tier switch - KFCTierStore): its rows are numbered in that tier's copy, not
-		// in the live list, so they go onto the copy - checked against the copy's layout as the live list's writes are checked
-		// against the live one below - and the list on the panel does not change (the tier is grey: it shows the copy as it
-		// was kept). (A query run's whole step never names a kept tier: a run that goes through lets the tiers go.)
-		if (!step.whole && step.resultSet != KFCResultModel::GetResultSetId() && KFCTierStore::HoldsSet(step.resultSet))
+		// A WRITE MADE ON A KEPT TIER'S LIST (OnKeptTier): its rows go onto the tier's copy, not the live list, and the
+		// list on the panel does not change (the tier is grey: it shows the copy as it was kept).
+		const bool ontoTier = OnKeptTier(step);
+		// THE ROWS ARE NUMBERED IN ONE LAYOUT - the live list's, or the tier's copy's. A write's rows are put back only
+		// onto the layout they were taken from; any other (which the order above should never leave) means the write
+		// can no longer be followed, and it is dropped rather than written onto the wrong rows.
+		if ((ontoTier ? KFCTierStore::LayoutOf(step.resultSet) : KFCResultModel::GetLayoutGeneration())
+			!= (undo ? step.layoutAfter : step.layoutBefore))
 		{
-			if (KFCTierStore::LayoutOf(step.resultSet) != (undo ? step.layoutAfter : step.layoutBefore))
-			{
+			if (ontoTier)
 				KFC_DIAG_LOG("  kept tier's layout mismatch - dropped %u", (unsigned)pick);
-				gSteps.erase(gSteps.begin() + static_cast<std::ptrdiff_t>(pick));
-				continue;
-			}
-			(void)KFCTierStore::ApplyRowStep(step.resultSet, step.rows, !undo);
-			step.done = !undo;
-			if (undo)
-				++undone;
 			else
-				++redone;
-			lastName = WriteName(step);
-			KFC_DIAG_LOG("  onto kept tier set=%u", step.resultSet);
-			continue;
-		}
-		// THE ROWS ARE NUMBERED IN ONE LAYOUT. A write's rows are put back only onto the layout they
-		// were taken from; any other (which the order above should never leave) means the write can no
-		// longer be followed, and it is dropped rather than written onto the wrong rows.
-		if (KFCResultModel::GetLayoutGeneration() != (undo ? step.layoutAfter : step.layoutBefore))
-		{
-			KFC_DIAG_LOG("  layout mismatch - dropped %u", (unsigned)pick);
+				KFC_DIAG_LOG("  layout mismatch - dropped %u", (unsigned)pick);
 			gSteps.erase(gSteps.begin() + static_cast<std::ptrdiff_t>(pick));
 			continue;
 		}
-		if (step.whole)
+		if (ontoTier)
+		{
+			(void)KFCTierStore::ApplyRowStep(step.resultSet, step.rows, !undo);
+			KFC_DIAG_LOG("  onto kept tier set=%u", step.resultSet);
+		}
+		else if (step.whole)
 		{
 			const std::vector<size_t>& frozen = undo ? step.frozenBefore : step.frozenAfter;
 			if (frozen.empty())
@@ -1090,7 +1066,7 @@ void KFCUndoFollow::ForgetDocument(const UIDRef& docRef)
 			gSteps.erase(gSteps.begin() + static_cast<std::ptrdiff_t>(i));
 		else if (!step.whole && closing >= 0 && step.resultSet == current)	// (row indices name the current list's rows only)
 			DropChapterRows(step, closing);
-		else if (!step.whole && step.resultSet != current && KFCTierStore::HoldsSet(step.resultSet))
+		else if (OnKeptTier(step))
 		{
 			// A write of a kept tier's list (the tier switch): its rows are numbered in the tier's copy - the closing chapter
 			// is looked for there (a tier's chapter already emptied by KFCTierStore::ForgetDocument is not found, and its
