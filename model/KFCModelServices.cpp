@@ -89,7 +89,7 @@ public:
 	KFCRunsSession(IPMUnknown* boss) : CPMUnknown<IKFCRuns>(boss) {}
 
 	virtual int32 SearchBook(PMString& outSummary) { return KFCSearchEngine::SearchBook(outSummary); }
-	virtual bool ReplaceHit(int32 chapterIdx, int32 hitIdx, PMString& outStatus) { return KFCUnderListQuery(outStatus, true, [&]() { return KFCReplaceEngine::ReplaceHit(chapterIdx, hitIdx, outStatus); }); }
+	virtual bool ReplaceHit(int32 chapterIdx, int32 hitIdx, PMString& outStatus) { return KFCUnderListQuery(outStatus, true /*writes*/, [&]() { return KFCReplaceEngine::ReplaceHit(chapterIdx, hitIdx, outStatus); }); }
 	virtual bool CanReplaceHit(int32 chapterIdx, int32 hitIdx) { return KFCReplaceEngine::CanReplaceHit(chapterIdx, hitIdx); }
 	virtual bool IsAnyRunning() { return KFCRunGuard::IsAnyRunning(); }
 	virtual const char* BusyMessage() { return KFCRunGuard::BusyMessage(); }
@@ -116,17 +116,17 @@ public:
 	virtual bool PreviewHit(int32 chapterIdx, int32 hitIdx, PMString& outAfter) { return KFCQueryScope::PreviewHit(chapterIdx, hitIdx, outAfter); }
 	virtual bool LoadSavedQuery(const IDFile& file) { return KFCSavedQueries::LoadIntoFindChange(file); }
 	virtual KFCResultModel::RowLocation LocateRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, TextIndex& ioStart, TextIndex& ioEnd) { return KFCSearchEngine::LocateRow(chapterIdx, hitIdx, docRef, ioStart, ioEnd); }
-	virtual bool SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMString& outStatus) { return KFCUnderListQuery(outStatus, false, [&]() { return KFCSearchEngine::SearchStoryAgain(chapterIdx, groupIdx, outStatus); }); }
+	virtual bool SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMString& outStatus) { return KFCUnderListQuery(outStatus, false /*writes*/, [&]() { return KFCSearchEngine::SearchStoryAgain(chapterIdx, groupIdx, outStatus); }); }
 	virtual void RestoreSearchScope(int32 mode, int32 scope) { KFCSearchEngine::RestoreSearchScope(mode, scope); }
-	virtual bool CheckObjectReplace(int32 chapterIdx, int32 hitIdx, PMString& outStatus) { return KFCUnderListQuery(outStatus, false, [&]() { return KFCObjectReplace::CheckRowNow(chapterIdx, hitIdx, outStatus); }); }
-	virtual bool CheckObjectReplaceRows(const KFCRowsByChapter& rows, PMString& outStatus) { return KFCUnderListQuery(outStatus, false, [&]() { return KFCObjectReplace::CheckRowsNow(rows, outStatus); }); }
-	virtual bool ReplaceRows(const KFCRowsByChapter& rows, PMString& outStatus) { return KFCUnderListQuery(outStatus, true, [&]() { return KFCReplaceEngine::ReplaceHits(rows, outStatus); }); }
-	virtual bool SearchDocumentAgain(int32 chapterIdx, PMString& outStatus) { return KFCUnderListQuery(outStatus, false, [&]() { return KFCSearchEngine::SearchDocumentAgain(chapterIdx, outStatus); }); }
+	virtual bool CheckObjectReplace(int32 chapterIdx, int32 hitIdx, PMString& outStatus) { return KFCUnderListQuery(outStatus, false /*writes*/, [&]() { return KFCObjectReplace::CheckRowNow(chapterIdx, hitIdx, outStatus); }); }
+	virtual bool CheckObjectReplaceRows(const KFCRowsByChapter& rows, PMString& outStatus) { return KFCUnderListQuery(outStatus, false /*writes*/, [&]() { return KFCObjectReplace::CheckRowsNow(rows, outStatus); }); }
+	virtual bool ReplaceRows(const KFCRowsByChapter& rows, PMString& outStatus) { return KFCUnderListQuery(outStatus, true /*writes*/, [&]() { return KFCReplaceEngine::ReplaceHits(rows, outStatus); }); }
+	virtual bool SearchDocumentAgain(int32 chapterIdx, PMString& outStatus) { return KFCUnderListQuery(outStatus, false /*writes*/, [&]() { return KFCSearchEngine::SearchDocumentAgain(chapterIdx, outStatus); }); }
 	virtual bool SwitchToTier(uint32 resultSet, PMString& outSummary) { return KFCTierStore::SwitchTo(resultSet, outSummary); }
 	virtual void GetKeptTierSets(std::vector<uint32>& out) { KFCTierStore::GetTierSets(out); }
 	virtual void DropKeptTiers() { KFCTierStore::DropAll(); }
 	virtual bool DropTier(uint32 resultSet) { return KFCTierStore::DropTier(resultSet); }
-	virtual bool SearchListAgain(PMString& outStatus) { return KFCUnderListQuery(outStatus, false, [&]() { return KFCSearchEngine::SearchListAgain(outStatus); }); }
+	virtual bool SearchListAgain(PMString& outStatus) { return KFCUnderListQuery(outStatus, false /*writes*/, [&]() { return KFCSearchEngine::SearchListAgain(outStatus); }); }
 	// CREATE OUTLINES, BY THE ROWS' KIND (one kind at a time - the selection rules keep it): object rows' items outlined whole
 	// (KFCObjectOutline), text rows' matched characters (KFCReplaceEngine::OutlineHits - the text-outlines spec).
 	virtual bool OutlineRows(const KFCRowsByChapter& rows, PMString& outStatus)
@@ -144,7 +144,7 @@ public:
 	virtual bool SpecialRows(int32 op, const KFCRowsByChapter& rows, const KFCSpecialParams& params, PMString& outStatus) { return KFCObjectSpecial::SpecialRows(op, rows, params, outStatus); }
 	virtual bool CanSpecialHit(int32 op, int32 chapterIdx, int32 hitIdx) { return KFCObjectSpecial::CanSpecialHit(op, chapterIdx, hitIdx); }
 	// Under the list's own query, as Search These Results Again (a Narrow Down searches with it - the spec's N3).
-	virtual bool NarrowList(const KFCNarrowStep& step, PMString& outStatus) { return KFCUnderListQuery(outStatus, false, [&]() { return KFCSearchEngine::NarrowList(step, outStatus); }); }
+	virtual bool NarrowList(const KFCNarrowStep& step, PMString& outStatus) { return KFCUnderListQuery(outStatus, false /*writes*/, [&]() { return KFCSearchEngine::NarrowList(step, outStatus); }); }
 };
 
 CREATE_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)
