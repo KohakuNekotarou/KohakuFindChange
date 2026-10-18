@@ -6,12 +6,13 @@
 //
 //  THE PANEL FOLLOWS AN UNDO AND A REDO (the author: "the panel should come back with it, the way KCM's does").
 //
-//  Every write of KFC's own that leaves a list - a hit row's Replace, and the query run - is ONE undo step. What it
-//  did to the panel's rows is kept beside it: the rows before it and after it (KFCResultModel::RowStep - or the
-//  whole result set, for the query run, which replaces the list), and the VERSION of every story it wrote to
-//  before it and after it (ITextModel::GetChangeCount, KFCSearchEngine::ReadStoryVersion) - for an object row's
-//  Replace, the FINGERPRINT of the item it changed (KFCObjectSearch::Fingerprint). (Change All in Book leaves no
-//  list, so it has nothing to follow.)
+//  Every write of KFC's own that leaves a list - a row's Replace, its Restore from Copy, its Create Outlines or another
+//  of its Special Operations, and the query run - is ONE undo step. What it did to the panel's rows is kept beside it:
+//  the rows before it and after it (KFCResultModel::RowStep - or the whole result set, for the query run, which
+//  replaces the list), and the VERSION of every story it wrote to before it and after it (ITextModel::GetChangeCount,
+//  KFCSearchEngine::ReadStoryVersion) - for an object row's write, the FINGERPRINT of the item it changed
+//  (KFCObjectSearch::Fingerprint), its place in its stack for an Arrange, and that it is gone for a write that takes it
+//  away. (Change All in Book leaves no list, so it has nothing to follow.)
 //
 //  An Undo puts a story back at EXACTLY the version it had (measured - memory text-change-counters), a
 //  Redo at exactly the one after. So when every story a write moved is back at its "before", that write was
@@ -60,9 +61,9 @@ class IDataBase;
 
 namespace KFCUndoFollow
 {
-	/** ONE WRITE, RECORDED (a row's Replace - by that name on the status line when an Undo or a Redo takes it) - made
-	    before a character is written (outside the write's command sequence, or at its head), kept once the write has
-	    gone through AND the rows show it.
+	/** ONE WRITE OF ROWS, RECORDED (a row's Replace, or another write of rows - named on the status line when an Undo
+	    or a Redo takes it: SetName, "Replace" when not named) - made before a character is written (outside the write's
+	    command sequence, or at its head), kept once the write has gone through AND the rows show it.
 
 	    The constructor reads the version of every story holding a row of the chapter (its document must be
 	    open) and starts the row backup (KFCResultModel::BeginRowBackup) - so a caller does not start one
@@ -85,10 +86,10 @@ namespace KFCUndoFollow
 		    (a write that moved neither has nothing an Undo could take back). */
 		void Keep();
 
-		/** AN OBJECT ROW'S ITEM: read its fingerprint now, before the write - an object Replace moves no
-		    story, so its Undo and Redo are told by the item's fingerprint coming back to "before" or "after".
-		    withOrder: its place in its parent's stack is read too (KFCPageItemFacts::StackIndex) - Object > Arrange moves
-		    that and nothing of the item's own data (KFCObjectSpecial), so its Undo and Redo are told by the place. */
+		/** AN OBJECT ROW'S ITEM: read its fingerprint now, before the write - an object row's write moves no story, so
+		    its Undo and Redo are told by the item's fingerprint coming back to "before" or "after". withOrder: its
+		    place in its parent's stack is read too (KFCPageItemFacts::StackIndex) - Object > Arrange moves that and
+		    nothing of the item's own data (KFCObjectSpecial), so its Undo and Redo are told by the place. */
 		void RecordItem(int32 chapterIdx, UID item, bool withOrder = false);
 
 		/** The write's name on the message line when an Undo or a Redo takes it ("Undo: <name> - ...") - a string that
@@ -133,16 +134,15 @@ namespace KFCUndoFollow
 	    user keeps the write). Nothing is processed over an error already standing (the step goes back on it). */
 	void MarkWrite(IDataBase* db);
 
-	/** A DOCUMENT IS CLOSING AND THE LIST ON SCREEN IS NOT A BOOK'S - whatever it shows: All Documents, one document, or
-	    no list at all (a query run leaves it empty - F7). The kept writes let it go all the same (the author's call,
-	    2026-10-13 - the spec map's UNDO-12 for a query run): a chapter of a kept BOOK's list (a whole result set a book's
-	    search made - its header.fromBook) the way a book's chapter goes (ForgetBookChapter: frozen where a write wrote
-	    it), any other document the way All Documents lets one go (ForgetDocument: emptied). Until then a kept write let
-	    a document go only while the list showed its rows: after a query run over two documents, one closed unsaved, an
-	    Undo in the other went unfollowed - the whole run dropped at the next follow, a document of it no longer open
-	    (case xq-alldocs-close-undo).
-	    Called by KFCCloseDocResponder for every close outside a run of ours while the list is not a book's - a book's
-	    list calls ForgetBookChapter itself, ahead of the run guard. */
+	/** A DOCUMENT IS CLOSING AND THE LIST ON SCREEN IS NOT A BOOK'S - whatever it shows: All Documents, one document,
+	    or no list at all (a query run leaves it empty - F7). The kept writes let it go all the same (the author's call:
+	    the spec map's UNDO-12 for a query run): a chapter of a kept BOOK's list (a whole result set a book's search
+	    made - its header.fromBook) the way a book's chapter goes (ForgetBookChapter: frozen where a write wrote it),
+	    any other document the way All Documents lets one go (ForgetDocument: emptied). Without it a kept write would
+	    let a document go only while the list showed its rows: after a query run over two documents, one closed unsaved,
+	    an Undo in the other would go unfollowed - the whole run dropped at the next follow, a document of it no longer
+	    open (case xq-alldocs-close-undo). Called by KFCCloseDocResponder for every close outside a run of ours while
+	    the list is not a book's - a book's list calls ForgetBookChapter itself, ahead of the run guard. */
 	void ForgetClosingDocument(const UIDRef& docRef);
 
 	/** A DOCUMENT OF AN ALL DOCUMENTS LIST IS CLOSING. Only its rows leave the panel

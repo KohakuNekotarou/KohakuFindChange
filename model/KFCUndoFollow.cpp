@@ -62,10 +62,10 @@ struct StoryMoved
 	StoryMoved() : story(kInvalidUID), before(0), after(0), afterText(0), now(nil) {}
 };
 
-// One page item a write changed - an object row's Replace: its fingerprint before and after the write
-// (KFCObjectSearch::Fingerprint) - what an Undo and a Redo of it are told by, as a story's version is for text (measured:
-// docs/superpowers/plans/2026-10-09-kfc-object-search.md, Task 1 M9 - an Undo brings the fingerprint back to "before", a
-// Redo to "after").
+// One page item a write changed - an object row's write (its Replace, Create Outlines or another special operation):
+// its fingerprint before and after the write (KFCObjectSearch::Fingerprint) - what an Undo and a Redo of it are told
+// by, as a story's version is for text (measured: docs/superpowers/plans/2026-10-09-kfc-object-search.md, Task 1 M9 -
+// an Undo brings the fingerprint back to "before", a Redo to "after").
 struct ItemMoved
 {
 	IDFile		file;
@@ -76,7 +76,7 @@ struct ItemMoved
 	uint64		after;
 	uint32		afterLength;
 	IDataBase*	now;
-	bool		afterGone;	// the write took the item away (Create Outlines): no print after it - gone is its "after"
+	bool		afterGone;	// the write took the item away (Create Outlines, Delete): its "after" is gone - no print
 	bool		withOrder;	// its place in its parent's stack is asked too (Arrange - RecordItem's withOrder)...
 	int32		orderBefore;	// ...before the write (KFCPageItemFacts::StackIndex)
 	int32		orderAfter;		// ...and after it
@@ -90,13 +90,14 @@ struct Step
 	bool							done;			// the write stands (false: an Undo took it back)
 	uint32							resultSet;		// KFCResultModel::GetResultSetId when it was made
 	uint32							resultSetBefore;	// a whole set's: the one it found - its Undo goes back to it
-	bool							whole;			// it reshaped the result set: a query run (RunRecorder); else a row's
-													// Replace (StepRecorder) - the name on the message line too
-	const char*						name;			// a row write's own name (StepRecorder::SetName - Create Outlines); nil = Replace
+	bool							whole;			// it reshaped the result set: a query run (RunRecorder - "Run
+													// Queries" on the message line); else a write of rows
+													// (StepRecorder)
+	const char*						name;			// the write's own name (StepRecorder::SetName); nil = "Replace"
 	uint32							layoutBefore;	// the layout the row indices named before it...
 	uint32							layoutAfter;	// ...and after it (the same, for a write of rows)
 	std::vector<StoryMoved>			stories;
-	std::vector<ItemMoved>			items;			// an object row's Replace: the item it changed
+	std::vector<ItemMoved>			items;			// an object row's write: the items it changed
 	KFCResultModel::RowStep			rows;			// a write of rows: the rows before and after
 	KFCResultModel::ModelSnapshot	before;			// a write of the whole result set: the set before...
 	KFCResultModel::ModelSnapshot	after;			// ...and after
@@ -377,7 +378,8 @@ void TakeMovedStories(Step& step)
 }
 
 // The items the recording read that the write changed, each with its fingerprint after it, onto the step - an item the
-// write took away (Create Outlines) leaves its UID unused, an Undo puts it back (KFCPageItemFacts::ItemIsThere).
+// write took away (Create Outlines, Delete) leaves its UID unused, an Undo puts it back
+// (KFCPageItemFacts::ItemIsThere).
 void TakeMovedItems(Step& step)
 {
 	for (size_t k = 0; k < gRecording.items.size(); ++k)
@@ -388,8 +390,9 @@ void TakeMovedItems(Step& step)
 			continue;
 		if (!KFCObjectSearch::Fingerprint(UIDRef(m.now, m.item), m.after, m.afterLength))
 		{
-			// AN ITEM THE WRITE TOOK AWAY (Create Outlines - the frame replaced by its outlines, KFCObjectOutline): no print to
-			// read after it - its Undo brings the item back at "before", its Redo takes it away again (AllAt).
+			// AN ITEM THE WRITE TOOK AWAY (Create Outlines - the frame replaced by its outlines, KFCObjectOutline;
+			// Delete - KFCObjectSpecial): no print to read after it - its Undo brings the item back at "before", its
+			// Redo takes it away again (AllAt).
 			if (!KFCPageItemFacts::ItemIsThere(m.now, m.item))
 			{
 				m.afterGone = true;
@@ -431,7 +434,7 @@ bool AllAt(const Step& step, bool after)
 	for (size_t k = 0; k < step.items.size(); ++k)
 	{
 		const ItemMoved& m = step.items[k];
-		// ...or, for an item the write took away (Create Outlines), gone again at "after" (a Redo).
+		// ...or, for an item the write took away (Create Outlines, Delete), gone again at "after" (a Redo).
 		if (after && m.afterGone)
 		{
 			if (KFCPageItemFacts::ItemIsThere(m.now, m.item))
@@ -565,8 +568,8 @@ void WatchDoc(IDataBase* db)
 	}
 }
 
-// A write's name on the message line - the menu item that made it: the query run is the one write that reshapes the whole
-// list; every other is a row's Replace.
+// A write's name on the message line - the menu item that made it: "Run Queries" for the query run, the one write that
+// reshapes the whole list; a write of rows' own name (StepRecorder::SetName), or "Replace".
 const char* WriteName(const Step& step)
 {
 	return step.whole ? "Run Queries" : (step.name != nil ? step.name : "Replace");
@@ -1059,9 +1062,9 @@ void KFCUndoFollow::ForgetDocument(const UIDRef& docRef)
 				if (sets[s]->chapters[c].docRef == docRef)
 					KFCResultModel::EmptyChapter(sets[s]->chapters[c],
 						docRef.GetDataBase() != nil ? docRef.GetDataBase()->GetSysFile() : nil);	// its file kept
-		// Its stories and items (an object row's Replace). A write of rows of this document alone goes whole (and its rows
-		// with it); one of several documents (rows selected together) keeps the others' and lets this one's rows go
-		// (DropChapterRows); a query run keeps the stories of the documents still open.
+		// Its stories and items (an object row's write). A write of rows of this document alone goes whole (and its
+		// rows with it); one of several documents (rows selected together) keeps the others' and lets this one's rows
+		// go (DropChapterRows); a query run keeps the stories of the documents still open.
 		if (TakeDocOff(step, [&](const auto& x) { return x.doc == docRef; }))
 			gSteps.erase(gSteps.begin() + static_cast<std::ptrdiff_t>(i));
 		else if (!step.whole && closing >= 0 && step.resultSet == current)	// (row indices name the current list's rows only)
