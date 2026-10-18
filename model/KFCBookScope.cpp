@@ -27,6 +27,7 @@
 #include "IActiveContext.h"		// GetContextDocument - ActiveDocument, the document-scope half of HasScopeTarget
 #include "IOpenFileCmdData.h"	// kOpenDefault / kUseLockFile
 #include "IOpenedFileInfo.h"	// the file an older-version chapter's conversion was opened from
+#include "IPageList.h"			// TargetSizes - an open document's page count
 #include "ISession.h"
 
 // General includes:
@@ -1446,6 +1447,81 @@ bool KFCBookScope::OpenChapterDoc(ChapterDoc& ioChapter, std::vector<SkippedChap
 		outSkipped->push_back(skipped);
 	}
 	return false;
+}
+
+std::vector<uint64> KFCBookScope::TargetSizes(const std::vector<ChapterDoc>& targets)
+{
+	std::vector<uint64> sizes(targets.size(), 0);
+	// The book found again by its path, as OpenChapterDoc finds it (no book pointer carried between calls). Nil (not a book's
+	// run, or the book closed since): the book's chapters read as not read - each then the average (ProgressBases).
+	IBook* book = gSearchedBookPath.IsEmpty() ? nil : FindOpenBookByPath(gSearchedBookPath);
+	IDataBase* bookDB = (book != nil) ? ::GetDataBase(book) : nil;
+	for (size_t i = 0; i < targets.size(); ++i)
+	{
+		if (targets[i].contentUID != kInvalidUID)
+		{
+			if (bookDB != nil && bookDB->IsValidUID(targets[i].contentUID))
+			{
+				InterfacePtr<IBookContent> content(bookDB, targets[i].contentUID, UseDefaultIID());
+				if (content != nil)
+					sizes[i] = content->GetSize();
+			}
+		}
+		else if (targets[i].docRef.GetDataBase() != nil)
+		{
+			InterfacePtr<IPageList> pages(targets[i].docRef, UseDefaultIID());
+			if (pages != nil && pages->GetPageCount() > 0)
+				sizes[i] = static_cast<uint64>(pages->GetPageCount());
+		}
+	}
+	return sizes;
+}
+
+std::vector<int32> KFCBookScope::ProgressBases(const std::vector<uint64>& sizes, int32 total)
+{
+	const size_t n = sizes.size();
+	std::vector<int32> bases(n + 1, 0);
+	if (n == 0)
+		return bases;
+	// The weights: each size, or the average of the sizes read for one not read (all unread: all alike - an even share).
+	uint64 sum = 0;
+	size_t read = 0;
+	for (size_t i = 0; i < n; ++i)
+		if (sizes[i] > 0)
+		{
+			sum += sizes[i];
+			++read;
+		}
+	const double average = (read > 0) ? static_cast<double>(sum) / static_cast<double>(read) : 1.0;
+	std::vector<double> weight(n, average);
+	double weights = 0.0;
+	for (size_t i = 0; i < n; ++i)
+	{
+		if (sizes[i] > 0)
+			weight[i] = static_cast<double>(sizes[i]);
+		weights += weight[i];
+	}
+	// ...each at least a quarter of an even share, then the range dealt out by them - the last base is the total exactly.
+	const double floorWeight = weights / static_cast<double>(n) / 4.0;
+	weights = 0.0;
+	for (size_t i = 0; i < n; ++i)
+	{
+		if (weight[i] < floorWeight)
+			weight[i] = floorWeight;
+		weights += weight[i];
+	}
+	double done = 0.0;
+	for (size_t i = 0; i < n; ++i)
+	{
+		bases[i] = static_cast<int32>(static_cast<double>(total) * done / weights + 0.5);
+		done += weight[i];
+	}
+	bases[n] = total;
+	// (never a stretch of none: a rounding that met the next base moves it on by one, while the total allows)
+	for (size_t i = 1; i <= n; ++i)
+		if (bases[i] <= bases[i - 1] && bases[i - 1] < total)
+			bases[i] = bases[i - 1] + 1;
+	return bases;
 }
 
 // End, KFCBookScope.cpp.

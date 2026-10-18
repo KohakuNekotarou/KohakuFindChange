@@ -266,7 +266,14 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 	// asked between steps - one document's Change All does not stop half way (the dialog's own rule). It comes down
 	// before the sequence ends: the chapters are handed back with no bar up.
 	{
-		const int32 units = static_cast<int32>(queries.size() * targets.size());
+		// A query's stretch of the bar split among the documents by their sizes (docs/superpowers/specs/2026-10-18-kfc-copy-
+		// results-progress-share-design.md - KFCBookScope::ProgressBases): a document's step is as long as its size makes it,
+		// not one each. `unit` still counts the steps (the test build's queries-cancel names one); the bar's place is
+		// Place(q, d).
+		const int32 perQueryBar = static_cast<int32>(targets.size()) * 100;
+		const std::vector<int32> shares(KFCBookScope::ProgressBases(KFCBookScope::TargetSizes(targets), perQueryBar));
+		const int32 units = static_cast<int32>(queries.size()) * perQueryBar;
+		auto Place = [&](size_t q, size_t d) { return static_cast<int32>(q) * perQueryBar + shares[d]; };
 		KFCProgressBar runBar(kKFCRunQueriesStepKey, 0, units, kTrue, kTrue);
 		int32 unit = 0;
 #ifdef KFC_DIAG
@@ -293,7 +300,7 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 			{
 				(loaded ? skippedNothing : skippedUnread).push_back(query.name);
 				unit += static_cast<int32>(targets.size());
-				runBar.SetPosition(unit);
+				runBar.SetPosition(Place(q + 1, 0));
 				continue;
 			}
 			// AN OBJECT QUERY (spec O14) writes WHOLE DOCUMENTS with InDesign's object Change All: the object walker has
@@ -305,14 +312,14 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 			{
 				skippedPart.push_back(query.name);
 				unit += static_cast<int32>(targets.size());
-				runBar.SetPosition(unit);
+				runBar.SetPosition(Place(q + 1, 0));
 				continue;
 			}
 			if (objectQuery && !KFCObjectSearch::HasChangeObjectFormat())
 			{
 				skippedNoChange.push_back(query.name);
 				unit += static_cast<int32>(targets.size());
-				runBar.SetPosition(unit);
+				runBar.SetPosition(Place(q + 1, 0));
 				continue;
 			}
 			// The tab and the change side are stated for a text query only: an Object query's write is the service's own
@@ -354,7 +361,8 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 					title.Append(" - ");
 					title.Append(targets[d].shortName);
 				}
-				runBar.SetPosition(unit++);
+				runBar.SetPosition(Place(q, d));
+				++unit;
 				runBar.SetTaskText(title);
 				bool cancelPressed = runBar.WasCancelled(kFalse) != kFalse;
 #ifdef KFC_DIAG

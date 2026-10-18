@@ -407,11 +407,14 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 	}
 	seq->SetName(kKFCChangeAllStepKey);
 	{
-		KFCProgressBar bar(kKFCChangeAllStepKey, 0,
-			static_cast<int32>(targets.size()), kTrue, kTrue);
+		// The bar split among the chapters by their sizes (docs/superpowers/specs/2026-10-18-kfc-copy-results-progress-share-
+		// design.md - KFCBookScope::ProgressBases): a chapter's step as long as its size makes it, not one each.
+		const int32 barTotal = static_cast<int32>(targets.size()) * 100;
+		const std::vector<int32> shares(KFCBookScope::ProgressBases(KFCBookScope::TargetSizes(targets), barTotal));
+		KFCProgressBar bar(kKFCChangeAllStepKey, 0, barTotal, kTrue, kTrue);
 		for (size_t d = 0; d < targets.size(); ++d)
 		{
-			bar.SetPosition(static_cast<int32>(d));
+			bar.SetPosition(shares[d]);
 			bar.SetTaskText(targets[d].shortName);
 #ifdef KFC_DIAG
 			// (Fault switch changeall-cancel, a test build's only - KFCDiag.h: Cancel taken as pressed once the first

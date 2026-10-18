@@ -2595,6 +2595,10 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 	// the one thing the bar is really there for, the cancel button, was never on screen. Better a
 	// brief flash on a fast search than a search that cannot be stopped.
 	const int32 progressTotal = static_cast<int32>(targets.size()) * kKFCChapterProgressSpan;
+	// THE BAR SPLIT BY THE TARGETS' SIZES (docs/superpowers/specs/2026-10-18-kfc-copy-results-progress-share-design.md): a book's
+	// chapter takes the share its size gives it, an open document the share its pages give it (KFCBookScope::ProgressBases) -
+	// the total as before. shares[t] is where target t's stretch starts, shares[t + 1] where it ends.
+	const std::vector<int32> shares(KFCBookScope::ProgressBases(KFCBookScope::TargetSizes(targets), progressTotal));
 
 	// The title names the scope, because the bar does not imply it: "Searching book..." when it
 	// really is a book, plain "Searching..." for a single document.
@@ -2689,7 +2693,7 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 			// A slice of the bar per document, the way the book's chapters share it.
 			for (size_t t = 0; t < targets.size(); ++t)
 			{
-				const int32 base = static_cast<int32>(t) * kKFCChapterProgressSpan;
+				const int32 base = shares[t];
 				KFCSetCountedTask(progressBar, "Document", t, targets.size(), targets[t].shortName);
 				KFCAdvanceProgress(&progressBar, progressReported, base, true /*force*/);
 				if (t > 0 && progressBar.WasCancelled(kFalse))
@@ -2700,7 +2704,7 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 				bool capped = false;
 				ChapterWalkResult walkResult = kChapterWalked;
 				CollectHitsInDoc(targets[t].docRef, limit, scopeOptions, kHitEverything, hits, capped, walkResult,
-					WalkBar(progressBar, base, kKFCChapterProgressSpan, targets[t].docRef, progressReported), UIDRef::gNull,
+					WalkBar(progressBar, base, shares[t + 1] - base, targets[t].docRef, progressReported), UIDRef::gNull,
 					IWalkerScopeFactoryUtils::kEmptyScope, &hitDBs);
 				if (walkResult == kChapterCancelled)
 				{
@@ -2810,6 +2814,7 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 		// bar names what is being worked on rather than what has just finished. This is also what
 		// keeps the bar moving through chapters that hold no hits at all.
 		KFCSetCountedTask(progressBar, "Chapter", i, targets.size(), targets[i].shortName);
+		progressBase = shares[i];		// the chapter's stretch, by its size (shares)
 		KFCAdvanceProgress(&progressBar, progressReported, progressBase, true /*force*/);
 
 		// Cancel is asked here, after the bar has been moved - from inside the walk and just above
@@ -2838,7 +2843,7 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 			{
 				// The reason is recorded; AppendUnopenableNote names it in the summary. Hand the
 				// bar on all the same, so a book whose chapters will not open still fills it.
-				progressBase += kKFCChapterProgressSpan;
+				progressBase = shares[i + 1];
 				KFCAdvanceProgress(&progressBar, progressReported, progressBase, true /*force*/);
 				continue;
 			}
@@ -2851,11 +2856,11 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 		bool docCapped = false;
 		ChapterWalkResult walkResult = kChapterWalked;
 		CollectHitsInDoc(chapterDocRef, static_cast<size_t>(remaining), scopeOptions, kHitEverything, hits, docCapped,
-			walkResult, WalkBar(progressBar, progressBase, kKFCChapterProgressSpan, chapterDocRef, progressReported));
+			walkResult, WalkBar(progressBar, progressBase, shares[i + 1] - progressBase, chapterDocRef, progressReported));
 
 		// This chapter is done, whatever it found: put the bar exactly where the next one starts, so
 		// a chapter whose stories the walk left early still hands the bar on at the right place.
-		progressBase += kKFCChapterProgressSpan;
+		progressBase = shares[i + 1];
 		KFCAdvanceProgress(&progressBar, progressReported, progressBase, true /*force*/);
 
 		// Hand the chapter back HERE, before any of the continues below can skip it.
@@ -4575,7 +4580,13 @@ bool SearchPartsAgain(const PMString& lead, PMString& outStatus, const KFCSearch
 		KFCSearchEngine::GetKFCWalkerScopeOptions(scopeOptions);
 		PMString title("Searching...");
 		title.SetTranslatable(kFalse);
-		KFCProgressBar bar(title, 0, static_cast<int32>(chapters.size()) * kKFCChapterProgressSpan, kTrue, kTrue);
+		// the bar split by the documents' pages (the progress-share spec - KFCBookScope::ProgressBases, as the search's is)
+		std::vector<KFCBookScope::ChapterDoc> sized(chapters.size());
+		for (size_t k = 0; k < chapters.size(); ++k)
+			sized[k].docRef = chapters[k].docRef;
+		const int32 barTotal = static_cast<int32>(chapters.size()) * kKFCChapterProgressSpan;
+		const std::vector<int32> shares(KFCBookScope::ProgressBases(KFCBookScope::TargetSizes(sized), barTotal));
+		KFCProgressBar bar(title, 0, barTotal, kTrue, kTrue);
 		bar.DisableChildProgressBars(kTrue);
 		int32 reported = 0;
 		size_t taken = 0;		// the rows the walks before this one found - the room is the whole list's
@@ -4583,7 +4594,8 @@ bool SearchPartsAgain(const PMString& lead, PMString& outStatus, const KFCSearch
 		{
 			ChapterAgain& one = chapters[k];
 			IDataBase* const db = one.docRef.GetDataBase();
-			const int32 base = static_cast<int32>(k) * kKFCChapterProgressSpan;
+			const int32 base = shares[k];
+			const int32 span = shares[k + 1] - base;
 			KFCSetCountedTask(bar, "Document", k, chapters.size(), one.name);
 			KFCAdvanceProgress(&bar, reported, base, true /*force*/);
 			const size_t limit = (room > static_cast<int32>(taken)) ? static_cast<size_t>(room) - taken : 0;
@@ -4595,7 +4607,7 @@ bool SearchPartsAgain(const PMString& lead, PMString& outStatus, const KFCSearch
 				ChapterWalkResult result = kChapterWalked;
 				if (storyForm)
 					CollectHitsInDoc(one.docRef, limit, scopeOptions, kHitEverything, one.hits, capped, result,
-						WalkBar(bar, base, kKFCChapterProgressSpan, one.docRef, reported), UIDRef(db, part.story));
+						WalkBar(bar, base, span, one.docRef, reported), UIDRef(db, part.story));
 				else
 				{
 					TempFocus partFocus;
@@ -4605,7 +4617,7 @@ bool SearchPartsAgain(const PMString& lead, PMString& outStatus, const KFCSearch
 						result = kChapterNoScope;
 					else
 						CollectHitsInDoc(one.docRef, limit, scopeOptions, kHitEverything, one.hits, capped, result,
-							WalkBar(bar, base, kKFCChapterProgressSpan, one.docRef, reported), UIDRef(db, part.story),
+							WalkBar(bar, base, span, one.docRef, reported), UIDRef(db, part.story),
 							IWalkerScopeFactoryUtils::kEmptyScope, nil, nil, partScope);
 				}
 				cancelled = (result == kChapterCancelled) || bar.WasCancelled(kFalse) != kFalse;

@@ -172,8 +172,9 @@ const int32 kDocSpan = 1000;
 class DocProgress
 {
 public:
-	DocProgress(KFCProgressBar& bar, const UIDRef& docRef, int32 base)
-		: fBar(bar), fBase(base), fReported(base), fSpreads(docRef, UseDefaultIID()) {}
+	// (span: the document's slice - kDocSpan, or its share of the run's bar by its size: the progress-share spec)
+	DocProgress(KFCProgressBar& bar, const UIDRef& docRef, int32 base, int32 span)
+		: fBar(bar), fBase(base), fSpan(span > 0 ? span : 1), fReported(base), fSpreads(docRef, UseDefaultIID()) {}
 
 	// The walk has listed an item of the spread `spread` (SpreadOf - kInvalidUID for an item on none): move the bar.
 	void Listed(UID spread)
@@ -183,11 +184,11 @@ public:
 		const int32 index = (fSpreads != nil && spread != kInvalidUID) ? fSpreads->GetSpreadIndex(spread) : -1;
 		if (count > 0 && index >= 0)
 		{
-			const int32 spreadStart = fBase + static_cast<int32>((static_cast<int64>(kDocSpan) * index) / count);
+			const int32 spreadStart = fBase + static_cast<int32>((static_cast<int64>(fSpan) * index) / count);
 			if (spreadStart > target)
 				target = spreadStart;
 		}
-		const int32 last = fBase + kDocSpan - 1;
+		const int32 last = fBase + fSpan - 1;
 		if (target > last)
 			target = last;
 		if (target != fReported)
@@ -200,6 +201,7 @@ public:
 private:
 	KFCProgressBar&				fBar;
 	const int32					fBase;
+	const int32					fSpan;
 	int32						fReported;
 	InterfacePtr<ISpreadList>	fSpreads;
 	DocProgress(const DocProgress&);
@@ -243,7 +245,7 @@ UID SpreadOf(const UIDRef& item)
 // one off the layer is, before the list's limit counts it; nil = every match.
 WalkEnd WalkDoc(IFindChangeService* svc, IObjectWalker* shared, const UIDRef& docRef, const UIDList* items, size_t limit,
 	std::vector<KFCResultModel::Hit>& outHits, bool& outCapped, bool fromSearchScope, KFCProgressBar& bar, int32 barBase,
-	UID onLayer, const KFCNarrow::Filter* narrow)
+	UID onLayer, const KFCNarrow::Filter* narrow, int32 barSpan = kDocSpan)
 {
 	IDataBase* const db = docRef.GetDataBase();
 	if (db == nil || svc == nil || shared == nil)
@@ -251,7 +253,7 @@ WalkEnd WalkDoc(IFindChangeService* svc, IObjectWalker* shared, const UIDRef& do
 	IDataBase::SaveRestoreModifiedState dirtyGuard(db);
 	if (!fromSearchScope)
 		shared->Initialize(KFCObjectSearch::WalkerOptionsFor(docRef, items));
-	DocProgress progress(bar, docRef, barBase);
+	DocProgress progress(bar, docRef, barBase, barSpan);
 #ifdef KFC_DIAG
 	// (Test builds only) Fault switch objsearch-cancel - KFCDiag.h: Cancel taken as pressed once this document's walk has
 	// listed its <n>th item, heard where the walk asks the bar.
@@ -943,8 +945,11 @@ void KFCObjectSearch::CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targ
 		const WalkAftercare aftercare;		// O6 / O7 as this block ends, after the last chapter is handed back
 		PMString title(fromBook ? "Searching book..." : "Searching...");
 		title.SetTranslatable(kFalse);
-		// A document's slice is kDocSpan steps, so the bar can move inside one (DocProgress).
+		// A document's slice is kDocSpan steps on average, so the bar can move inside one (DocProgress) - dealt out among the
+		// documents by their sizes (the progress-share spec - KFCBookScope::ProgressBases: a book's chapter by the size its book
+		// records, an open document by its pages).
 		const int32 barEnd = static_cast<int32>(targets.size()) * kDocSpan;
+		const std::vector<int32> shares(KFCBookScope::ProgressBases(KFCBookScope::TargetSizes(targets), barEnd));
 		KFCProgressBar bar(title, 0, barEnd, kTrue, kTrue);
 		bar.DisableChildProgressBars(kTrue);
 		int32 objectLimit = KFCResultModel::kKFCCollectObjectLimit;	// the object lists' own (N7)
@@ -961,7 +966,7 @@ void KFCObjectSearch::CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targ
 		for (size_t i = 0; i < targets.size(); ++i)
 		{
 			KFCSetCountedTask(bar, fromBook ? "Chapter" : "Document", i, targets.size(), targets[i].shortName);
-			const int32 barBase = static_cast<int32>(i) * kDocSpan;
+			const int32 barBase = shares[i];
 			bar.SetPosition(barBase);
 			if (bar.WasCancelled(kFalse))
 			{
@@ -998,7 +1003,7 @@ void KFCObjectSearch::CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targ
 			std::vector<KFCResultModel::Hit> hits;
 			bool capped = false;
 			const WalkEnd end = WalkDoc(svc, shared, docRef, items, limit - static_cast<size_t>(out.total), hits, capped,
-				fromSearchScope, bar, barBase, onLayer, narrow);
+				fromSearchScope, bar, barBase, onLayer, narrow, shares[i + 1] - barBase);
 			// A book's chapter goes back now, closed on the spot (the text search's reason: one chapter of ours at a time).
 			if (fromBook && !KFCBookScope::HandBackHeldDocNow(docRef))
 				out.unclosed.push_back(targets[i].shortName);
