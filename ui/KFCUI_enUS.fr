@@ -30,8 +30,15 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
         k_enUS,									// Locale Id
         kEuropeanWinToMacEncodingConverter,		// Character encoding converter (irp) I made this WinToMac as we have a bias to generate on Win...
         {
+                // The UI half's strings - all but the names Edit > Undo gives KFC's writes, which are the model half's
+                // (model/KFC_enUS.fr). English in every UI language, one table (ui/KFCUI.fr's LocaleIndex says why),
+                // and ASCII (a BOM-less .fr: ODFRC reads it as CP932 - memory plugin-ui-localization-fr-encoding).
         	 // ----- Menu strings
-                kKFCCompanyKey,					"Kohaku Plug-Ins",	// menu-group display name (KCM's shape; distinct from kKFCCompanyValue)
+                // The menu groups' name (Window > Kohaku Plug-Ins, and Help's About Plug-ins). The key is every Kohaku
+                // plug-in's, and a string key is one name for the whole application (keys must be unique across it):
+                // every table that has this key gives it this same value. (Not kKFCCompanyValue - the company name the
+                // plug-in's own record carries.)
+                kKFCCompanyKey,					"Kohaku Plug-Ins",
                 kKFCAboutMenuKey,					kKFCDisplayName "...",
 
                 kKFCAboutThisPlugInMenuKey,		"About This Plug-In...",	// KFC's own key - KFCUIID.h says why
@@ -102,7 +109,8 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCFittingSubmenuKey,				"Fitting",
                 kKFCArrangeSubmenuKey,				"Arrange",
                 kKFCTransformSubmenuKey,			"Transform",
-                // The operating reference. English in every UI language, like the rest of the flyout.
+                // How to Use... is the operating reference: the item reads English like the rest of the flyout, and
+                // its page is switched by UI language (KFCHowTo.cpp).
                 kKFCHowToMenuKey,				"How to Use...",
                 kKFCOpenFindChangeMenuKey,		"Open Find/Change...",
                 kKFCRunSavedQueriesMenuKey,		"Run Saved Queries...",
@@ -142,9 +150,6 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 // follows Find/Change's Search: (KFCSearchEngine::FindCommandName), so any one name would
                 // be wrong as often as not.
                 kKFCStaticTextKey,				"Type what to find in Edit > Find/Change, then run Find from this panel's menu.",
-
-                // (The model half's strings - the names Edit > Undo gives KFC's writes - are in
-                //  model/KFC_enUS.fr.)
 
 
 		// ----- Misc strings

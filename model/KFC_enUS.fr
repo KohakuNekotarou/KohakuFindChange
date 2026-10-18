@@ -31,10 +31,11 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
         kEuropeanWinToMacEncodingConverter,		// Character encoding converter (irp) I made this WinToMac as we have a bias to generate on Win...
         {
                 // The model half's strings: what the model writes itself. Every other string is the UI
-                // half's (ui/KFCUI_enUS.fr). English in every UI language - one table (the author's call).
-                // What Edit > Undo calls KFC's writes: a row's Replace (rows replaced together too), the
-                // query run, and Change All in Book.
-                kKFCReplaceStepKey,				"Replace",
+                // half's (ui/KFCUI_enUS.fr). English in every UI language - one table (the author's call) - and
+                // ASCII (a BOM-less .fr: ODFRC reads it as CP932 - memory plugin-ui-localization-fr-encoding).
+                // What Edit > Undo calls each of KFC's writes - the rows below are the list - handed over as its key
+                // (ICommandSequence::SetName; the Undo menu translates it). The writes from the list's rows first:
+                kKFCReplaceStepKey,				"Replace",		// rows replaced together too
                 kKFCCreateOutlinesStepKey,		"Create Outlines",
                 kKFCRestoreOriginalStepKey,		"Restore from Copy",
                 // An object row's other Special Operations (KFCObjectSpecial) - InDesign's own English command names.
@@ -66,6 +67,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCScaleStepKey,					"Scale",
                 kKFCRotateStepKey,					"Rotate",
                 kKFCShearStepKey,					"Shear",
+                // The query run and Change All in Book - each also the title of its progress bar.
                 kKFCRunQueriesStepKey,			"Run Queries",
                 kKFCChangeAllStepKey,			"Change All",
         }

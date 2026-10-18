@@ -22,7 +22,7 @@
 #include "SDKDef.h"
 
 // Company:
-#define kKFCCompanyKey	"KohakuNekotarou"		// Company name used internally for menu paths and the like. Must be globally unique, only A-Z, 0-9, space and "_". It is a string-table KEY, not what the user sees: the UI half's string table (KFCUI_enUS.fr - the only one that has it) maps it to "Kohaku Plug-Ins", so the group reads Kohaku Plug-Ins, under Window (kKFCPanelWindowMenuName) - not KohakuNekotarou (measured on the real application). KCM, KESCL, KT and KIDMCP use the same key, which is what puts them all under one group.
+#define kKFCCompanyKey	"KohakuNekotarou"		// Company name used internally for menu paths and the like. Must be globally unique, only A-Z, 0-9, space and "_". It is a string-table KEY, not what the user sees: the UI half's string table (KFCUI_enUS.fr - the only one that has it) maps it to "Kohaku Plug-Ins", so the group reads Kohaku Plug-Ins, under Window (kKFCPanelWindowMenuName) - not KohakuNekotarou (measured on the real application). All Kohaku plug-ins share the key (one group) - and must share its value (KFCUI_enUS.fr).
 #define kKFCCompanyValue	"KohakuNekotarou"	// Company name displayed externally.
 
 // Plug-in:
