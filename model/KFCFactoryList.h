@@ -21,6 +21,8 @@
 //  
 //========================================================================================
 // The model half's implementations. The UI half's are in ui/KFCUIFactoryList.h.
+// Every implementation a boss in KFC.fr names needs its line here - a missing one is not caught as the plug-in
+// loads (ui/KFCUIFactoryList.h says why).
 // The jump marker (a global text adornment - KFCHitMarker.cpp) and the startup/shutdown service.
 REGISTER_PMINTERFACE(KFCHitMarkerAdornment, kKFCHitMarkerAdornmentImpl)
 REGISTER_PMINTERFACE(KFCStartupShutdown, kKFCStartupShutdownImpl)

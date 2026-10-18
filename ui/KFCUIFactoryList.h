@@ -21,6 +21,8 @@
 //  
 //========================================================================================
 // The UI half's implementations. The model half's are in model/KFCFactoryList.h.
+// Every implementation a boss in KFCUI.fr names needs its line here. A missing one is NOT caught as the plug-in loads -
+// Adobe's buttonui names one it never registers (kSelectFileButtonBoss) and loads - so a clean start proves nothing.
 REGISTER_PMINTERFACE(KFCActionComponent, kKFCActionComponentImpl)
 // Result tree: hierarchy adapter, row widget manager, the colour cell's view + data.
 REGISTER_PMINTERFACE(KFCResultListAdapter, kKFCResultListAdapterImpl)
@@ -36,8 +38,7 @@ REGISTER_PMINTERFACE(KFCResultEyeDragSource, kKFCResultEyeDragSourceImpl)
 REGISTER_PMINTERFACE(KFCResultEyeDropTarget, kKFCResultEyeDropTargetImpl)
 // ...and the row's observer: a row closed takes the rows selected under it out of the selection.
 REGISTER_PMINTERFACE(KFCResultNodeObserver, kKFCResultNodeObserverImpl)
-// The result LIST's own handler: up / down arrows that open the row they land on. A boss in the
-// .fr naming an implementation that is not registered here takes InDesign down at load time.
+// The result LIST's own handler - the keys the list takes (the head of KFCResultTreeEH.cpp lists them).
 REGISTER_PMINTERFACE(KFCResultTreeEH, kKFCResultTreeEHImpl)
 // ...and its Return, taken on the application's event dispatcher before the widget layer gets it.
 REGISTER_PMINTERFACE(KFCReturnFilterEH, kKFCReturnFilterEHImpl)
@@ -61,8 +62,7 @@ REGISTER_PMINTERFACE(KFCPanelVisibilityObserver, kKFCPanelVisibilityObserverImpl
 REGISTER_PMINTERFACE(KFCPanelRollOver, kKFCPanelRollOverImpl)
 // "Remember Book Panel Placement": the observer on kActiveContextBoss, the palette-manager service
 // boss's two halves and the command interceptor (KFCBookPanelPlacement.cpp) - the observer here, the
-// other three after the next line. A boss in the .fr naming an implementation that is not registered
-// here takes InDesign down at load time.
+// other three after the next line.
 REGISTER_PMINTERFACE(KFCBookPanelObserver, kKFCBookPanelObserverImpl)
 // "Link the Application Bar's Search Field to This Panel": the observer on kActiveContextBoss that
 // makes the field follow Find/Change (KFCAppBarSearchEnter.cpp).

@@ -14,8 +14,9 @@
 //  switch perf-commands is on (KFCDiag.h). It counts every command InDesign processes - by class, its name kept
 //  from the first one seen - and never refuses one (kCmdNotHandled on every path, as KIDMCP's KIDMCPCmdWatch).
 //  Without KFC_DIAG the two functions do nothing; the boss and its implementation stay in the plug-in but are
-//  never created (KFC.fr: a resource cannot follow the test build's define, and a boss named there with no
-//  implementation behind it would fail to load).
+//  never created (KFC.fr cannot follow the test build's define, so the boss is in every build - and keeps the
+//  implementation it names: one a boss names and the plug-in lacks is not caught as it loads -
+//  ui/KFCUIFactoryList.h).
 //
 //========================================================================================
 

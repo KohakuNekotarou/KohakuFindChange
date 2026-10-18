@@ -146,8 +146,8 @@ DECLARE_PMID(kImplementationIDSpace, kKFCResultNodeEHImpl, kKFCUIPrefix + 8)
 // the picture and the message the moment the panel appears, hears the picture's click, and keeps the
 // tab's name following the Find/Change settings and the selection (an ActiveSelectionObserver).
 DECLARE_PMID(kImplementationIDSpace, kKFCPanelObserverImpl, kKFCUIPrefix + 13)
-// The result tree's OWN event handler (the list, not a row): up / down arrows that OPEN the row
-// they land on, so a book search's closed chapters do not hide their hits from the keyboard.
+// The result tree's OWN event handler (the list, not a row) - the keys the list takes, listed at the head of
+// KFCResultTreeEH.cpp (the arrows among them open a closed row they land on: a book search's chapters come up closed).
 DECLARE_PMID(kImplementationIDSpace, kKFCResultTreeEHImpl, kKFCUIPrefix + 17)
 // The panel illustration's tooltip: hovering the icon shows the URL clicking it opens, so the
 // picture is not a mystery button (see KFCIconTip.cpp).
@@ -342,27 +342,27 @@ DECLARE_PMID(kActionIDSpace, kKFCSearchDocumentAgainActionID, kKFCUIPrefix + 51)
 // right-clicked is the menu's widget (KFCActionComponent's RightClickedRow). + 52: the next after the highest spent.
 DECLARE_PMID(kActionIDSpace, kKFCSelectAllRowsActionID, kKFCUIPrefix + 52)
 // RETIRED (never reuse - a keyboard shortcut is recorded against the ActionID): "Keep Previous Results", the flyout's
-// toggle for the panel's Find keeping the list it replaced as a tier (the stacked results' spec, section 2-3). The same
-// day (10-14) the author made keeping the default and dropped the toggle, so every Find keeps (KFCResultHistory).
+// toggle for the panel's Find keeping the list it replaced as a tier (the stacked results' spec, section 2-3). The
+// author then made keeping the default and dropped the toggle, so every Find keeps (KFCResultHistory).
 //DECLARE_PMID(kActionIDSpace, kKFCKeepPreviousResultsActionID, kKFCUIPrefix + 53)
 // "Clear These Results" on a TIER's own row's right-click menu (docs/superpowers/specs/2026-10-14-kfc-tier-switch-v2-design.md
 // R9 - the author's call): that tier alone let go - a grey one, or the live list (the grey tiers stay). The flyout's Clear
 // Results still lets every tier go. + 54: the next after the highest spent (+ 53 is retired).
 DECLARE_PMID(kActionIDSpace, kKFCClearTheseResultsActionID, kKFCUIPrefix + 54)
-// "Search These Results Again" on a TIER's own row's right-click menu (the author, 2026-10-14 night): that tier's own
+// "Search These Results Again" on a TIER's own row's right-click menu (the author's call): that tier's own
 // search run once more - a grey one switched to first (KFCResultTree::SearchListAgain). + 55: the next after the highest
 // spent.
 DECLARE_PMID(kActionIDSpace, kKFCSearchTierAgainActionID, kKFCUIPrefix + 55)
-// "Create Outlines" in an OBJECT row's right-click menu, under Special Operations (the author, 2026-10-17 - the rows'
+// "Create Outlines" in an OBJECT row's right-click menu, under Special Operations (the author's call - the rows'
 // objects outlined across spreads: KFCResultTree::OutlineRows, KFCObjectOutline). + 56: the next after the highest spent.
 DECLARE_PMID(kActionIDSpace, kKFCCreateOutlinesActionID, kKFCUIPrefix + 56)
 // "Restore from Copy" on a TEXT row's right-click menu, under Replace (docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md
-// C1 - the author, 2026-10-17: "copy back, from the right-click menu"; the name is the author's of the same evening,
+// C1 - the author: "copy back, from the right-click menu"; the name is the author's later word,
 // "put back with the copy" - the IDs and keys keep the first name, Restore Original): the copy the row's Replace took put back
 // (KFCResultTree::RestoreRows, KFCReplaceEngine::RestoreHits). + 57: the next after the highest spent.
 DECLARE_PMID(kActionIDSpace, kKFCRestoreOriginalActionID, kKFCUIPrefix + 57)
 // An OBJECT row's other Special Operations (docs/superpowers/specs/2026-10-17-kfc-object-special-operations-design.md - the
-// author, 2026-10-17): InDesign's own Object menu commands over the rows' objects across spreads (KFCResultTree::SpecialRows,
+// author's call): InDesign's own Object menu commands over the rows' objects across spreads (KFCResultTree::SpecialRows,
 // KFCObjectSpecial). Each action stands for one KFCSpecialOp (KFCActionComponent.cpp's table). + 58 on: the next after the
 // highest spent.
 // ...Fitting:
@@ -408,7 +408,7 @@ DECLARE_PMID(kActionIDSpace, kKFCRotateActionID, kKFCUIPrefix + 89)
 DECLARE_PMID(kActionIDSpace, kKFCShearActionID, kKFCUIPrefix + 90)
 //DECLARE_PMID(kActionIDSpace, kKFCTransformSep1ActionID, kKFCUIPrefix + 91)	// retired (above) - never reuse
 // FIND OBJECTS ON ACTIVE LAYER (the panel menu, under Find - the spec's E14, the author's S3 "the same layer"): the Object
-// tab's search kept to the objects on the Layers panel's layer. + 92. RETIRED 2026-10-18 (the author moved it into a tier
+// tab's search kept to the objects on the Layers panel's layer. + 92. RETIRED (the author moved it into a tier
 // heading's Narrow Down as On Active Layer, text tiers too - kKFCNarrowOnLayerActionID) - never reuse.
 //DECLARE_PMID(kActionIDSpace, kKFCFindOnActiveLayerActionID, kKFCUIPrefix + 92)
 // CLEAR FROM RESULTS (docs/superpowers/specs/2026-10-18-kfc-clear-from-results-design.md K2): the rows of a hit, object, story or
@@ -432,7 +432,7 @@ DECLARE_PMID(kActionIDSpace, kKFCNarrowFramesActionID, kKFCUIPrefix + 102)
 DECLARE_PMID(kActionIDSpace, kKFCCopyResultsActionID, kKFCUIPrefix + 103)
 DECLARE_PMID(kActionIDSpace, kKFCCopyRowsActionID, kKFCUIPrefix + 104)
 DECLARE_PMID(kActionIDSpace, kKFCCopyTheseResultsActionID, kKFCUIPrefix + 105)
-// NARROW DOWN > ON ACTIVE LAYER (the author, 2026-10-18: Find Objects on Active Layer moved off the panel menu into Narrow
+// NARROW DOWN > ON ACTIVE LAYER (the author's call: Find Objects on Active Layer moved off the panel menu into Narrow
 // Down, text tiers too): the tier's rows kept to the front document's active layer, by its name. + 106.
 DECLARE_PMID(kActionIDSpace, kKFCNarrowOnLayerActionID, kKFCUIPrefix + 106)
 
@@ -501,7 +501,7 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryMessageTextWidgetID, kKFCUIPrefix + 42)
 DECLARE_PMID(kWidgetIDSpace, kKFCQuerySaveOrderButtonWidgetID, kKFCUIPrefix + 43)
 DECLARE_PMID(kWidgetIDSpace, kKFCQueryLoadOrderButtonWidgetID, kKFCUIPrefix + 44)
 // ...and Find beside Run (docs/superpowers/specs/2026-10-14-kfc-stacked-results-design.md section 2-1 - the author's call
-// (a)): the run order's selected query searched (the author's call, 10-14 night), its list a new tier on the panel
+// (a)): the run order's selected query searched (the author's call), its list a new tier on the panel
 // (KFCResultHistory), and the selection moved down one. + 45: never used at either prefix.
 DECLARE_PMID(kWidgetIDSpace, kKFCQueryFindButtonWidgetID, kKFCUIPrefix + 45)
 // A hit row's eye (the row eye) - found by the widget manager in each hit row (+ 46: the next after the highest spent;
@@ -547,7 +547,7 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 #define kKFCSearchDocumentAgainMenuKey	kKFCStringPrefix "kKFCSearchDocumentAgainMenuKey"
 // The book, document and story rows' menus.
 #define kKFCSelectAllRowsMenuKey		kKFCStringPrefix "kKFCSelectAllRowsMenuKey"
-// A tier's own row's menu. NOT "kKFCClearTheseResultsMenuKey" (measured, 10-14 night): that key has the length and the
+// A tier's own row's menu. NOT "kKFCClearTheseResultsMenuKey" (measured): that key has the length and the
 // character sum of kKFCInternalPopupMenuNameKey (24 characters, 2448 each after the prefix), and the menu drew the
 // internal popup's key in its place - InDesign's string lookup took the one for the other. A new key is checked against
 // the untranslated table's (work/note-scripts/2026-10-14-kfc-tier-switch/key_collisions.py).
@@ -559,10 +559,10 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 // ...and a text row's Restore Original (measured against every other key - key_collisions.py).
 #define kKFCRestoreOriginalMenuKey	kKFCStringPrefix "kKFCRestoreOriginalMenuKey"
 // ...and Clear from Results - a hit, object, story or document row's. NOT "kKFCClearFromResultsMenuKey": the length and the
-// character sum of kKFCClearTierResultsMenuKey ("From" and "Tier" add up alike - key_collisions.py, 2026-10-18).
+// character sum of kKFCClearTierResultsMenuKey ("From" and "Tier" add up alike - key_collisions.py).
 #define kKFCClearRowsMenuKey		kKFCStringPrefix "kKFCClearRowsMenuKey"
 // ...and a tier heading's Narrow Down - the submenu's name and its items (measured against every other key -
-// key_collisions.py, 2026-10-18: none reads alike).
+// key_collisions.py: none reads alike).
 #define kKFCNarrowDownSubmenuKey		kKFCStringPrefix "kKFCNarrowDownSubmenuKey"
 #define kKFCNarrowInTablesMenuKey		kKFCStringPrefix "kKFCNarrowInTablesMenuKey"
 #define kKFCNarrowInFootnotesMenuKey	kKFCStringPrefix "kKFCNarrowInFootnotesMenuKey"
@@ -570,7 +570,7 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 #define kKFCNarrowPagesMenuKey			kKFCStringPrefix "kKFCNarrowPagesMenuKey"
 #define kKFCNarrowOnPasteboardMenuKey	kKFCStringPrefix "kKFCNarrowOnPasteboardMenuKey"
 #define kKFCNarrowFramesMenuKey			kKFCStringPrefix "kKFCNarrowFramesMenuKey"
-#define kKFCNarrowOnLayerMenuKey		kKFCStringPrefix "kKFCNarrowOnLayerMenuKey"		// "On Active Layer" (2026-10-18)
+#define kKFCNarrowOnLayerMenuKey		kKFCStringPrefix "kKFCNarrowOnLayerMenuKey"		// "On Active Layer"
 // ...and Copy Results: the panel menu's, a row's Copy Rows, a tier heading's Copy These Results (measured against every
 // other key - key_collisions.py).
 #define kKFCCopyResultsMenuKey			kKFCStringPrefix "kKFCCopyResultsMenuKey"
@@ -672,27 +672,27 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 #define kKFCPanelMenuActionAreaValue	"Palette Menus:Kohaku Find/Change"
 #define kKFCTargetMenuPath kKFCInternalPopupMenuNameKey
 
-// The HIT rows' right-click menu (Replace - that row, or the rows selected together it is one of): the popup's internal
-// name.
+// The HIT rows' right-click menu: the popup's internal name. What it and the menus below hold is their MenuDef in
+// KFCUI.fr, in abc order by the positions under "Menu item positions" below.
 // KFCResultNodeEH::RButtonDn pops the MenuDef subtree of this name at the cursor with
 // IMenuManager::HandlePopupMenu - the same machinery as the real Links / Layers panel row menus, and
 // as KESCL's report rows (kKESCLReportRowMenuName). The root name is never displayed, so it is a
 // plain literal rather than a translated key. (The book / document rows' "KFCRtMenuResultRow" went with Change
 // Checked - spec F16 - and so did the story rows' first menu, Replace / Check All / Uncheck All.)
 #define kKFCResultHitMenuName				"KFCRtMenuResultHit"
-// The STORY rows' right-click menu (Search This Story Again, Select All Rows), popped the same way.
+// The STORY rows' right-click menu, popped the same way.
 #define kKFCResultStoryMenuName				"KFCRtMenuResultStory"
-// The DOCUMENT rows' right-click menu (Search This Document Again, Select All Rows), popped the same way.
+// The DOCUMENT rows' right-click menu, popped the same way.
 // A name of its own, not the retired "KFCRtMenuResultRow" above.
 #define kKFCResultDocumentMenuName			"KFCRtMenuResultDocument"
-// The BOOK row's right-click menu (Select All Rows), popped the same way.
+// The BOOK row's right-click menu, popped the same way.
 #define kKFCResultBookMenuName				"KFCRtMenuResultBook"
-// A TIER's own row's right-click menu (Clear These Results - v2 R9), popped the same way - a grey tier's and the live one's.
+// A TIER's own row's right-click menu, popped the same way - a grey tier's and the live one's.
 #define kKFCResultTierMenuName				"KFCRtMenuResultTier"
-// An OBJECT row's right-click menu (the Object tab's rows - the author, 2026-10-17): its Replace, and Special Operations
-// > Create Outlines - a text row keeps kKFCResultHitMenuName (Replace alone). Popped the same way.
+// An OBJECT row's right-click menu (the Object tab's rows - the author's call; a text row's is kKFCResultHitMenuName),
+// popped the same way.
 #define kKFCResultObjectMenuName			"KFCRtMenuResultObject"
-// ...its Special Operations submenu (the author's word, 2026-10-17): the parent node is ActionID 0 with the path and a
+// ...its Special Operations submenu (the author's word): the parent node is ActionID 0 with the path and a
 // delimiter (KCM's submenus' Adobe idiom), its items take the path. Named by KFC's own key, as the submenus in it are
 // (basicmenu's idiom - every SDK sample's menu path ends in a key of its own): a plain word in a path is looked up as a
 // key all the same, and shows as itself only while no key reads the same.
@@ -702,7 +702,7 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 // ...and the submenus in it, after InDesign's own Object menu (the spec's E2): Fitting, Arrange, Transform - the same idiom
 // one level down. NAMED BY KFC'S OWN KEYS (basicmenu's idiom - BscMnuID.h, kBscMnuPluginsMenuKey): the plain words are
 // InDesign's own string keys, and the menu showed them in InDesign's language ("Fitting" as Japanese InDesign's
-// Fitting submenu - measured live, 2026-10-17); KFC's words are English in every language (the author's call).
+// Fitting submenu - measured live); KFC's words are English in every language (the author's call).
 #define kKFCFittingSubmenuPath				kKFCSpecialOpsSubmenuPath kSDKDefDelimitMenuPath kKFCFittingSubmenuKey
 #define kKFCArrangeSubmenuPath				kKFCSpecialOpsSubmenuPath kSDKDefDelimitMenuPath kKFCArrangeSubmenuKey
 #define kKFCTransformSubmenuPath			kKFCSpecialOpsSubmenuPath kSDKDefDelimitMenuPath kKFCTransformSubmenuKey
@@ -729,7 +729,6 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 // Open Find/Change... leads the block: open the dialog, type the query, then search.
 #define kKFCOpenFindChangeMenuItemPosition	0.5
 #define kKFCSearchBookMenuItemPosition		1.0
-// (Find Objects on Active Layer stood under Find, at 1.05 - retired 2026-10-18: Narrow Down > On Active Layer now.)
 // Change All in Book (No List) under Find, then Clear Results (the spec's section 4).
 #define kKFCChangeAllMenuItemPosition		1.1
 #define kKFCClearResultsMenuItemPosition	1.25
@@ -741,11 +740,11 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 // (Block 2 - the two scans - is gone.)
 #define kKFCSeparator3MenuItemPosition		2.0
 
-// Block 3 - the check-mark toggles, 2.2 to 2.9, in alphabetical order (the author's arrangement, 2026-10-14). That
+// Block 3 - the check-mark toggles, 2.2 to 2.9, in alphabetical order (the author's arrangement). That
 // keeps Book Scope first - it is the one that decides what the commands in block 1 run on - and Find/Change Selected
 // Documents (Book) right under it: it narrows Book Scope, and works only with it on. Then Hide Previous Chapter, Link the
 // Application Bar's Search Field to This Panel, Minimizable Find/Change, Remember Book Panel Placement, Translucent
-// Find/Change and Translucent Panel. (Keep Previous Results stood at 2.45 for the same day - retired with its ActionID.)
+// Find/Change and Translucent Panel.
 #define kKFCBookScopeMenuItemPosition		2.2
 #define kKFCSelectedDocumentsMenuItemPosition	2.3
 #define kKFCHidePrevChapterMenuItemPosition	2.4
@@ -766,11 +765,11 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 #define kKFCHowToMenuItemPosition			10.5
 #define kKFCAboutThisMenuItemPosition		11.0
 
-// THE RIGHT-CLICK MENUS OF THE ROWS AND THE TIER HEADINGS, IN ABC ORDER (the author, 2026-10-18: "sort the menus on the
+// THE RIGHT-CLICK MENUS OF THE ROWS AND THE TIER HEADINGS, IN ABC ORDER (the author's call: "sort the menus on the
 // panel's rows in abc order"): every item ONE position by its NAME, the same number wherever it appears - so each menu,
 // holding a few of them, comes out in abc order whichever it is (a hit, object, story, document or book row; a tier
-// heading) - and no rules between them. Each submenu is in abc order within itself. (Until that day each menu followed its
-// spec: the searches first and the one that takes away last under a rule; Special Operations InDesign's Object menu's order.)
+// heading) - and no rules between them. Each submenu is in abc order within itself. This replaces the order the specs
+// give (the searches first and the one that takes away last under a rule; Special Operations in the Object menu's order).
 #define kKFCClearFromResultsMenuItemPosition	1.0		// Clear from Results
 #define kKFCClearTheseResultsMenuItemPosition	2.0		// Clear These Results
 #define kKFCCopyRowsMenuItemPosition			3.0		// Copy Rows

@@ -870,7 +870,7 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// ----- Clear from Results: the hit, object, story and document rows' menus (docs/superpowers/specs/2026-10-18-kfc-clear-from-results-design.md K2) -----
-		// (In abc order with the rest since 2026-10-18 - the positions in KFCUIID.h; until then last, under a rule): a hit or object row's
+		// (In abc order with the rest - the positions in KFCUIID.h; the spec put it last, under a rule): a hit or object row's
 		// rows - the rows selected together when it is one of them - or every hit row under a story or document row, taken off the
 		// list (KFCResultTree::ClearRows). The document is not touched.
 		kKFCClearFromResultsActionID,
@@ -937,7 +937,7 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// ----- The other Special Operations (docs/superpowers/specs/2026-10-17-kfc-object-special-operations-design.md E2) -----
-		// In abc order since 2026-10-18 (the author's call - the positions in KFCUIID.h; until then InDesign's own Object menu's,
+		// In abc order (the author's call - the positions in KFCUIID.h; the spec gave InDesign's own Object menu's order,
 		// with rules). Each item's action stands for one KFCSpecialOp (KFCActionComponent.cpp's table) - the rows' objects
 		// written where they stand.
 		// Fitting (a submenu one level down: the same idiom).
@@ -1758,7 +1758,7 @@ resource ActionDef (kSDKDefActionResourceID)
 		// kCustomEnabling: a text row a Replace wrote (CanRestoreAny); why a copy cannot go back it says on the status line.
 		kKFCActionComponentBoss,
 		kKFCRestoreOriginalActionID,
-		kKFCRestoreOriginalMenuKey,	// "Restore from Copy" (the author's name since 2026-10-17 evening - the IDs keep the first one)
+		kKFCRestoreOriginalMenuKey,	// "Restore from Copy" (the author's later name - the IDs keep the first one)
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
