@@ -64,29 +64,28 @@ namespace KFCResultModel
 		kCopyNone = 0,			// no Replace of the list has written the row (or one restored it since)
 		kCopyKept,				// a copy is kept (HitCopy::store / story)
 		kCopyOutsideMainText,	// its match is in a table cell, a footnote or a note - outside the story's primary thread
-		kCopyTouchesHyperlink,	// what it copies holds a hyperlink source the paste would replace whole - the match itself,
-								// one in the run-on rest, one at the match's edge (setting it again crashed InDesign,
-								// 2026-10-17) - or touches a CROSS-REFERENCE source (its text is made by InDesign). Other
+		kCopyTouchesHyperlink,	// what it copies holds a hyperlink source the paste would replace whole - the match
+								// itself, one in the run-on rest, one at the match's edge (setting it again crashed
+								// InDesign) - or touches a CROSS-REFERENCE source (its text is made by InDesign). Other
 								// hyperlink sources are copied and put back as one link: HitCopy::links - C15
 		kCopyRestHoldsObject,	// the rest of its paragraph, which the copy would run on over, holds an object or a marker
 		kCopyHoldsAnchoredObject,	// its match holds an anchored or inline object - a copy would put it back under a new
-								// UID (the author's call of 2026-10-17 evening)
+								// UID (the author's call)
 		kCopyFailed				// the copy could not be taken
-		// (kCopyParagraphFormat stood here until the author's call of 2026-10-17 evening - the spec's C16: a Replace that
-		//  sets paragraph formatting keeps its copy now, and the paragraph's own formatting with it - HitCopy::paraStyle.)
 	};
 
-	/** THE COPY A ROW'S REPLACE TOOK OF THE TEXT IT WROTE OVER (KFCCopyStore - the spec's C4 and C6), taken just before the
-	    write (KFCReplaceEngine's ReplaceRowsNow) and given to the row once the write has gone through (SetHitCopy): the
-	    match, or - a match holding a paragraph return - the match run on to just before the return of the paragraph it
-	    ends in, so a paste puts that paragraph's own attributes back on the return it meets. A Replace that sets paragraph
-	    formatting (the spec's C16) also keeps the formatting of the paragraph the match STARTS in - its style and its own
-	    overrides - which a paste cannot carry (its first paragraph takes the attributes of the one it is pasted into), put
-	    back on that paragraph after the paste. What Restore from Copy puts back (KFCReplaceEngine::RestoreHits).
-	    Copied with the row - a tier, an Undo step, a backup - so the copy it names comes back with it. */
+	/** THE COPY A ROW'S REPLACE TOOK OF THE TEXT IT WROTE OVER (KFCCopyStore - the copy-restore spec's C4 and C6),
+	    taken just before the write (KFCReplaceEngine's ReplaceRowsNow) and given to the row once the write has gone
+	    through (SetHitCopy): the match, or - a match holding a paragraph return - the match run on to just before the
+	    return of the paragraph it ends in, so a paste puts that paragraph's own attributes back on the return it meets.
+	    A Replace that sets paragraph formatting (C16) also keeps the formatting of the paragraph the match STARTS in -
+	    its style and its own overrides - which a paste cannot carry (its first paragraph takes the attributes of the
+	    one it is pasted into), put back on that paragraph after the paste. What Restore from Copy puts back
+	    (KFCReplaceEngine::RestoreHits). Copied with the row - a tier, an Undo step, a backup - so the copy it names
+	    comes back with it. */
 	/** A HYPERLINK TEXT SOURCE THE COPY TOUCHED, and where it stood from the match's start when the copy was taken (the
-	    spec's C15): what Restore from Copy puts back where it stood - the paste makes a second link over a source the
-	    Replace kept (measured live 2026-10-17, H1 and H5), and cuts one the match crossed (H3). */
+	    copy-restore spec's C15): what Restore from Copy puts back where it stood - the paste makes a second link over a
+	    source the Replace kept (measured live, H1 and H5), and cuts one the match crossed (H3). */
 	struct HitLink
 	{
 		UID		source;		// the hyperlink text source
@@ -176,7 +175,7 @@ namespace KFCResultModel
 								// stays when its story or document is searched again, found or not (MergeKeptRows). A
 								// replace turns it on (MarkHitReplaced, MarkItemReplaced); the eye's click turns it either
 								// way (SetHitKept) - on a row KFC has WRITTEN only (replaced, outlined, or given a special
-								// operation - the author, 2026-10-17 evening: an eye on a row not written only kept a match
+								// operation - the author's call: an eye on a row not written only kept a match
 								// since deleted as Missing); its Restore from Copy turns it off. Copied whole with the
 								// row - a tier, an Undo step, a backup.
 		bool		cleared;	// TAKEN OFF THE LIST (Clear from Results - docs/superpowers/specs/2026-10-18-kfc-clear-from-results-design.md
@@ -310,13 +309,13 @@ namespace KFCResultModel
 		// Each story's version (ITextModel::GetChangeCount) where KFC last knew the rows in it to stand
 		// - see GetStoryVersion.
 		std::map<UID, uint32>	storyVersions;
-		// A search over part of a story: the part of each story holding a row (SearchedRange). Empty otherwise. What the
-		// story row's and the tier heading's searches again walk again (the author, 2026-10-17 evening: "the same
-		// conditions as the first search") - so kept through them, and recorded again where it is found.
+		// A search over part of a story: the part of each story holding a row (SearchedRange). Empty otherwise. What
+		// the story row's and the tier heading's searches again walk again (the author: "the same conditions as the
+		// first search") - so kept through them, and recorded again where it is found.
 		std::map<UID, SearchedRange>	searchedRanges;
-		// A SEARCH: STORY'S STORY - the one story it searched (its first match's, KFCSearchEngine's CollectTargets): what the
-		// tier heading's search again walks again ("a Story search, that story alone" - the author, the same evening), as
-		// the story row walks its own. kInvalidUID otherwise.
+		// A SEARCH: STORY'S STORY - the one story it searched (its first match's, KFCSearchEngine's CollectTargets):
+		// what the tier heading's search again walks again ("a Story search, that story alone" - the author), as the
+		// story row walks its own. kInvalidUID otherwise.
 		UID						searchedStory;
 		// SEARCHED AGAIN AND NOTHING FOUND (Search This Document Again, and Search This Story Again over its last story with
 		// rows - the author's calls): shown with no rows, (0/0), so it can be searched again after the next edit. A
@@ -372,9 +371,9 @@ namespace KFCResultModel
 	void SetSearchScope(SearchScopeKind scope);
 	SearchScopeKind GetSearchScope();
 
-	/** A NARROWED LIST'S STEPS (Narrow Down - the spec's N4, N5): its conditions in the order they were taken - kept with the
-	    list as its Search: is, so a tier's heading names them and its search again searches with them; recorded beside
-	    SetSearchScope, after the commit point. Empty for every list no Narrow Down made. */
+	/** A NARROWED LIST'S STEPS (Narrow Down - the narrow-down spec's N4, N5): its conditions in the order they were
+	    taken - kept with the list as its Search: is, so a tier's heading names them and its search again searches with
+	    them; recorded beside SetSearchScope, after the commit point. Empty for every list no Narrow Down made. */
 	void SetNarrowSteps(const std::vector<KFCNarrowStep>& steps);
 	std::vector<KFCNarrowStep> GetNarrowSteps();
 	/** The steps in words, as a tier's heading draws them after its name and the status line names them: "In Tables /
@@ -383,21 +382,21 @@ namespace KFCResultModel
 	/** ARE THE LIST'S ROWS OBJECT ROWS - an Object tab search's, or a Frames of These Matches list's? The heading's menu greys
 	    a condition that only text rows can meet. */
 	bool ListHoldsObjects();
-	/** Is the list a FRAMES OF THESE MATCHES list - object rows found by a text search, not by the Object tab's (its Replace
-	    writes with the Object tab's Change Object Format alone - KFCObjectReplace, the spec's N6)? */
+	/** Is the list a FRAMES OF THESE MATCHES list - object rows found by a text search, not by the Object tab's (its
+	    Replace writes with the Object tab's Change Object Format alone - KFCObjectReplace, the narrow-down
+	    spec's N6)? */
 	bool ListIsFrames();
 	/** The list's limit of rows: kKFCCollectObjectLimit for a list of object rows (ListHoldsObjects), kKFCCollectHitLimit for
 	    any other - what a search's walks and its searches again take the room from. */
 	int32 ListLimit();
 
-	/** A DOCUMENT OF THE LIST WAS CLOSED (the author's calls: only its rows go - an All Documents list's, 2026-09-29, and
-	    every list's, its heading staying while it is a tier, 2026-10-14 night - KFCCloseDocResponder).
-	    Its chapter is emptied - rows, groups, story versions - and unbound (no docRef, no file), but
-	    it KEEPS ITS PLACE: KFCUndoFollow names rows by (chapter, row), and closing up the gap would renumber
-	    every chapter after it and cut those off from their Undo. A chapter with no rows is not shown
-	    (GetShownChapter) and holds nothing to count or write, so nothing else has to know it is there.
-	    `closedFile` = the closing document's file (IDataBase::GetSysFile - nil for one never saved), kept on the
-	    emptied chapter as Chapter::closedFile. */
+	/** A DOCUMENT OF THE LIST WAS CLOSED (the author's calls: only its rows go - an All Documents list's, and every
+	    list's, its heading staying while it is a tier - KFCCloseDocResponder). Its chapter is emptied - rows, groups,
+	    story versions - and unbound (no docRef, no file), but it KEEPS ITS PLACE: KFCUndoFollow names rows by (chapter,
+	    row), and closing up the gap would renumber every chapter after it and cut those off from their Undo. A chapter
+	    with no rows is not shown (GetShownChapter) and holds nothing to count or write, so nothing else has to know it
+	    is there. `closedFile` = the closing document's file (IDataBase::GetSysFile - nil for one never saved), kept on
+	    the emptied chapter as Chapter::closedFile. */
 	void CloseChapter(int32 chapterIdx, const IDFile* closedFile);
 
 	/** CloseChapter's work on a chapter that is not in the model - one of a kept whole result set
@@ -550,9 +549,10 @@ namespace KFCResultModel
 	    range. */
 	int32 GetFontGroupHit(int32 chapterIdx, int32 fontIdx, int32 nth);
 
-	/** Which story group a hit belongs to, and where it sits inside that group: the tree's "who is my
-	    parent" and "which child am I". -1 for an index out of range, and for an object row, which has no story (every
-	    text hit has a group). */
+	/** Which story group a hit belongs to, and where it sits inside that group: the tree's "who is my parent" and
+	    "which child am I". -1 for an index out of range and for a row taken off the list (Hit::cleared); the group is
+	    -1 for an object row too, which has no story, and its position is its place among the object rows its chapter
+	    shows (GetObjectRowHit). Every text row the list shows has a group. */
 	int32 GetHitFontGroup(int32 chapterIdx, int32 hitIdx);
 	int32 GetHitFontGroupPos(int32 chapterIdx, int32 hitIdx);
 
@@ -575,7 +575,7 @@ namespace KFCResultModel
 
 	/** THE ROW EYE'S CLICK (KFCResultEyeEH, through IKFCResults::SetHitKept): the row's eye on or off. Not a change to
 	    the document - no Undo step, no backup. false = no such row, or an eye turned on on a row KFC has not written
-	    (replaced, outlined, or given a special operation - the author, 2026-10-17 evening). */
+	    (replaced, outlined, or given a special operation - the author's call). */
 	bool SetHitKept(int32 chapterIdx, int32 hitIdx, bool kept);
 
 	/** How many rows of a chapter have their eye on - of one story, or of the whole chapter (story = kInvalidUID): the
@@ -705,10 +705,11 @@ namespace KFCResultModel
 	/** The row's copy (HitCopy). false = index out of range. */
 	bool GetHitCopy(int32 chapterIdx, int32 hitIdx, HitCopy& outCopy);
 
-	/** A ROW ITS RESTORE ORIGINAL PUT BACK (KFCReplaceEngine::RestoreHits - the spec's C10): no longer replaced (its Replace
-	    offered again), its eye off (a row not written keeps none - Hit::kept), what it wrote and its copy
-	    forgotten, its place the text put back - [start, end) of storyUID - and nothing said about it (kOutcomeNone). Backed
-	    up first, so an Undo puts the replaced row back, copy and all. The caller reads its line again (RereadRowText). */
+	/** A ROW ITS RESTORE FROM COPY PUT BACK (KFCReplaceEngine::RestoreHits - the copy-restore spec's C10): no longer
+	    replaced (its Replace offered again), its eye off (a row not written keeps none - Hit::kept), what it wrote and
+	    its copy forgotten, its place the text put back - [start, end) of storyUID - and nothing said about it
+	    (kOutcomeNone). Backed up first, so an Undo puts the replaced row back, copy and all. The caller reads its line
+	    again (RereadRowText). */
 	void MarkHitRestored(int32 chapterIdx, int32 hitIdx, UID storyUID, TextIndex start, TextIndex end);
 
 	/** A TEXT ROW WRITTEN AS OUTLINES (KFCReplaceEngine::OutlineHits - docs/superpowers/specs/2026-10-18-kfc-text-outlines-design.md
@@ -859,13 +860,13 @@ namespace KFCResultModel
 		int32* outStayed = nil);
 
 	/** SEARCH THIS DOCUMENT AGAIN's change to the list (KFCSearchEngine::SearchDocumentAgain - the author's call):
-	    every row of the chapter replaced by docHits - the document walked again, taken (swapped out) - put in
-	    page order, its story groups and their numbers rebuilt, its stories' versions replaced by storyVersions (taken).
-	    What a search over part of the document searched stays - its searched parts, recorded again by the caller where they
-	    stand, and its story (Chapter::searchedStory): the tier heading's search again walks them again (the author, 2026-10-17
-	    evening: "the same conditions as the first search"). With no row left the chapter is shown empty
-	    (Chapter::shownEmpty). The rows' places in the list change, so what indexes them is let go, as ReplaceStoryRows
-	    lets it go. Returns the chapter's row count now; -1 = no such chapter. */
+	    every row of the chapter replaced by docHits - the document walked again, taken (swapped out) - put in page
+	    order, its story groups and their numbers rebuilt, its stories' versions replaced by storyVersions (taken). What
+	    a search over part of the document searched stays - its searched parts, recorded again by the caller where they
+	    stand, and its story (Chapter::searchedStory): the tier heading's search again walks them again (the author:
+	    "the same conditions as the first search"). With no row left the chapter is shown empty (Chapter::shownEmpty).
+	    The rows' places in the list change, so what indexes them is let go, as ReplaceStoryRows lets it go. Returns the
+	    chapter's row count now; -1 = no such chapter. */
 	int32 ReplaceChapterRows(int32 chapterIdx, std::vector<Hit>& docHits, std::map<UID, uint32>& storyVersions,
 		int32* outStayed = nil);
 
@@ -1032,10 +1033,11 @@ namespace KFCResultModel
 	    that went). */
 	void RestoreModelSnapshot(const ModelSnapshot& snapshot);
 
-	/** ApplyRowStep's work on a list that is NOT in the model - a kept tier's (KFCTierStore - the tier switch): an Undo or a
-	    Redo of a write made while that list was the live one, followed while it is kept. Its rows and recorded versions
-	    put back on `list`; no text focus is touched (a kept list has none - the switch attaches them). A row whose index
-	    is out of range is passed over, as ApplyRowStep does. */
+	/** ApplyRowStep's work on a list that is NOT in the model - a kept tier's (KFCTierStore - the tier switch): an Undo
+	    or a Redo of a write made while that list was the live one, followed while it is kept. Its rows and recorded
+	    versions put back on `list`; no text focus is touched (a kept list's foci are held - KFCRowFoci::HandOver - and
+	    follow the Undo or the Redo themselves: KFCRowFocus.h). A row whose index is out of range is passed over, as
+	    ApplyRowStep does. */
 	void ApplyRowStepTo(ModelSnapshot& list, const RowStep& step, bool after);
 
 	/** A LIST'S COUNTS, AS ITS TIER'S ROW READS THEM - how many of its hits it has replaced, of how many - for a list that

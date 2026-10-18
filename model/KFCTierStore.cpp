@@ -63,15 +63,15 @@ namespace
 		out.bookPath = PMString();
 		out.bookPath.SetTranslatable(kFalse);
 		(void)KFCBookScope::GetSearchedBookPath(out.bookPath);
-		// ITS ROWS' TEXT FOCI GO WITH IT (the author's call, 10-14 night): handed over, not let go, so they go on following
-		// the edits made while the list is grey - another tier's replace among them (KFCRowFoci::HandOver).
+		// ITS ROWS' TEXT FOCI GO WITH IT (the author's call): handed over, not let go, so they go on following the
+		// edits made while the list is grey - another tier's replace among them (KFCRowFoci::HandOver).
 		out.foci = KFCRowFoci::HandOver();
 	}
 
 	// A TIER PUT INTO THE STORE IN SEARCH ORDER - by its result set, which every list made anew numbers upward
-	// (KFCResultModel::GetResultSetId) and a switch keeps (ReturnToResultSet) - so a list switched to and away again goes
-	// back to the place it had: the tiers stay where they are (v2 R4 - the author: "the same position"). Past the cap the
-	// oldest go - from the front, where they stand.
+	// (KFCResultModel::GetResultSetId) and a switch keeps (ReturnToResultSet) - so a list switched to and away again
+	// goes back to the place it had: the tiers stay where they are (the tier-switch v2 spec's R4 - the author: "the
+	// same position"). Past the cap the oldest go - from the front, where they stand.
 	void AddInOrder(TierRecord&& tier)
 	{
 		size_t at = 0;
@@ -114,10 +114,10 @@ void KFCTierStore::DropAll()
 	KFC_DIAG_LOG("TIER drop all tiers=%d", static_cast<int>(gTiers.size()));
 	// Fresh storage, not clear(): the lists and their query copies go with it.
 	gTiers = std::vector<TierRecord>();
-	// ...AND THE LIVE LIST IS NO TIER-TO-BE ANY MORE: its query copy goes too. Clear Results leaves a list that found nothing
-	// as it is (KFCActionComponent's Clear Results - only the tiers go), and with its copy kept it was what the next search
-	// put aside as a tier - one with no name, since the tiers' names went with the tiers ("Results (0/0)", the author's
-	// live test, 10-14). A list made anew - a Run's, Change All's - has no copy to lose.
+	// ...AND THE LIVE LIST IS NO TIER-TO-BE ANY MORE: its query copy goes too. Clear Results leaves a list that found
+	// nothing as it is (KFCActionComponent's Clear Results - only the tiers go), and with its copy kept it was what the
+	// next search put aside as a tier - one with no name, since the tiers' names went with the tiers ("Results (0/0)",
+	// the author's live test). A list made anew - a Run's, Change All's - has no copy to lose.
 	KFCResultModel::SetQueryCopy(nullptr);
 }
 
@@ -163,8 +163,8 @@ void KFCTierStore::ForgetDocument(IDataBase* db)
 			{
 				KFCResultModel::EmptyChapter(chapters[c], db->GetSysFile());	// its file kept (Chapter::closedFile)
 				KFC_DIAG_LOG("TIER forget chapter=%d of set=%u", static_cast<int>(c), gTiers[t].set);
-				// THE PANEL'S GREY COPY FOLLOWS (the author, 10-14 night: "only the closed document's part goes"): that
-				// document's rows go from it, and its heading reads the counts the list has now - the tier stays.
+				// THE PANEL'S GREY COPY FOLLOWS (the author: "only the closed document's part goes"): that document's
+				// rows go from it, and its heading reads the counts the list has now - the tier stays.
 				int32 replaced = 0, hits = 0;
 				KFCResultModel::GetListCounts(gTiers[t].list, replaced, hits);
 				KFCNotifyKeptChapterGone(gTiers[t].set, static_cast<int32>(c), replaced, hits);
@@ -237,16 +237,17 @@ bool KFCTierStore::SwitchTo(uint32 set, PMString& outSummary)
 
 	// 3. THE TIER'S LIST BACK, AS ITS OWN RESULT SET (the writes kept for it are followed again - KFCUndoFollow).
 	// RestoreModelSnapshot lets the live list's text foci go and attaches the tier's where its stories are as kept.
-	// FIND/CHANGE IS LEFT AS IT IS (v2 R1 - the author: "there is no need to change it when a row is selected"): a row
-	// operation states this list's query only when Find/Change is on another one, and puts it back after (KFCQueryScope).
+	// FIND/CHANGE IS LEFT AS IT IS (the v2 spec's R1 - the author: "there is no need to change it when a row is
+	// selected"): a row operation states this list's query only when Find/Change is on another one, and puts it back
+	// after (KFCQueryScope).
 	KFCResultModel::RestoreModelSnapshot(wanted.list);
 	// ITS ROWS' FOCI BACK - the ones held while it was grey, which followed the edits since (the list put back attached
 	// new ones only where its stories are as kept - KFCRowFoci::TakeBack lets those go for the held).
 	KFCRowFoci::TakeBack(wanted.foci);
 	KFCResultModel::ReturnToResultSet(wanted.set);
-	// ITS ROWS FOLLOW THOSE FOCI AT ONCE (KFCSearchEngine::FollowChapterFoci - the author, 10-14 night: "the Story part's
-	// text is getting different"): the edits made while it was grey moved its foci, not its rows; the list is drawn
-	// with the text as it is now - the story rows' words too.
+	// ITS ROWS FOLLOW THOSE FOCI AT ONCE (KFCSearchEngine::FollowChapterFoci - the author: "the Story part's text is
+	// getting different"): the edits made while it was grey moved its foci, not its rows; the list is drawn with the
+	// text as it is now - the story rows' words too.
 	for (int32 c = 0; c < KFCResultModel::GetChapterCount(); ++c)
 		KFCSearchEngine::FollowChapterFoci(c);
 	// The Find Format this list was searched with is the one the replace's door compares against (FindFormatHasChanged) -
@@ -258,8 +259,8 @@ bool KFCTierStore::SwitchTo(uint32 set, PMString& outSummary)
 	if (wanted.list.header.fromBook)
 		KFCBookScope::SetSearchedBookPath(wanted.bookPath);
 
-	// 4. THE STORE: the tier switched to leaves it; the list put aside goes in at its place in search order (when it is one
-	// to keep) - every tier stays where it stood (v2 R4).
+	// 4. THE STORE: the tier switched to leaves it; the list put aside goes in at its place in search order (when it is
+	// one to keep) - every tier stays where it stood (the v2 spec's R4).
 	for (size_t i = 0; i < gTiers.size(); ++i)
 		if (gTiers[i].set == wanted.set)
 		{

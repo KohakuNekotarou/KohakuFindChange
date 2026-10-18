@@ -637,8 +637,8 @@ int32 KFCResultModel::ClearRows(const KFCRowsByChapter& rows)
 		// is the search's order, which finds a row among look-alikes): BuildFontGroups alone, no new layout generation (no
 		// row moves), so the writes kept for an Undo still name their rows.
 		BuildFontGroups(*c);
-		// A document searched again with nothing found was shown at (0/0) to be searched again; its rows taken off by hand,
-		// its row goes as any other document's (the spec's K5).
+		// A document searched again with nothing found was shown at (0/0) to be searched again; its rows taken off by
+		// hand, its row goes as any other document's (the clear-from-results spec's K5).
 		if (ShownRows(c->hits) == 0)
 			c->shownEmpty = false;
 	}
@@ -1174,8 +1174,8 @@ void KFCResultModel::MarkHitRestored(int32 chapterIdx, int32 hitIdx, UID storyUI
 		return;
 	Hit& h = *hp;
 	BackUpRow(chapterIdx, hitIdx, h);
-	// The row as it was before its Replace (the spec's C10): a match to replace again, its eye off (a row not written
-	// keeps none - Hit::kept) - the line and the hash are read again from the text put back by the caller
+	// The row as it was before its Replace (the copy-restore spec's C10): a match to replace again, its eye off (a row
+	// not written keeps none - Hit::kept) - the line and the hash are read again from the text put back by the caller
 	// (RereadRowText), the page words kept as the Replace kept them (MarkHitReplaced).
 	h.replaced = false;
 	h.outlined = false;
@@ -1559,10 +1559,9 @@ int32 KFCResultModel::ReplaceChapterRows(int32 chapterIdx, std::vector<Hit>& doc
 		*outStayed = stayed;
 	// ReplaceStoryRows' steps over the whole chapter: its foci let go (they name rows by index), the walk's rows in, in
 	// page order, and the end ReplaceStoryRows has (RowsLaidOutAgain - indexed as the search's are, what names the rows
-	// by index let go). WHAT A SEARCH OVER PART OF THE DOCUMENT SEARCHED STAYS - its searched parts (recorded again where
-	// they stand by the caller, so their foci come back on them) and its story: the tier heading's search again walks
-	// them again (the author, 2026-10-17 evening: "the same conditions as the first search - a Story search, that story
-	// alone").
+	// by index let go). WHAT A SEARCH OVER PART OF THE DOCUMENT SEARCHED STAYS - its searched parts (recorded again
+	// where they stand by the caller, so their foci come back on them) and its story: the tier heading's search again
+	// walks them again (the author: "the same conditions as the first search - a Story search, that story alone").
 	KFCRowFoci::DetachChapter(chapterIdx);
 	OrderHitsByPage(docHits);
 	c->hits.swap(docHits);
@@ -1638,9 +1637,10 @@ void KFCResultModel::TakeRowBackup(RowStep& out)
 		out.versionsAfter.push_back(VersionNow(out.versionsBefore[i].chapter, out.versionsBefore[i].story));
 }
 
-// A ROW PUT BACK FROM A STEP'S COPY KEEPS WHAT THE LIST DID TO IT SINCE (Clear from Results - the spec's K5): taken off the list
-// it stays off - an Undo of a write does not bring back a row the person cleared - and its place in its group is the list's
-// now (BuildFontGroups gave the rows around a cleared one new places; the copy holds the ones from before).
+// A ROW PUT BACK FROM A STEP'S COPY KEEPS WHAT THE LIST DID TO IT SINCE (Clear from Results - the clear-from-results
+// spec's K5): taken off the list it stays off - an Undo of a write does not bring back a row the person cleared - and
+// its place in its group is the list's now (BuildFontGroups gave the rows around a cleared one new places; the copy
+// holds the ones from before).
 static void PutRowBack(KFCResultModel::Hit& h, const KFCResultModel::Hit& copy)
 {
 	const bool cleared = h.cleared;
@@ -1670,9 +1670,9 @@ static void PutStepOnto(std::vector<KFCResultModel::Chapter>& chapters, const KF
 void KFCResultModel::ApplyRowStep(const RowStep& step, bool after)
 {
 	PutStepOnto(gChapters, step, after);
-	// The foci of the rows put back go back on their places (the text-focus spec's T7): an Undo or a Redo moves text
-	// without moving a focus, and these rows' stored places are exact now - the step is followed only when the story
-	// is at its version.
+	// The foci of the rows put back go on the rows' places (the text-focus spec's T7) - exact now: the step is followed
+	// only when the story is at its version. (KFC's own focus follows an Undo and a Redo itself - KFCRowFocus.h - so
+	// out of a write's step this moves only a focus that could not follow one, or none: KFCRowFoci::MoveTo.)
 	const std::vector<RowCopy>& rows = after ? step.after : step.before;
 	for (size_t i = 0; i < rows.size(); ++i)
 		KFCRowFoci::Reanchor(rows[i].chapter, rows[i].hit);

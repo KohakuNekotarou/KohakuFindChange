@@ -1419,10 +1419,11 @@ KFCReplaceEngine::DocsAfterWrite::~DocsAfterWrite()
 // Replace): one row's sentences are its own ("this row", "the match"); several rows' say "a selected row", and the rows
 // left are counted by their reason.
 // ======================================================================================================
-// THE COPIES A ROW'S REPLACE TAKES, FOR ITS RESTORE ORIGINAL (docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md
-// C3 / C4): taken after every door of the write and before its step opens (ReplaceRowsNow), into the document's copy
-// store (KFCCopyStore) - nothing of it is in the document's undo step - and given to the rows once the write has gone
-// through (KFCResultModel::SetHitCopy). Put back by RestoreHits, below.
+// THE COPIES A ROW'S REPLACE TAKES, FOR ITS RESTORE FROM COPY
+// (docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md C3 / C4): taken after every door of the write and
+// before its step opens (ReplaceRowsNow), into the document's copy store (KFCCopyStore) - nothing of it is in the
+// document's undo step - and given to the rows once the write has gone through (KFCResultModel::SetHitCopy). Put back
+// by RestoreHits, below.
 // ======================================================================================================
 namespace
 {
@@ -1865,10 +1866,10 @@ static bool ReplaceRowsNow(std::vector<ChapterWrite>& chapters,
 				c.writtenStories.insert(story);
 		}
 	}
-	// THE COPIES RESTORE ORIGINAL PUTS BACK (the spec's C3 / C4 - TakeRowCopy): every row to write, copied now - after every
-	// door, at the places they have just confirmed, and before the step opens, so nothing of it is in the document's undo
-	// step. A row with none is written all the same (its Restore from Copy says why); each row takes its copy once the
-	// write has gone through (SetHitCopy, below).
+	// THE COPIES RESTORE FROM COPY PUTS BACK (the spec's C3 / C4 - TakeRowCopy): every row to write, copied now - after
+	// every door, at the places they have just confirmed, and before the step opens, so nothing of it is in the
+	// document's undo step. A row with none is written all the same (its Restore from Copy says why); each row takes
+	// its copy once the write has gone through (SetHitCopy, below).
 	std::vector<std::vector<std::pair<int32, KFCResultModel::HitCopy> > > copies(chapters.size());
 	for (size_t k = 0; k < chapters.size(); ++k)
 	{
@@ -2166,7 +2167,7 @@ bool KFCReplaceEngine::ReplaceHits(const KFCRowsByChapter& rowsByChapter, PMStri
 }
 
 // ======================================================================================================
-// RESTORE ORIGINAL (docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md - the author, 10-17: "copy back,
+// RESTORE FROM COPY (docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md - the author, 10-17: "copy back,
 // from the row's right-click menu"; the calls C1 - C14 are mine, for the author to confirm). A text row a Replace of the
 // list wrote gets back the text that Replace wrote over: the copy taken just before it (TakeRowCopy) pasted over what it
 // wrote - and, for a copy run on to its paragraph's return, over the rest of that paragraph too, which the copy holds as

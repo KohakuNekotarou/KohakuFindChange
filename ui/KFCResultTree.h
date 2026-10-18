@@ -225,10 +225,10 @@ namespace KFCResultTree
 	    nothing is brought forward. The rows drawn again, the status line. Not under a landing or a run. True = written. */
 	bool OutlineRows(const KFCRowsByChapter& rows);
 
-	/** A TEXT ROW'S RESTORE ORIGINAL (docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md): the copies the rows'
-	    Replace took put back over what it wrote, by the model (KFCRuns()->RestoreRows, KFCReplaceEngine::RestoreHits), with
-	    no landing: nothing is brought forward. The rows drawn again - the tree rebuilt when the list went - and the status
-	    line. Not under a landing or a run. True = written. */
+	/** A TEXT ROW'S RESTORE FROM COPY (docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md): the copies
+	    the rows' Replace took put back over what it wrote, by the model (KFCRuns()->RestoreRows,
+	    KFCReplaceEngine::RestoreHits), with no landing: nothing is brought forward. The rows drawn again - the tree
+	    rebuilt when the list went - and the status line. Not under a landing or a run. True = written. */
 	bool RestoreRows(const KFCRowsByChapter& rows);
 
 	/** Can Restore from Copy be offered on these rows - is any of them a text row a Replace wrote, its copy held
