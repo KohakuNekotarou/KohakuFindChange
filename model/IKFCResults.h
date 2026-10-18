@@ -7,13 +7,13 @@
 //  IKFCResults - one of the doors the UI half reaches the model half through (the model/UI split;
 //  docs/superpowers/specs/2026-10-01-kbs-model-ui-split-design.md section 4.1).
 //
-//  The RESULT SET - KFCResultModel's questions and the few changes the panel makes to it (what a jump learns of a
-//  row - its document rebound, its outcome).
-//  Each method is the KFCResultModel function of the same name; the contract is written there.
+//  The RESULT SET - KFCResultModel's questions, and the changes the panel makes to it, each named below (a row's
+//  document rebound and its outcome - what a jump learns of it; the row eye's click; Clear from Results).
+//  Each method is the KFCResultModel function named beside it; the contract is written there.
 //
 //  ON kSessionBoss, NOT A FACADE ON kUtilsBoss - this note is all the doors' (IKFCRuns.h and IKFCChapters.h point
 //  here). What is behind them is session STATE (the results, the held chapters, the marker), and the guide's
-//  facades keep no global or static state (gs-04); the session is where InDesign keeps its own session state
+//  facades keep no global or static state (guide gs-04); the session is where InDesign keeps its own session state
 //  (IBookManager, IClipboardController). The UI half reaches this door with KFCResults() (KFCModelAccess.h).
 //  EDITED BY HAND. The doors IKFCResults / IKFCRuns / IKFCChapters and their implementation (KFCModelServices.cpp)
 //  were first generated from one table (work/sdd/2026-10-01-kbs-model-ui-split/gen_ifaces.py); methods have been
@@ -21,8 +21,8 @@
 //  new method goes at the END of its interface - a vtable slot is a promise to every built caller. One taken out
 //  moves every slot below it, so both halves are built together then (nothing outside KFC calls these doors).
 //  Either way kKFCBoundaryRevision goes up by one (KFCBoundaryID.h) - a UI half built against the old slots then
-//  stands in for the doors instead of calling them - and the stand-in (ui/KFCModelAccess.cpp) takes the new method
-//  too.
+//  stands in for the doors instead of calling them - and the stand-in (ui/KFCModelAccess.cpp) gains or loses the
+//  method too (nothing complains of a stand-in method its door no longer has).
 //
 //========================================================================================
 
@@ -105,8 +105,8 @@ public:
 	virtual int32 GetTotalReplacedCount() = 0;
 	/** = KFCResultModel::GetHitItem (appended) - the page item an object row stands for, kInvalidUID for a text row. */
 	virtual UID GetHitItem(int32 chapterIdx, int32 hitIdx) = 0;
-	/** = KFCResultModel::GetResultSetId (appended) - a new number every time the list is made anew (a search past its commit
-	    point, Clear Results, a run): what tells the panel a search went through (KFCResultHistory - the results kept in
+	/** = KFCResultModel::GetResultSetId (appended) - a new number every time the list is made anew
+	    (KFCResultModel.h says when): what tells the panel a search went through (KFCResultHistory - the results kept in
 	    tiers). */
 	virtual uint32 GetResultSetId() = 0;
 	/** = KFCResultModel::SetHitKept (appended) - the row eye's click: a row's eye on or off. false = no such row. */

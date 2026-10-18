@@ -74,7 +74,7 @@
 //                (a jumped-to replaced row drawn hilited)
 //    menu-drop-grey  (UI half) ui/KFCResultNodeEH.cpp's PopRowMenu passes HandlePopupMenu removeDisabledItems kTrue, the
 //                old way: a row menu drops its grey items, and one with nothing else does not open (SET-11 - the grey
-//                items stay since 2026-10-17; this was menu-keep-grey, the other way round, until then)
+//                items stay)
 //    click-acquire-only  (UI half) ui/KFCResultNodeEH.cpp's row click hands the keyboard to the list the old way
 //                - IKeyBoard alone, and only when it names another holder - not through the panel's doors
 //                (KFCResultTree::TakeKeyboard): the case that shows what the doors add after Find/Change's title bar was
@@ -176,9 +176,14 @@
 //    copy-fail  KFCCopyStore::Take keeps no copy: a row's Replace goes through all the same, and that row's Restore
 //                Original says no copy could be kept (docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md C3, R16)
 //    copy-links  TakeRowCopy's cross-reference door stands open: a row whose copy touches a cross-reference source keeps
-//                its copy all the same (its hyperlink sources are kept and put back as one link - the same spec's C15;
-//                with this switch the hyperlink doors were opened on 2026-10-17 to measure what the replace and the paste
-//                leave of the links, H1-H5, before that way was written)
+//                its copy all the same (its hyperlink sources are kept and put back as one link - the same spec's C15)
+//    qcopy-roundtrip / qcopy-armed / qcopy-abort  the panel's Find copies Find/Change's query in memory, states it
+//                back and says what came back, searching nothing (KFCQueryCopier::DiagProbe - KFCQueryCopy.h says what
+//                each does; work\note-scripts\2026-10-14-kfc-tier-switch\spike.ps1). One-shot.
+//    object-limit  the file holds a number: KFCObjectSearch::CollectTargets takes it for the object lists' limit of
+//                rows in place of kKFCCollectObjectLimit - the limit measured before it was chosen (M6 of
+//                docs/superpowers/specs/2026-10-18-kfc-narrow-down-design.md -
+//                work\note-scripts\2026-10-18-kfc-narrow\m6.ps1)
 //
 //  AND TIMERS: KFC_CLOCK / KFC_SPENT add up the milliseconds a stretch of code takes, and KFCDiagPhase
 //  writes "PHASE <name> begin" and "PHASE <name> end <ms>" around a scope - all of it nothing without KFC_DIAG.

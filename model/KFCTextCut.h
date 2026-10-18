@@ -4,11 +4,12 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  WHERE A SHOWN STRING MAY BE CUT - the one rule every cut of shown text follows, in either half: the model's (a hit
-//  row's line and its match - KFCSearchEngine.cpp's SplitLineWithScanner; a story row's first words -
-//  KFCPageItemFacts.cpp's StoryLeadText; an object row's item name - KFCObjectSearch.cpp's BuildObjectHit) and the UI's
-//  (the message area's lines and contexts - KFCStatusTextView.cpp; a GREP row's Preview Text -
-//  KFCResultListWidgetMgr.cpp). One place, so the two halves cannot come to cut by two rules.
+//  WHERE A SHOWN STRING MAY BE CUT - the one rule every cut of shown text follows, in either half (the callers of
+//  KFCSafeCut and KFCIsAttachedMark are the list): the model's (a hit row's line and its match - KFCSearchEngine.cpp's
+//  SplitLineWithScanner; a story row's first words - KFCPageItemFacts.cpp's StoryLeadText; an object row's item name -
+//  KFCObjectSearch.cpp's BuildObjectHit) and the UI's (the message area's lines and contexts - KFCStatusTextView.cpp; a
+//  GREP row's Preview Text - KFCResultListWidgetMgr.cpp; a tier's name - KFCResultHistory.cpp; a saved query's text in
+//  the query dialog - KFCQueryContents.cpp). One place, so the two halves cannot come to cut by two rules.
 //  In model/ with the other headers both halves read: header-only - two inline functions on PMString and UnicodeClass,
 //  nothing of either plug-in's code - so each half compiles its own copy and nothing crosses the boundary through it.
 //

@@ -16,7 +16,7 @@
 //  UI half reaches this door with KFCChapters() (KFCModelAccess.h). A new method goes at the END of the interface -
 //  a vtable slot is a promise to every built caller; one taken out moves every slot below it, so both halves are
 //  built together then. Either way kKFCBoundaryRevision goes up by one (KFCBoundaryID.h), and the stand-in
-//  (ui/KFCModelAccess.cpp) takes the new method too.
+//  (ui/KFCModelAccess.cpp) gains or loses the method too.
 //
 //========================================================================================
 

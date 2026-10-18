@@ -5,8 +5,9 @@
 //  KohakuFindChange (KFC)
 //
 //  The model half's session interfaces (IKFCResults.h / IKFCRuns.h / IKFCChapters.h), each method
-//  forwarding to the function it names - nothing is decided here (the model/UI split) - and the boundary
-//  stamp the UI half checks before it calls any of them (IKFCBoundary.h).
+//  forwarding to the function it names - the rules are that function's (the model/UI split); a door decides
+//  only where a call goes: under the list's query (KFCQueryScope.h) or not, and Create Outlines by the rows'
+//  kind - and the boundary stamp the UI half checks before it calls any of them (IKFCBoundary.h).
 //  EDITED BY HAND. First generated from one table with the headers
 //  (work/sdd/2026-10-01-kbs-model-ui-split/gen_ifaces.py); a method appended to a header since is forwarded
 //  here by hand, and the table does not know it - the generator is a record only and refuses to write.
@@ -29,7 +30,7 @@
 #include "KFCObjectOutline.h"		// OutlineRows - an object row's Special Operations > Create Outlines
 #include "KFCObjectSpecial.h"		// SpecialRows - an object row's other Special Operations
 #include "KFCOversetLocator.h"
-#include "KFCQueryScope.h"		// KFCUnderListQuery - a row operation under its own list's query (v2)
+#include "KFCQueryScope.h"		// KFCUnderListQuery - a row operation under its own list's query; PreviewHit
 #include "KFCQuerySequence.h"
 #include "KFCReplaceEngine.h"
 #include "KFCResultModel.h"
@@ -127,8 +128,9 @@ public:
 	virtual void DropKeptTiers() { KFCTierStore::DropAll(); }
 	virtual bool DropTier(uint32 resultSet) { return KFCTierStore::DropTier(resultSet); }
 	virtual bool SearchListAgain(PMString& outStatus) { return KFCUnderListQuery(outStatus, false /*writes*/, [&]() { return KFCSearchEngine::SearchListAgain(outStatus); }); }
-	// CREATE OUTLINES, BY THE ROWS' KIND (one kind at a time - the selection rules keep it): object rows' items outlined whole
-	// (KFCObjectOutline), text rows' matched characters (KFCReplaceEngine::OutlineHits - the text-outlines spec).
+	// CREATE OUTLINES, BY THE ROWS' KIND (one kind at a time - the selection rules keep it): object rows' items
+	// outlined whole (KFCObjectOutline), text rows' matched characters (KFCReplaceEngine::OutlineHits -
+	// docs/superpowers/specs/2026-10-18-kfc-text-outlines-design.md).
 	virtual bool OutlineRows(const KFCRowsByChapter& rows, PMString& outStatus)
 	{
 		int32 chapter = -1, hit = -1;
@@ -143,7 +145,8 @@ public:
 	// (Not under the list's query either - KFCUnderListQuery: a special operation walks no story, as Create Outlines.)
 	virtual bool SpecialRows(int32 op, const KFCRowsByChapter& rows, const KFCSpecialParams& params, PMString& outStatus) { return KFCObjectSpecial::SpecialRows(op, rows, params, outStatus); }
 	virtual bool CanSpecialHit(int32 op, int32 chapterIdx, int32 hitIdx) { return KFCObjectSpecial::CanSpecialHit(op, chapterIdx, hitIdx); }
-	// Under the list's own query, as Search These Results Again (a Narrow Down searches with it - the spec's N3).
+	// Under the list's own query, as Search These Results Again: a Narrow Down searches with it
+	// (docs/superpowers/specs/2026-10-18-kfc-narrow-down-design.md N3).
 	virtual bool NarrowList(const KFCNarrowStep& step, PMString& outStatus) { return KFCUnderListQuery(outStatus, false /*writes*/, [&]() { return KFCSearchEngine::NarrowList(step, outStatus); }); }
 };
 

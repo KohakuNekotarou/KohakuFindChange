@@ -83,19 +83,10 @@ DECLARE_PMID(kInterfaceIDSpace, IID_IKFCUIBOUNDARY, kKFCPrefix + 14)
 // a UI half that does not find its own stamp in the model half calls nothing at all, and a model half that does not
 // find its own in the UI half takes it for no UI half.
 // kKFCBoundaryRevision GOES UP BY ONE whenever a door gains, loses or reorders a method, or a type that crosses changes
-// its layout; kKFCVersion is in the stamp too, so two releases never pass for one.
-#define kKFCBoundaryRevision	"19"		// 19: IKFCRuns::SearchBookOnLayer and IKFCResults::GetSearchLayer taken out - no
-										// caller since Find Objects on Active Layer moved into Narrow Down (2026-10-18).
-										// 18: KFCNarrowStep gains `layer` (Narrow Down's On Active Layer - Find Objects on
-										// Active Layer moved off the panel menu, 2026-10-18).
-										// 17: IKFCRuns::NarrowList, IKFCResults::GetNarrowWords / ListHoldsObjects / ClearRows /
-										// GetObjectRowHit appended; KFCNarrowStep and RowDisplay::outlinedText cross (Narrow
-										// Down, Clear from Results, a text row's Create Outlines - 2026-10-18).
-										// 16: IKFCUIServices::SnapshotBackgroundSelections and RestoreBackgroundSelections
-										// appended (an object search gives back the selections of the documents behind the
-										// front one, 2026-10-18). 15: IKFCRuns::SearchBookOnLayer and IKFCResults::GetSearchLayer appended (Find
-										// Objects on Active Layer, 2026-10-17). 14: KFCSpecialParams::y is Shear's axis too -
-										// the layout the same, but a half that did not read it would shear the other way
+// its layout - or only what one of its fields means (KFCSpecialParams::y became Shear's axis as well: the layout the
+// same, but a half that did not read it would shear the other way); kKFCVersion is in the stamp too, so two releases
+// never pass for one. What each revision changed is this file's history (git log -p -- model/KFCBoundaryID.h).
+#define kKFCBoundaryRevision	"19"
 #define kKFCBoundaryStamp		kKFCVersion "/" kKFCBoundaryRevision
 
 #endif // __KFCBoundaryID_h__

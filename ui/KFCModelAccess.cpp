@@ -51,6 +51,8 @@ namespace
 	// IsAnyRunning) and a command that is tried anyway says why on the message line (KFCResultTree::RefusedWhileRunning
 	// shows BusyMessage). Statics, so AddRef and Release count nothing.
 	// A METHOD ADDED TO A DOOR IS ADDED HERE TOO - the stand-in is abstract, and so does not compile, until it is.
+	// A METHOD TAKEN OUT OF A DOOR IS TAKEN OUT HERE TOO - left here, it still compiles (nothing here says override)
+	// and stands in for nothing.
 	// A COMMAND THAT READS A DOOR BUT IS NOT kCustomEnabling ASKS RefusedWhileRunning ITSELF - no grey reaches it
 	// (Save Panel Settings, KFCSavePanelState).
 

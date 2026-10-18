@@ -142,10 +142,11 @@ public:
 	    be put back as it was after a list's query was stated for a GREP row's after-text, or for an operation that left
 	    early (KFCQueryScope). Said at once (KFCResultTree::ShowStatus), so the person checks Edit > Find/Change. */
 	virtual void				ShowNotice(const PMString& words) = 0;
-	/** THE SELECTIONS OF THE DOCUMENTS BEHIND THE FRONT ONE, AROUND AN OBJECT SEARCH (the object search's O6 - the selection,
-	    given back): its walks select what they find in every document with a window they walk (IFindChangeService::
-	    SearchObject - measured 2026-10-18: an All Documents search with nothing selected anywhere left the last item it
-	    found selected in the document behind the front one), and the selection snapshot gives the front view's back only.
+	/** THE SELECTIONS OF THE DOCUMENTS BEHIND THE FRONT ONE, AROUND AN OBJECT SEARCH (the selection, given back -
+	    O6 of docs/superpowers/specs/2026-10-09-kfc-object-search-design.md): its walks select what they find in every
+	    document with a window they walk (IFindChangeService::SearchObject - measured: an All Documents search with
+	    nothing selected anywhere left the last item it found selected in the document behind the front one), and the
+	    selection snapshot gives the front view's back only.
 	    Snapshot = every other document's layout view read now - the page items selected, nothing, or something else (text,
 	    a table's cells); Restore = put back once the walks are over: the items selected again, nothing selected where
 	    nothing was, and where text or cells were (which this cannot read back) the items a walk left selected taken away.

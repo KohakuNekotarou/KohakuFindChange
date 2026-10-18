@@ -46,7 +46,7 @@ namespace KFCResultModel
 		kRowNotFound = 0,	// nowhere that can be told - the jump says "Not found"
 		kRowAtPlace,		// at its stored place
 		kRowMoved,			// moved to the one free candidate (OneFreePlace's rule) - the row stands there now
-		kRowElsewhere		// found through its text focus or by order - for this jump only (spec T3)
+		kRowElsewhere		// found through its text focus or by order - for this jump only (T3 above)
 	};
 
 	enum SearchScopeKind
@@ -59,7 +59,7 @@ namespace KFCResultModel
 		kScopeSelection
 	};
 
-	/** THE MOST TIERS KEPT (the author's call, 10-14 - 50 being too many searches to keep): past it the oldest goes. One
+	/** THE MOST TIERS KEPT (the author's call - 50 being too many searches to keep): past it the oldest goes. One
 	    number for both halves - the model keeps the tiers to it (KFCTierStore::kMaxTiers), the UI half names it when one
 	    goes (KFCResultHistory). */
 	enum { kMaxKeptTiers = 10 };
@@ -78,18 +78,18 @@ namespace KFCResultModel
 		bool			kept;		// the row eye (Hit::kept - docs/superpowers/specs/2026-10-17-kfc-row-eye-keep-design.md)
 		int32			special;	// the special operation KFC last wrote the row's item with (Hit::special - a KFCSpecialOp;
 									// 0 = none): the row reads its word first (the UI half's KFCSpecialRowWord)
-		PMString		outlinedText;	// A TEXT ROW WRITTEN AS OUTLINES (Hit::outlinedText - docs/superpowers/specs/
-									// 2026-10-18-kfc-text-outlines-design.md X6): the characters it outlined, drawn where the
-									// match stands - matchText holds what the row reads now (the inline's mark, not shown),
-									// which the doors compare. Empty for every other row.
+		PMString		outlinedText;	// A TEXT ROW WRITTEN AS OUTLINES (Hit::outlinedText -
+									// docs/superpowers/specs/2026-10-18-kfc-text-outlines-design.md X6): the characters
+									// it outlined, drawn where the match stands; matchText holds what the row reads
+									// now (the inline's mark, not shown), which the doors compare. Empty on other rows.
 
 		RowDisplay() : replaced(false), outlined(false), kept(false), special(0) {}
 	};
 }
 
-/** A TIER'S NARROWING (docs/superpowers/specs/2026-10-18-kfc-narrow-down-design.md - the author, 2026-10-18): one condition
-    of a tier heading's Narrow Down, kept with the list in the order the steps were taken (ListHeader::narrow) and handed over
-    one at a time (IKFCRuns::NarrowList). The kind crosses the boundary, so it is FIXED: a new one is appended before
+/** A TIER'S NARROWING (docs/superpowers/specs/2026-10-18-kfc-narrow-down-design.md): one condition of a tier heading's
+    Narrow Down, kept with the list in the order the steps were taken (ListHeader::narrow) and handed over one at a time
+    (IKFCRuns::NarrowList). The kind crosses the boundary, so it is FIXED: a new one is appended before
     kKFCNarrowKindCount, none is renumbered. */
 enum KFCNarrowKind
 {
@@ -100,7 +100,7 @@ enum KFCNarrowKind
 	kKFCNarrowPages,			// the row's page in a range of pages (`pages` - the print dialog's way of writing one)
 	kKFCNarrowOnPasteboard,		// the item, or the match's frame, out on the pasteboard
 	kKFCNarrowFrames,			// the frames holding the matches, one object row each
-	kKFCNarrowOnLayer,			// the item, or the match's frame, on a layer of a name (`layer` - On Active Layer, 2026-10-18)
+	kKFCNarrowOnLayer,			// the item, or the match's frame, on a layer of a name (`layer` - On Active Layer)
 	kKFCNarrowKindCount
 };
 
@@ -108,19 +108,19 @@ struct KFCNarrowStep
 {
 	int32		kind;		// a KFCNarrowKind
 	PMString	pages;		// kKFCNarrowPages: the range as typed ("1-5, 8"); empty for every other kind
-	PMString	layer;		// kKFCNarrowOnLayer: the layer's name - the front document's active layer when it was pressed (the
-							// author's call, 2026-10-18: Find Objects on Active Layer moved into Narrow Down, text tiers too);
-							// another document's layer of the same name. Empty for every other kind
+	PMString	layer;		// kKFCNarrowOnLayer: the layer's name - the front document's active layer when it was
+							// pressed (the author's call: in Narrow Down, not a command of its own, and for text
+							// tiers too); in another document, its layer of that name. Empty for every other kind
 
 	KFCNarrowStep() : kind(kKFCNarrowNone) {}
 	explicit KFCNarrowStep(int32 k) : kind(k) {}
 };
 
-/** AN OBJECT ROW'S SPECIAL OPERATIONS (docs/superpowers/specs/2026-10-17-kfc-object-special-operations-design.md - the
-    author, 2026-10-17): InDesign's own Object menu commands over the rows selected together, across spreads and documents
-    (KFCObjectSpecial). The number crosses the boundary - IKFCRuns::SpecialRows, RowDisplay::special - so it is FIXED:
-    a new operation is appended before kKFCSpecialOpCount, none is renumbered. (Create Outlines is not one of them: it has
-    its own door and mark - KFCObjectOutline, Hit::outlined.) */
+/** AN OBJECT ROW'S SPECIAL OPERATIONS (docs/superpowers/specs/2026-10-17-kfc-object-special-operations-design.md):
+    InDesign's own Object menu commands over the rows selected together, across spreads and documents
+    (KFCObjectSpecial). The number crosses the boundary - IKFCRuns::SpecialRows, RowDisplay::special - so it is
+    FIXED: a new operation is appended before kKFCSpecialOpCount, none is renumbered. (Create Outlines is not one of
+    them: it has its own door and mark - KFCObjectOutline, Hit::outlined.) */
 enum KFCSpecialOp
 {
 	kKFCSpecialNone = 0,
@@ -158,15 +158,14 @@ enum KFCSpecialOp
 	kKFCSpecialScale,
 	kKFCSpecialRotate,
 	kKFCSpecialShear,
-	// (No "Run Script on the rows' objects": dropped - the author, 2026-10-17 night, the spec's E13.)
+	// (No "Run Script on the rows' objects": dropped - the author's call, E13 of the spec named above.)
 	kKFCSpecialOpCount
 };
 
 /** WHAT A SPECIAL OPERATION IS GIVEN besides its rows (IKFCRuns::SpecialRows). x, y: Move - the horizontal and vertical
     distances in points (right and down positive); Scale - the horizontal and vertical percentages; Rotate, Shear - the
     angle in degrees in x (counter-clockwise positive, as InDesign's dialogs have it); Shear - its axis in y, 0 Horizontal
-    and 1 Vertical (the Shear dialog's Axis, as InDesign's own - 2026-10-17). text: Move to Active Layer - the layer's
-    name. */
+    and 1 Vertical (the Shear dialog's Axis, as InDesign's own). text: Move to Active Layer - the layer's name. */
 struct KFCSpecialParams
 {
 	double		x;

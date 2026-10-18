@@ -6,8 +6,7 @@
 //
 //  The UI half's side of IKFCUIServices.h (the model/UI split): what the model half asks the UI half for.
 //  AddIn'd on kSessionBoss from the UI half's resource, so a background thread - which loads no UI plug-in -
-//  finds nothing there and the model does without. The bar, the windows and the Book panel are what
-//  KFCBookScope / the engines did themselves before the split, carried over unchanged; the notes are theirs.
+//  finds nothing there and the model does without.
 //
 //========================================================================================
 
@@ -143,7 +142,9 @@ namespace
 
 	/** The selection manager of a document's layout view - the first of its views, front or behind: the official way to
 	    reach a selection that is not the active one (KCM's QuerySelectionManagerFor, KCMStoryJump.cpp - after Adobe's
-	    trackers and SnpManipulateStructureView.cpp). AddRef'ed; nil for a document with no layout window. */
+	    trackers and SnpManipulateStructureView.cpp). AddRef'ed; nil for a document with no layout window - and for one
+	    whose window is minimised: GetAllLayoutViews lists no view of it then (KIDMCP measured it), and whether an
+	    object search's walk selects in such a window is not measured. */
 	ISelectionManager* QueryDocSelectionManager(IDataBase* db)
 	{
 		Utils<ILayoutViewUtils> viewUtils;
@@ -191,11 +192,11 @@ public:
 
 	/** Does this document have a WINDOW anywhere - front, or behind another tab? The
 	    all-presentations search, because GetFrontmostPresentationForDocument answers nil for a
-	    document sitting behind another tab (ShowChapterWindow asks it this way too).
+	    document sitting behind another tab (KFCBookScope::ShowChapterWindow asks this too).
 
 	    Asked by the held-chapter releases: a window makes a chapter the USER'S,
 	    whoever raised the window. ShowChapterWindow and the jump take a chapter off the held list
-	    when they raise one themselves, but a window can be raised behind this module's back - the
+	    when they raise one themselves, but a window can be raised behind KFC's back - the
 	    book panel lists every chapter, and double-clicking one there windows the very document being
 	    held. A release that closed it then would take a window the user is looking at; and once they
 	    had saved their work, not even the unsaved-work door would stand in the way.
@@ -213,12 +214,12 @@ public:
 			db, &FindPresCriteria::accept_all, noPreference) != nil;
 	}
 
-	/** The window half of KFCBookScope::ShowChapterWindow, carried over as it stood. */
+	/** The window half of KFCBookScope::ShowChapterWindow. */
 	virtual bool OpenLayoutWindow(const UIDRef& docRef)
 	{
 		// THE WINDOW IS ALLOWED NOT TO APPEAR - this function's false says so - so its error
-		// state stays in here. Preserve, then clear, exactly as the open in ReopenChapterDoc does
-		// (see that note for the SDK's own shape and the contract at ErrorUtils.h:115-117). Placed
+		// state stays in here. Preserve, then clear, exactly as the open in KFCBookScope::ReopenChapterDoc
+		// does (its note has the SDK's own shape and the contract at ErrorUtils.h:115-117). Placed
 		// ahead of the command rather than inside the failure branch so that all THREE ways this can
 		// end without a window are covered: the command that would not build, the one that failed, and
 		// the one that reported success without producing a presentation.
@@ -325,7 +326,8 @@ public:
 				continue;		// the front view's selection is the snapshot's (KFCObjectSearch's SelectionKeeper)
 			InterfacePtr<ISelectionManager> manager(QueryDocSelectionManager(db));
 			if (manager == nil)
-				continue;		// no layout window: a walk selects nothing there to give back
+				continue;		// no layout window: a walk selects nothing there to give back (a minimised one:
+								// QueryDocSelectionManager)
 			BackSelection kept;
 			kept.db = db;
 			kept.items = UIDList(db);

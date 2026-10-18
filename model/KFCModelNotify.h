@@ -19,8 +19,9 @@
 //  where the direct call it replaced did - the order of "empty the model, then draw the tree" is unchanged.
 //
 //  The senders: the pieces of the model that change the results while no menu command of the panel is
-//  running - the book watcher, the close and Save As responders, the Undo follower; the callers of KFCNotify*
-//  are the list. The runs themselves hand their summary back to the command that started them, which draws it.
+//  running - the book watcher, the close and Save As responders, the Undo follower, the kept tiers' store; the
+//  callers of KFCNotify* are the list. The runs themselves hand their summary back to the command that started
+//  them, which draws it.
 //
 //========================================================================================
 

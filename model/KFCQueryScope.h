@@ -9,7 +9,8 @@
 //  Find/Change can hold another one: a tier switched to (the switch leaves Find/Change alone - v2 R1), or the person's
 //  edit since the search (REP-13 as changed by v2: such a Replace used to be refused and the list cleared). An operation
 //  that reads the query - a row's Replace, the rows selected together, an object row's check and write, a GREP row's
-//  after-text, Search This Story / Document Again - runs inside a scope:
+//  after-text, Search This Story / Document / These Results Again, Narrow Down: the doors IKFCRuns.h says run under
+//  the list's query - runs inside a scope:
 //   - Find/Change's find side reads as the list's (KFCReplaceEngine::QueryUnchangedSinceSearch - the tab, the walk
 //     signature, the Find Format): nothing is stated, and the operation runs as it always has - Change to as the dialog
 //     holds it. A Replace that goes through so takes the list's copy again (R3 - the list remembers what it last
