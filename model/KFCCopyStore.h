@@ -6,7 +6,7 @@
 //
 //  KFC'S OWN COPY STORES (docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md C3 - C5). Before a text
 //  row's Replace writes, the text it is about to write over is copied - its objects and formatting with it - into a
-//  store of KFC's own, so the row's Restore Original can put it back later (KFCReplaceEngine). A store is the scrap
+//  store of KFC's own, so the row's Restore from Copy can put it back later (KFCReplaceEngine). A store is the scrap
 //  database of a data exchange controller of KFC's (kKFCCopyStoreBoss, a CDataExchangeController) - not a document, not
 //  the user's clipboard, not in app.documents - ONE PER DOCUMENT (a store shared by many documents once made a copy of
 //  a style no document had: docs/ai-notes/private-scrap-store-2026-10-06.md). Copies are never dropped one at a time -
@@ -16,7 +16,7 @@
 //  store, the range copied to its end; put back with one command that replaces a range. The ranges are text model
 //  positions (a table is 0x16 + 0x17), checked here against the story's PRIMARY thread (GetPrimaryStoryThreadSpan - a
 //  range into a table cell's or a footnote's thread crashed InDesign), since the commands check nothing.
-//  The main thread only: a row's Replace and its Restore Original run there.
+//  The main thread only: a row's Replace and its Restore from Copy run there.
 //
 //========================================================================================
 

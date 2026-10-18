@@ -58,7 +58,7 @@ namespace KFCResultModel
 	const int32 kKFCCollectObjectLimit = 1000;
 
 	/** WHY A ROW'S REPLACE KEPT NO COPY (HitCopy::whyNot - docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md
-	    C4): what the row's Restore Original says when it has none to put back. */
+	    C4): what the row's Restore from Copy says when it has none to put back. */
 	enum CopyWhyNot
 	{
 		kCopyNone = 0,			// no Replace of the list has written the row (or one restored it since)
@@ -82,8 +82,8 @@ namespace KFCResultModel
 	    ends in, so a paste puts that paragraph's own attributes back on the return it meets. A Replace that sets paragraph
 	    formatting (the spec's C16) also keeps the formatting of the paragraph the match STARTS in - its style and its own
 	    overrides - which a paste cannot carry (its first paragraph takes the attributes of the one it is pasted into), put
-	    back on that paragraph after the paste. What Restore Original puts back (KFCReplaceEngine::RestoreHits). Copied with
-	    the row - a tier, an Undo step, a backup - so the copy it names comes back with it. */
+	    back on that paragraph after the paste. What Restore from Copy puts back (KFCReplaceEngine::RestoreHits).
+	    Copied with the row - a tier, an Undo step, a backup - so the copy it names comes back with it. */
 	/** A HYPERLINK TEXT SOURCE THE COPY TOUCHED, and where it stood from the match's start when the copy was taken (the
 	    spec's C15): what Restore from Copy puts back where it stood - the paste makes a second link over a source the
 	    Replace kept (measured live 2026-10-17, H1 and H5), and cuts one the match crossed (H3). */
@@ -177,8 +177,8 @@ namespace KFCResultModel
 								// replace turns it on (MarkHitReplaced, MarkItemReplaced); the eye's click turns it either
 								// way (SetHitKept) - on a row KFC has WRITTEN only (replaced, outlined, or given a special
 								// operation - the author, 2026-10-17 evening: an eye on a row not written only kept a match
-								// since deleted as Missing); its Restore Original turns it off. Copied whole with the row - a
-								// tier, an Undo step, a backup.
+								// since deleted as Missing); its Restore from Copy turns it off. Copied whole with the
+								// row - a tier, an Undo step, a backup.
 		bool		cleared;	// TAKEN OFF THE LIST (Clear from Results - docs/superpowers/specs/2026-10-18-kfc-clear-from-results-design.md
 								// K5): the row keeps its place in the chapter - the writes kept for an Undo name rows by their
 								// place - but no story group and no object row's position holds it, so the tree does not draw it
@@ -217,8 +217,9 @@ namespace KFCResultModel
 		// matchText): a replaced row that an edit has moved is looked for again by it
 		// (KFCSearchEngine::LocateRow). Empty until the row is replaced.
 		PMString	replacedText;
-		// --- the copy its replace took (Restore Original - docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md) ---
-		HitCopy		copy;		// given once its Replace has gone through (SetHitCopy); taken off by its Restore Original
+		// --- the copy its replace took (Restore from Copy - the copy-restore spec) ---
+		HitCopy		copy;		// given once its Replace has gone through (SetHitCopy); taken off by its
+								// Restore from Copy
 		// The first characters of the match's STORY: what a story row of
 		// the tree reads, taken when the hit is built - the search closes a chapter it opened as soon
 		// as it has walked it, so the story cannot be read again when the tree draws.

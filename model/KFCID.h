@@ -191,7 +191,7 @@ DECLARE_PMID(kImplementationIDSpace, kKFCCopyStoreImpl, kKFCPrefix + 47)
 #define kKFCReplaceStepKey			kKFCStringPrefix "kKFCReplaceStepKey"
 // The Edit menu's name of an object row's Create Outlines step (KFCObjectOutline - Special Operations).
 #define kKFCCreateOutlinesStepKey	kKFCStringPrefix "kKFCCreateOutlinesStepKey"
-// The Edit menu's name of a text row's Restore Original step (KFCReplaceEngine::RestoreHits - the copies put back).
+// The Edit menu's name of a text row's Restore from Copy step (KFCReplaceEngine::RestoreHits - the copies put back).
 #define kKFCRestoreOriginalStepKey	kKFCStringPrefix "kKFCRestoreOriginalStepKey"
 // The Edit menu's names of an object row's other Special Operations (KFCObjectSpecial - one per KFCSpecialOp, InDesign's
 // own English command names; "Degrees" for the degree sign, the string table being ASCII).

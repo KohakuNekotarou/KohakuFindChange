@@ -49,7 +49,7 @@
 #include "TextChar.h"				// kTextChar_CR, the table's characters (TakeRowCopy)
 #include "textiterator.h"			// a range read character by character (TakeRowCopy, TextHash)
 
-#include <algorithm>		// std::sort - Restore Original's rows in text order
+#include <algorithm>		// std::sort - Restore from Copy's rows in text order
 #include <map>
 #include <set>
 #include <vector>
@@ -66,7 +66,7 @@
 #include "KFCBookScope.h"		// reopening a chapter the user closed since the search
 #include "KFCUndoFollow.h"		// every write recorded, so that the panel follows its Undo and Redo
 #include "KFCObjectReplace.h"	// an object row's Replace
-#include "KFCCopyStore.h"		// the copies a row's Replace takes and its Restore Original puts back
+#include "KFCCopyStore.h"		// the copies a row's Replace takes and its Restore from Copy puts back
 #ifdef KFC_DIAG
 #include "ITextFocusManager.h"	// how many foci a story carries while it is written (WALKSTEP) - test builds only
 #include "IFrameList.h"			// whether its frames stand damaged around a find (WALKSTEP) - test builds only
@@ -1267,8 +1267,8 @@ bool KFCReplaceEngine::QueryUnchangedSinceSearch()
 }
 
 // ======================================================================================================
-// REPLACE A ROW - OR THE ROWS SELECTED TOGETHER - FROM ITS RIGHT-CLICK MENU OR RETURN (the author's calls) - the one
-// write from the list (spec F16). No prompt. The list stays a WORK LIST, so a row written shows its new text and every
+// REPLACE A ROW - OR THE ROWS SELECTED TOGETHER - FROM ITS RIGHT-CLICK MENU OR RETURN (the author's calls -
+// spec F16). No prompt. The list stays a WORK LIST, so a row written shows its new text and every
 // other row is carried to where its text now stands, ready for the next Replace. One undo step ("Replace"). Its doors
 // (ReplaceRowsNow): the query unchanged (RefuseChangedQuery), every document of several still open once the last is
 // reached, and the verify walk's three questions (ChapterMovedUnderRows). Nothing is accepted, and nothing recorded of
@@ -1452,7 +1452,7 @@ PMString RowName(int32 chapterIdx, int32 hitIdx)
 }
 
 // A RANGE'S TEXT AS ONE NUMBER - FNV-1a over its code points, its length mixed in (KFCUndoFollow.cpp's StoryTextHash's
-// shape; 0 never comes out): what a copy's run-on rest is checked by before Restore Original pastes over it.
+// shape; 0 never comes out): what a copy's run-on rest is checked by before Restore from Copy pastes over it.
 uint64 TextHash(ITextModel* model, TextIndex start, TextIndex end)
 {
 	uint64 hash = 14695981039346656037ULL;
@@ -1867,7 +1867,7 @@ static bool ReplaceRowsNow(std::vector<ChapterWrite>& chapters,
 	}
 	// THE COPIES RESTORE ORIGINAL PUTS BACK (the spec's C3 / C4 - TakeRowCopy): every row to write, copied now - after every
 	// door, at the places they have just confirmed, and before the step opens, so nothing of it is in the document's undo
-	// step. A row with none is written all the same (its Restore Original says why); each row takes its copy once the
+	// step. A row with none is written all the same (its Restore from Copy says why); each row takes its copy once the
 	// write has gone through (SetHitCopy, below).
 	std::vector<std::vector<std::pair<int32, KFCResultModel::HitCopy> > > copies(chapters.size());
 	for (size_t k = 0; k < chapters.size(); ++k)
@@ -2014,7 +2014,7 @@ static bool ReplaceRowsNow(std::vector<ChapterWrite>& chapters,
 			chapters[k].docRef.GetDataBase()->SetModified(kFalse);
 	}
 	// (What each row wrote - Hit::replacedText - is taken by the walk that writes it, WalkStoryReplacing.)
-	// WHAT IT DID (spec F16 / F19 / F20): the row's Replace is the one write from the list, one undo step. The
+	// WHAT IT DID (spec F16 / F19 / F20): the row's Replace is one undo step. The
 	// message says nothing of Ctrl+Z (the author's call). Which row, in the message: RowName ("ID:262 #3").
 	if (!several)
 	{
@@ -2175,8 +2175,8 @@ bool KFCReplaceEngine::ReplaceHits(const KFCRowsByChapter& rowsByChapter, PMStri
 // THE ROW'S OWN PLACE IS WHAT IS TRUSTED, NOT THE STORY'S VERSION (C8): the rows of its story follow their foci first
 // (KFCSearchEngine::FollowStoryFoci), and a row is put back only where its own focus stands exactly on its place and that
 // place still reads what its Replace wrote - so an edit anywhere else in the story, made since, does not stop it (what
-// Restore Original is for: Ctrl+Z cannot reach one replace past the edits after it), and an edit of what it wrote does.
-// A story with no foci falls back on the version rule (StoryAsKFCLeftIt), as a Replace does.
+// Restore from Copy is for: Ctrl+Z cannot reach one replace past the edits after it), and an edit of what it wrote
+// does. A story with no foci falls back on the version rule (StoryAsKFCLeftIt), as a Replace does.
 // The rows that pass are pasted in text order, each checked again just before its paste (C9 - its run-on rest is
 // compared there); one whose rest has changed waits for another round, since putting back a row after it in the same
 // paragraph can make the rest read as copied again. Every other row is carried as a Replace carries them (RowNow): the
@@ -2190,7 +2190,7 @@ namespace
 enum RestoreRefusal
 {
 	kRestoreOk = 0,
-	kRestoreNotText,		// an object row (never from the panel - its menu has no Restore Original)
+	kRestoreNotText,		// an object row (never from the panel - its menu has no Restore from Copy)
 	kRestoreNotReplaced,	// nothing to put back
 	kRestoreNoCopy,			// no copy kept - HitCopy::whyNot says why
 	kRestoreNoDoc,			// its document could not be found

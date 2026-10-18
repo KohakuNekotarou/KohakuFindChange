@@ -130,7 +130,7 @@ namespace KFCReplaceEngine
 	    too); one that cannot be yet waits for another round. Each row put back reads as before its Replace - not replaced,
 	    its eye as it was (KFCResultModel::MarkHitRestored); every other row is carried to where its text stands.
 	    outStatus: "Restored ID:262 #3." - "Restored 2 of 3 rows: ID:262 #1, ID:262 #3. Left as they were: 1 edited
-	    since." - "Restored 3 rows in 2 documents: a.indd ID:262 #1; b.indd ID:270 #1."; a refusal ("Restore Original:
+	    since." - "Restored 3 rows in 2 documents: a.indd ID:262 #1; b.indd ID:270 #1."; a refusal ("Restore from Copy:
 	    ...") when none could be put back. True when something was written. Refused while a run of ours is up. */
 	bool RestoreHits(const KFCRowsByChapter& rows, PMString& outStatus);
 

@@ -557,7 +557,7 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 #define kKFCSearchTierAgainMenuKey	kKFCStringPrefix "kKFCSearchTierAgainMenuKey"
 // ...and an object row's Create Outlines (measured against every other key - key_collisions.py: none reads alike).
 #define kKFCCreateOutlinesMenuKey	kKFCStringPrefix "kKFCCreateOutlinesMenuKey"
-// ...and a text row's Restore Original (measured against every other key - key_collisions.py).
+// ...and a text row's Restore from Copy (measured against every other key - key_collisions.py).
 #define kKFCRestoreOriginalMenuKey	kKFCStringPrefix "kKFCRestoreOriginalMenuKey"
 // ...and Clear from Results - a hit, object, story or document row's. NOT "kKFCClearFromResultsMenuKey": the length and the
 // character sum of kKFCClearTierResultsMenuKey ("From" and "Tier" add up alike - key_collisions.py).

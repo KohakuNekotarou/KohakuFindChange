@@ -25,7 +25,7 @@
 #include "KFCHitMarker.h"		// the jump marker's static state, emptied at shutdown
 #include "KFCBookScope.h"
 #include "KFCBookWatch.h"
-#include "KFCCopyStore.h"		// the copy stores (Restore Original): scrap databases of KFC's own
+#include "KFCCopyStore.h"		// the copy stores (Restore from Copy): scrap databases of KFC's own
 #include "KFCResultModel.h"
 #include "KFCSearchEngine.h"	// the remembered Find Format: an attribute list and a raw IDataBase*
 #include "KFCTierStore.h"		// the kept tiers: whole lists, and their query copies (attribute lists)
@@ -58,8 +58,8 @@ public:
 		// between finds nothing to take down.)
 		KFCHitMarker::ShutdownCleanup();
 		KFCBookScope::ShutdownCleanup();
-		// ...and the copy stores (Restore Original): each holds a scrap database of its own - let go while the session is
-		// whole, as KIDMCP lets its task-start store go; the rows that name the copies go next.
+		// ...and the copy stores (Restore from Copy): each holds a scrap database of its own - let go while the
+		// session is whole, as KIDMCP lets its task-start store go; the rows that name the copies go next.
 		KFCCopyStore::ShutdownCleanup();
 		KFCResultModel::ShutdownCleanup();
 		// ...and the writes kept so that the panel can follow an Undo: each holds rows, and a query

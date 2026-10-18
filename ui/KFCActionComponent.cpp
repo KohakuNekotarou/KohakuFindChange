@@ -218,8 +218,8 @@ bool CopyTargetRows(IPMUnknown* widget, KFCRowsByChapter& out, bool& outAll)
 	return false;
 }
 
-// The TIER whose own row was right-clicked (v2 R9) - a grey one's number, or -1 for the live tier - while the list still
-// has it. false for any other row, and for none.
+// The TIER whose own row was right-clicked (docs/superpowers/specs/2026-10-14-kfc-tier-switch-v2-design.md R9) - a grey
+// one's number, or -1 for the live tier - while the list still has it. false for any other row, and for none.
 bool RightClickedTier(IPMUnknown* widget, int32& outTier)
 {
 	const NodeID node(RightClickedRow(widget));
@@ -295,7 +295,7 @@ const struct NarrowAction
 	{ kKFCNarrowPagesActionID, kKFCNarrowPages },
 	{ kKFCNarrowOnPasteboardActionID, kKFCNarrowOnPasteboard },
 	{ kKFCNarrowFramesActionID, kKFCNarrowFrames },
-	{ kKFCNarrowOnLayerActionID, kKFCNarrowOnLayer },		// On Active Layer (Find Objects on Active Layer moved here, 2026-10-18)
+	{ kKFCNarrowOnLayerActionID, kKFCNarrowOnLayer },		// On Active Layer (Find Objects on Active Layer moved here)
 };
 
 bool ActiveLayerName(IActiveContext* ac, PMString& outName);	// (below - Move to Active Layer's reading, On Active Layer's too)
@@ -309,9 +309,9 @@ int32 NarrowKindOf(const ActionID& action)
 	return kKFCNarrowNone;
 }
 
-// Is it a condition only a text row can meet (In Tables, In Footnotes, In Endnotes, Frames of These Matches - the spec's
-// N2: greyed over a tier of object rows, kept on the menu)? (The model's own question is KFCNarrow::IsTextOnly - the UI half
-// does not link the model's code.)
+// Is it a condition only a text row can meet (In Tables, In Footnotes, In Endnotes, Frames of These Matches - the
+// narrow-down spec's N2: greyed over a tier of object rows, kept on the menu)? (The model's own question is
+// KFCNarrow::IsTextOnly - the UI half does not link the model's code.)
 bool NarrowIsTextOnly(int32 kind)
 {
 	return kind == kKFCNarrowInTables || kind == kKFCNarrowInFootnotes || kind == kKFCNarrowInEndnotes
@@ -336,7 +336,8 @@ void DoNarrow(IActiveContext* ac, int32 kind, IPMUnknown* widget)
 		KFCResultTree::ShowStatus(why);
 		return;
 	}
-	// PAGES...: the range asked FIRST (KFCSpecialDialogs - the spec's N5) - Cancel changes nothing, a grey tier not switched to.
+	// PAGES...: the range asked FIRST (KFCSpecialDialogs - the narrow-down spec's N5) - Cancel changes nothing, a grey
+	// tier not switched to.
 	if (kind == kKFCNarrowPages)
 	{
 		PMString why;
@@ -357,10 +358,10 @@ void DoNarrow(IActiveContext* ac, int32 kind, IPMUnknown* widget)
 	(void)KFCResultHistory::Narrow(step, summary);
 }
 
-// THE LAYER THE LAYERS PANEL HAS ACTIVE in the front document, by its name (Move to Active Layer - the spec's E11: the
-// author's "the layer selected in the Layers panel"). Asked the way the panel's own menu finds its target layer
-// (layerpanel/LayerPanelMenuComponent.cpp, QueryTargetLayer: ILayerUIUtils::QueryContextActiveLayer). false = none - no
-// document in front.
+// THE LAYER THE LAYERS PANEL HAS ACTIVE in the front document, by its name (Move to Active Layer - the
+// special-operations spec's E11: the author's "the layer selected in the Layers panel"). Asked the way the panel's own
+// menu finds its target layer (layerpanel/LayerPanelMenuComponent.cpp, QueryTargetLayer:
+// ILayerUIUtils::QueryContextActiveLayer). false = none - no document in front.
 bool ActiveLayerName(IActiveContext* ac, PMString& outName)
 {
 	outName.Clear();
@@ -379,8 +380,9 @@ bool ActiveLayerName(IActiveContext* ac, PMString& outName)
 // AN OBJECT ROW'S SPECIAL OPERATION: the row the menu was popped over - or the rows selected together, when it is one of
 // them (RowsOfRightClick, as Replace and Create Outlines) - written where they stand (KFCResultTree::SpecialRows). Move to
 // Active Layer takes the active layer's name with it (ActiveLayerName); Move, Scale, Rotate and Shear their values, asked
-// first (KFCSpecialDialogs - the spec's E12): Cancel writes nothing and says nothing, a value that would change nothing
-// (0 and 0, 100%, 0 degrees) is said rather than written. No object row (the action pressed by its ActionID): nothing.
+// first (KFCSpecialDialogs - the special-operations spec's E12): Cancel writes nothing and says nothing, a value that
+// would change nothing (0 and 0, 100%, 0 degrees) is said rather than written. No object row (the action pressed by its
+// ActionID): nothing.
 void DoSpecial(IActiveContext* ac, int32 op, IPMUnknown* widget)
 {
 	int32 chapter = -1, hit = -1;
@@ -489,20 +491,18 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 
 			// The search through the one door a search into the panel takes (KFCResultHistory::Find): the tab's scope
 			// written first, the list drawn once it returns, the status line set - and the list it replaces kept as a tier
-			// above it, named after the query (the author's calls, 10-14: always kept, no toggle).
+			// above it, named after the query (the author's calls: always kept, no toggle).
 			PMString summary;
 			(void)KFCResultHistory::Find(KFCResultHistory::QueryLabel(), summary);
 			break;
 		}
 
-		// (FIND OBJECTS ON ACTIVE LAYER stood here - the panel menu's, 2026-10-17 - until 2026-10-18: the author moved it into a
-		//  tier heading's Narrow Down as On Active Layer, text tiers too - DoNarrow.)
-
 		case kKFCChangeAllActionID:
 		{
-			// Change All in Book (No List) (the author's calls - F6 and F18): InDesign's own Change All over
-			// the book's chapters, no list. The engine keeps its own doors and says why on a refusal (KFCChangeAll::Run).
-			// Not while a landing is under way - Find's reason (KFCJump::IsLanding).
+			// Change All in Book (No List) (the author's calls - F6 and F18 of
+			// docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md): InDesign's own Change All
+			// over the book's chapters, no list. The engine keeps its own doors and says why on a refusal
+			// (KFCChangeAll::Run). Not while a landing is under way - Find's reason (KFCJump::IsLanding).
 			if (KFCJump::IsLanding())
 				break;
 			KFCPanelTitle::Update();
@@ -692,8 +692,8 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 
 		case kKFCClearTheseResultsActionID:
 		{
-			// A tier's own row's right-click menu (v2 R9) - the tier it was popped over, alone: a grey tier, or the live list
-			// (the grey tiers stay). Not under a landing or a run, as Clear Results.
+			// A tier's own row's right-click menu (the tier-switch v2 spec's R9) - the tier it was popped over, alone:
+			// a grey tier, or the live list (the grey tiers stay). Not under a landing or a run, as Clear Results.
 			int32 tier = -1;
 			if (KFCJump::IsLanding() || KFCResultTree::RefusedWhileRunning() || !RightClickedTier(widget, tier))
 				break;
@@ -703,7 +703,7 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 
 		case kKFCSearchTierAgainActionID:
 		{
-			// A tier's own row's right-click menu (the author, 2026-10-14 night): that tier's own search run once more. A grey
+			// A tier's own row's right-click menu (the author's call): that tier's own search run once more. A grey
 			// tier is switched to first - the live list, as a click on its heading makes it (a refusal says why on the status
 			// line) - then searched again (KFCResultTree::SearchListAgain - the model reads the list's query, scope and
 			// documents). Not under a landing or a run: both doors refuse.
@@ -722,11 +722,11 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 
 		case kKFCCreateOutlinesActionID:
 		{
-			// A row's Special Operations > Create Outlines - an OBJECT row's item outlined whole (the author, 2026-10-17), a TEXT
-			// row's matched characters alone (the text-outlines spec, 2026-10-18): the row it was popped over - or the rows
+			// A row's Special Operations > Create Outlines - an OBJECT row's item outlined whole (the author's call), a
+			// TEXT row's matched characters alone (the text-outlines spec): the row it was popped over - or the rows
 			// selected together, when it is one of them (RowsOfRightClick, as Replace) - outlined wherever they stand
-			// (KFCResultTree::OutlineRows; the model takes each kind its own way). No hit row (the action pressed by its
-			// ActionID): do nothing.
+			// (KFCResultTree::OutlineRows; the model takes each kind its own way). No hit row (the action pressed by
+			// its ActionID): do nothing.
 			int32 chapter = -1, hit = -1;
 			if (RightClickedHit(widget, chapter, hit))
 				(void)KFCResultTree::OutlineRows(KFCResultTree::RowsOfRightClick(chapter, hit));
@@ -735,9 +735,10 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 
 		case kKFCRestoreOriginalActionID:
 		{
-			// A TEXT row's Restore Original (docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md): the row it was
-			// popped over - or the rows selected together, when it is one of them (RowsOfRightClick, as Replace) - their
-			// copies put back (KFCResultTree::RestoreRows). No hit row (the action pressed by its ActionID): do nothing.
+			// A TEXT row's Restore from Copy (docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md): the
+			// row it was popped over - or the rows selected together, when it is one of them (RowsOfRightClick, as
+			// Replace) - their copies put back (KFCResultTree::RestoreRows). No hit row (the action pressed by its
+			// ActionID): do nothing.
 			int32 chapter = -1, hit = -1;
 			if (RightClickedHit(widget, chapter, hit))
 				(void)KFCResultTree::RestoreRows(KFCResultTree::RowsOfRightClick(chapter, hit));
@@ -900,12 +901,13 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 			}
 			case kKFCChangeAllActionID:
 			{
-				// Change All in Book (No List): the book's alone (F18 - a document's Change All is InDesign's own dialog's).
-				// Its name says when the run takes only the Book panel's selected documents - "Change All in Selected
-				// Documents (No List)" (the query dialog's spec, section 4-4) - from the model, as Find's is. Grey with
-				// Book Scope off, while the panel holds a list (Clear Results first), with no book or chapter to run on
-				// (haveTarget), on the Colour tab, and with nothing to find (on the Object tab: an empty Find Object
-				// Format) - the spec's section 4; a run standing up greys everything above.
+				// Change All in Book (No List): the book's alone (the no-track Change All spec's F18 - a document's
+				// Change All is InDesign's own dialog's). Its name says when the run takes only the Book panel's
+				// selected documents - "Change All in Selected Documents (No List)" (the query dialog's spec, section
+				// 4-4) - from the model, as Find's is. Grey with Book Scope off, while the panel holds a list (Clear
+				// Results first), with no book or chapter to run on (haveTarget), on the Colour tab, and with nothing
+				// to find (on the Object tab: an empty Find Object Format) - the no-track Change All spec's section 4;
+				// a run standing up greys everything above.
 				const bool canRun = KFCChapters()->IsBookScopeOn()
 					&& haveTarget
 					&& KFCResults()->GetTotalHitCount() <= 0
@@ -1044,7 +1046,7 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 			case kKFCSearchDocumentAgainActionID:
 			{
 				// A document row's menu: Search This Document Again over a document row - GREYED OVER A SEARCH OF PART OF A
-				// DOCUMENT (Search: Story, To End of Story, Selection - the author, 2026-10-17 evening: "greyed may be
+				// DOCUMENT (Search: Story, To End of Story, Selection - the author: "greyed may be
 				// fine"): it walks a whole document, and such a list is searched again as it was searched by its story rows
 				// and its heading. Its other refusals (a changed query) said on the status line, as the story row's are
 				// (KFCSearchEngine::SearchDocumentAgain - which still refuses a part, for a caller that never opened the menu).
@@ -1086,7 +1088,7 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 			case kKFCCreateOutlinesActionID:
 			{
 				// An object or text row's menu: Create Outlines while the row - or one of the rows selected together with it - can
-				// be outlined (CanOutlineAny - its doors, read only: greyed when none can, the author's wish of 2026-10-17; a run
+				// be outlined (CanOutlineAny - its doors, read only: greyed when none can, the author's wish; a run
 				// standing greys everything, above). A row of a closed chapter counts as one that can: pressing reaches it, and
 				// what the write then refuses it says on the status line, row by row counted.
 				int32 chapter = -1, hit = -1;
@@ -1097,10 +1099,10 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 			}
 			case kKFCRestoreOriginalActionID:
 			{
-				// A text row's menu: Restore Original while the row - or one of the rows selected together with it - is a text
-				// row a Replace wrote and its copy is held (CanRestoreAny - the spec's C7: greyed when none is, the author's
-				// wish of 2026-10-17). What only the document can tell it says on the status line when pressed (edited since,
-				// the rest changed, locked), as Create Outlines says its refusals.
+				// A text row's menu: Restore from Copy while the row - or one of the rows selected together with it -
+				// is a text row a Replace wrote and its copy is held (CanRestoreAny - the copy-restore spec's C7:
+				// greyed when none is, the author's wish). What only the document can tell it says on the status line
+				// when pressed (edited since, the rest changed, locked), as Create Outlines says its refusals.
 				int32 chapter = -1, hit = -1;
 				const bool enable = RightClickedHit(widget, chapter, hit)
 					&& KFCResultTree::CanRestoreAny(KFCResultTree::RowsOfRightClick(chapter, hit));
@@ -1142,10 +1144,10 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 			}
 			default:
 			{
-				// A tier heading's Narrow Down: over a tier's row - a condition only a text row can meet greyed over a tier of
-				// object rows (the spec's N2 - kept on the menu, SET-11). Its other refusals (no query of its own, a document
-				// or book not open, a part of a document's Object tab Selection) said on the status line, as Search These
-				// Results Again's are.
+				// A tier heading's Narrow Down: over a tier's row - a condition only a text row can meet greyed over a
+				// tier of object rows (the narrow-down spec's N2 - kept on the menu, SET-11). Its other refusals (no
+				// query of its own, a document or book not open, a part of a document's Object tab Selection) said on
+				// the status line, as Search These Results Again's are.
 				// On Active Layer also wants a layer active in the front document (Move to Active Layer's test).
 				const int32 narrow = NarrowKindOf(action);
 				if (narrow != kKFCNarrowNone)

@@ -231,7 +231,7 @@ namespace KFCResultTree
 	    line. Not under a landing or a run. True = written. */
 	bool RestoreRows(const KFCRowsByChapter& rows);
 
-	/** Can Restore Original be offered on these rows - is any of them a text row a Replace wrote, its copy held
+	/** Can Restore from Copy be offered on these rows - is any of them a text row a Replace wrote, its copy held
 	    (KFCRuns()->CanRestoreHit)? The question the row menu greys it by (the spec's C7); why a copy cannot go back now is
 	    said by RestoreRows. */
 	bool CanRestoreAny(const KFCRowsByChapter& rows);

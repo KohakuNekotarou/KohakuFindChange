@@ -737,8 +737,8 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCReplaceHitMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// ...and Restore Original under it (docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md C1): the copy
-		// the row's Replace took put back - or the copies of the rows selected together it is one of (KFCReplaceEngine::RestoreHits).
+		// ...and Restore from Copy under it (the copy-restore spec's C1): the copy the row's Replace took put back -
+		// or the copies of the rows selected together it is one of (KFCReplaceEngine::RestoreHits).
 		kKFCRestoreOriginalActionID,
 		kKFCResultHitMenuName
 		kKFCRestoreOriginalMenuItemPosition,
@@ -1745,7 +1745,7 @@ resource ActionDef (kSDKDefActionResourceID)
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
 
-		// Restore Original - a text row's right-click menu, under Replace (docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md).
+		// Restore from Copy - a text row's right-click menu, under Replace (the copy-restore spec).
 		// kCustomEnabling: a text row a Replace wrote (CanRestoreAny); why a copy cannot go back it says on the status line.
 		kKFCActionComponentBoss,
 		kKFCRestoreOriginalActionID,

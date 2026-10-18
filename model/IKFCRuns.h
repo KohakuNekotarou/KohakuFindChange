@@ -138,11 +138,11 @@ public:
 	    a row's Special Operations > Create Outlines: the rows' frames, or their matched characters, outlined in one
 	    undo step (the rows are of one kind). False = nothing written; outStatus says why. */
 	virtual bool OutlineRows(const KFCRowsByChapter& rows, PMString& outStatus) = 0;
-	/** = KFCReplaceEngine::CanRestoreHit (appended) - a text row's Restore Original offered: a row a Replace of the list
-	    wrote, its copy held. */
+	/** = KFCReplaceEngine::CanRestoreHit (appended) - a text row's Restore from Copy offered: a row a Replace of the
+	    list wrote, its copy held. */
 	virtual bool CanRestoreHit(int32 chapterIdx, int32 hitIdx) = 0;
-	/** = KFCReplaceEngine::RestoreHits (appended) - Restore Original over text rows: the copies their Replace took put back,
-	    one undo step. False = nothing written; outStatus says why. */
+	/** = KFCReplaceEngine::RestoreHits (appended) - Restore from Copy over text rows: the copies their Replace took
+	    put back, one undo step. False = nothing written; outStatus says why. */
 	virtual bool RestoreRows(const KFCRowsByChapter& rows, PMString& outStatus) = 0;
 	/** = KFCObjectOutline::CanOutlineHit for an object row, KFCReplaceEngine::CanOutlineHit for a text row
 	    (appended) - a row's Create Outlines offered: read only, nothing opened (what only the document can tell is

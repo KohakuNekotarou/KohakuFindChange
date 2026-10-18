@@ -278,8 +278,8 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 
 	/** KFC's own copy store (KFCCopyStore.cpp - docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md C5): a
 	 *  data exchange controller whose scrap database holds the text a row's Replace is about to write over, for its
-	 *  Restore Original. kInvalidClass, the shape of KIDMCP's task-start store (kKIDMCPTaskStoreBoss): made by name with
-	 *  CreateObject2 and never registered with the clipboard or a drag, so nothing else looks it up.
+	 *  Restore from Copy. kInvalidClass, the shape of KIDMCP's task-start store (kKIDMCPTaskStoreBoss): made by name
+	 *  with CreateObject2 and never registered with the clipboard or a drag, so nothing else looks it up.
 	 */
 	Class
 	{

@@ -3671,8 +3671,8 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	AppendKeptStay(outSummary, keptStay);	// the row eye: what stayed of the list as it was
 	outSummary.Append(chapterNotes);
 
-	// How to replace (spec F19): a hit row's Replace - its right-click menu, or Return on a selected row
-	// (F17) - is the one write from the list, and nothing else on screen says so (the user's request).
+	// How to replace (spec F19): a hit row's Replace - its right-click menu, or Return on a selected row (F17).
+	// Nothing else on screen says how (the user's request).
 	// Shift+Return - replace, then on to the next row - is said too (the author's call).
 	//
 	// Last, after the warnings: it is an offer, not something that went wrong, and the status field

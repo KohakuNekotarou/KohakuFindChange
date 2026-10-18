@@ -133,8 +133,8 @@ static void LetGoOfClosingDocument(const UIDRef& closingDocRef)
 	// (KFCSearchEngine::ForgetSearchedFindFormatOf).
 	KFCSearchEngine::ForgetSearchedFindFormatOf(closingDocRef.GetDataBase());
 
-	// The copy store of the closing document (Restore Original) lets go of its address: one never saved is let go whole -
-	// no row can reach that document again - and a saved one's keeps the file it is found again by
+	// The copy store of the closing document (Restore from Copy) lets go of its address: one never saved is let go
+	// whole - no row can reach that document again - and a saved one's keeps the file it is found again by
 	// (KFCCopyStore::DocumentClosing).
 	KFCCopyStore::DocumentClosing(closingDocRef.GetDataBase());
 }
