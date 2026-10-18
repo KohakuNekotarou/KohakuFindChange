@@ -94,6 +94,7 @@
   （2026-10-06 の英語だけの書き直し（行の Replace・Change All in Book・Clear Results・300件）は、10-09 朝に日本語に合わせたときに無くなった。）
   - ⬜ How to Use に載っていない項目＝Change All in Book (No List)・Find/Change Selected Documents (Book)・Clear Results・Search This Story Again・Search This Document Again・Select All Rows（「結果の見方」は「右クリックメニュー」の一語）・Translucent／Minimizable の設定・Save Panel Settings（足すかは作者）。
   - ✅（2026-10-18 午後）**作者の文面に差し替えた**（デスクトップの `KFC-How-To-Use-ja.txt` を作者が直したもの＝Ctrl+Return・Narrow Down は短く、Copy Results の行を足し、Create Outlines と Frames の Replace の行は外した）。中身は10＝**特殊操作（Special Operations）**の節を足した（作者の依頼「Special Operations の項目を HowTo に」「簡素に」＝1行・私の下書きを作者が直した＝「（Create Outlines など）」を外した・同じ日 13:51 のデスクトップのファイル）。英語はそれに1行ずつ合わせた。
+  - ✅（2026-10-18 夜）「保存したクエリを順に実行」の節に **Find** の行を足した＝クエリのダイアログの Find（QRY-29）だけが載っていなかった（ブロック1の不具合の回の観察）→作者「Find の簡素な説明を追加したのを」＝私の下書きを作者が直した（「結果をパネルの一番下に足します（置換はしません）」を外した）＝デスクトップの `KFC-How-To-Use-Queries-ja.txt` を一字一句そのまま・英語はそれに1行合わせた。
   - 訂正:
 
 - **PNL-18** スクリプトの窓が出せないときは、ふつうのアラートで同じ文を出す（先頭に `Kohaku Find/Change - How to Use` を付ける＝アラートには題が無いので）。
