@@ -142,7 +142,7 @@
   `Replace: the text of this row has changed since the search (edited, or undone) - search again.`
   書けなかった行は、理由を言って元のまま（`Replace: InDesign's replace command would not run there - left as it is.` など）。行の状態も元に戻る（語は付かない）。
   ✅利用者に見える文の旧名は改名（2026-10-04）で `KohakuFindChange` に直した（"not by KohakuFindChange"）。
-  - 訂正:
+  - 訂正: ★2026-10-14 夜の作者の判断で「ストーリーのどこかが変わったら書かない」は外れた（`7d4bddf`・計画 `docs/superpowers/plans/2026-10-14-kfc-row-focus-undo.md` Task 4）＝行は書く前に**フォーカス（一致の文字の位置）を追い**、追えた行は同じストーリーの別の所が変わっていても書く。最初の文（`the story of this row has changed`）で断るのは、フォーカスを追えないストーリー（検索より前の編集の Undo・閉じていた間に編集された章を開き直したとき＝回帰 `xs3-d2-para-save-close-jump-replace`）だけ。一致の文字が消えていた行は書かずに `Missing` になり（`Replace: it did not go through - nothing was changed.`）、その行の Replace は灰色（作者 2026-10-18「(a)」＝もとからこの形＝`KFCReplaceEngine::WhyGreyed`）。（2026-10-18 に地図へ追記＝回帰の期待もこの日に直した＝`stale-document`・`edit-elsewhere-then-change`・`tf-replace-still-refused`・`sr-refused-then-research`・`edit-shift-same-text`・`jump-after-edit`・`msg-story-changed-shot`／`-floor`＝`work/note-scripts/2026-10-18-kfc-narrow/renew_1018.py`。）
 
 - **REP-28** 結果の文＝`Replaced ID:<UID> #<n>.`（REP-22）。
   - 訂正:
