@@ -93,6 +93,7 @@
   ★**日本語は作者の文面そのまま、英語はそれに1行ずつ合わせる**（2026-10-09 朝 `33fecee`＝Change Checked と Show Changes の節を外した。同じ日の夜、作者が書いた「保存したクエリを順に実行」の節を足した＝作者「HOWTOにクエリダイアログの件がのってなかったですね」）。
   （2026-10-06 の英語だけの書き直し（行の Replace・Change All in Book・Clear Results・300件）は、10-09 朝に日本語に合わせたときに無くなった。）
   - ⬜ How to Use に載っていない項目＝Change All in Book (No List)・Find/Change Selected Documents (Book)・Clear Results・Search This Story Again・Search This Document Again・Select All Rows（「結果の見方」は「右クリックメニュー」の一語）・Translucent／Minimizable の設定・Save Panel Settings（足すかは作者）。
+  - ⬜（2026-10-18）Ctrl+Return・Narrow Down・文字の行の Create Outlines・Frames の一覧の Replace の行を英・日で足した（`KFCHowTo.cpp`）＝★**日本語は私の下書きで、作者の文面ではない**＝上の決まり（日本語は作者の文面そのまま）に合わせて、作者の文面に差し替えるかを作者に聞く。
   - 訂正:
 
 - **PNL-18** スクリプトの窓が出せないときは、ふつうのアラートで同じ文を出す（先頭に `Kohaku Find/Change - How to Use` を付ける＝アラートには題が無いので）。

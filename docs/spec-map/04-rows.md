@@ -157,6 +157,9 @@
   ```
   ヒットの行       Replace
                    Restore from Copy（2026-10-17＝REP-38・最初の名前 Restore Original）
+                   Special Operations ▸ Create Outlines（文字の行・2026-10-18＝REP-39）
+                   ─
+                   Clear from Results（2026-10-18＝ROW-47）
   （物の行）       Replace
                    Special Operations ▸ Create Outlines（2026-10-17＝OBJ-19）
                                         ─
@@ -167,11 +170,24 @@
                                         Move to Active Layer・Clear Object Style Overrides
                                         ─
                                         Delete（2026-10-17 夜＝OBJ-20）
+                   ─
+                   Clear from Results
   ストーリーの行   Search This Story Again
                    Select All Rows
+                   ─
+                   Clear from Results
   文書の行         Search This Document Again
                    Select All Rows
+                   ─
+                   Clear from Results
   ブックの行       Select All Rows
+  段の見出しの行   Search These Results Again（ROW-44）
+                   Narrow Down ▸ In Tables・In Footnotes・In Endnotes
+                                 ─
+                                 Pages...・On Pasteboard
+                                 ─
+                                 Frames of These Matches（2026-10-18＝ROW-46）
+                   Clear These Results（ROW-43）
   ```
 
   （ヒットの行の Replace＝2026-10-06・F16／ストーリーの行＝2026-10-09＝REP-35／文書の行の Search This Document Again＝2026-10-10＝REP-37／Select All Rows とブックの行のメニュー＝2026-10-11＝ROW-38。どれも作者の依頼。）
@@ -287,6 +303,24 @@
   ★**なぞって付け外し**（2026-10-17 夜・作者「目の付けたり外したりするの、レイヤーパネルの様にドラッグで出来る様になってるのかな？今さわったところ、ドラッグ（なぞる）でうまくいかない」→「目の列のなぞり　お願いします」）＝目玉を押したまま動かすと、**最初の目玉と同じ状態の目玉を、なぞった行まで反対にそろえる**（付いていた目から始めると外す・外れていた目から始めると付ける）。**速く動かして飛ばした行も埋まる**＝最初の行からなぞった行までの、一覧が描いている行の全部（閉じた文書の中は塗らない）。書いていない行（目玉の欄が空）は飛ばす。逆向き・往復も同じ（一度そろえた目は戻さない）。メッセージ欄＝1行なら `P1(3)  kept when searching again`、2行以上なら `5 rows:  not kept when searching again`。動かさずに離せば今までどおり1つの付け外し・押した目からすぐ外へ出て目に入らなかったドラッグも1つの付け外し。目玉の付け外しは取り消しの段にならない（クリックと同じ）。作り＝レイヤーパネルの目（`open/components/layerpanel`）＝目玉がドラッグの元と先を兼ね、入った瞬間に塗る（レイヤーパネルは最初と入った行の2つだけ・KFC は間の行も＝状態パネル `buttonui/appearancepanel` の流儀）。✅ 実機（2026-10-17・テスト用ビルド・KIDMCP `send_input` の本物のマウス）＝下へ5行（2〜6行目が外れ1・7・8は付いたまま）・上へ（7行目だけ外れた）・速く（2行ずつ飛ばして4行付いた）・クリック1つ・文書の行を閉じて開き直しても同じ目（モデルと一致）。
   **目玉の付いた行は、探し直し（Search This Story Again・Search This Document Again・Search These Results Again）でも消えない**＝検索が見つけなくても残る（置換済みなら `Changed` のまま）。並びは新しい行とページの順に混ぜる（ページは行が覚えているページ・同じストーリーの中は、行のフォーカスが追っている今の文字の位置の順）。追えなくなった行（ストーリーが消えたなど）も残る＝押すと今と同じく答える（置換済みの行は `The replacement is no longer here - undone, or edited since.`・置換していない行は Missing）。見つけ直した行（同じストーリーの同じ範囲・同じ物）は1行にまとめ、目玉は付いたまま。置換済みの行が書いた文字に検索がまた一致しても2行にしない（置換済みの行を残し、重なる一致は足さない）。目玉の無い行は今までどおり（置換済みなら消える）。300行の上限＝目玉の行は必ず残し、検索の行は残りの枠に入る。`(R/N)` は残った行も数える。探し直しの文の後ろに残した数＝`1 kept row stays.`（2行以上は `N kept rows stay.`）。Search These Results Again では、目玉の行はそれぞれの文書の章へ運ばれ、今は一致の無い文書（または今回探していない本の章）も、目玉の行だけの章で残る（文書の並びは探した順）。
   Ctrl+Z で置換を取り消すと、行は置換の前に戻る＝自動で付いた目玉も外れる（Redo で付く＝UNDO-03）。目玉の付け外しそのものは取り消しの段にならない。文書を閉じると目玉の行も消える（LIFE-01）。新しい検索は新しい段＝前の段は目玉ごと灰色の記録になり、切り替えると戻る。
+  - 訂正:
+
+- **ROW-46** ★**Narrow Down**（段の見出しの行の右クリック・2026-10-18 作者の依頼＝設計書 `docs/superpowers/specs/2026-10-18-kfc-narrow-down-design.md`・作者の選択「後者」＝その段をもう一度探して、条件に合わない一致は歩きの途中で落とす）――
+  見出しのメニューは上から `Search These Results Again`・`Narrow Down ▸`・`Clear These Results`。サブメニュー＝`In Tables`・`In Footnotes`・`In Endnotes`／`Pages...`・`On Pasteboard`／`Frames of These Matches`（区切り2本）。
+  押すと**その段の検索を、その段の条件に1つ足して回し、結果は新しい段**になる（元の段は灰色で残る＝ROW-40・ROW-41 の「残る」）。灰色の段の見出しから押すと、先にその段へ切り替わる（ROW-42）。条件は重ねられる（絞った段からもう一度絞る）。絞った段の見出しは**名前の後に条件**＝`[Text/Document] F:"cat" C:"dog" / In Tables  (0/1)`（名前そのものは変えない＝段の検算は名前で読む）。絞った段の Search These Results Again は条件ごと探す（ROW-44）。
+  ★**上限（GEN-34）は条件に通った行で数える**＝歩きの途中で落とすので、本文に上限を超える一致があっても、表の中の一致だけで上限まで集まる。
+  条件＝`In Tables`（表のセルの中の一致）／`In Footnotes`（脚注の中）／`In Endnotes`（後注の中＝後注は文書の別のストーリー）／`Pages...`（ページの範囲＝先にダイアログ `Kohaku Find/Change - Narrow Down`・欄 `Pages:`・例 `e.g. 1-5, 8`・印刷ダイアログの範囲と同じ読み方＝`1-5, 8`・セクションの名前つき `Sec1:3`・絶対番号 `+3`・**各文書が自分のページ番号で読む**・行のページは一致の枠のページ）／`On Pasteboard`（一致の枠・物がペーストボードの上）／`Frames of These Matches`（一致をその枠の物の行にする＝OBJ-22）。
+  物の段（Object タブの一覧）では `In Tables`・`In Footnotes`・`In Endnotes`・`Frames of These Matches` が灰色（`Pages...` と `On Pasteboard` は使える）。
+  メッセージ欄＝検索の文の頭に `Narrowed down (<条件>): `＝`Narrowed down (In Tables): 12 hit(s) in 3 of 5 chapter(s).`・0件 `Narrowed down (In Tables / On Pasteboard): No matches in document "nd1.indd".`・Cancel `Narrow Down: cancelled.`（一覧は押す前のまま）。
+  断る（`Narrow Down: ` の後に・一覧はそのまま）＝文字だけの条件を物の段に `<条件> narrows text results - these are objects.`／ページが空 `no pages were given - nothing was searched.`／どの文書でも読めない範囲 `"2-x" is not a page range in any document - nothing was searched.`（探す前に、一覧の文書のうち開いているもので読む）／ほかは Search These Results Again と同じ断り（自分の条件を持たない段・閉じた文書・実行中など＝ROW-44）。ダイアログの Cancel は何もしない（メッセージ欄も変えない）。
+  ✅ 実機（2026-10-18・テスト用ビルド・KIDMCP・`work/note-scripts/2026-10-18-kfc-narrow/n1.ps1`・`n2.ps1`）＝N-1〜N-4（表・脚注・後注・ペーストボード・重ねた条件・灰色の段から・物の段の灰色・絞った段の探し直し・Cancel・本文 310＋表 310 で表だけ 300 行）・Pages...（`2-3` で2行・`2-x` で断り・ダイアログの Cancel は何もしない・`5` で5ページ目の行とその枠のあふれの行・物の段）＝ノート `docs/ai-notes/kfc-narrow-clear-outlines-2026-10-18.md`。
+  - 訂正:
+
+- **ROW-47** ★**Clear from Results**（ヒット・物・ストーリー・文書の行の右クリックの一番下・区切りの後＝2026-10-18 作者「検索結果の行を、消去したくなりますね」）と **Ctrl+Return**（作者「Ctrl＋リターンでその検索結果の行を消せるといいかも」・設計書 `docs/superpowers/specs/2026-10-18-kfc-clear-from-results-design.md`）――
+  行を**一覧から外すだけ**（文書は変えない・取り消しの段にならない）。ヒットの行（物の行）＝その行・まとめて選んだ行の1つなら選んだ行すべて／ストーリーの行＝その下の行全部とストーリーの行／文書の行＝その文書の行全部と文書の行（段の見出しは `(0/0)` で残る）。`(R/N)` も減る。メッセージ欄 `Cleared 1 row from the results.`／`Cleared 3 rows from the results.`。
+  **Ctrl+Return**＝選んだヒットの行（物の行）を外し、**下の行を選んで飛ぶ**（一番下の行なら上の行）＝Return と同じくキーボードは一覧に残る（REP-32）。Ctrl+Shift+Return は何もしない。
+  外した行は、それより前の置換の取り消し・やり直しでも戻らない（残った行の追いかけは今までどおり＝UNDO-02）。Search This Story／Document Again・Search These Results Again で探し直すと、まだ一致する所は行として戻る。外した行は段を切り替えて戻っても外れたまま。
+  ✅ 実機（2026-10-18・`k1.ps1`）＝1行・まとめて3行・ストーリーの行・文書の行・置換2つの後に1行外して Ctrl+Z／Redo（外した行は戻らない・段は置換の2つだけ）・Ctrl+Return（下の行が選ばれ文書の一致が選ばれる・最後の行は上へ・Ctrl+Shift+Return は何もしない）・探し直しで戻る・物の行（Ctrl+Return で下の物がレイアウトで選ばれる・灰色にしてから戻っても外れたまま）・4つのメニューの区切り。⬜まだ＝押したまま（キーの自動反復）・本文にキーボードがあるときの Ctrl+Return（KIDMCP の `send_input` が自動反復を作れない）。
   - 訂正:
 
 ---

@@ -206,8 +206,8 @@
   逆向き＝**行のクリックの着地の最中**は、パネルから書く・歩く・走らせる操作を始めない（JMP-05b）。
   - 訂正:
 
-- **GEN-34** ★件数の上限は**1つ＝300 行**（2026-10-06・F9＝作者「最大を３００にする／３００でStop」）。検索は 300 行まで集め、**パネルは全部描く**。
-  300 で止まったら ` Stopped at the 300 limit - narrow the search, or use Change All in InDesign's Find/Change.`（ブックの検索は `… or use Change All in Book (No List).`）。
+- **GEN-34** ★件数の上限は**文字の一覧 300 行・物の一覧 1000 行**（2026-10-06・F9＝作者「最大を３００にする／３００でStop」。2026-10-18 から物の一覧〈Object タブの検索・Frames of These Matches の一覧＝OBJ-22〉は 1000＝300／500／1000 で検索と特殊操作の時間を測って決めた・作者が承認＝設計書 `docs/superpowers/specs/2026-10-18-kfc-narrow-down-design.md` §3-1 の M6）。検索は上限まで集め、**パネルは全部描く**。
+  300 で止まったら ` Stopped at the 300 limit - narrow the search, or use Change All in InDesign's Find/Change.`（ブックの検索は `… or use Change All in Book (No List).`）。物の一覧は ` Stopped at the 1000 limit - narrow the search (Narrow Down > Pages...), or use …`（Narrow Down で分けて取れる＝ROW-46）。Narrow Down の段は条件に通った行で数える。
   一覧の行は1つずつ見て置換するためのもので、それより多い置換は Change All の仕事（ブックは KFC の Change All in Book、それ以外は本体の「すべてを置換」）。
   クエリ連続実行は一覧を作らないので、この上限は無い（本体の Change All で書く）。
   パネルが描く数は一覧が持つ数そのもの＝描く側に別の上限は無い（行を足す道はどれも 300 で止まる＝検索・Search This Story／Document Again・オブジェクトの検索）。

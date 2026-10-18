@@ -158,7 +158,7 @@
   - 訂正:
 
 - **REP-32** ★**行を選んで Return キー**（テンキーの Enter も）でも、その行を置換する（2026-10-06・F17＝矢印キーで行を歩き、合っている所で Return＝キーボードだけで置換できる）。
-  右クリックの Replace と同じ口（同じ確かめ・同じ文）。Ctrl・Alt を押しながらの Return・ストーリー／文書／本の行の Return・置換済みの行の Return では何もしない（Shift を押しながらの Return は REP-32b）。
+  右クリックの Replace と同じ口（同じ確かめ・同じ文）。Alt を押しながらの Return・ストーリー／文書／本の行の Return・置換済みの行の Return では何もしない（Shift を押しながらの Return は REP-32b）。**Ctrl を押しながらの Return は行を一覧から外す**（2026-10-18＝ROW-47・Ctrl+Shift+Return は何もしない。それまでは Ctrl+Return も何もしなかった）。
   1.4.0 から、ヒットの行を何行か選んでいれば、その全部を置換する（REP-36。選んだ行のどれも置換できなければ何もしない）。
   ダブルクリックでキーボードが本文に移っているときの Return は本文に改行を打つ（KFC は何もしない）。章を開いて書いたときも、キーボードはツリーに戻る。
   ★**Return で置換した後もキーボードはツリーに残る**＝続けて矢印で歩き、また Return で置換できる（2026-10-07・作者が見つけた不具合の直し＝それまでは Return の後に InDesign 自身がキーボードを文書へ返し、次の矢印が**レイアウトで選んでいるページアイテムを動かしていた**。右クリックの Replace では起きなかった）。KFC がツリーにキーボードがある間だけ Return を先に受け取り、InDesign のパネルの「Return で文書へ戻る」まで届かせない（`IEventDispatcher` に載せる小さな受け手）。
@@ -247,6 +247,15 @@
   押した後に断る（行はそのまま・何行なら数えて言う）＝置換で書いた文字を後で直した `edited since`・広げた後ろが変わった `rest of paragraph changed`・ストーリーを追えない `not followed`・ロック `locked`・文書を開けない。閉じたブックの章は、置換と同じく窓なしで開いて戻し、窓を出す。
   文＝`Restored ID:262 #3.`／`Restored 2 of 3 rows: ID:262 #1, ID:262 #3. Left as they were: 1 edited since.`／`Restored 3 rows in 2 documents: a.indd ID:262 #1; b.indd ID:270 #1.`／1行の断り `Restore from Copy: <理由>`（例 `Restore from Copy: no copy was kept when this row was replaced - its match holds an anchored object, which a copy would put back as a new object (a new ID).`）。
   写しの置き場は InDesign を終えるまで残る（保存していない文書の分は閉じたときに捨てる）・キャッシュフォルダに1つ約120KB のファイル（`KohakuFindChangeCopyStore<番号>`）。実機＝設計書 §7（テスト用ビルド・KIDMCP）。（1.4.0）
+  - 訂正:
+
+- **REP-39** ★**文字の行の Special Operations ▸ Create Outlines**（ヒットの行の右クリック・Restore from Copy の下・2026-10-18 作者「Text 一致の文字だけを Create Outlines。テキスト用のスペシャルの機能ですね（オブジェクト以外用）」＝設計書 `docs/superpowers/specs/2026-10-18-kfc-text-outlines-design.md`）――
+  **一致の文字だけ**をアウトラインにする（本体の 書式 > アウトラインを作成 と同じ命令）。まとめて選んだ行の1つなら選んだ行すべて・文書をまたいでも1つの取り消しの段（Edit メニューの名前 `Create Outlines`＝UNDO-02）。
+  本体はアウトラインを**行（語のかたまり）ごとに1つのインライン**にする＝2行にまたがる一致は2つのインラインと間の空白、段落をまたぐ一致は段落の区切りも残る、一致の中の元のインラインは残る（設計書 §3-1 の M7＝DOM の `createOutlines(true)` で実測）。
+  書いた行は `Outlined` と読み、一致の位置には**元の文字**を描き続ける（本文はもうインラインの印）。目玉が付く（ROW-45）。同じストーリーの後ろの行も位置を追う（行の長さは書く前と後のストーリーの長さの差で読み直す）・アウトラインにした行は、後の書き込みでも運ばれる（`b3ca26e`）。**置換済みの行もアウトラインにできる**（書いた文字をアウトラインにする）。
+  **灰色**＝押せる行が1つも無いとき（SET-11）。1行ずつの扉＝物の行（その Create Outlines は OBJ-19）・アウトライン済み・文字の無い一致（GREP の `^`・`$`）・あふれた文字（本体が断る＝エラー 80650）・ロック（ロックしたレイヤー・ストーリー＝DOM は通すが KFC は Replace と同じく断る）・文書が無い／開けない・ストーリーが追えない形で変わった・一致の文字が検索の後で書き換わった（置換済みの行は書いた文字と比べる）。
+  文＝`Outlined ID:262 #3.`／`Outlined 2 of 3 matches: ID:262 #1, ID:262 #3. Left as they were: 1 in overset text.`／`Outlined 3 matches in 2 documents: a.indd ID:262 #1, ID:262 #3; b.indd ID:270 #1.`／1行の断り `Create Outlines: <理由>`（例 `Create Outlines: the match is in overset text, which InDesign cannot outline - left as it is.`）。
+  ✅ 実機（2026-10-18・テスト用ビルド・KIDMCP・`work/note-scripts/2026-10-18-kfc-narrow/x1.ps1`）＝1行（`Outlined ID:254 #1.`・Ctrl+Z・Redo）・同じ段落の2つ目を続けて（1つ目の行も読み直される＝直したのは `b3ca26e`）・2つの文書の行をまとめて・あふれの行の項目は灰色・置換済みの行もアウトラインにできた。⬜まだ＝表のセル・脚注・後注の中の一致（DOM では通った＝M7）・ロックしたレイヤー（断る文）・アンカー付きの物を含む一致・連結した枠をまたぐ一致・「検索と置換」を開いたまま。（1.4.0）
   - 訂正:
 
 ---
