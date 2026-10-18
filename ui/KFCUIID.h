@@ -609,7 +609,10 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 #define kKFCScaleMenuKey					kKFCStringPrefix "kKFCScaleMenuKey"
 #define kKFCRotateMenuKey					kKFCStringPrefix "kKFCRotateMenuKey"
 #define kKFCShearMenuKey					kKFCStringPrefix "kKFCShearMenuKey"
-// ...and the names of their submenus (kKFCFittingSubmenuPath below - the plain words are InDesign's own keys).
+// ...and the names of their submenus: Special Operations, and Fitting / Arrange / Transform in it
+// (kKFCSpecialOpsSubmenuPath below - the plain words of the three are InDesign's own keys), each measured against
+// every other key (key_collisions.py).
+#define kKFCSpecialOpsSubmenuKey			kKFCStringPrefix "kKFCSpecialOpsSubmenuKey"
 #define kKFCFittingSubmenuKey				kKFCStringPrefix "kKFCFittingSubmenuKey"
 #define kKFCArrangeSubmenuKey				kKFCStringPrefix "kKFCArrangeSubmenuKey"
 #define kKFCTransformSubmenuKey				kKFCStringPrefix "kKFCTransformSubmenuKey"
@@ -690,11 +693,12 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 // > Create Outlines - a text row keeps kKFCResultHitMenuName (Replace alone). Popped the same way.
 #define kKFCResultObjectMenuName			"KFCRtMenuResultObject"
 // ...its Special Operations submenu (the author's word, 2026-10-17): the parent node is ActionID 0 with the path and a
-// delimiter (KCM's submenus' Adobe idiom), its items take the path. The name is the words shown, as KCM's are.
-#define kKFCSpecialOpsSubmenuName			"Special Operations"
-#define kKFCSpecialOpsSubmenuPath			kKFCResultObjectMenuName kSDKDefDelimitMenuPath kKFCSpecialOpsSubmenuName
+// delimiter (KCM's submenus' Adobe idiom), its items take the path. Named by KFC's own key, as the submenus in it are
+// (basicmenu's idiom - every SDK sample's menu path ends in a key of its own): a plain word in a path is looked up as a
+// key all the same, and shows as itself only while no key reads the same.
+#define kKFCSpecialOpsSubmenuPath			kKFCResultObjectMenuName kSDKDefDelimitMenuPath kKFCSpecialOpsSubmenuKey
 // ...and a TEXT row's (the text-outlines spec's X1): the same submenu under the hit row's menu, Create Outlines in it.
-#define kKFCHitSpecialOpsSubmenuPath		kKFCResultHitMenuName kSDKDefDelimitMenuPath kKFCSpecialOpsSubmenuName
+#define kKFCHitSpecialOpsSubmenuPath		kKFCResultHitMenuName kSDKDefDelimitMenuPath kKFCSpecialOpsSubmenuKey
 // ...and the submenus in it, after InDesign's own Object menu (the spec's E2): Fitting, Arrange, Transform - the same idiom
 // one level down. NAMED BY KFC'S OWN KEYS (basicmenu's idiom - BscMnuID.h, kBscMnuPluginsMenuKey): the plain words are
 // InDesign's own string keys, and the menu showed them in InDesign's language ("Fitting" as Japanese InDesign's

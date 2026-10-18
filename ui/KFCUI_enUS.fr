@@ -98,6 +98,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCScaleMenuKey,					"Scale...",
                 kKFCRotateMenuKey,					"Rotate...",
                 kKFCShearMenuKey,					"Shear...",
+                kKFCSpecialOpsSubmenuKey,			"Special Operations",
                 kKFCFittingSubmenuKey,				"Fitting",
                 kKFCArrangeSubmenuKey,				"Arrange",
                 kKFCTransformSubmenuKey,			"Transform",
