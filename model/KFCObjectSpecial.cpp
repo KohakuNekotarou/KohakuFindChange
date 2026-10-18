@@ -248,7 +248,7 @@ void Refuse(PMString& out, const OpInfo& info, const PMString& why)
 // each document of the rows). kInvalidUID = none.
 UID LayerNamed(const UIDRef& docRef, const PMString& name)
 {
-	return KFCPageItemFacts::DocLayerNamed(docRef, name);		// the one reading of it - Find Objects on Active Layer's too
+	return KFCPageItemFacts::DocLayerNamed(docRef, name);		// the one reading of it - Narrow Down's On Active Layer's too
 }
 
 // The object style applied to an item (kInvalidUID = none).

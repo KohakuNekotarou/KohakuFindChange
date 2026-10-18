@@ -84,7 +84,9 @@ DECLARE_PMID(kInterfaceIDSpace, IID_IKFCUIBOUNDARY, kKFCPrefix + 14)
 // find its own in the UI half takes it for no UI half.
 // kKFCBoundaryRevision GOES UP BY ONE whenever a door gains, loses or reorders a method, or a type that crosses changes
 // its layout; kKFCVersion is in the stamp too, so two releases never pass for one.
-#define kKFCBoundaryRevision	"18"		// 18: KFCNarrowStep gains `layer` (Narrow Down's On Active Layer - Find Objects on
+#define kKFCBoundaryRevision	"19"		// 19: IKFCRuns::SearchBookOnLayer and IKFCResults::GetSearchLayer taken out - no
+										// caller since Find Objects on Active Layer moved into Narrow Down (2026-10-18).
+										// 18: KFCNarrowStep gains `layer` (Narrow Down's On Active Layer - Find Objects on
 										// Active Layer moved off the panel menu, 2026-10-18).
 										// 17: IKFCRuns::NarrowList, IKFCResults::GetNarrowWords / ListHoldsObjects / ClearRows /
 										// GetObjectRowHit appended; KFCNarrowStep and RowDisplay::outlinedText cross (Narrow

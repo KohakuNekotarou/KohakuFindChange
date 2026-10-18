@@ -30,7 +30,6 @@
 
 #include <vector>
 
-#include "KFCBoundaryID.h"	// IID_IKFCCHAPTERS
 #include "KFCModelTypes.h"	// the types the methods carry
 
 class IDataBase;

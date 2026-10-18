@@ -48,10 +48,8 @@ namespace KFCResultHistory
 	    `label` names the new list's tier.
 	    Then the list drawn again (KFCResultTree::Rebuild) and the status line set to the search's words - with a word on
 	    the tier let go, if one was. Returns the search's answer (the matches found); *outCommitted, when given, says whether
-	    the search went through. onLayer, when given: Find Objects on Active Layer's layer - the search is
-	    KFCRuns()->SearchBookOnLayer, its rows kept to that layer, and the tier's heading names it (LiveTierLabel).
-	    NOT GIVEN SINCE 2026-10-18 (the command moved into Narrow Down as On Active Layer): to go in a tidy-up. */
-	int32 Find(const PMString& label, PMString& outSummary, bool* outCommitted = nil, const PMString* onLayer = nil);
+	    the search went through. */
+	int32 Find(const PMString& label, PMString& outSummary, bool* outCommitted = nil);
 
 	/** NARROW DOWN (docs/superpowers/specs/2026-10-18-kfc-narrow-down-design.md - a tier heading's submenu): the live list's
 	    search run once more with its conditions and `step` (KFCRuns()->NarrowList) into a NEW list, carried as Find carries a

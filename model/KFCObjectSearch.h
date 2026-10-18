@@ -71,8 +71,6 @@ namespace KFCObjectSearch
 	void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBook, bool allDocuments,
 		int32 selectionScope, std::vector<KFCBookScope::SkippedChapter>& unopenable, KFCSearchEngine::CollectTally& out,
 		int32 reserved,			// rows the list holds before the walk - a search again's kept rows (the row eye); 0 otherwise
-		const PMString& layer,	// Find Objects on Active Layer: only what stands on each document's layer of this name
-								// (a document with none is named in out.unsearchable); empty = everything found
 		const KFCNarrow::Filter* narrow = nil);	// a narrowed list's conditions (Narrow Down): only the items that meet them,
 								// dropped before the list's limit counts them; nil = everything found
 
@@ -83,7 +81,6 @@ namespace KFCObjectSearch
 	    false = it broke off, or Cancel was pressed (outCancelled) - the rows are not to be used then. */
 	bool WalkOneDocument(const UIDRef& docRef, const PMString& name, size_t limit,
 		std::vector<KFCResultModel::Hit>& outHits, bool& outCapped, bool& outCancelled,
-		UID onLayer,	// the document's layer the rows are kept to (Find Objects on Active Layer); kInvalidUID = all
 		const KFCNarrow::Filter* narrow = nil);	// a narrowed list's conditions (CollectTargets'); nil = all
 
 	/** AN OBJECT ROW FOR AN ITEM (the object search's own BuildObjectHit - its text, its place, its fingerprint): what

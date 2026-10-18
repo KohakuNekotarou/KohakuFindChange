@@ -19,10 +19,10 @@
 #include "IDocumentUIUtils.h"	// FindPresentationForDocument (has-a-window test)
 #include "IOpenLayoutCmdData.h"	// GetResultingPresentation - did the window actually appear?
 #include "IWindow.h"			// the window kOpenLayoutCmdBoss is supposed to have produced
-#include "IConcreteSelection.h"	// GetSelectedPageItems - the layout selection's concrete selection
-#include "ILayoutHitTestSuite.h"	// ...reached through the active layout hit-test suite
+#include "IConcreteSelection.h"	// ReadSelectedItems - a selection's concrete selection
+#include "ILayoutHitTestSuite.h"	// ...reached through its layout hit-test suite
 #include "ILayoutTarget.h"		// GetUIDList(kStripStandoffs) - the selected page items
-#include "ISelectionUtils.h"	// QueryActiveLayoutHitTestSuite
+#include "ISelectionUtils.h"	// GetActiveSelection, QueryLayoutHitTestSuite
 #include "ISelectionManager.h"	// ActiveSelectionExists - SelectionExists by the CSB's class
 #include "TextEditorID.h"		// kTextSelectionBoss
 #include "IActiveContext.h"		// GetContextDocument - which document is in front (the background selections)
@@ -110,6 +110,25 @@ namespace
 			&& selectionManager->SelectionExists(csb, ISelectionManager::kAnySelection) != kFalse;
 	}
 
+	/** The page items a selection manager holds, standoffs stripped - how the SDK's snippets read a selection
+	    (SnpInspectLayoutModel.cpp: ILayoutTarget::GetUIDList(kStripStandoffs)), reached through the manager's layout
+	    hit-test suite's concrete selection (csxsdemo's VDActionComponent.cpp; KT measured it) - into outItems. False =
+	    no layout selection to read, outItems left as it was. The one reading of a selection's items here: the active
+	    selection's (GetSelectedPageItems) and each background document's (Snapshot / RestoreBackgroundSelections). */
+	bool ReadSelectedItems(ISelectionManager* manager, UIDList& outItems)
+	{
+		Utils<ISelectionUtils> selectionUtils;
+		if (manager == nil || !selectionUtils)
+			return false;
+		InterfacePtr<ILayoutHitTestSuite> hitSuite(selectionUtils->QueryLayoutHitTestSuite(manager));
+		InterfacePtr<IConcreteSelection> concrete(hitSuite, UseDefaultIID());
+		InterfacePtr<ILayoutTarget> target(concrete, UseDefaultIID());
+		if (target == nil)
+			return false;
+		outItems = target->GetUIDList(kStripStandoffs);
+		return true;
+	}
+
 	// ----- THE SELECTIONS OF THE DOCUMENTS BEHIND THE FRONT ONE (IKFCUIServices::SnapshotBackgroundSelections) -----
 
 	/** One document's selection as an object search found it: its page items, or nothing, or something else. */
@@ -139,21 +158,6 @@ namespace
 		return nil;
 	}
 
-	/** The page items a selection manager holds, standoffs stripped (GetSelectedPageItems' chain, for a given manager). */
-	UIDList SelectedItemsOf(ISelectionManager* manager, IDataBase* db)
-	{
-		UIDList items(db);
-		Utils<ISelectionUtils> selectionUtils;
-		if (manager == nil || !selectionUtils)
-			return items;
-		InterfacePtr<ILayoutHitTestSuite> hitSuite(selectionUtils->QueryLayoutHitTestSuite(manager));
-		InterfacePtr<IConcreteSelection> concrete(hitSuite, UseDefaultIID());
-		InterfacePtr<ILayoutTarget> target(concrete, UseDefaultIID());
-		if (target != nil)
-			items = target->GetUIDList(kStripStandoffs);
-		return items;
-	}
-
 	/** The front document's database - the active context's (IActiveContext::GetContextDocument, the one question KFC's UI
 	    half asks it with); nil with none. */
 	IDataBase* FrontDocDB()
@@ -163,19 +167,13 @@ namespace
 		return (doc != nil) ? ::GetDataBase(doc) : nil;
 	}
 
-	/** Is this database an open document's now? Compared, never dereferenced (a closed document's pointer dangles). */
+	/** Is this database an open document's now? Compared, never dereferenced (a closed document's pointer dangles): the
+	    document list's own comparison, IDocumentList::FindDocByDataBase - KFC's liveness test (KFCHitMarkerView.cpp). */
 	bool IsOpenDocDB(IDataBase* db)
 	{
 		InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
 		InterfacePtr<IDocumentList> docs((app != nil) ? app->QueryDocumentList() : nil);
-		const int32 count = (docs != nil) ? docs->GetDocCount() : 0;
-		for (int32 d = 0; d < count; ++d)
-		{
-			IDocument* const doc = docs->GetNthDoc(d);
-			if (doc != nil && ::GetDataBase(doc) == db)
-				return true;
-		}
-		return false;
+		return docs != nil && docs->FindDocByDataBase(db) != nil;
 	}
 }
 
@@ -266,20 +264,11 @@ public:
 
 	virtual bool GetSelectedPageItems(UIDList& outItems)
 	{
-		// The layout selection's items, standoffs stripped - how the SDK's snippets read a selection
-		// (SnpInspectLayoutModel.cpp: ILayoutTarget::GetUIDList(kStripStandoffs)) - reached from the active selection
-		// through its layout hit-test suite's concrete selection (csxsdemo's VDActionComponent.cpp; KT measured it).
+		// The active selection's items (ReadSelectedItems).
 		outItems.Clear();
 		Utils<ISelectionUtils> selectionUtils;
-		if (!selectionUtils.Exists())
-			return false;
-		InterfacePtr<ILayoutHitTestSuite> hitSuite(selectionUtils->QueryActiveLayoutHitTestSuite());
-		InterfacePtr<IConcreteSelection> concrete(hitSuite, UseDefaultIID());
-		InterfacePtr<ILayoutTarget> target(concrete, UseDefaultIID());
-		if (target == nil)
-			return false;
-		outItems = target->GetUIDList(kStripStandoffs);
-		return outItems.Length() > 0;
+		return selectionUtils.Exists() && ReadSelectedItems(selectionUtils->GetActiveSelection(), outItems)
+			&& outItems.Length() > 0;
 	}
 
 	virtual bool HasTextSelection()
@@ -339,7 +328,8 @@ public:
 				continue;		// no layout window: a walk selects nothing there to give back
 			BackSelection kept;
 			kept.db = db;
-			kept.items = SelectedItemsOf(manager, db);
+			kept.items = UIDList(db);
+			(void)ReadSelectedItems(manager, kept.items);
 			kept.other = kept.items.Length() == 0
 				&& manager->SelectionExists(kInvalidClass, ISelectionManager::kAnySelection) != kFalse;
 			gBackSelections.push_back(kept);
@@ -358,7 +348,8 @@ public:
 				continue;
 			// A selection is no change to the document - the guard is SelectItem's (KFCJump.cpp), for the same reason.
 			IDataBase::SaveRestoreModifiedState dirtyGuard(kept.db);
-			const UIDList now = SelectedItemsOf(manager, kept.db);
+			UIDList now(kept.db);
+			(void)ReadSelectedItems(manager, now);
 			if (kept.items.Length() > 0)
 			{
 				// THE ITEMS SELECTED THEN, selected again - the ones still there - when the walks changed them.

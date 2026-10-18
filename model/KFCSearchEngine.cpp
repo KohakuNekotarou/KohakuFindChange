@@ -3084,7 +3084,6 @@ namespace KFCSearchEngine
 		KFCBookScope::ChapterDoc	doc;			// Search: Document - the list's document, found open (when hasDoc)
 		bool					hasDoc;			// false = the front document, as Find searches (a search that found nothing)
 		PMString				bookPath;
-		PMString				layer;			// Find Objects on Active Layer's list: the layer it was searched on (else empty)
 		uint32					set;			// the list's result set: kept, so the tier stays where it stands (v2 R4)
 		std::vector<KFCNarrowStep>	narrow;	// the list's conditions (Narrow Down) - and a Narrow Down's new one after them
 		bool					newTier;	// NARROW DOWN: into a new list, the live one parked as a tier first, as Find parks it
@@ -3092,45 +3091,21 @@ namespace KFCSearchEngine
 		AgainTarget() : fromBook(false), allDocuments(false), hasDoc(false), set(0), newTier(false) {}
 	};
 
-	/** THE SEARCH'S ONE BODY - SearchBook's (again nil), SearchBookOnLayer's (onLayer), SearchListAgain's and NarrowList's:
+	/** THE SEARCH'S ONE BODY - SearchBook's (again nil), SearchListAgain's and NarrowList's:
 	    the same doors, the same walk, the same summary. A list searched again is not parked as a tier - it is the same one -
 	    and is put back as it was when the search does not go through. A Narrow Down's (again->newTier) is a new list, as
 	    Find's is: the list it narrows parked first; its rows are what again->narrow lets through (KFCNarrow::Filter).
-	    outCommitted = past the commit point, and not put back.
-	    onLayer: Find Objects on Active Layer's layer (nil otherwise - a list searched again brings its own, again->layer). */
-	int32 RunSearch(const AgainTarget* again, PMString& outSummary, bool& outCommitted, const PMString* onLayer);
-
-	/** " on layer "Images"" - what a summary says of Find Objects on Active Layer's layer; nothing for no layer. */
-	void AppendLayerWords(PMString& out, const PMString& layer)
-	{
-		if (layer.IsEmpty())
-			return;
-		out.Append(" on layer \"");
-		out.Append(layer);
-		out.Append("\"");
-	}
+	    outCommitted = past the commit point, and not put back. */
+	int32 RunSearch(const AgainTarget* again, PMString& outSummary, bool& outCommitted);
 }
 
 int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 {
 	bool committed = false;
-	return RunSearch(nil, outSummary, committed, nil);
+	return RunSearch(nil, outSummary, committed);
 }
 
-int32 KFCSearchEngine::SearchBookOnLayer(const PMString& layer, PMString& outSummary)
-{
-	bool committed = false;
-	if (layer.IsEmpty())
-	{
-		outSummary.Clear();
-		outSummary.SetTranslatable(kFalse);
-		outSummary.Append("Find Objects on Active Layer: no layer is active in the Layers panel - open a document.");
-		return 0;
-	}
-	return RunSearch(nil, outSummary, committed, &layer);
-}
-
-int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary, bool& outCommitted, const PMString* onLayer)
+int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary, bool& outCommitted)
 {
 	outCommitted = false;
 	outSummary.Clear();
@@ -3204,26 +3179,6 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 		return 0;
 	}
 	const bool objectTab = (tab == IFindChangeOptions::kObjectSearch);	// the Object tab - KFCObjectSearch
-
-	// FIND OBJECTS ON ACTIVE LAYER'S LAYER (the spec's E14) - the command's, or the list's own when it is searched again: its
-	// rows are page items on a layer, which only the Object tab lists. The menu greys the command on the other tabs; this
-	// stays for a caller that never opened the menu, as the Colour tab's refusal above does.
-	PMString layer;
-	layer.SetTranslatable(kFalse);
-	if (again != nil)
-		layer = again->layer;
-	else if (onLayer != nil)
-		layer = *onLayer;
-	layer.SetTranslatable(kFalse);
-	if (!layer.IsEmpty() && !objectTab)
-	{
-		outSummary.Append("Find Objects on Active Layer searches the Object tab - the Find/Change dialog is on the ");
-		PMString tabName(KFCSearchEngine::TabName(tab));
-		tabName.SetTranslatable(kFalse);
-		outSummary.Append(tabName);
-		outSummary.Append(" tab.");
-		return 0;
-	}
 
 	// Transliterate - the CJK character-type conversion (Kanji / kana / half- and full-width) - is
 	// walked like any other text tab (the author's call: whatever the official panel is set to, this
@@ -3460,9 +3415,6 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 		: (selectionScope == IWalkerScopeFactoryUtils::kToEndOfStoryScope) ? KFCResultModel::kScopeToEndOfStory
 		: (selectionScope == IWalkerScopeFactoryUtils::kSelectionScope) ? KFCResultModel::kScopeSelection
 		: KFCResultModel::kScopeDocument);
-	// ...and the layer it kept to (Find Objects on Active Layer - empty for every other search), for the same reason: the
-	// list's searches again search that layer, and its tier's heading names it.
-	KFCResultModel::SetSearchLayer(layer);
 	// ...and a narrowed list's conditions (Narrow Down - the spec's N4: its searches again search with them, its tier's heading
 	// names them) - empty for every other search.
 	KFCResultModel::SetNarrowSteps((again != nil) ? again->narrow : std::vector<KFCNarrowStep>());
@@ -3528,7 +3480,7 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 		const WalkFilterScope walkFilter(narrowFilter);
 		if (objectTab)		// THE OBJECT TAB: page items, walked by InDesign's own object search one document at a time.
 			KFCObjectSearch::CollectTargets(targets, fromBook, allDocuments, static_cast<int32>(selectionScope), unopenable, tally,
-				reserved, layer, narrowFilter.Empty() ? nil : &narrowFilter);
+				reserved, narrowFilter.Empty() ? nil : &narrowFilter);
 		else
 			CollectTargets(targets, fromBook, allDocuments, selectionScope, unopenable, tally, reserved);
 	}
@@ -3615,7 +3567,6 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	if (tally.total == 0)
 	{
 		outSummary.Append("No matches");
-		AppendLayerWords(outSummary, layer);	// Find Objects on Active Layer: " on layer "Images"" (nothing otherwise)
 		if (fromBook && selection.selected > 0)
 		{
 			// the selected documents were all that was looked at (Find/Change Selected Documents (Book))
@@ -3661,7 +3612,6 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	// still name what was searched - there is no tree under it to read.
 	outSummary.AppendNumber(tally.total);
 	outSummary.Append(narrowFilter.MakesFrames() ? " frame(s)" : " hit(s)");	// (a Frames of These Matches list's rows are frames)
-	AppendLayerWords(outSummary, layer);		// Find Objects on Active Layer: " on layer "Images"" (nothing otherwise)
 	if (fromBook && selection.selected > 0)
 	{
 		// "in M of S selected document(s) (T in the book)" (the query dialog's spec, section 4-4): M held a hit, S were
@@ -4672,7 +4622,7 @@ bool SearchPartsAgain(const PMString& lead, PMString& outStatus, const KFCSearch
 	}
 	// NARROW DOWN: what the walks found filed as a NEW list. What goes on it is read off the list it narrows before that is
 	// parked - each document's searched story or parts (recorded where they were walked, at the version walked at), its
-	// scope, its layer, its query copy; then the list parked as Find parks it (KFCTierStore::ParkCurrent - its rows' foci go
+	// scope, its query copy; then the list parked as Find parks it (KFCTierStore::ParkCurrent - its rows' foci go
 	// with it), its documents handed back, the list dropped (a new result set), and the new list's header written as the
 	// search writes it - its mode, its walk's key and its Find Format read under the door that stated its query, as the
 	// search reads them - its conditions after them. No row with its eye on comes along (N9).
@@ -4705,15 +4655,12 @@ bool SearchPartsAgain(const PMString& lead, PMString& outStatus, const KFCSearch
 				made[k].ranges[part.story] = part.record;
 			}
 		}
-		PMString layer(KFCResultModel::GetSearchLayer());
-		layer.SetTranslatable(kFalse);
 		const std::shared_ptr<const KFCQueryCopy> copy(KFCResultModel::GetQueryCopy());
 		KFCTierStore::ParkCurrent();
 		KFCBookScope::ReleaseHeldDocs(true /*close now*/);
 		KFCSearchEngine::DropResults();
 		KFCResultModel::SetFromBook(false);
 		KFCResultModel::SetSearchScope(scope);
-		KFCResultModel::SetSearchLayer(layer);
 		KFCResultModel::SetNarrowSteps(again.narrow);
 		KFCResultModel::NoteRun();
 		KFCResultModel::SetBookName(PMString());
@@ -4990,23 +4937,6 @@ bool KFCSearchEngine::SearchDocumentAgain(int32 chapterIdx, PMString& outStatus)
 	}
 	KFCResultModel::RebindChapterDoc(chapterIdx, docRef);
 	const bool ours = KFCBookScope::IsHeldDoc(docRef);
-	// FIND OBJECTS ON ACTIVE LAYER'S LIST: the same layer again - this document's layer of the name; refused (the rows left
-	// as they are) when it has none now. (A chapter of ours goes back on the way out.)
-	UID onLayer = kInvalidUID;
-	const PMString layer(KFCResultModel::GetSearchLayer());
-	if (!layer.IsEmpty() && KFCResultModel::GetSearchMode() == IFindChangeOptions::kObjectSearch)
-	{
-		onLayer = KFCPageItemFacts::DocLayerNamed(docRef, layer);
-		if (onLayer == kInvalidUID)
-		{
-			if (ours)
-				(void)KFCBookScope::HandBackHeldDocNow(docRef);
-			outStatus.Append("the document has no layer named \"");
-			outStatus.Append(layer);
-			outStatus.Append("\" now - the rows are left as they were.");
-			return false;
-		}
-	}
 	// The rows - the kept ones too (the row eye) - where their foci stand now: a kept row the walk does not find again
 	// stays at that place (MergeKeptRows).
 	FollowChapterFoci(chapterIdx);
@@ -5025,7 +4955,7 @@ bool KFCSearchEngine::SearchDocumentAgain(int32 chapterIdx, PMString& outStatus)
 		const KFCNarrow::Filter narrowFilter(KFCResultModel::GetNarrowSteps());
 		const WalkFilterScope walkFilter(narrowFilter);
 		if (KFCResultModel::GetSearchMode() == IFindChangeOptions::kObjectSearch)
-			walked = KFCObjectSearch::WalkOneDocument(docRef, name, limit, hits, capped, cancelled, onLayer,
+			walked = KFCObjectSearch::WalkOneDocument(docRef, name, limit, hits, capped, cancelled,
 				narrowFilter.Empty() ? nil : &narrowFilter);
 		else
 		{
@@ -5205,7 +5135,6 @@ bool SearchListOnceMore(const KFCNarrowStep* step, PMString& outStatus)
 	}
 	KFCSearchEngine::AgainTarget again;
 	again.set = KFCResultModel::GetResultSetId();
-	again.layer = KFCResultModel::GetSearchLayer();		// Find Objects on Active Layer's list: the same layer again
 	again.narrow = KFCResultModel::GetNarrowSteps();	// a narrowed list's conditions - searched with again (N4)
 	if (step != nil)
 	{
@@ -5289,7 +5218,7 @@ bool SearchListOnceMore(const KFCNarrowStep* step, PMString& outStatus)
 		}
 	}
 	bool committed = false;
-	(void)KFCSearchEngine::RunSearch(&again, outStatus, committed, nil);
+	(void)KFCSearchEngine::RunSearch(&again, outStatus, committed);
 	return committed;
 }
 }	// anonymous namespace

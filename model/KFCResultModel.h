@@ -371,12 +371,6 @@ namespace KFCResultModel
 	void SetSearchScope(SearchScopeKind scope);
 	SearchScopeKind GetSearchScope();
 
-	/** THE LAYER THESE RESULTS WERE SEARCHED ON (Find Objects on Active Layer - the spec's E14): its name, each document's
-	    layer of that name - empty for every other search. Kept with the list as its Search: is, so a search again
-	    searches the same layer and a tier's heading names it; recorded beside SetSearchScope, after the commit point. */
-	void SetSearchLayer(const PMString& layer);
-	PMString GetSearchLayer();
-
 	/** A NARROWED LIST'S STEPS (Narrow Down - the spec's N4, N5): its conditions in the order they were taken - kept with the
 	    list as its Search: is, so a tier's heading names them and its search again searches with them; recorded beside
 	    SetSearchScope, after the commit point. Empty for every list no Narrow Down made. */
@@ -1015,7 +1009,6 @@ namespace KFCResultModel
 	{
 		bool			fromBook;		// SetFromBook
 		SearchScopeKind	searchScope;	// SetSearchScope
-		PMString		searchLayer;	// SetSearchLayer - empty but for Find Objects on Active Layer's list
 		std::vector<KFCNarrowStep>	narrow;	// SetNarrowSteps - a Narrow Down's conditions, in order (empty for any other list)
 		PMString		bookName;		// SetBookName
 		int32			searchMode;		// SetSearchMode (-1 = nothing searched yet)

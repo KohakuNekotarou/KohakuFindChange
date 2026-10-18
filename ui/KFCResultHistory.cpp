@@ -386,7 +386,7 @@ namespace
 	}
 }	// anonymous namespace
 
-int32 KFCResultHistory::Find(const PMString& label, PMString& outSummary, bool* outCommitted, const PMString* onLayer)
+int32 KFCResultHistory::Find(const PMString& label, PMString& outSummary, bool* outCommitted)
 {
 	if (outCommitted != nil)
 		*outCommitted = false;
@@ -405,8 +405,7 @@ int32 KFCResultHistory::Find(const PMString& label, PMString& outSummary, bool* 
 	const int titleBefore = KFCDiagCounter(kKFCDiagTitleRecomputes);
 	const int mirrorBefore = KFCDiagCounter(kKFCDiagFieldMirrors);
 #endif
-	const int32 found = (onLayer != nil) ? KFCRuns()->SearchBookOnLayer(*onLayer, outSummary)		// Find Objects on Active Layer
-		: KFCRuns()->SearchBook(outSummary);
+	const int32 found = KFCRuns()->SearchBook(outSummary);
 #ifdef KFC_DIAG
 	KFC_DIAG_LOG("UIOBS search title=%d mirror=%d", KFCDiagCounter(kKFCDiagTitleRecomputes) - titleBefore,
 		KFCDiagCounter(kKFCDiagFieldMirrors) - mirrorBefore);
@@ -536,9 +535,7 @@ namespace
 	// "[Text/Story]", the query dialog's "1  [GREP]" "1  [GREP/Book]". DRAWN, NOT KEPT IN THE NAME: the name is what a row
 	// operation reads the query against (QueryReadsAsTier - QueryLabel made again from Find/Change), and Search: is not part
 	// of the query stated back. A name with no brackets ("Results") is drawn as it is.
-	// ...AND THE LAYER Find Objects on Active Layer kept the list to (the spec's E14): "[Object/Document/Layer: Images]" -
-	// drawn as Search: is, for its reason (not part of the query the name is read against). Empty for every other list.
-	PMString WithScope(const PMString& name, KFCResultModel::SearchScopeKind scope, const PMString& layer)
+	PMString WithScope(const PMString& name, KFCResultModel::SearchScopeKind scope)
 	{
 		PMString out(name);
 		out.SetTranslatable(kFalse);
@@ -560,11 +557,6 @@ namespace
 		PMString scoped("/");
 		scoped.SetTranslatable(kFalse);
 		scoped.Append(words);
-		if (!layer.IsEmpty())
-		{
-			scoped.Append("/Layer: ");
-			scoped.Append(layer);
-		}
 		out.Insert(scoped, close);
 		return out;
 	}
@@ -644,11 +636,7 @@ PMString KFCResultHistory::LiveTierLabel()
 	PMString label("Results");
 	label.SetTranslatable(kFalse);
 	if (gLive.set != 0 && gLive.set == KFCResults()->GetResultSetId() && !gLive.label.IsEmpty())
-	{
-		PMString layer;
-		KFCResults()->GetSearchLayer(layer);	// Find Objects on Active Layer's (empty for any other list)
-		label = WithScope(gLive.label, KFCResults()->GetSearchScope(), layer);	// "[Text/Story] ..." - the list's own Search:
-	}
+		label = WithScope(gLive.label, KFCResults()->GetSearchScope());	// "[Text/Story] ..." - the list's own Search:
 	// A NARROWED LIST'S CONDITIONS, after the name - drawn for Search:'s reason (the narrow-down spec's N4: "[Text/Book]
 	// F:"cat" C:"dog" / In Tables / Pages 1-5").
 	PMString narrow;

@@ -50,8 +50,8 @@ namespace KFCPageItemFacts
 	    cannot be told (an inline in overset text). */
 	UID DocLayerOf(IDataBase* db, UID item);
 
-	/** A document's layer of that name - the one ILayerList::FindByName finds (Move to Active Layer's, and Find Objects on
-	    Active Layer's in each document). kInvalidUID = none, or no name. */
+	/** A document's layer of that name - the one ILayerList::FindByName finds (Move to Active Layer's, and Narrow Down's
+	    On Active Layer's in each document). kInvalidUID = none, or no name. */
 	UID DocLayerNamed(const UIDRef& docRef, const PMString& name);
 }
 

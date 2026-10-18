@@ -34,6 +34,7 @@
 #include "IKFCChapters.h"
 #include "IKFCResults.h"
 #include "IKFCRuns.h"
+#include "KFCBoundaryID.h"	// IID_IKFCRESULTS / IID_IKFCRUNS / IID_IKFCCHAPTERS - each spelled here alone
 #include "KFCModelTypes.h"
 
 /** Is the model half that is loaded the one this UI half was built with? Asked once a session (KFCModelAccess.cpp). */

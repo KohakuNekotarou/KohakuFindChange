@@ -16,7 +16,7 @@
 #include "ISubject.h"
 
 // Project includes:
-#include "KFCID.h"
+#include "KFCBoundaryID.h"		// kKFCModelChangedMessage, IID_IKFCMODELOBSERVER
 #include "KFCModelNotify.h"
 #include "KFCModelTypes.h"		// KFCNotifyPayload
 

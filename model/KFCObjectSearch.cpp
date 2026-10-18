@@ -237,15 +237,12 @@ UID SpreadOf(const UIDRef& item)
 // InDesign to initialise it from Search: itself (kTrue), which takes the caret's frame (measured: the plan's Task 1 M6),
 // and the steps after it go on "as is". Only for the front document, whose selection that is.
 // bar / barBase: the run's bar and this document's slice of it - moved and asked at every item listed (DocProgress).
-// onLayer (Find Objects on Active Layer - the spec's E14): the document's layer the rows are kept to - each match
-// InDesign's search finds is listed only when it stands on that layer (KFCPageItemFacts::DocLayerOf: a group's member on
-// its group's, an item in text on its anchor frame's); kInvalidUID = every match. The matching stays InDesign's own: the
-// walk is the same, and only what it lists is narrowed.
-// narrow (Narrow Down - the spec's N3): a narrowed list's conditions - an item that does not meet them is passed over as
-// one off the layer is, before the list's limit counts it; nil = every match.
+// narrow (Narrow Down - the spec's N3): a narrowed list's conditions - an item that does not meet them is passed over
+// before the list's limit counts it; nil = every match. The matching stays InDesign's own: the walk is the same, and
+// only what it lists is narrowed.
 WalkEnd WalkDoc(IFindChangeService* svc, IObjectWalker* shared, const UIDRef& docRef, const UIDList* items, size_t limit,
 	std::vector<KFCResultModel::Hit>& outHits, bool& outCapped, bool fromSearchScope, KFCProgressBar& bar, int32 barBase,
-	UID onLayer, const KFCNarrow::Filter* narrow, int32 barSpan = kDocSpan)
+	const KFCNarrow::Filter* narrow, int32 barSpan = kDocSpan)
 {
 	IDataBase* const db = docRef.GetDataBase();
 	if (db == nil || svc == nil || shared == nil)
@@ -289,17 +286,9 @@ WalkEnd WalkDoc(IFindChangeService* svc, IObjectWalker* shared, const UIDRef& do
 			return kWalkBroke;
 		if (!seen.insert(current.GetUID()).second)
 			return kWalkDone;
-		// NOT ON THE LAYER (onLayer): passed over - still moving the bar and asking Cancel, as a listed item does, so a
-		// document whose matches stand mostly elsewhere can still be cancelled while it is walked.
-		if (onLayer != kInvalidUID && KFCPageItemFacts::DocLayerOf(db, current.GetUID()) != onLayer)
-		{
-			progress.Listed(SpreadOf(current));
-			if (bar.WasCancelled(kFalse) != kFalse)
-				return kWalkCancelled;
-			continue;
-		}
-		// NOT MEETING A NARROWED LIST'S CONDITIONS (narrow): built to be asked, then passed over as an item off the layer is -
-		// the limit below counts only the rows that pass.
+		// NOT MEETING A NARROWED LIST'S CONDITIONS (narrow): built to be asked, then passed over - still moving the bar and
+		// asking Cancel, as a listed item does, so a document whose matches mostly fail them can still be cancelled while it
+		// is walked. The limit below counts only the rows that pass.
 		KFCResultModel::Hit hit;
 		const bool built = (narrow != nil);
 		if (built)
@@ -914,7 +903,7 @@ bool KFCObjectSearch::ReadItemPlace(const UIDRef& docRef, UID item, KFCResultMod
 
 void KFCObjectSearch::CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBook, bool allDocuments,
 	int32 selectionScope, std::vector<KFCBookScope::SkippedChapter>& unopenable, KFCSearchEngine::CollectTally& out,
-	int32 reserved, const PMString& layer, const KFCNarrow::Filter* narrow)
+	int32 reserved, const KFCNarrow::Filter* narrow)
 {
 	out = KFCSearchEngine::CollectTally();
 	InterfacePtr<IFindChangeService> svc(CreateFindChangeService());
@@ -981,29 +970,10 @@ void KFCObjectSearch::CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targ
 			if (fromBook && targets[i].docRef == UIDRef::gNull && !KFCBookScope::OpenChapterDoc(targets[i], &unopenable))
 				continue;
 			const UIDRef docRef = targets[i].docRef;
-			// FIND OBJECTS ON ACTIVE LAYER (the spec's E14): this document's layer of the name - one without it is not
-			// searched, and is named ("<name>: no layer named "Images""), as a target never searched always is.
-			UID onLayer = kInvalidUID;
-			if (!layer.IsEmpty())
-			{
-				onLayer = KFCPageItemFacts::DocLayerNamed(docRef, layer);
-				if (onLayer == kInvalidUID)
-				{
-					PMString note(targets[i].shortName);
-					note.SetTranslatable(kFalse);
-					note.Append(": no layer named \"");
-					note.Append(layer);
-					note.Append("\"");
-					out.unsearchable.push_back(note);
-					if (fromBook && !KFCBookScope::HandBackHeldDocNow(docRef))
-						out.unclosed.push_back(targets[i].shortName);
-					continue;
-				}
-			}
 			std::vector<KFCResultModel::Hit> hits;
 			bool capped = false;
 			const WalkEnd end = WalkDoc(svc, shared, docRef, items, limit - static_cast<size_t>(out.total), hits, capped,
-				fromSearchScope, bar, barBase, onLayer, narrow, shares[i + 1] - barBase);
+				fromSearchScope, bar, barBase, narrow, shares[i + 1] - barBase);
 			// A book's chapter goes back now, closed on the spot (the text search's reason: one chapter of ours at a time).
 			if (fromBook && !KFCBookScope::HandBackHeldDocNow(docRef))
 				out.unclosed.push_back(targets[i].shortName);
@@ -1030,7 +1000,7 @@ void KFCObjectSearch::CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targ
 }
 
 bool KFCObjectSearch::WalkOneDocument(const UIDRef& docRef, const PMString& name, size_t limit,
-	std::vector<KFCResultModel::Hit>& outHits, bool& outCapped, bool& outCancelled, UID onLayer, const KFCNarrow::Filter* narrow)
+	std::vector<KFCResultModel::Hit>& outHits, bool& outCapped, bool& outCancelled, const KFCNarrow::Filter* narrow)
 {
 	outHits.clear();
 	outCapped = false;
@@ -1050,7 +1020,7 @@ bool KFCObjectSearch::WalkOneDocument(const UIDRef& docRef, const PMString& name
 		bar.SetPosition(0);
 		// The whole document, from the top - Search: as the search had it is a whole document's (the caller refuses one
 		// over part of a document).
-		end = WalkDoc(svc, shared, docRef, nil, limit, outHits, outCapped, false, bar, 0, onLayer, narrow);
+		end = WalkDoc(svc, shared, docRef, nil, limit, outHits, outCapped, false, bar, 0, narrow);
 		if (end == kWalkDone && bar.WasCancelled(kFalse))
 			end = kWalkCancelled;
 		bar.SetPosition(kDocSpan);

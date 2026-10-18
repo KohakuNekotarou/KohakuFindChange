@@ -10,9 +10,6 @@
 
 #include "VCPlugInHeaders.h"
 
-// Interface includes:
-#include "ISession.h"
-
 // Project includes:
 #include "IKFCUIServices.h"
 #include "KFCProgressBar.h"
