@@ -818,7 +818,7 @@ void KFCActionComponent::DoAbout()
 	CAlert::ModalAlert
 	(
 		// The About box is the plug-in's name and version, the same in every UI language (the author's call) - as is
-		// everything from the string table; only the How to Use page's body is switched (KFCLoc::JapaneseUI). The
+		// everything from the string table; only the How to Use page's body is switched (KFCHowTo::Show). The
 		// name and the version are not words - translating them would be translating an identifier.
 		//
 		// The KEY goes in as a key, and the alert translates it: CAlert.h:70 says the message

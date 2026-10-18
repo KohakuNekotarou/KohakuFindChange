@@ -27,13 +27,14 @@
 // General includes:
 #include "CAlert.h"
 #include "PMString.h"
+#include "LocaleSetting.h"			// which language to show
+#include "PMLocaleIds.h"			// k_jaJP
 
 #include <string>
 #include <cstdio>
 
 // Project includes:
 #include "KFCHowTo.h"
-#include "KFCLoc.h"					// JapaneseUI - the one place "is the UI Japanese" is asked
 
 namespace
 {
@@ -177,9 +178,11 @@ void AppendJSEscaped(std::string& out, const wchar_t* text)
 
 void KFCHowTo::Show()
 {
-	// Japanese InDesign gets the Japanese reference, everything else the English one - asked through
-	// KFCLoc::JapaneseUI (see the header).
-	const wchar_t* const text = KFCLoc::JapaneseUI() ? kHowToJA : kHowToEN;
+	// Japanese InDesign gets the Japanese reference, everything else the English one - the one thing KFC switches by
+	// UI language (the string tables are English in every UI language - model/KFC.fr's LocaleIndex note). What is
+	// asked is the UI LANGUAGE, not the featureset (PMLocaleId keeps them as separate axes - PMLocaleId.h:39-43): a
+	// Roman-engine install running a Japanese UI gets the Japanese page.
+	const wchar_t* const text = (LocaleSetting::GetLocale().GetUserInterfaceId() == k_jaJP) ? kHowToJA : kHowToEN;
 
 	Utils<IExtendScriptUtils> esUtils;
 	if (esUtils.Exists())

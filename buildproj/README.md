@@ -22,7 +22,7 @@ declares a `PluginDependency` on the model half, never the other way round.
 - `KohakuFindChangeUI.vcxproj` / `.vcxproj.filters` — the UI half's MSVC project.
 - `KohakuFindChangeUICPP.rsp` / `KohakuFindChangeUIODFRC.rsp` — its response files. The C++ one adds
   `/I ..\..\..\source\sdksamples\KFC\model`: the UI includes the headers the halves share
-  (`KFCBoundaryID.h`, `KFCModelTypes.h`, `KFCLoc.h`, `IKFC*.h`), which live in `model/` and nowhere else.
+  (`KFCBoundaryID.h`, `KFCModelTypes.h` and `IKFC*.h` among them), which live in `model/` and nowhere else.
 - The four `.sdk.props` per project (`KFC*.sdk.props`, `KFCUI*.sdk.props`) are NOT kept: they are the
   DollyXs boilerplate, identical between projects.
 

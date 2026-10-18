@@ -615,7 +615,7 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 #define kKFCTransformSubmenuKey				kKFCStringPrefix "kKFCTransformSubmenuKey"
 // "How to Use...": the operating reference. English in every UI language, like the rest of the
 // flyout - there is one string table, and the one thing switched to Japanese at run time is this page's
-// body (KFCLoc::JapaneseUI).
+// body (KFCHowTo::Show).
 // The BODY of the reference is not here at all: it lives in KFCHowTo.cpp, because odfrc caps a single
 // string at about 3.1KB and this text is several times that.
 #define kKFCHowToMenuKey				kKFCStringPrefix "kKFCHowToMenuKey"
