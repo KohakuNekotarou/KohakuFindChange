@@ -51,8 +51,8 @@
 //    - Book Scope: which scope the NEXT run uses. That is the question being worked on right
 //      now, not a preference, and it is already written on the panel's own tab where it can be seen.
 //    - The kept tiers (KFCResultHistory): work state. Whether a Find keeps them is no setting either - it always does
-//      (the author's call, 10-14). The toggle that set it went the same day; its key, "keepPreviousResults", is read
-//      by nothing, so a file written while it stood reads as if the key were not there.
+//      (the author's call). The toggle that once set it is gone; its key, "keepPreviousResults", is read by nothing,
+//      so a file written while it stood reads as if the key were not there.
 //
 //========================================================================================
 

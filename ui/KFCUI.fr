@@ -1256,9 +1256,9 @@ resource ActionDef (kSDKDefActionResourceID)
 		// the settings down, which is possible with nothing loaded and no results.
 		// !Without kCustomEnabling this action never reaches UpdateActionStates at all, so the blanket
 		// disable at the top of that method does NOT cover it - the hook completes the enabling only
-		// for actions that ask for it (ActionDefs.h:40). It changes nothing in practice: a run's
-		// progress bar is modal, so the flyout cannot be opened while one is going (measured on the
-		// running panel).
+		// for actions that ask for it (ActionDefs.h:40). A run's progress bar is modal, so the flyout
+		// cannot be opened while one is going (measured); the stand-in for a model half of another build
+		// answers "a run standing" for good - KFCSavePanelState asks the run door itself, which says why.
 		kKFCActionComponentBoss,
 		kKFCSavePanelSettingsActionID,
 		kKFCSavePanelSettingsMenuKey,	// "Save Panel Settings"
@@ -2050,9 +2050,9 @@ resource KFCPanelWidget(kSDKDefPanelResourceID + index_enUS)
 		 * hanging off the top of a part-empty message box reads as detached from it. The two share a
 		 * bottom edge, and that is the whole of why the top is what it is.
 		 *
-		 * THREE of them, STACKED at one frame: the plain cat until something has been run, the
-		 * searching cat once it has, and the changing cat once a replace has written something.
-		 * KFCPanelIcon owns which - it is the only place that names them, so a fourth picture is a
+		 * THE PICTURES, STACKED at one frame: the plain cat until something has been run, the
+		 * searching cat once it has, and the changing cat once a Change All has written something.
+		 * KFCPanelIcon owns which - it is the only place that names them, so another picture is a
 		 * widget here and a row there. All but the first come up HIDDEN; KFCPanelIcon writes the real
 		 * answer when the panel appears, because these widgets are rebuilt on every show and a
 		 * default written here would otherwise outrank the actual state.

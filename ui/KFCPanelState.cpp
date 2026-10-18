@@ -575,7 +575,7 @@ void KFCSavePanelState()
 	pairs.push_back(KFCJsonPair("minimizableFindChange", KFCBoolLiteral(KFCGetFindChangeMinimizable())));
 	pairs.push_back(KFCJsonPair("appBarSearchEnter",     KFCBoolLiteral(KFCGetAppBarSearchEnter())));
 	pairs.push_back(KFCJsonPair("hidePreviousChapter",   KFCBoolLiteral(KFCJump::IsHidePreviousChapterOn())));
-	// Find/Change Selected Documents (Book) (the query dialog's spec, G10: kept, the author's call - unlike Book Scope).
+	// Find/Change Selected Documents (Book): kept (the author's call - unlike Book Scope).
 	{
 		InterfacePtr<IKFCChapters> chapters(KFCChapters());
 		pairs.push_back(KFCJsonPair("selectedDocuments",
