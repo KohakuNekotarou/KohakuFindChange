@@ -6,9 +6,9 @@
 //
 //  "A document has been saved as another file" (kAfterSaveAsDocSignalRespServiceImpl, KFC.fr): the rows of a
 //  document-scope list take the document's new name there and then (the author's call - the spec map's LIFE-14).
-//  The rows always followed the document itself - its UIDRef, and a Save As keeps the database - but showed
+//  The rows follow the document itself - its UIDRef, and a Save As keeps the database - so without this they would show
 //  the name the search read: with B.indd saved as C.indd and B.indd's file opened again, the row "B.indd" wrote into
-//  C.indd, the right document under the wrong name (measured before this responder - case ad-saveas-reopen-replace).
+//  C.indd, the right document under the wrong name (measured without this responder - case ad-saveas-reopen-replace).
 //  A book's list keeps its names: its rows stand for the book's chapters (KFCResultModel::RenameDocumentChapters).
 //  The kept tiers' lists take the name as well (KFCTierStore::RenameDocument), and the lists kept for a query run's
 //  Undo (KFCUndoFollow::RenameDocument) - a switch back or an Undo does not bring the old name back.

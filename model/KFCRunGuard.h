@@ -38,9 +38,17 @@
 //    * the panel's actions (KFCActionComponent, the UI half - through IKFCRuns): UpdateActionStates
 //      greys out every kCustomEnabling one, and RefusedWhileRunning turns away a command that arrives anyway
 //      (Save Panel Settings, which no grey reaches, asks it first);
-//    * each engine's own front door (KFCSearchEngine, KFCReplaceEngine, KFCChangeAll - Clear Results
-//      too - and KFCQuerySequence), for a caller that never went through the menu - a script firing an
-//      action by ID reaches the engine whatever the menu says;
+//    * each engine's own front door (KFCSearchEngine - a search, the walks again, Search These Results Again and
+//      Narrow Down; KFCReplaceEngine's Restore from Copy and a text row's Create Outlines; KFCObjectOutline and
+//      KFCObjectSpecial - an object row's Create Outlines and Special Operations; KFCChangeAll - Clear Results too -
+//      and KFCQuerySequence), for a caller that never went through the menu - a script firing an action by ID reaches
+//      the engine whatever the menu says (a row's Replace has no door of its own in the engine: every way to it comes
+//      through the list's, RefusedWhileRunning - below);
+//    * the tiers' doors (KFCTierStore::SwitchTo, DropTier), which would otherwise put a kept list back, or drop a
+//      tier - the live list among them - under a run that is filling the list;
+//    * the list's query, stated into Find/Change for a row's operation and for a GREP row's preview (KFCQueryScope),
+//      and that preview itself (KFCReplaceEngine::PreviewHit - it writes the row and takes it back), which would
+//      otherwise rewrite Find/Change, or write a story, under a run;
 //    * the book-close watcher (KFCBookWatch's RetireMustWait, asked by the deferred callback and by the
 //      question itself - which the no-timer fallback asks directly), whose question would otherwise release
 //      the chapters a run is walking;
@@ -50,16 +58,18 @@
 //      run (it binds them itself);
 //    * the Save As responder (KFCSaveAsDocResponder), which leaves the list's names to the run that owns the list;
 //    * the Undo follow (KFCUndoFollow.cpp's Follow), which would otherwise put rows back under a run;
-//    * the query dialog's double click (KFCQueryDialogShowInFindChange, the UI half - through IKFCRuns),
-//      which would otherwise load a query into Find/Change while a query run is putting its own there;
-//    * a row's landing (KFCJump::ActivateNode, the UI half - through IKFCRuns), whose Hide Previous Chapter sweep
-//      would otherwise schedule the close of a chapter a Replace is about to write;
+//    * the query dialog's double click and its Find (KFCQueryDialogShowInFindChange, PressFind in KFCQueryDialog.cpp -
+//      the UI half, through IKFCRuns), which would otherwise load a query into Find/Change while a query run is putting
+//      its own there;
+//    * a row's landing (KFCJump::ActivateNode, the UI half - through IKFCRuns), whose Hide Previous Chapter sweep would
+//      otherwise schedule the close of a chapter a run is walking or a write from the list is about to write;
 //    * the result list's own doors (the UI half - through IKFCRuns): a row's Replace - from Return as well as the
-//      menu - and Search This Story / Document Again (KFCResultTree::ReplaceRows and SearchAgain, through
-//      RefusedWhileRunning), which would otherwise write a row, or walk a story or a document again, under a
-//      run; a click's press (KFCResultTreeController::ProcessSelectionRules) and the keys that move the selection
-//      (MoveUnderWay in KFCResultTreeEH.cpp), which would otherwise select a row whose landing is turned away -
-//      the page left on the row before, and the next Return writing a row the page does not show;
+//      menu - the other writes from the list (Create Outlines, Restore from Copy, the Special Operations),
+//      Clear from Results and Search This Story / Document Again (KFCResultTree::ReplaceRows, WriteRowsInPlace,
+//      ClearRows and SearchAgain, through RefusedWhileRunning), which would otherwise write, take out or walk again
+//      rows under a run; a click's press (KFCResultTreeController::ProcessSelectionRules) and the keys that move the
+//      selection (MoveUnderWay in KFCResultTreeEH.cpp), which would otherwise select a row whose landing is turned
+//      away - the page left on the row before, and the next Return writing a row the page does not show;
 //    * a test build's hidden-document check (KFCDiagHiddenDocs, the UI half), which leaves the chapter a
 //      run is walking to the run.
 //

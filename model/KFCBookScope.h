@@ -68,11 +68,10 @@ namespace KFCBookScope
 	    Session state only - every launch starts OFF, like KESCL's "Search book" toggle. */
 	bool IsBookScopeOn();
 
-	/** Flip the scope. JUST THE FLAG: nothing is closed and no result is cleared here (KESCL
-	    learned this the hard way - closing the held chapters inside the toggle crashed). The held
-	    windowless chapters are released when the results are next thrown away (ReleaseSearchedBook -
-	    a search of either scope, a query run, a Change All, Clear Results), or when their book is closed, and a jump
-	    into a chapter the user closed since reopens it through ReopenChapterDoc. */
+	/** Flip the scope. JUST THE FLAG: nothing is closed and no result is cleared here (KESCL learned this the hard
+	    way - closing the held chapters inside the toggle crashed). The held windowless chapters are released when the
+	    results are next thrown away (ReleaseSearchedBook - the callers of KFCSearchEngine::DropResults), or when their
+	    book is closed, and a jump into a chapter the user closed since reopens it through ReopenChapterDoc. */
 	void SetBookScopeOn(bool on);
 
 	/** FIND/CHANGE SELECTED DOCUMENTS (BOOK) (docs/superpowers/specs/_done/2026-10-07-kfc-query-dialog-and-selected-documents-design.md
@@ -111,11 +110,10 @@ namespace KFCBookScope
 	};
 	TargetBook GetTargetBook();
 
-	/** Is there anything for the CURRENT scope to run on - a target book with chapters while Book
-	    Scope is ON (GetTargetBook), an active document while it is OFF? Asked by the menu's
-	    enablement (KFCActionComponent's UpdateActionStates) so the commands that start a run on it -
-	    Find and Change All in Book - go grey when there is nothing to run them against, rather
-	    than starting and reporting "No open document to search."
+	/** Is there anything for the CURRENT scope to run on - a target book with chapters while Book Scope is ON
+	    (GetTargetBook), an active document while it is OFF? Asked by the menu's enablement (KFCActionComponent's
+	    UpdateActionStates) so the commands that start a run on it - Find and Change All in Book - go grey when there is
+	    nothing to run them against, rather than starting and reporting "No open document to search."
 
 	    It asks exactly what the engines ask when they resolve their own scope - GetTargetBook() and
 	    ActiveDocument() - so the grey state and the run cannot disagree. Cheap enough for a menu
@@ -173,19 +171,20 @@ namespace KFCBookScope
 	    in. Also records WHICH book the run is against (see GetSearchedBookPath) - so call
 	    ReleaseSearchedBook first, as the search does at its commit point: that hands back whatever
 	    the last run left held, and this does not.
-	    NARROWED: with Find/Change Selected Documents (Book) on and a PART of the book selected in the
-	    Book panel that shows it, only those chapters are listed - read now, as the run starts (section 4-2).
+	    NARROWED: with Find/Change Selected Documents (Book) on and a PART of the book selected in the Book panel that
+	    shows it, only those chapters are listed - read now, as the run starts (the query dialog's spec, section 4-2).
 	    outSelection, when given, says how many were taken and of how many (selected 0 = the whole book).
-	    bookPath, when given, names the book instead (a list's own - KFCSearchEngine::SearchListAgain): found open by its
-	    path (nothing listed when it is not) - narrowed by its Book panel's selection the same way.
+	    bookPath, when given, names the book instead (a list's own - Search These Results Again and Narrow Down, through
+	    KFCSearchEngine::RunSearch): found open by its path (nothing listed when it is not) - narrowed by its
+	    Book panel's selection the same way.
 
 	    @return true when a book was resolved and it has at least one chapter. Note that this says
 	            nothing about whether those chapters can be OPENED - only OpenChapterDoc knows. */
 	bool ListBookChapters(std::vector<ChapterDoc>& outDocs, PMString& outBookName, BookSelection* outSelection = nil,
 		const PMString* bookPath = nil);
 
-	/** THE TARGET BOOK, DESCRIBED WITHOUT A TRACE (the same section): its title, how many documents it
-	    holds and how many a run would take (the same narrowing as ListBookChapters, from the same place) - the book
+	/** THE TARGET BOOK, DESCRIBED WITHOUT A TRACE (the query dialog's spec, section 4-4): its title, how many documents
+	    it holds and how many a run would take (the same narrowing as ListBookChapters, from the same place) - the book
 	    ListBookChapters would list (ResolveTargetBook). For the words that name a run before it starts (the menu's
 	    names, the query dialog's Runs on: line), so it may be asked at any time: unlike ListBookChapters it records
 	    nothing (GetSearchedBookPath), opens nothing and holds nothing.
@@ -242,23 +241,27 @@ namespace KFCBookScope
 	    is searched and written, but only a jump opens one - its row says "(no window)".) */
 	bool HasWindow(const UIDRef& docRef);
 
-	/** The full file path of the book the results on the panel came from. false (and an empty
-	    string) when the panel is not showing a book's results.
+	/** The full file path of the book a run last resolved: the book of the list on the panel when that list is a
+	    book's - and after Change All in Book or a query run, which leave no list, the book they ran on, whose chapters
+	    they may still hold (the file header of KFCBookWatch.cpp says why it outlives the list). false (and an empty
+	    string) when no book is recorded. Whether the panel shows a book's list: KFCResultModel::IsFromBook, not this.
 
-	    Set when a run resolves its book; cleared by ReleaseSearchedBook. ReleaseHeldDocs does NOT
-	    touch it - closing chapters and showing results are separate facts, and since every run
-	    closes its chapters as it goes, tying the two together would blank this while a full result
-	    set is still on screen. */
+	    Set when a run resolves its book (ListBookChapters) and when a list is put back (SetSearchedBookPath); cleared
+	    by ReleaseSearchedBook. ReleaseHeldDocs does NOT touch it - closing chapters and showing results are separate
+	    facts, and since every run closes its chapters as it goes, tying the two together would blank this while a full
+	    result set is still on screen. */
 	bool GetSearchedBookPath(PMString& outPath);
 
-	/** THE BOOK A LIST PUT BACK WAS SEARCHED IN (the tier switch - KFCTierStore::SwitchTo): recorded as a run that resolved
-	    it records it (GetSearchedBookPath), holding nothing - the list's chapters are reached by their files, as ever.
-	    Call ReleaseSearchedBook first, as a run does at its commit point. */
+	/** THE BOOK A LIST PUT BACK WAS SEARCHED IN (the tier switch - KFCTierStore::SwitchTo; a search again that does not
+	    go through - KFCSearchEngine::RunSearch): recorded as a run that resolved it records it (GetSearchedBookPath),
+	    holding nothing - the list's chapters are reached by their files, as ever. Call ReleaseSearchedBook first, as a
+	    run does at its commit point. */
 	void SetSearchedBookPath(const PMString& path);
 
-	/** Let go of the book the results came from: forget the path AND close whatever chapters are
-	    still held for it. It goes with every KFCResultModel::Clear() - KFCSearchEngine::DropResults
-	    does the two together.
+	/** Let go of the recorded book (GetSearchedBookPath): forget the path AND close whatever chapters are still held
+	    for it. Whatever throws the results away does it - KFCSearchEngine::DropResults, with the model's Clear(). (The
+	    Clear() a query run makes at its end, leaving no list, keeps the book recorded, as Change All in Book leaves it:
+	    GetSearchedBookPath.)
 
 	    The two halves are one operation on purpose. Nothing else remembers which book a held
 	    chapter belongs to, so a path dropped on its own strands them with their .indd files locked
@@ -392,15 +395,16 @@ namespace KFCBookScope
 	    Cheap - a walk of a list that holds at most a handful of entries. */
 	bool IsHeldDoc(const UIDRef& docRef);
 
-	/** A CHAPTER OF OURS HANDED BACK WHEN THE WORK ON IT ENDS WITHOUT ITS WINDOW (the author: "a hidden document
-	    left behind would be trouble"). HandBackHeldDocNow when the chapter is held; nothing for any other
-	    document. Every verdict is ReleaseHeldDoc's: closed when windowless and clean, left alone - and no longer held -
-	    with a window, kept with unsaved work. For a door that reached a chapter (ReachChapterDoc - which may reopen it
-	    windowless and hold it) and is leaving it without the window that would have made it the user's: an object row's
-	    refused Replace (KFCObjectReplace), a row's Replace that reached a chapter and wrote nothing in it
+	/** A CHAPTER OF OURS HANDED BACK WHEN THE WORK ON IT ENDS WITHOUT ITS WINDOW (the author: "a hidden document left
+	    behind would be trouble"). HandBackHeldDocNow when the chapter is held; nothing for any other document. Every
+	    verdict is ReleaseHeldDoc's: closed when windowless and clean, left alone - and no longer held - with a window,
+	    kept with unsaved work. For a door that reached a chapter (ReachChapterDoc - which may reopen it windowless and
+	    hold it) and is leaving it without the window that would have made it the user's: an object row's refused
+	    Replace (KFCObjectReplace), a write from the list that reached a chapter and wrote nothing in it
 	    (KFCReplaceEngine::DocsAfterWrite), and every landing of the UI half's (KFCJump, through IKFCChapters) whose
-	    window did not come forward. closeNow's rule applies: outside any command sequence, with no walk standing - and the
-	    caller holds nothing of the chapter's database any more (no IDataBase::SaveRestoreModifiedState left to run). */
+	    window did not come forward. closeNow's rule applies: outside any command sequence, with no walk standing - and
+	    the caller holds nothing of the chapter's database any more (no IDataBase::SaveRestoreModifiedState left to
+	    run). */
 	void HandBackIfHeld(const UIDRef& docRef);
 
 	/** Name the chapters a run opened and could NOT hand back, appending to a status line. The
@@ -506,8 +510,8 @@ namespace KFCBookScope
 	/** ReachChapterDoc WITHOUT THE OPEN: the chapter's
 	    document if it is open now - by its file, the same lookup ReopenChapterDoc makes before it
 	    opens anything; a chapter with no file (a document-scope row) by IsDocStillOpen(ioDocRef).
-	    For everything that acts on an open document only - KFCUndoFollow, the rows' text foci (KFCRowFoci) and the
-	    open responder (KFCOpenDocResponder).
+	    For everything that acts on an open document only - its callers: the Undo follow, the rows' text foci, the open
+	    responder, the tiers and the walks again among them.
 	    Not IsDocStillOpen of the docRef the results hold: a chapter the user closed and opened again
 	    reads "not open" by it (a new address) - and one whose address a document opened later has
 	    taken reads as THAT document (the address-reuse fault above).
@@ -547,13 +551,13 @@ namespace KFCBookScope
 	void ShutdownCleanup();
 
 	/** A BAR'S RANGE SPLIT AMONG A RUN'S TARGETS BY THEIR SIZES
-	    (docs/superpowers/specs/2026-10-18-kfc-copy-results-progress-share-design.md - the author's yes of 2026-10-18 to
-	    "the bar divided by the chapters' sizes"): out[i] is where target i's stretch starts and out[n] == total
+	    (docs/superpowers/specs/2026-10-18-kfc-copy-results-progress-share-design.md - the author's yes to "the bar
+	    divided by the chapters' sizes"): out[i] is where target i's stretch starts and out[n] == total
 	    (n = targets.size()). A target's size: a chapter of the book the run is against (contentUID valid) - the size
 	    its book records for it (IBookContent::GetSize: nothing opened); a document-scope target - its page count
 	    (IPageList, the document open). A size not read counts as the average of those read; every stretch is at least a
-	    quarter of an even share, so a small chapter still moves the bar - and none is empty. Until this a bar gave each
-	    target an even share, and a book's one big chapter held it still while the small ones flew past. */
+	    quarter of an even share, so a small chapter still moves the bar - and none is empty. An even share for each
+	    target would hold the bar still through a book's one big chapter while the small ones flew past. */
 	std::vector<int32> ProgressBases(const std::vector<ChapterDoc>& targets, int32 total);
 }
 

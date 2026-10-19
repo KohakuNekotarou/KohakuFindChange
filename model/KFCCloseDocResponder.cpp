@@ -14,7 +14,7 @@
 //      the user closes a searched document -> its rows go, and the list stays while it is one to keep
 //      (KFCTierStore::LiveListIsKeepable - a row left, or a search made it): an All Documents list keeps
 //      the other documents' rows, and a list a search made keeps its heading - "(0/0)" once its last
-//      document is gone (the author, 2026-10-14 night: "only the closed document's part goes"). Only a
+//      document is gone (the author: "only the closed document's part goes"). Only a
 //      list that is no tier any more goes, the panel back to empty (Respond). The kept tiers lose that
 //      document's rows too, their headings staying (KFCTierStore::ForgetDocument).
 //
@@ -23,10 +23,10 @@
 //  results because one chapter was closed would throw away work. Book results are retired when the
 //  BOOK closes, by KFCBookWatch (an observer: a book close has no signal to respond to).
 //
-//  Some bookkeeping DOES run for every close, whatever the scope: everything that holds the closing
-//  document by address lets it go (the held-chapter list, the jump marker, the rows' text foci, the
-//  Undo follow, the remembered Find Format) - LetGoOfClosingDocument, ahead of every exit in Respond
-//  bar the main-thread gate and a signal that names no document.
+//  Some bookkeeping DOES run for every close, whatever the scope: everything that holds the closing document by address
+//  lets it go (the held-chapter list, the jump marker, the rows' text foci, the Undo follow, the kept tiers' chapters,
+//  the remembered Find Format, the copy store) - LetGoOfClosingDocument, ahead of every exit in Respond bar the
+//  main-thread gate and a signal that names no document.
 //
 //  Why kBeforeCloseDoc and not kAfterCloseDoc: the signal data still carries a live IDocument
 //  before the close, and carries nil after it - the document we have to compare against is only
@@ -232,20 +232,19 @@ void KFCCloseDocResponder::Respond(ISignalMgr* signalMgr)
 		return;
 	}
 
-	// ONLY THAT DOCUMENT'S ROWS GO (the author's calls: an All Documents list's, 2026-09-29 - the others are still open,
-	// their rows and their Undo stay; every list's, 2026-10-14 night - "can the title part stay? only the closed
-	// document's part goes"). The chapter keeps its place in the model (KFCResultModel::CloseChapter says why); the kept
-	// writes let the document go above (KFCUndoFollow::ForgetClosingDocument). Only that row goes, and the others stay
-	// as they are (open or closed): the panel draws every row a list holds
-	// (docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md F9), so taking one out brings no other
-	// into view.
+	// ONLY THAT DOCUMENT'S ROWS GO (the author's calls: an All Documents list's - the others are still open, their rows
+	// and their Undo stay; every list's - "can the title part stay? only the closed document's part goes"). The chapter
+	// keeps its place in the model (KFCResultModel::CloseChapter says why); the kept writes let the document go above
+	// (KFCUndoFollow::ForgetClosingDocument). Only that row goes, and the others stay as they are (open or closed): the
+	// panel draws every row a list holds (docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md
+	// F9), so taking one out brings no other into view.
 	PMString closedName;
 	int32 closedCount = 0;
 	KFCResultModel::GetChapterDisplay(closingChapter, closedName, closedCount);
 	KFC_DIAG_LOG("CLOSE - chapter %d's %d row(s) go", closingChapter, closedCount);
 	KFCNotifyChapterRowGoes(closingChapter);
-	// ...the file it is closed from kept on its emptied chapter (Chapter::closedFile): the heading's Search These Results
-	// Again finds the document open again by it - it never reopens one (LIFE-01).
+	// ...the file it is closed from kept on its emptied chapter (Chapter::closedFile): the heading's
+	// Search These Results Again finds the document open again by it - it never reopens one (LIFE-01).
 	IDataBase* const closingDB = closingDocRef.GetDataBase();
 	KFCResultModel::CloseChapter(closingChapter, closingDB != nil ? closingDB->GetSysFile() : nil);
 

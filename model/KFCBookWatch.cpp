@@ -33,21 +33,21 @@
 //  state: a spurious cue simply finds the book still open and does nothing, and a book that
 //  disappears by any route at all is caught by the next cue.
 //
-//  It is asked about the SEARCHED BOOK (KFCBookScope::GetSearchedBookPath), NOT about the result
-//  set. Asked about the result set, two cases get through, and in both of them chapters stay open
-//  with their files locked for the rest of the session:
-//    * a book search that found NOTHING - no result set, so an "are there results?" gate returns
-//      early while the chapters it opened to look are still held;
-//    * a book search followed by a DOCUMENT-scope search - IsFromBook() is false by then, so that
-//      gate returns early as well.
-//  The searched-book path survives both. It is set whenever a run resolves a book, whatever that
-//  run goes on to find, and the only way to let it go is ReleaseSearchedBook - which hands the held
-//  chapters back in the same breath. So when this gate is false, what is left open is only what
-//  REFUSED to be handed back: ReleaseHeldDocs puts a chapter back on the held list when it holds
-//  unsaved work or when its close is refused, and those two outlive the path that named their book.
-//  Nothing is stranded by it: whatever next throws the results away - a search, a query run, a Change All,
-//  Clear Results: the callers of KFCSearchEngine::DropResults - calls ReleaseSearchedBook and tries them
-//  again, and a chapter kept for unsaved work is one a write has already reported to the user.
+//  It is asked about the SEARCHED BOOK (KFCBookScope::GetSearchedBookPath), NOT about the result set. Asked about the
+//  result set, two cases get through, and in both of them a chapter a run could not hand back stays open with its file
+//  locked for the rest of the session:
+//    * a book search that found NOTHING - no result set, so an "are there results?" gate returns early;
+//    * Change All in Book and a query run - they leave no list at all, so IsFromBook() is false and that gate returns
+//      early as well, while a chapter a write went into may still be held.
+//  The searched-book path survives both. It is set whenever a run resolves a book, whatever that run goes on to find
+//  (and when a list from a book is put back - KFCBookScope::SetSearchedBookPath), and the only way to let it go is
+//  ReleaseSearchedBook - which hands the held chapters back in the same breath (a book search followed by a
+//  DOCUMENT-scope search lets it go so, at the later search's commit point). So when this gate is false, what is left
+//  open is only what REFUSED to be handed back: ReleaseHeldDocs puts a chapter back on the held list when it holds
+//  unsaved work or when its close is refused, and those two outlive the path that named their book. Nothing is stranded
+//  by it: whatever next throws the results away (the callers of KFCSearchEngine::DropResults - a search, Change All,
+//  Clear Results among them) calls ReleaseSearchedBook and tries them again, and a chapter kept for unsaved work is one
+//  a write has already reported to the user.
 //
 //  (Not about the HELD CHAPTERS either: a run closes each chapter as soon as it has walked it, so the
 //  held list is empty almost always and a gate on it would never arm the timer at all.)
@@ -232,14 +232,14 @@ uint32 RetireTimerCallback(void* /*refPtr*/)
 	// (CTracker's timers are ITrackerTimer, a different interface, and are not evidence either way.
 	// KFCPanelAlpha's re-apply chain rests on the same observation.)
 	//
-	// WHAT CATCHES IT IF THE RE-ARM DOES NOT HAPPEN. The cue is dropped and this book's
-	// chapters are not handed back HERE - but whatever next throws the results away (the callers of
-	// KFCSearchEngine::DropResults - a search, a query run or a Change All at its commit point, Clear Results) calls
-	// ReleaseSearchedBook and hands them back then. A row's Replace keeps the searched book on purpose, its
-	// results being still on the panel. So the worst case is a book's results left on the panel, and any
-	// chapter that refused to close left locked, until the next of those - not a permanent strand. Named
-	// rather than assumed, because a fallback nobody has written down is one the next change can remove
-	// without noticing.
+	// WHAT CATCHES IT IF THE RE-ARM DOES NOT HAPPEN. The cue is dropped and this book's chapters are not handed back
+	// HERE - but whatever next throws the results away (the callers of KFCSearchEngine::DropResults - a search, a query
+	// run or a Change All at its commit point, Clear Results among them) calls ReleaseSearchedBook and hands them back
+	// then. A write from the list keeps the searched book on purpose, its results being still on the panel (a Replace
+	// turned away for a changed query drops them - one of those callers). So the worst case is a book's results left on
+	// the panel, and any chapter that refused to close left locked, until the next of those - not a permanent strand.
+	// Named rather than assumed, because a fallback nobody has written down is one the next change can remove without
+	// noticing.
 	// ...and a row's landing is waited out the same way (RetireBookResultsIfGone says why).
 	if (RetireMustWait())
 		return kKFCBookRetireDelayMs;

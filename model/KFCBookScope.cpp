@@ -79,24 +79,27 @@ namespace
 		return -1;
 	}
 
-	// Which book the RESULTS on the panel came from (its full file path). NOT "which book we hold
-	// chapters for": every run closes each chapter as soon as it is done with it,
-	// so the held list is empty most of the time while a full result set is still on screen.
+	// Which book a run last resolved (its full file path) - the book of the list on the panel when that list is a
+	// book's, and after Change All in Book or a query run, which leave no list, the book they ran on
+	// (GetSearchedBookPath). NOT "which book we hold chapters for": every run closes each chapter as soon as it is done
+	// with it, so the held list is empty most of the time while a full result set is still on screen.
 	//
-	// Read from OUTSIDE through GetSearchedBookPath, and every caller asks about the RESULTS:
-	//   * KFCBookWatch - "the book these results name has been closed, retire them"
-	//   * KFCJump's ShowBook (the UI half, through IKFCChapters) - "the book row was clicked, bring
-	//     that book forward"
-	// And read from INSIDE by OpenChapterDoc, which is not about the results at all: it is how a
-	// chapter finds the book it belongs to, having deliberately not parked an IBook* between calls.
+	// Read from OUTSIDE through GetSearchedBookPath:
+	//   * KFCBookWatch - "the book a run resolved has been closed: hand its chapters back, and retire the list if it is
+	//     that book's"
+	//   * KFCJump's ShowBook (the UI half, through IKFCChapters) - "the book row was clicked, bring that book forward"
+	//   * KFCSearchEngine - a list searched again in its own book, and put back with it when that does not go through
+	//   * KFCTierStore - a list kept as a tier keeps its book, and puts it back when it is switched to
+	// And read from INSIDE, not about the results at all: by OpenChapterDoc through SearchedBookDB - how a chapter
+	// finds the book it belongs to, having deliberately not parked an IBook* between calls - by the bar's sizes
+	// (KFCTargetSizes) the same way, and by the Hide Previous Chapter sweep (KFCSearchedBookChapterFiles).
 	//
-	// Let go through ReleaseSearchedBook, which goes with every KFCResultModel::Clear()
-	// (KFCSearchEngine::DropResults).
+	// Set by ListBookChapters and SetSearchedBookPath; let go only through ReleaseSearchedBook, which hands the held
+	// chapters back in the same breath.
 	PMString gSearchedBookPath;
 
-	// The search-scope toggle. Session state only (every launch starts OFF), like KESCL's
-	// gBookSearchOn: ON searches the whole target book (ResolveTargetBook); OFF, what Edit >
-	// Find/Change's Search: names.
+	// The search-scope toggle. Session state only (every launch starts OFF), like KESCL's gBookSearchOn: ON searches
+	// the whole target book (ResolveTargetBook); OFF, what Edit > Find/Change's Search: names.
 	bool gBookScopeOn = false;
 
 	// Find/Change Selected Documents (Book): narrows a Book Scope run to the Book panel's selected
@@ -237,10 +240,10 @@ namespace
 		if (bookMgr == nil)
 			return nil;
 
-		// The book API's own lookup by file - "Search to see if whatBook is already open or not.
-		// Returns nil means whatBook is not open" (IBookManager.h:144-149) - which is the same
-		// question ListBookChapters asks it further down this file - one way of asking in the one
-		// module, not a walk of GetBookCount/GetNthBook comparing paths beside it.
+		// The book API's own lookup by file - "Search to see if whatBook is already open or not. Returns nil means
+		// whatBook is not open" (IBookManager.h:144-149) - and the one place this module asks it: every lookup of an
+		// open book by its path comes here (ListBookChapters' and the target book's among them), not a walk of
+		// GetBookCount/GetNthBook comparing paths beside it.
 		SDKFileHelper bookFileHelper(bookPath);
 		IBook* book = bookMgr->FindOpenBookByName(bookFileHelper.GetIDFile());	// non-owning
 		if (book == nil)
@@ -257,8 +260,8 @@ namespace
 
 	/** The database of the searched book (gSearchedBookPath), found again by its path rather than carried between calls
 	    in a static: a book pointer parked there goes stale the moment the user closes the book, and a run pumps events
-	    through its progress bar. Costs one IBookManager::FindOpenBookByName. nil = no open book has that path - the
-	    results are not a book's, or the book has closed since. */
+	    through its progress bar. Costs one IBookManager::FindOpenBookByName. nil = no open book has that path - none is
+	    recorded, or the book has closed since. */
 	IDataBase* SearchedBookDB()
 	{
 		IBook* const book = FindOpenBookByPath(gSearchedBookPath);	// non-owning
@@ -307,14 +310,14 @@ namespace
 		return (activeBook != nil && activeBook->IsOpen()) ? activeBook : nil;
 	}
 
-	/** THE ONE PLACE A BOOK RUN IS NARROWED TO THE BOOK PANEL'S SELECTION (Find/Change Selected Documents
-	    (Book), docs/superpowers/specs/_done/2026-10-07-kfc-query-dialog-and-selected-documents-design.md section 4-4): the
+	/** THE ONE PLACE A BOOK RUN IS NARROWED TO THE BOOK PANEL'S SELECTION (Find/Change Selected Documents (Book),
+	    docs/superpowers/specs/_done/2026-10-07-kfc-query-dialog-and-selected-documents-design.md section 4-4): the
 	    book's own BookContent UIDs the Book panel showing it has selected, in the book's order - EMPTY for the whole
 	    book: the toggle off, no UI half (a background thread, InDesign Server), no panel showing this book, none or all
 	    of it selected (the UI half's answer, by the product's rule - AcquireCurrentBook::AllOrNoneSelected), or a
 	    selection none of whose UIDs is one of this book's chapters. ListBookChapters (the run) and DescribeTargetBook
-	    (the names and the Runs on: line) ask here, so what a run takes and what the words say cannot differ.
-	    Book Scope is the callers' to have asked: they are reached for a book run only. Nothing is recorded. */
+	    (the names and the Runs on: line) ask here, so what a run takes and what the words say cannot differ. Book Scope
+	    is the callers' to have asked: they are reached for a book run only. Nothing is recorded. */
 	std::vector<UID> SelectedChapterContents(IBook* book)
 	{
 		std::vector<UID> taken;
@@ -385,8 +388,8 @@ bool KFCBookScope::IsDocStillOpen(const UIDRef& docRef)
 	if (docList == nil)
 		return false;
 
-	// The document list's own lookup by database (IDocumentList.h:71-76), which is how the rest of this
-	// plug-in asks this (KFCRowFoci.cpp, the UI half's KFCHitMarkerView.cpp) and how KCM asks it everywhere.
+	// The document list's own lookup by database (IDocumentList.h:71-76), which is how the rest of this plug-in asks
+	// this (KFCRowFoci.cpp; the UI half's KFCHitMarkerView.cpp and KFCUIServices.cpp) and how KCM asks it everywhere.
 	//
 	// THE DATABASE POINTER IS COMPARED, NEVER DEREFERENCED. For a chapter closed since
 	// its UIDRef was taken that pointer is dangling, and asking it anything is undefined behaviour -
@@ -575,9 +578,8 @@ void KFCBookScope::ReleaseSearchedBook()
 	// is "is OUR book still open" - would have no book left to ask about, and they would keep their
 	// .indd files locked for the rest of the session.
 	//
-	// This covers the second of the two cases the file header of KFCBookWatch.cpp names (a book run followed by a
-	// DOCUMENT-scope run), at the moment the results are dropped, rather than leaving it for a book
-	// close that may never come.
+	// A book run followed by a DOCUMENT-scope run is covered here, at the moment the results are dropped (the later
+	// run's commit point - DropResults), rather than left for a book close that may never come.
 	ReleaseHeldDocs();
 	gSearchedBookPath.Clear();
 }
@@ -1055,8 +1057,8 @@ bool KFCBookScope::DescribeTargetBook(PMString& outBookName, BookSelection& outS
 	outBookName.SetTranslatable(kFalse);
 	outSelection = BookSelection();
 
-	// The book a run would resolve, by the run's own resolver (GetTargetBook says why), and its title as the Book
-	// panel's tab shows it (IBook.h: "used for the title of book panel") - ListBookChapters' outBookName.
+	// The book a run would resolve, by the run's own resolver (GetTargetBook says why), and its title as the
+	// Book panel's tab shows it (IBook.h: "used for the title of book panel") - ListBookChapters' outBookName.
 	IBook* const book = ResolveTargetBook();		// non-owning - no release
 	if (book == nil)
 		return false;
@@ -1206,8 +1208,8 @@ bool KFCBookScope::MakeBookActive(const PMString& bookPath)
 		return false;
 	bookMgr->SetCurrentActiveBook(book);
 
-	// 2. The tab the user can SEE is the UI half's (KFCBookPanelLookup::BringBookTabForward - the Book
-	//    panel is user interface, which a model plug-in may not reach). The caller asks it next.
+	// 2. The tab the user can SEE is the UI half's (KFCBookPanelLookup::BringBookTabForward - the Book panel is user
+	//    interface, which a model plug-in may not reach). The caller asks it next.
 	return true;
 }
 
@@ -1315,12 +1317,11 @@ bool KFCBookScope::ListBookChapters(std::vector<ChapterDoc>& outDocs, PMString& 
 	}
 
 	// NO CHAPTERS = NO SEARCHED BOOK.
-	// gSearchedBookPath has to be written before the loop - the entries are read out of the book it
-	// names - but it means "the panel is showing THIS book's results", and a caller that gets false
-	// here puts nothing on the panel at all (every run answers "That book has no chapters."
-	// and returns). Leaving the path standing would leave that statement true about a book with no
-	// results behind it, which is the one thing the readers of this value - KFCBookWatch and
-	// KFCJump's ShowBook - are not allowed to be told.
+	// gSearchedBookPath has to be written before the loop - the entries are read out of the book it names - but it
+	// means "a run took THIS book" (GetSearchedBookPath), and a caller that gets false here runs on nothing and puts
+	// nothing on the panel (every run answers "That book has no chapters." and returns). Leaving the path standing
+	// would name to the readers of this value (GetSearchedBookPath's callers) a book no run took, with no list and no
+	// chapter of a run's behind it.
 	//
 	// Cleared rather than restored to what it was: the callers all clear it through
 	// ReleaseSearchedBook immediately before calling this, so there is no earlier value to go back
