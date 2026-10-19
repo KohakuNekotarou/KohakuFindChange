@@ -96,6 +96,9 @@
   （名前は `Replace`・`Run Queries`）。
   いくつかなら `Undo: 3 changes of Kohaku Find/Change - the rows are back as they were before them.`、
   取り消しとやり直しが混ざれば `Undo / Redo: the rows follow the document (N undone, M redone).`
+  段（灰色の履歴の段）で書いた行の追従は、見えている一覧が変わらない（ROW-40）ので、どこに出るかを最後に足す（2026-10-19 作者「おすすめで」＝O6b-1）＝
+  全部が段なら `… It was made in a kept tier: switch to that tier to see its rows.`（いくつかなら `… They were made in kept tiers: switch to a tier to see its rows.`）、
+  一部なら `… One of them was made in a kept tier: switch to that tier to see its rows.`／`… N of them were made in kept tiers: switch to a tier to see its rows.`。
   - 訂正:
 
 - **UNDO-16** クエリ連続実行の取り消し・やり直しは一覧が**丸ごと入れ替わる**ので木を作り直す。行の Replace は行を描き直すだけで、開いた・閉じた行はそのまま。

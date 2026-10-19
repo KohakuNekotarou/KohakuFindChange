@@ -897,6 +897,7 @@ static void Follow()
 	// loop goes on until nothing more moves: one notification can stand for several steps (a query run over
 	// three chapters, or a Redo that is not followed until the next notification).
 	int32 undone = 0, redone = 0;
+	int32 ontoTiers = 0;			// of those, the writes followed onto a kept tier's copy (OnKeptTier)
 	bool reshaped = false;
 	const char* lastName = "";		// the name of the write followed last (WriteName)
 	const size_t guard = 2 * gSteps.size() + 2;
@@ -937,6 +938,7 @@ static void Follow()
 		if (ontoTier)
 		{
 			(void)KFCTierStore::ApplyRowStep(step.resultSet, step.rows, !undo);
+			++ontoTiers;
 			KFC_DIAG_LOG("  onto kept tier set=%u", step.resultSet);
 		}
 		else if (step.whole)
@@ -999,6 +1001,24 @@ static void Follow()
 		}
 		msg.Append(undo ? " - the rows are back as they were before " : " - the rows are as they were after ");
 		msg.Append(count == 1 ? "it." : "them.");
+	}
+	// A WRITE FOLLOWED ONTO A KEPT TIER'S COPY changed nothing on screen - the tier stays grey as it was kept
+	// (ROW-40) and shows its rows followed once switched to (ROW-42) - so the message says where they are (the
+	// author's call: the spec map's UNDO-15).
+	if (ontoTiers > 0)
+	{
+		const int32 followed = undone + redone;
+		if (ontoTiers == followed)
+			msg.Append(followed == 1 ? " It was made in a kept tier: switch to that tier to see its rows."
+				: " They were made in kept tiers: switch to a tier to see its rows.");
+		else if (ontoTiers == 1)
+			msg.Append(" One of them was made in a kept tier: switch to that tier to see its rows.");
+		else
+		{
+			msg.Append(" ");
+			msg.AppendNumber(ontoTiers);
+			msg.Append(" of them were made in kept tiers: switch to a tier to see its rows.");
+		}
 	}
 	KFCNotifyStatus(msg);
 }
