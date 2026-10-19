@@ -615,7 +615,8 @@ void KFCShutdownAppBarSearchEnter()
 	sShutdown = true;
 	AttachMirrorObserver(false);
 	UnhookAppBar();
-	sPendingText.clear();
+	// A fresh value, so the storage goes too - clear() keeps it (KFCResultTree::ShutdownCleanup's reason).
+	std::wstring().swap(sPendingText);
 	if (sRunTimer != nil)
 	{
 		sRunTimer->StopTimer();

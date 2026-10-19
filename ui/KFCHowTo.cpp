@@ -213,7 +213,8 @@ void KFCHowTo::Show()
 	}
 
 	// Script route unavailable or failed: the plain (non-scrollable) alert is better than no
-	// reference at all.
+	// reference at all. A failed run leaves no global error standing - the return code carries the
+	// failure (measured on a throw, a parse error and a failing DOM call) - so nothing is cleared first.
 	//
 	// It is the one route that needs a heading. The reference itself carries none - the ScriptUI
 	// window puts "Kohaku Find/Change - How to Use" in its title bar, so a first line saying the same
