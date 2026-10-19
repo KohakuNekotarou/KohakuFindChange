@@ -1097,9 +1097,15 @@ void KFCResultHistory::SwitchToKeptRowLater(int32 tier, int32 row)
 	if (gSwitchTimer == nil)
 		gSwitchTimer = ::CreateObject2<ICallbackTimer>(kCallbackTimerBoss, IID_ICALLBACKTIMER);
 	// At the next idle, once the click is over (v2 R7 - no double click's wait: KFC has no double click of its own, and the
-	// tiers not moving, a second click lands on the row the first switched to). A click booked before it ran books anew.
+	// tiers not moving, a second click lands on the row the first switched to). A click booked before it ran books
+	// anew: its booking taken off first, then started again - the official re-arm stops the running timer before it
+	// starts one (HTTPAssetLinkResourceHandler.cpp), and ICallbackTimer.h promises nothing for a StartTimer over a
+	// live booking.
 	if (gSwitchTimer != nil)
+	{
+		gSwitchTimer->StopTimer();
 		gSwitchTimer->StartTimer(RunPendingSwitch, 1, nil);
+	}
 	KFC_DIAG_LOG("STACK switch booked set=%u row=%d", gBookedTier, static_cast<int>(row));
 }
 
