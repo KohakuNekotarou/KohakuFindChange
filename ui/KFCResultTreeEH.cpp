@@ -250,11 +250,11 @@ bool GoOnToNextReplaceableRow(ITreeViewController* controller, const NodeID& fro
 }
 
 // CTRL+RETURN TAKES THE SELECTED ROWS OFF THE LIST (docs/superpowers/specs/2026-10-18-kfc-clear-from-results-design.md K4):
-// through the right-click Clear from Results' own door (KFCResultTree::ClearRows), then the hit row just below the lowest of
-// them is landed on (LandOnRow) - the one just above the highest when none is below, and none when the list has no other
-// row. That row is found before the rows go and kept as its chapter and hit: a NodeID holds its story group's place too,
-// which moves when a story before it loses its last row. Only the live list's rows are walked - a tier's own row ends the
-// walk (the grey tiers are drawn below or above it).
+// through the right-click Clear from Results' own door (KFCResultTree::ClearRows), then - once they went - the hit row
+// just below the lowest of them is landed on (LandOnRow) - the one just above the highest when none is below, and none
+// when the list has no other row. That row is found before the rows go and kept as its chapter and hit: a NodeID holds
+// its story group's place too, which moves when a story before it loses its last row. Only the live list's rows are
+// walked - a tier's own row ends the walk (the grey tiers are drawn below or above it).
 void ClearThenLand(ITreeViewController* controller, const KFCRowsByChapter& rows)
 {
 	InterfacePtr<const ITreeViewHierarchyAdapter> adapter(controller, UseDefaultIID());
@@ -293,8 +293,11 @@ void ClearThenLand(ITreeViewController* controller, const KFCRowsByChapter& rows
 			found = stays(before);
 		}
 	}
-	(void)KFCResultTree::ClearRows(rows);
-	if (found > 0)
+	// LANDED ON ONLY WHEN THE ROWS WENT: a clear the door turned away (a run of ours up - ClearRows asks it; a
+	// landing is asked before this, in TakeReturn) moves nothing, as no key moves the selection under something under
+	// way (MoveUnderWay): the row below selected while its landing is turned away would leave the list on one row and
+	// the page on another.
+	if (KFCResultTree::ClearRows(rows) && found > 0)
 		LandOnRow(controller, adapter, treeMgr, NodeID(KFCResultNodeID::Create(landChapter, landHit)), landChapter, landHit);
 }
 

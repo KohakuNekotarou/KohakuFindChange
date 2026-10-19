@@ -485,8 +485,18 @@ bool KFCResultHistory::Narrow(const KFCNarrowStep& step, PMString& outSummary)
 	const int32 letGo = FollowNewList(committed, havePending, pending, setBefore, label, keptPending);
 	KFC_DIAG_LOG("STACK narrow kind=%d went=%d kept=%d letgo=%d tiers=%d", static_cast<int>(step.kind), committed ? 1 : 0,
 		keptPending ? 1 : 0, static_cast<int>(letGo), static_cast<int>(gKept.size()));
+	// Drawn again either way: a new list rebuilt; the list a refusal or a Cancel left repainted - a walk over part of a
+	// document has its rows follow their foci before it can be refused (KFCResultListWidgetMgr's SearchAgain says why).
 	if (committed)
 		KFCResultTree::Rebuild();
+	else
+	{
+#ifdef KFC_DIAG
+		// (Test builds only) Fault switch again-no-repaint: the rows left as drawn, the old way.
+		if (!KFC_DIAG_FAULT("again-no-repaint"))
+#endif
+			KFCResultTree::RefreshRows();
+	}
 	SayFound(outSummary, letGo);
 	return committed;
 }
@@ -692,6 +702,8 @@ bool KFCResultHistory::GetKeptLook(int32 tier, int32 row, KFCResultTree::RowLook
 	{
 		out.label = gKept[static_cast<size_t>(tier)].label;		// the tier's own row: its name and counts, at the left edge
 		out.label.SetTranslatable(kFalse);
+		out.name = gKept[static_cast<size_t>(tier)].head;
+		out.name.SetTranslatable(kFalse);
 		return true;
 	}
 	const KeptRow* kept = RowOf(tier, row);

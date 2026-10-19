@@ -191,6 +191,13 @@
 //                view alone (ILayoutViewUtils::GetAllLayoutViews), the old way: an object search's walk leaves its last
 //                item selected in a minimised window and in a document's second window (obj-bg-sel-minimised-armed,
 //                obj-bg-sel-second-window-armed)
+//    again-no-repaint  (UI half) a Search ... Again or a Narrow Down turned away or cancelled leaves the rows as drawn,
+//                the old way (ui/KFCResultListWidgetMgr.cpp's SearchAgain, ui/KFCResultHistory.cpp's Narrow): the rows
+//                its walk had follow their foci first - a line read again - stay drawn as before
+//                (sr-toend-edge-repaint-armed)
+//    copy-name-from-label  (UI half) Copy Results' Document column reads a document row's name off its label, the old
+//                way (ui/KFCCopyResults.cpp's DocumentName): a document with no window, searched with All Documents, is
+//                named "<name> (no window)" (copy-results-nowindow-armed)
 //
 //  AND TIMERS: KFC_CLOCK / KFC_SPENT add up the milliseconds a stretch of code takes, and KFCDiagPhase
 //  writes "PHASE <name> begin" and "PHASE <name> end <ms>" around a scope - all of it nothing without KFC_DIAG.

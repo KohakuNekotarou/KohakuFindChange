@@ -482,6 +482,7 @@ bool KFCResultTree::GetRowLook(const NodeID& node, RowLook& out)
 		// counts as the book row reads them. At the left edge.
 		out.label = KFCResultHistory::LiveTierLabel();
 		out.label.SetTranslatable(kFalse);
+		out.name = out.label;
 		AppendCounts(out.label, KFCResults()->GetTotalReplacedCount(), KFCResults()->GetTotalHitCount());
 		return true;
 	}
@@ -536,6 +537,7 @@ bool KFCResultTree::GetRowLook(const NodeID& node, RowLook& out)
 		// No shift: the book row IS the outermost level of the list.
 		out.label = KFCResults()->GetBookName();
 		out.label.SetTranslatable(kFalse);
+		out.name = out.label;
 		AppendCounts(out.label, KFCResults()->GetTotalReplacedCount(), KFCResults()->GetTotalHitCount());
 		return true;
 	}
@@ -553,6 +555,7 @@ bool KFCResultTree::GetRowLook(const NodeID& node, RowLook& out)
 		// GetFontDisplay is in range - no further test needed.)
 		out.label = name;
 		out.label.SetTranslatable(kFalse);
+		out.name = out.label;
 		AppendCounts(out.label, KFCResults()->GetFontReplacedCount(nodeID->GetChapter(), nodeID->GetFont()), fullCount);
 		out.shift = LevelShift() + kFontLevelIndent;
 		return true;
@@ -564,6 +567,7 @@ bool KFCResultTree::GetRowLook(const NodeID& node, RowLook& out)
 	// carries (AppendCounts). About the work, not the drawing - never "(shown / total)".
 	out.label = name;
 	out.label.SetTranslatable(kFalse);
+	out.name = out.label;		// (before the note below - the name is the document's, the note the drawing's)
 	// A DOCUMENT WITH NO WINDOW. Search: = All Documents searches those too, as
 	// InDesign's own does; a replace there leaves it hidden (the user may hide a heavy one on purpose) and
 	// only a jump opens a window - so its row says so. Asked as the row is drawn: a jump that opens one
@@ -1202,7 +1206,9 @@ namespace
 // way (KFCJump::IsLanding): the walk reopens the chapter and hands it back - closed on the spot - which can be the very
 // document the landing is giving a window; nor while a run of ours is up (RefusedWhileRunning). Then the walk; the tree
 // REBUILT, not repainted, when its rows were put back - every row after them has another place, the document's another
-// number of them and another order; the status line either way.
+// number of them and another order; REPAINTED when they were not: a walk turned away or cancelled once it began has had
+// the rows follow their foci (KFCSearchEngine::FollowStoryFoci - a line read again, Missing put on a row whose match
+// was edited), which nothing else draws; the status line either way.
 template <typename Walk>
 bool SearchAgain(Walk walk)
 {
@@ -1212,6 +1218,15 @@ bool SearchAgain(Walk walk)
 	const bool done = walk(status);
 	if (done)
 		KFCResultTree::Rebuild();
+	else
+	{
+#ifdef KFC_DIAG
+		// (Test builds only) Fault switch again-no-repaint: the rows left as drawn, the old way - the case that shows
+		// what the repaint adds (sr-toend-edge-repaint-armed).
+		if (!KFC_DIAG_FAULT("again-no-repaint"))
+#endif
+			KFCResultTree::RefreshRows();
+	}
 	KFCResultTree::ShowStatus(status);
 	return done;
 }

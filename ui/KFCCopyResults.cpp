@@ -26,6 +26,7 @@
 
 // Project includes:
 #include "KFCCopyResults.h"
+#include "KFCDiag.h"			// the copy-name-from-label fault switch - test builds only
 #include "KFCResultHistory.h"
 #include "KFCResultNodeID.h"
 #include "KFCResultTree.h"
@@ -119,7 +120,8 @@ namespace
 		}
 	}
 
-	// A BRANCH ROW'S NAME: its label without the counts KFCResultTree::AppendCounts puts after it ("ch1.indd  (1/3)").
+	// A BRANCH ROW'S LABEL WITHOUT ITS COUNTS (KFCResultTree::AppendCounts: "ch1.indd  (1/3)"): a kept row's kind
+	// is told by it (IsDocumentLabel). Not a document's name - the label has a note after the name too (DocumentName).
 	PMString NameOf(const PMString& label)
 	{
 		PMString name(label);
@@ -133,6 +135,21 @@ namespace
 					name.Remove(i - 2, count - (i - 2));
 					break;
 				}
+		return name;
+	}
+
+	// A DOCUMENT ROW'S NAME for the Document column - the name the row was drawn from (RowLook::name), not its
+	// label: the label carries a note after the name too ("ch1.indd (no window)" - All Documents' document with no
+	// window), and the column names the document. (Fault switch copy-name-from-label, a test build's only -
+	// KFCDiag.h: read off the label, the old way.)
+	PMString DocumentName(const KFCResultTree::RowLook& look)
+	{
+#ifdef KFC_DIAG
+		if (KFC_DIAG_FAULT("copy-name-from-label"))
+			return NameOf(look.label);
+#endif
+		PMString name(look.name);
+		name.SetTranslatable(kFalse);
 		return name;
 	}
 
@@ -187,7 +204,7 @@ namespace
 			// a document row names the rows under it; the book row and a story row pass their document on
 			PMString name(document);
 			if (!row->IsBookRow() && !row->IsFontRow() && KFCResultTree::GetRowLook(child, look))
-				name = NameOf(look.label);
+				name = DocumentName(look);
 			WalkLive(child, name, only, limit, out);
 		}
 	}
@@ -239,7 +256,7 @@ namespace
 				AppendRow(out, document, look);
 				continue;
 			}
-			WalkKept(tier, child, IsDocumentLabel(look.label) ? NameOf(look.label) : document, limit, out);
+			WalkKept(tier, child, IsDocumentLabel(look.label) ? DocumentName(look) : document, limit, out);
 		}
 	}
 

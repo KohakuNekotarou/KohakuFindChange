@@ -205,6 +205,7 @@
   検索のときに本体が歩いた範囲（文字のかたまりの列＝表があるとその前・セル・後ろの3つ）を記録し、同じかたまりを公式の口（To End＝`QueryToEndOfStoryWalkerScope`・Selection＝`QueryFocusListWalkerScope`）で作り直せることをその場で確かめておく。範囲にはテキストフォーカスを付ける。
   歩き直すときの範囲の端＝ストーリーが記録した版のままなら記録した位置、変わっていればフォーカス（編集に付いてくる）から、**端のすぐ外の8文字が同じに読める一番近い所**（取り消しで古くなったフォーカスも、端のちょうどに打った文字も、これで正しい所に戻る）。
   断る＝範囲が離れたかたまり（2行以上にまたがる表のセルの選択）`... the searched part cannot be searched again on its own (separate stretches) - search again.`（2026-10-09 の最終検査で縮めた＝前の文は約190字で「search again」が切れた）／端のすぐ外の文字が書き換えられた `... the text at the edge of the searched part of this story has changed - search again.`。回帰＝`sr-toend-*`・`sr-selection-*`・`sr-table-*`。
+  ★断っても、歩く前に行はフォーカスへ追ってある（行の文の読み直し・一致が書き換わった行に Missing）＝**一覧はそれを描き直す**（2026-10-19 ブロック7の再検査 D7-6＝それまでは描き直さず、次に描き直すまで前の文のままだった・回帰 `sr-toend-edge-repaint`／`-armed`）。
   KFC が検索の後で閉じた章は、窓なしで開いて歩き、閉じて返す。文は `Searched this story again: N match(es).`。0件ならストーリーの行は消え、それで文書に行が1つも無くなっても文書の行は `(0/0)` で残る（ROW-07・2026-10-13 作者の決定 P-1）。行の並びが変わるので、それより前の KFC の書き込みの取り消しは一覧が追わなくなる（UNDO-14）。回帰＝`sr-*`。
   - 訂正:
 
@@ -232,6 +233,7 @@
   断る（一覧はそのまま）＝実行中／検索が文書の一部だった（灰色の項目をスクリプトが押したとき）`Search This Document Again: the search was over part of the document (Search: Story) - search again.`（`To End of Story`・`Selection` も）／
   検索と置換の設定が変わった `Search This Document Again: the Find/Change settings have changed since the search - search again.`／開けない `...: the document of this row could not be opened.`／
   Cancel `...: cancelled - the document's rows are left as they were.`／本体の検索がエラーで止まった `...: InDesign's search stopped with an error - the document's rows are left as they were.`。
+  ★Cancel・エラーでも、歩く前に行はフォーカスへ追ってある＝一覧はそれを描き直す（REP-35 と同じ・2026-10-19 D7-6）。
   文は `Searched this document again: N match(es).`（上限に当たれば ` The list's limit of rows was reached - its other matches are not listed.`）。行の並びが変わるので、それより前の KFC の書き込みの取り消しは一覧が追わなくなる（UNDO-14）。回帰＝`dr-cases.tsv`（`dr-part-refused`＝2026-10-17 から灰色を期待）。（1.4.0）
   - 訂正:
 

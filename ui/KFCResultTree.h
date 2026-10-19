@@ -41,6 +41,8 @@ namespace KFCResultTree
 		bool		hit;		// a hit row - the colour cell - rather than an expander and a label
 		PMReal		shift;		// how far right of the list's outermost level; a tier's own level is not counted
 		PMString	label;		// a book, document, story or tier row's "<name>  (R/N)"
+		PMString	name;		// ...its <name> alone - no counts, no note after it (" (no window)"):
+								//   the Document column of Copy Results (KFCCopyResults)
 		PMString	locator;	// a hit row's five parts, as IKFCRowData::SetSegments takes them ("Changed " at the head of
 		PMString	flag;		//   the locator of a row this list has replaced)
 		PMString	pre;
@@ -227,7 +229,8 @@ namespace KFCResultTree
 
 	/** SEARCH THIS STORY AGAIN (a story row's right-click menu - the author's call): nothing while a run of
 	    ours is up (RefusedWhileRunning); then the story walked again (KFCRuns()->SearchStoryAgain), the tree rebuilt
-	    when its rows were put back (their places in the list moved) and the status line set either way. True = done. */
+	    when its rows were put back (their places in the list moved) - repainted when they were not (a walk turned away
+	    has had them follow their foci) - and the status line set either way. True = done. */
 	bool SearchStoryAgain(int32 chapterIdx, int32 groupIdx);
 
 	/** SEARCH THIS DOCUMENT AGAIN (a document row's right-click menu - the author's call): as

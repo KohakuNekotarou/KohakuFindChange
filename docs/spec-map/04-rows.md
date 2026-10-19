@@ -313,13 +313,13 @@
 
 - **ROW-47** ★**Clear from Results**（ヒット・物・ストーリー・文書の行の右クリック＝abc 順で一番上〈ROW-32・2026-10-18 午後から。それまでは一番下・区切りの後〉・2026-10-18 作者「検索結果の行を、消去したくなりますね」）と **Ctrl+Return**（作者「Ctrl＋リターンでその検索結果の行を消せるといいかも」・設計書 `docs/superpowers/specs/2026-10-18-kfc-clear-from-results-design.md`）――
   行を**一覧から外すだけ**（文書は変えない・取り消しの段にならない）。ヒットの行（物の行）＝その行・まとめて選んだ行の1つなら選んだ行すべて／ストーリーの行＝その下の行全部とストーリーの行／文書の行＝その文書の行全部と文書の行（段の見出しは `(0/0)` で残る）。`(R/N)` も減る。メッセージ欄 `Cleared 1 row from the results.`／`Cleared 3 rows from the results.`。
-  **Ctrl+Return**＝選んだヒットの行（物の行）を外し、**下の行を選んで飛ぶ**（一番下の行なら上の行）＝Return と同じくキーボードは一覧に残る（REP-32）。Ctrl+Shift+Return は何もしない。
+  **Ctrl+Return**＝選んだヒットの行（物の行）を外し、**下の行を選んで飛ぶ**（一番下の行なら上の行）＝Return と同じくキーボードは一覧に残る（REP-32）。Ctrl+Shift+Return は何もしない。★外すのが断られたとき（KFC の実行中＝メッセージ欄がそう言う）は**何も動かさない**＝下の行も選ばない（矢印と同じく、何かの最中は選択を動かさない＝JMP-05b・2026-10-19 ブロック7の再検査 D7-4。⚠実行中のキーが一覧に届く道は未実証＝回帰は無い）。
   外した行は、それより前の置換の取り消し・やり直しでも戻らない（残った行の追いかけは今までどおり＝UNDO-02）。Search This Story／Document Again・Search These Results Again で探し直すと、まだ一致する所は行として戻る。外した行は段を切り替えて戻っても外れたまま。
   ✅ 実機（2026-10-18・`k1.ps1`）＝1行・まとめて3行・ストーリーの行・文書の行・置換2つの後に1行外して Ctrl+Z／Redo（外した行は戻らない・段は置換の2つだけ）・Ctrl+Return（下の行が選ばれ文書の一致が選ばれる・最後の行は上へ・Ctrl+Shift+Return は何もしない）・探し直しで戻る・物の行（Ctrl+Return で下の物がレイアウトで選ばれる・灰色にしてから戻っても外れたまま）・4つのメニューの区切り。✅（2026-10-18 午後）押したまま＝KIDMCP の `send_input` の `CTRL+ENTER*3`（Windows と同じ自動反復の印・10-09 から有った）で外れたのは1行（`work/note-scripts/2026-10-18-kfc-narrow/km1.ps1`・記録 RETFOCUS の repeat=0 の後に repeat=1）。⬜まだ＝本文にキーボードがあるときの Ctrl+Return。
   - 訂正:
 
 - **ROW-48** ★**Copy Results**（パネルメニュー・Clear Results の下）・**Copy Rows**（ヒット・物・ストーリー・文書・ブックの行の右クリック）・**Copy These Results**（段の見出しの右クリック）・**Ctrl+C**（2026-10-18 作者「Copy Results やりましょう」・設計書 `docs/superpowers/specs/2026-10-18-kfc-copy-results-progress-share-design.md`）――
-  行を**タブ区切りのテキストでクリップボードへ写す**（本体のリンクパネルの「選択したリンクの情報をコピー」と同じ形＝1行目に列の名前・列の間にタブ・行の間に改行）。列＝`Document`・`Page`・`Status`・`Text`。Page＝行の場所の語のまま（`P1(2)`・`P2 overset` など）／Status＝`Changed`・`Outlined`・特殊操作の語・`Missing` など（無ければ空）／Text＝行と同じ「前[一致]後」（本文のタブは »・改行は空白）・物の行は物の名前。一覧から外した行（ROW-47）は写さない。文書は変えない（取り消しの段にならない）。
+  行を**タブ区切りのテキストでクリップボードへ写す**（本体のリンクパネルの「選択したリンクの情報をコピー」と同じ形＝1行目に列の名前・列の間にタブ・行の間に改行）。列＝`Document`・`Page`・`Status`・`Text`。Document＝文書の名前だけ（All Documents の窓の無い文書の行が後ろに付ける ` (no window)` は付けない＝2026-10-19 ブロック7の再検査 D7-5・回帰 `copy-results-nowindow`／`-armed`）。Page＝行の場所の語のまま（`P1(2)`・`P2 overset` など）／Status＝`Changed`・`Outlined`・特殊操作の語・`Missing` など（無ければ空）／Text＝行と同じ「前[一致]後」（本文のタブは »・改行は空白）・物の行は物の名前。一覧から外した行（ROW-47）は写さない。文書は変えない（取り消しの段にならない）。
   Copy Results＝今の段の行全部／Copy Rows＝その行（まとめて選んだ行の1つなら選んだ行すべて・ストーリーと文書の行はその下の行全部・ブックの行は全部）／Copy These Results＝その段の行（灰色の段も）／Ctrl+C＝一覧にキーボードがあるとき選んだ行（Copy Rows と同じ・本体の「コピー」は走らない）。メッセージ欄 `Copied 4 rows to the clipboard.`（1行は `Copied 1 row to the clipboard.`）。灰色＝写す行が無いとき。
   ★`Copy Results` はキーボードショートカットに割り当てられる（SET-13・2026-10-18 作者「だしましょう」）。
   ✅ 実機（2026-10-18・テスト用ビルド・KIDMCP・`work/note-scripts/2026-10-18-kfc-narrow/c1.ps1`・`p1.ps1`）＝見出し＋4行の4列・»・置換した行の Changed・外した行は入らない・ストーリーの行で2行・文書の行で4行・灰色の段で4行・Ctrl+C で1行（本体のコピーで上書きされない）・ブックの行で16行。
