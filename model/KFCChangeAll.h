@@ -37,7 +37,7 @@ namespace KFCChangeAll
 
 	/** The command's name - "Change All in Book (No List)", or "Change All in Selected Documents (No List)" while
 	    Find/Change Selected Documents (Book) narrows it: the menu's (IKFCRuns::ChangeAllCommandName) and
-	    the one the search's row limit (kKFCCollectHitLimit) names. */
+	    the one the search's row limit (KFCResultModel::ListLimit) names. */
 	const char* CommandName();
 
 	/** Is a Change All running (KFCRunGuard counts it)? */

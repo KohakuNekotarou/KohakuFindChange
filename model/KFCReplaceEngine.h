@@ -6,13 +6,13 @@
 //
 //  Replace engine: replaces the rows the user asks for in the result panel - a row's right-click menu or Return, one
 //  row (ReplaceHit) or the rows selected together (ReplaceHits; object rows are KFCObjectReplace's) - using the CHANGE
-//  string of the official Find/Change dialog. The Replace never writes that string - it uses it
-//  as the dialog holds it - so GREP back-references and escapes are interpreted by InDesign's own engine and are
-//  never parsed here. (What KFC does write to the panel - a value restated, the direction turned - is listed at
-//  the head of KFCSearchEngine.h.)
-//  ALSO HERE, shared with the object rows (KFCObjectReplace): a write's undo step (WriteStep) and what its documents are
-//  left as (DocsAfterWrite), the doors before it (RefuseChangedQuery, WhyGreyed) and IsReplacing, which KFCRunGuard
-//  counts; and a GREP row's after-text (PreviewHit).
+//  string of the official Find/Change dialog. The Replace never writes that string - it uses it as the dialog holds
+//  it - so GREP back-references and escapes are interpreted by InDesign's own engine and are never parsed here. (What
+//  KFC does write to the panel - a value restated, the direction turned - is listed at the head of KFCSearchEngine.h.)
+//  ALSO HERE: Restore from Copy (RestoreHits - its copies are KFCCopyStore's) and a text row's Create Outlines
+//  (OutlineHits); what every write from the list shares - its undo step (WriteStep) and what its documents are left as
+//  (DocsAfterWrite); the doors before a Replace (RefuseChangedQuery, WhyGreyed); IsReplacing, which KFCRunGuard counts;
+//  and a GREP row's after-text (PreviewHit).
 //
 //  HOW IT WRITES: ONE MATCH AT A TIME, A STORY AT A TIME (the author's call). ReplaceInChapterOneByOne in
 //  the .cpp walks each story that holds a row asked for (kFindTextCmdBoss, then kTWReplaceTextCmdBoss on
@@ -116,20 +116,20 @@ namespace KFCReplaceEngine
 
 	/** RESTORE FROM COPY (docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md): is the row one to offer it
 	    to - a text row a Replace of the list wrote (replaced, no item) whose copy is held (kCopyKept - the menu greys a
-	    row without one, the author's wish of 2026-10-17)? Whether its copy can be put back now - its text, the rest of
-	    its paragraph, a lock - is RestoreHits' to say, on the status line (the spec's C7). */
+	    row without one, the author's wish)? Whether its copy can be put back now - its text, the rest of its paragraph,
+	    a lock, a hyperlink on it, its paragraph style - is RestoreHits' to say, on the status line (the spec's C7). */
 	bool CanRestoreHit(int32 chapterIdx, int32 hitIdx);
 
 	/** RESTORE FROM COPY over text rows - the right-clicked row, or the rows selected together it is one of: the copy
 	    each one's Replace took of the text it wrote over (KFCCopyStore - ReplaceHits takes it) pasted back over what it
 	    wrote, in ONE undo step ("Restore from Copy" in the Edit menu - WriteStep) that the panel follows
-	    (KFCUndoFollow). The doors, row by row (C8): a replaced text row with its copy kept; its document reached (a
-	    closed chapter reopened windowless, as a Replace reaches it); its story followed (its rows take their foci's
-	    places - KFCSearchEngine::FollowStoryFoci - and its own focus stands exactly on its place; a story with no foci
-	    as KFC left it); what its Replace wrote still there; not locked; the paragraph style it puts back, when it puts
-	    one back, still in the document. The rows that pass are pasted in text order, each checked again just before
-	    (its run-on rest too, and a hyperlink the paste would replace whole); one that cannot be yet waits for another
-	    round. Each row put back reads as before its Replace - not replaced, its eye as it was
+	    (KFCUndoFollow). The doors, row by row (the copy-restore spec's C8): a replaced text row with its copy kept; its
+	    document reached (a closed chapter reopened windowless, as a Replace reaches it); its story followed (its rows
+	    take their foci's places - KFCSearchEngine::FollowStoryFoci - and its own focus stands exactly on its place; a
+	    story with no foci as KFC left it); what its Replace wrote still there; not locked; the paragraph style it puts
+	    back, when it puts one back, still in the document. The rows that pass are pasted in text order, each checked
+	    again just before (its run-on rest too, and a hyperlink the paste would replace whole); one that cannot be yet
+	    waits for another round. Each row put back reads as before its Replace - not replaced, its eye as it was
 	    (KFCResultModel::MarkHitRestored); every other row is carried to where its text stands. outStatus:
 	    "Restored ID:262 #3." - "Restored 2 of 3 rows: ID:262 #1, ID:262 #3. Left as they were: 1 edited since." -
 	    "Restored 3 rows in 2 documents: a.indd ID:262 #1; b.indd ID:270 #1."; a refusal ("Restore from Copy: ...") when
@@ -146,13 +146,14 @@ namespace KFCReplaceEngine
 	    (overset - InDesign refuses it -, locked, edited since, ...). True = something written; outStatus says what. */
 	bool OutlineHits(const KFCRowsByChapter& rows, PMString& outStatus);
 
-	/** Can a text row be outlined - a text row not outlined yet, not locked, not overset, not zero-width? Read off the row
-	    alone (nothing opened): the menu greys Create Outlines by it (X9); what only the document can tell is said when it is
-	    pressed. */
+	/** Can a text row be outlined - a text row not outlined yet, not locked, not overset, not zero-width? Read off the
+	    row alone (nothing opened): the menu greys Create Outlines by it (the outlines spec's X9); what only the
+	    document can tell is said when it is pressed. */
 	bool CanOutlineHit(int32 chapterIdx, int32 hitIdx);
 
-	/** ONE UNDO STEP FOR A WRITE FROM THE LIST ("Replace" - kKFCReplaceStepKey), the one rule for the text rows (ReplaceHit,
-	    ReplaceHits) and the object rows (KFCObjectReplace):
+	/** ONE UNDO STEP FOR A WRITE FROM THE LIST, the one rule for every such write - its callers are the list (a row's
+	    Replace of text or object rows, Restore from Copy, Create Outlines, the Special Operations), each naming its
+	    step by stepKey ("Replace" - kKFCReplaceStepKey - by default):
 	      - ONE DOCUMENT: a plain sequence, rolled back on a failure the SDK's own way - the error state raised, the
 	        sequence ended, the state cleared (CmdUtils.h, SequenceContext). Plain, as the SDK asks: a plain sequence is
 	        the type that meets most needs, and an abortable one is for where it is needed - it carries "a heavy
@@ -181,10 +182,10 @@ namespace KFCReplaceEngine
 		const char* internalName = "KFC Replace");
 	void EndWriteStep(WriteStep& step, bool ok);
 
-	/** WHAT EACH DOCUMENT OF A WRITE FROM THE LIST IS LEFT AS (the author's calls), once the write is over, whichever way
-	    it went - the one rule for the text rows (ReplaceHit, ReplaceHits) and the object rows, one row's and rows selected
-	    together (KFCObjectReplace's one write behind its two doors). A closed chapter was reopened windowless and is held
-	    (KFCBookScope::ReopenChapterDoc).
+	/** WHAT EACH DOCUMENT OF A WRITE FROM THE LIST IS LEFT AS (the author's calls), once the write is over, whichever
+	    way it went - the one rule for every such write - its users are the list (a row's Replace of text or object
+	    rows, one row's and rows selected together, Restore from Copy, Create Outlines, the Special Operations). A
+	    closed chapter was reopened windowless and is held (KFCBookScope::ReopenChapterDoc).
 	      - WRITTEN: a chapter of ours gets its window, so the write can be seen and saved
 	        (KFCBookScope::ShowChapterWindow); a document that is not ours is left as it is - one the user keeps WITHOUT a
 	        window (Search: = All Documents) stays hidden, and the status line says so. (Not a window for every write:
@@ -229,11 +230,12 @@ namespace KFCReplaceEngine
 	    outcome - WhyGreyed answering kGreyedNot. */
 	bool CanReplaceHit(int32 chapterIdx, int32 hitIdx);
 
-	/** IS A ROW'S REPLACE UNDER WAY - ReplaceHit or ReplaceHits, text rows or object rows, from the door to the last
-	    chapter's hand-back? KFCRunGuard counts it. It has no bar, but reopening a closed chapter and giving a written one
-	    its window RUN THE MESSAGE LOOP, and what that dispatches must not start inside it: a landing (its Hide Previous
-	    Chapter sweep would schedule the close of a chapter this is about to write), a second Replace, a run (its commit
-	    point would close the chapter this reopened), the book watcher's release, the Undo follow. */
+	/** IS A WRITE OF THIS ENGINE'S UNDER WAY - a row's Replace (ReplaceHit or ReplaceHits, text rows or object rows),
+	    Restore from Copy (RestoreHits), a text row's Create Outlines (OutlineHits) - from the door to the last
+	    chapter's hand-back? KFCRunGuard counts it. It has no bar, but reopening a closed chapter and giving a written
+	    one its window RUN THE MESSAGE LOOP, and what that dispatches must not start inside it: a landing (its
+	    Hide Previous Chapter sweep would schedule the close of a chapter this is about to write), a second write, a run
+	    (its commit point would close the chapter this reopened), the book watcher's release, the Undo follow. */
 	bool IsReplacing();
 
 	/** WHY A ROW'S REPLACE IS GREYED - the one place the reasons are asked (CanReplaceHit is this answering kGreyedNot) -

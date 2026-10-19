@@ -110,9 +110,9 @@ bool KFCChangeAll::IsRunning()
 
 const char* KFCChangeAll::CommandName()
 {
-	// One name (F18): a document's Change All is InDesign's own dialog's, so this command is the book's alone - said
-	// as the selected documents' when Find/Change Selected Documents (Book) narrows it to the Book panel's selection
-	// (asked of the one place that narrows the run, KFCBookScope's, as Find's name is).
+	// One name (the no-track spec's F18): a document's Change All is InDesign's own dialog's, so this command is the
+	// book's alone - said as the selected documents' when Find/Change Selected Documents (Book) narrows it to the
+	// Book panel's selection (asked of the one place that narrows the run, KFCBookScope's, as Find's name is).
 	if (KFCBookScope::IsBookScopeOn())
 	{
 		PMString bookName;
@@ -148,11 +148,11 @@ bool KFCChangeAll::WriteDocument(const UIDRef& docRef, int32 selectionScope, con
 		walker->Halt();
 	walker->Initialize(client, scope, opts, nil);
 	const KFCSearchEngine::WalkerStops stops(walker);		// halted on every way out (KFCSearchEngine.h)
-	// NOTHING TO WALK IS NOTHING TO CHANGE (KFCSearchEngine::ScopeHasNothingToWalk - a document with no text frame, or with
-	// master-page text only and Include Master Pages off): the command would answer kFailure, read below as a failed Change
-	// All, and the caller would take its whole step back - a book stopped at its chapter of pictures, while InDesign's own
-	// Change All goes past it (measured - cases xq-notext-doc, xq-masteronly-doc, ca-book-notext-chapters). Done,
-	// with nothing changed.
+	// NOTHING TO WALK IS NOTHING TO CHANGE (KFCSearchEngine::ScopeHasNothingToWalk - a document with no text frame, or
+	// with master-page text only and Include Master Pages off): the command would answer kFailure, read below as a
+	// failed Change All, and the caller would take its whole step back - a book stopped at its chapter of pictures,
+	// while InDesign's own Change All goes past it (measured - cases xq-notext-doc, xq-masteronly-doc,
+	// ca-book-notext-chapters). Done, with nothing changed.
 	if (KFCSearchEngine::ScopeHasNothingToWalk(scope))
 	{
 		KFC_DIAG_LOG("CHANGEALL doc=%p scope=%d nothing to walk - nothing to change", (void*)docRef.GetDataBase(), (int)selectionScope);
@@ -292,11 +292,11 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 		outSummary.Append("Change All: the Colour tab is not supported.");
 		return 0;
 	}
-	// THE OBJECT TAB (spec O13): InDesign's object Change All over each chapter. Refused with nothing to find - an
-	// empty Find Object Format would change every frame of the Type in the book - or nothing to change to. (The menu greys
-	// the item with nothing to find - HasFindQueryNow - so that door is for a caller that never went through the menu; with
-	// nothing to change to the menu still offers it - O13 greys by the text tabs' conditions, which have no such one - and
-	// this door is what answers.)
+	// THE OBJECT TAB (the object search spec's O13): InDesign's object Change All over each chapter. Refused with
+	// nothing to find - an empty Find Object Format would change every frame of the Type in the book - or nothing to
+	// change to. (The menu greys the item with nothing to find - HasFindQueryNow - so that door is for a caller that
+	// never went through the menu; with nothing to change to the menu still offers it - O13 greys by the text tabs'
+	// conditions, which have no such one - and this door is what answers.)
 	const bool objectTab = (KFCSearchEngine::CurrentSearchMode() == IFindChangeOptions::kObjectSearch);
 	if (objectTab && !KFCObjectSearch::HasFindObjectFormat())
 	{
@@ -313,8 +313,9 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 		outSummary.Append("Change All: nothing to find - type it in Edit > Find/Change first.");
 		return 0;
 	}
-	// THE BOOK'S ALONE (F18): with Book Scope off, a document's Change All is InDesign's own dialog's. Asked before
-	// ResolveRunScope, which with the scope off can refuse first over a Search: it cannot follow - not the reason.
+	// THE BOOK'S ALONE (the no-track spec's F18): with Book Scope off, a document's Change All is InDesign's own
+	// dialog's. Asked before ResolveRunScope, which with the scope off can refuse first over a Search: it cannot
+	// follow - not the reason.
 	if (!KFCBookScope::IsBookScopeOn())
 	{
 		outSummary.Append("Change All in Book (No List) needs Book Scope on.");
@@ -325,9 +326,9 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 			: KFCSearchEngine::ResolveRunScope(scope, outSummary)))
 		return 0;
 	// THE TAB AND THE CHANGE SIDE, STATED BEFORE THE SEQUENCE (outside any command sequence - CommitSearchMode's rule):
-	// what the command writes is what the dialog shows. Not for the Object tab: its Change All is the service's
-	// own object replace, which no text walker mode steers - CommitSearchMode turns that tab away by design, as in
-	// KFCSearchEngine::SearchBook.
+	// what the command writes is what the dialog shows. Not for the Object tab: its Change All is the service's own
+	// object replace, which no text walker mode steers - CommitSearchMode turns that tab away by design, as in
+	// KFCSearchEngine::RunSearch.
 	if (!objectTab && !KFCSearchEngine::CommitSearchMode())
 	{
 		outSummary.Append("Change All: the Find/Change tab could not be stated - nothing was changed.");
@@ -339,16 +340,17 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 		return 0;
 	}
 
-	// ===== THE COMMIT POINT - the results thrown away (KFCSearchEngine::DropResults: the rows, the searched book and the
-	// chapters it holds, the find format) before the book's chapters are listed, as the search and the query run do. What
-	// can stand here is a search that found nothing - Change All runs only with no list (above) - and a book search leaves
-	// its book's row up then, "<book>  (0/0)". Left standing, that row read "(0/0)" over a run that wrote (the query run's
-	// reason for leaving the panel empty - KFCQuerySequence.cpp, "NO LIST"), and ListBookChapters below records THIS
-	// run's book as the searched one (its header asks for ReleaseSearchedBook first): the row then named one book and
-	// KFC watched another - closing the book Change All wrote cleared the row ("Results cleared - the book was closed."),
-	// closing the row's own book left it, and a click on it brought the other book forward (case
-	// ca-after-other-book-empty). The chapters held from before go now, not on a schedule (SearchBook says why). The UI
-	// half draws the empty tree when the run returns (KFCActionComponent).
+	// ===== THE COMMIT POINT - the results thrown away (KFCSearchEngine::DropResults: the rows, the searched book and
+	// the chapters it holds, the find format) before the book's chapters are listed, as the search and the query run
+	// do. What can stand here is a search that found nothing - Change All runs only with no list (above) - and a book
+	// search leaves its book's row up then, "<book>  (0/0)". Left standing, that row read "(0/0)" over a run that wrote
+	// (the query run's reason for leaving the panel empty - KFCQuerySequence.cpp, "NO LIST"), and ListBookChapters
+	// below records THIS run's book as the searched one (its header asks for ReleaseSearchedBook first): the row then
+	// named one book and KFC watched another - closing the book Change All wrote cleared the row ("Results cleared -
+	// the book was closed."), closing the row's own book left it, and a click on it brought the other book forward
+	// (case ca-after-other-book-empty). The chapters held from before go now, not on a schedule
+	// (KFCSearchEngine::RunSearch says why). The UI half draws the empty tree when the run returns
+	// (KFCActionComponent).
 	// THE PANEL'S PICTURE STAYS WHAT IT WAS (spec map PNL-07 / PNL-08): the results go, the fact that a search has run does
 	// not - DropResults' Clear() takes it away with them, and only a Change All that WROTE changes the picture (the pencil
 	// cat, NoteChangeAllWrote at the end).
@@ -392,7 +394,7 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 
 	// ===== ONE SEQUENCE AROUND EVERY CHAPTER - one Ctrl+Z for the whole book.
 	int32 replaced = 0;
-	int32 partially = 0;		// the Object tab's items changed only in part (spec O13)
+	int32 partially = 0;		// the Object tab's items changed only in part (the object search spec's O13)
 	std::vector<bool> wroteTo(targets.size(), false);		// by target: did its Change All write anything
 	std::vector<std::pair<PMString, int32> > written;		// the By chapter list: each chapter written, how many (book order)
 	bool cancelled = false, failed = false;
@@ -407,8 +409,9 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 	}
 	seq->SetName(kKFCChangeAllStepKey);
 	{
-		// The bar split among the chapters by their sizes (docs/superpowers/specs/2026-10-18-kfc-copy-results-progress-share-
-		// design.md - KFCBookScope::ProgressBases): a chapter's step as long as its size makes it, not one each.
+		// The bar split among the chapters by their sizes
+		// (docs/superpowers/specs/2026-10-18-kfc-copy-results-progress-share-design.md - KFCBookScope::ProgressBases):
+		// a chapter's step as long as its size makes it, not one each.
 		const int32 barTotal = static_cast<int32>(targets.size()) * 100;
 		const std::vector<int32> shares(KFCBookScope::ProgressBases(KFCBookScope::TargetSizes(targets), barTotal));
 		KFCProgressBar bar(kKFCChangeAllStepKey, 0, barTotal, kTrue, kTrue);
@@ -473,8 +476,9 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 	else
 		CmdUtils::EndCommandSequence(seq);
 	seq = nil;
+	// The shared walker named the book's chapters: aimed back at the front (the object search spec's O7).
 	if (objectTab)
-		KFCObjectSearch::AimSharedWalkerAtFront();		// O7 - the walker named the book's chapters
+		KFCObjectSearch::AimSharedWalkerAtFront();
 
 	if (cancelled || failed)
 	{
@@ -529,7 +533,7 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 		outSummary.AppendNumber(static_cast<int32>(written.size()));
 		outSummary.Append(" chapter(s)");
 		AppendPartially(outSummary, partially);
-		outSummary.Append(".");		// one undo step; nothing said of Ctrl+Z (spec F20)
+		outSummary.Append(".");		// one undo step; nothing said of Ctrl+Z (the no-track spec's F20)
 	}
 	KFCBookScope::AppendUnopenableNote(outSummary, unopenable);
 	KFCBookScope::AppendUnclosedNote(outSummary, unclosed);

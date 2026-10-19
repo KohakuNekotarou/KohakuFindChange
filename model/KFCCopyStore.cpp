@@ -40,14 +40,14 @@ namespace
 {
 // THE NUMBER THE NEXT STORE IS MADE WITH - read by the controller as it is constructed, for its scrap database's file
 // name: CDataExchangeController.h asks that name to be unique, and InDesign keeps a scrap database as a file in its
-// Caches folder (its own clipboards are "InDesign ClipboardScrap1", "...2" - measured, 2026-10-17). KFC holds one store
-// per document, so each takes the number of its own.
+// Caches folder (its own clipboards are "InDesign ClipboardScrap1", "...2" - measured). KFC holds one store per
+// document, so each takes the number of its own.
 uint32 gNamingNumber = 0;
 }
 
-/** THE STORE'S CONTROLLER - KIDMCP's task-start store's (KIDMCPTaskStoreController), itself KT's spike's
-	(KTScrapStoreController, branch exp/2026-10-06-private-scrap): nothing registers it with the clipboard or a drag, so
-	the person's clipboard is never touched and the scrap is nobody else's. */
+/** THE STORE'S CONTROLLER - the shape of KIDMCP's task-start store (KIDMCPTaskStoreController), measured first in KT
+	(docs/ai-notes/private-scrap-store-2026-10-06.md): nothing registers it with the clipboard or a drag, so the
+	person's clipboard is never touched and the scrap is nobody else's. */
 class KFCCopyStoreController : public CDataExchangeController
 {
 public:
@@ -128,7 +128,7 @@ void LetGo(Store& store)
 	{
 		// Cleanup deletes the scrap database ("Release referenced objects and destroy database",
 		// CDataExchangeController.h); a scrap is independent of the document it was copied from, so this is safe before
-		// or after that document closes (KT measured copies outliving their document, 2026-10-06).
+		// or after that document closes (KT measured copies outliving their document).
 		going->Cleanup();
 		going->Release();
 	}
@@ -212,8 +212,8 @@ bool KFCCopyStore::Take(const UIDRef& story, TextIndex start, TextIndex end, Cop
 		return false;
 	}
 #endif
-	// THE RANGE MUST LIE IN THE STORY'S PRIMARY THREAD: the copy command checks nothing - [1, 2) of an empty story, and a
-	// range run into a table cell's thread, crashed InDesign in KT (2026-10-06).
+	// THE RANGE MUST LIE IN THE STORY'S PRIMARY THREAD: the copy command checks nothing - [1, 2) of an empty story, and
+	// a range run into a table cell's thread, crashed InDesign in KT.
 	const int32 span = PrimaryLength(story);
 	if (span < 0 || start < 0 || end < start || end > span)
 		return false;

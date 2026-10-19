@@ -64,11 +64,11 @@
 //                query x document) was being written - heard where the run asks the bar next, so a test can press it
 //                in the run's last step, which only the ask after the loop hears (work\kbs-regress\xq-cases.tsv).
 //                Throwaway documents only.
-//    book-selection  (UI half) the file's first line "book=<a book's file name>", then one chapter's short
-//                name a line: ui/KFCBookPanelLookup.cpp's GetPanelBookSelection answers with those chapters as the Book
-//                panel's selection for that book (nothing selected for any other), judged by the same rule as a real
-//                one - Find/Change Selected Documents (Book) tested apart from the panel (work\kbs-regress\sd-cases.tsv;
-//                the make scripts' selectChapters writes it, qd-off.jsx takes it off)
+//    book-selection  (UI half) the file's first line "book=<a book's file name>", then one chapter's short name a line:
+//                ui/KFCBookPanelLookup.cpp's GetPanelBookSelection answers with those chapters as the Book panel's
+//                selection for that book (nothing selected for any other), judged by the same rule as a real one -
+//                Find/Change Selected Documents (Book) tested apart from the panel (work\kbs-regress\sd-cases.tsv; the
+//                make scripts' selectChapters writes it, qd-off.jsx takes it off)
 //    no-return-filter  (UI half) ui/KFCResultTreeEH.cpp's PushReturnFilter pushes nothing: the result list's
 //                Return filter stays off the dispatcher's stack - what the filter alone changes, told apart from the rest
 //                (a jumped-to replaced row drawn hilited)
@@ -98,12 +98,12 @@
 //    return-filter-holder-only  (UI half) ui/KFCResultTreeEH.cpp's Return filter asks InDesign's keyboard holder alone,
 //                the old way - not the window the system sends the keys to as well: the case that shows what the second
 //                question stops, a Return pressed after Find/Change's title bar was clicked (ret-after-fc-title-armed)
-//    object-rows-sweep  (UI half) ui/KFCJump.cpp's ReplaceObjectRows fronts the shown row's chapter WITH the "Hide Previous
-//                Chapter" sweep. The sweep is decided at the end of the operation (P-C), after the write,
-//                and keeps the written chapters (sel-book-objects-open-hide-deferred); with sweep-at-once as well it is
-//                scheduled in the middle, the old way - the other chapters it is about to write are closed after the write,
-//                the write in them: the case that shows the written-document check (KFCDiagWrittenDocs.h) catching it
-//                (sel-book-objects-open-hide-armed)
+//    object-rows-sweep  (UI half) ui/KFCJump.cpp's ReplaceObjectRows fronts the shown row's chapter WITH the
+//                "Hide Previous Chapter" sweep. The sweep is decided at the end of the operation (P-C), after the
+//                write, and keeps the written chapters (sel-book-objects-open-hide-deferred); with sweep-at-once as
+//                well it is scheduled in the middle, the old way - the other chapters it is about to write are closed
+//                after the write, the write in them: the case that shows the written-document check
+//                (KFCDiagWrittenDocs.h) catching it (sel-book-objects-open-hide-armed)
 //    sweep-at-once  (UI half) ui/KFCJump.cpp's FrontChapter schedules the "Hide Previous Chapter" sweep on the spot, in the
 //                middle of the operation, instead of leaving it to the operation's SweepAtEnd - the way before P-C
 //                (sel-book-objects-open-hide-armed, with object-rows-sweep)
@@ -116,10 +116,10 @@
 //    landing-return  (UI half) ui/KFCJump.cpp's JumpToHit replaces its own row through the panel's door
 //                (KFCResultTree::ReplaceRows) once its window is in front - the Return a landing's message loop can
 //                dispatch: the door must turn it away (landing-return)
-//    landing-guard-off  (UI half) KFCJump::IsLanding answers no, the old way: with landing-return the write goes in inside
-//                the landing's dirty guard, is marked clean when the landing ends, and the next landing's Hide Previous
-//                Chapter sweep closes it unsaved - the case that shows the written-document check catching it
-//                (landing-return-armed)
+//    landing-guard-off  (UI half) KFCJump::IsLanding answers no, the old way: with landing-return the write goes in
+//                inside the landing's dirty guard, is marked clean when the landing ends, and the next landing's
+//                Hide Previous Chapter sweep closes it unsaved - the case that shows the written-document check
+//                catching it (landing-return-armed)
 //    select-all-expand-once  (UI half) Select All Rows opens the rows under its row with one ITreeViewMgr::ExpandNode with
 //                all its descendants, the old way (ui/KFCResultTreeController.cpp): on a book result as the search left it -
 //                the book row open, its chapters closed - the rows under them would be selected and not drawn, and Return,
@@ -176,8 +176,9 @@
 //    query-scope-refuse  KFCQueryScope (a row operation under its list's query - the tier switch v2) refuses once every
 //                check has passed: the refusal's whole path - the sequence aborted, Find/Change put back, nothing done -
 //                tried on demand (the v2 spec's section 5, item 7). One-shot.
-//    copy-fail  KFCCopyStore::Take keeps no copy: a row's Replace goes through all the same, and that row's Restore
-//                Original says no copy could be kept (docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md C3, R16)
+//    copy-fail  KFCCopyStore::Take keeps no copy: a row's Replace goes through all the same, and that row's
+//                Restore from Copy says no copy could be kept
+//                (docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md C3, R16)
 //    copy-links  TakeRowCopy's cross-reference door stands open: a row whose copy touches a cross-reference source keeps
 //                its copy all the same (its hyperlink sources are kept and put back as one link - the same spec's C15)
 //    restore-link-in-way  Restore from Copy pastes over a hyperlink source whose whole text lies on the paste, the old
@@ -208,9 +209,9 @@
 //    narrow-ceiling-first  a narrowed list's text walk (KFCSearchEngine.cpp's CollectHitsInDoc) asks the list's ceiling
 //                ahead of its conditions, of every match it meets, the old way: a full list met by one more match the
 //                conditions drop is called cut short - "Stopped at the 300 limit" (nd-limit-dropped-armed)
-//    part-narrow-as-text  a Narrow Down over part of a document (KFCSearchEngine.cpp's SearchPartsAgain) files a Frames
-//                of These Matches list with a text list's limit and words, and says nothing of the matches no frame
-//                holds, the old way (nd-frames-part-armed)
+//    part-narrow-as-text  a Narrow Down over part of a document (KFCSearchEngine.cpp's SearchPartsAgain) files a
+//                Frames of These Matches list with a text list's limit and words, and says nothing of the matches no
+//                frame holds, the old way (nd-frames-part-armed)
 //
 //  AND TIMERS: KFC_CLOCK / KFC_SPENT add up the milliseconds a stretch of code takes, and KFCDiagPhase
 //  writes "PHASE <name> begin" and "PHASE <name> end <ms>" around a scope - all of it nothing without KFC_DIAG.

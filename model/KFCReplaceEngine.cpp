@@ -77,8 +77,9 @@
 namespace
 {
 
-// A ROW'S REPLACE UNDER WAY (KFCReplaceEngine::IsReplacing - KFCRunGuard counts it). A depth, not a flag: ReplaceHits hands
-// one row to ReplaceHit, and the inner one's end must not say the outer one is over.
+// A WRITE OF THIS ENGINE'S UNDER WAY - a row's Replace, Restore from Copy, a text row's Create Outlines
+// (KFCReplaceEngine::IsReplacing - KFCRunGuard counts it). A depth, not a flag: ReplaceHits hands one row to
+// ReplaceHit, and the inner one's end must not say the outer one is over.
 int32 gReplacingDepth = 0;
 
 struct ReplacingScope
@@ -340,8 +341,8 @@ void KeepRowAt(IDataBase* db, std::vector<RowNow>& rowNow, std::vector<int32>& k
 
 // ======================================================================================================
 // ONE MATCH AT A TIME, STORY BY STORY (the author's call). Only the rows asked for are written, one at a time
-// (kFindTextCmdBoss, then kTWReplaceTextCmdBoss on the match it made current), a story at a time, with Track
-// Changes as each story has it - KFC records nothing of its own (spec F1). (Not Change All - see above.)
+// (kFindTextCmdBoss, then kTWReplaceTextCmdBoss on the match it made current), a story at a time, with Track Changes as
+// each story has it - KFC records nothing of its own (the no-track spec's F1). (Not Change All - see above.)
 //
 // WHICH WAY THE WALK GOES IS DECIDED BEFORE ANYTHING IS WRITTEN (the author's call). A walk that writes
 // as it goes reads text it has already rewritten, and each direction has one shape it cannot get right
@@ -513,11 +514,11 @@ struct ChapterOutcome
 	}
 };
 
-// One story's walk: every pending row the walk meets is written, one at a time, in the direction the
-// session is set to (the caller's KFCBackwardSearchScope). What the walk writes moves every row after it
-// in the same thread (CarryRowsPast); a written row is put where its new text stands - an endnote's
-// last match too, written as InDesign writes it (spec F12). What is still in `pending` at the
-// end never came up. False = the walk could not start at all; io.walkFailed = it started and broke off.
+// One story's walk: every pending row the walk meets is written, one at a time, in the direction the session is set to
+// (the caller's KFCBackwardSearchScope). What the walk writes moves every row after it in the same thread
+// (CarryRowsPast); a written row is put where its new text stands - an endnote's last match too, written as InDesign
+// writes it (the no-track spec's F12). What is still in `pending` at the end never came up. False = the walk could not
+// start at all; io.walkFailed = it started and broke off.
 bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerScopeOptions& scopeOptions,
 	IFindChangeOptions* opts, std::vector<RowNow>& rowNow, std::set<int32>& pending, std::vector<int32>& keptRows,
 	ChapterOutcome& io)
@@ -810,13 +811,13 @@ void ReadBackRows(int32 chapterIdx, IDataBase* db, const std::vector<RowNow>& ro
 // version on record again and the rows stand where their text does. The example above ("catcatcatcat",
 // Ctrl+Z) is such an Undo and is followed;
 // typing, an Undo of anything else, the Track Changes panel and a script still stop the write.
-// OVERTURNED FOR ROWS THAT FOLLOW THEIR FOCI (the author's call of 2026-10-14 night -
+// OVERTURNED FOR ROWS THAT FOLLOW THEIR FOCI (the author's call -
 // docs/superpowers/plans/2026-10-14-kfc-row-focus-undo.md): a row's text focus is of KFC's own class now, and the
 // user's Undo and Redo put it back (KFCRowFocus.h). Before every write the rows of each story take their foci's places
 // and the story its version as it stands (KFCSearchEngine::FollowStoryFoci, in ReplaceRowsNow), so typing, an Undo of
-// anything, the Track Changes panel, a script and InDesign's own Change All no longer stop it; a row whose own text
-// was edited is Missing. This version rule still decides for a story whose rows have no foci - and a story with a
-// focus that could not follow (an Undo of an edit older than the search) is refused whatever its version says.
+// anything, the Track Changes panel, a script and InDesign's own Change All no longer stop it; a row whose own text was
+// edited is Missing. This version rule still decides for a story whose rows have no foci - and a story with a focus
+// that could not follow (an Undo of an edit older than the search) is refused whatever its version says.
 // ======================================================================================================
 
 // Is the story at the version KFC last recorded for it? Nothing recorded, or unreadable, answers no.
@@ -920,7 +921,7 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 			continue;
 		}
 		// (A match inside or next to the user's own pending insertion is written as InDesign writes it - into the
-		//  insertion, as its own Change does (case nt-own-insertion): KFC accepts nothing - spec F1.)
+		//  insertion, as its own Change does (case nt-own-insertion): KFC accepts nothing - the no-track spec's F1.)
 		pendingByStory[story].insert(i);
 	}
 	// Nothing to write: every row kept was placed a moment ago from where it stands, and nothing has moved
@@ -1156,12 +1157,12 @@ enum QueryCompared
 QueryCompared CompareQueryWithSearch()
 {
 	// ----- (1) the TAB the results were searched with -----
-	// The row's story is RE-WALKED, and a walk in another mode returns another set of matches - so the
-	// rows would be lined up with occurrences the user never saw. Asked first because it is the most
-	// specific thing that can be said, and because it does NOT cost the results: a tab is one click to
-	// put back. Read through the call the results were stamped with (KFCSearchEngine::CurrentSearchMode).
-	// (Not "is the searched tab one this panel walks at all": the tab on the results is one SearchBook
-	// searched - the four text tabs or the Object tab - so it would never answer no.)
+	// The row's story is RE-WALKED, and a walk in another mode returns another set of matches - so the rows would be
+	// lined up with occurrences the user never saw. Asked first because it is the most specific thing that can be said,
+	// and because it does NOT cost the results: a tab is one click to put back. Read through the call the results were
+	// stamped with (KFCSearchEngine::CurrentSearchMode). (Not "is the searched tab one this panel walks at all": the
+	// tab on the results is one a search walked (KFCSearchEngine::RunSearch) - the four text tabs or the Object tab -
+	// so it would never answer no.)
 	const int32 searchedMode = KFCResultModel::GetSearchMode();
 	const int32 currentMode = KFCSearchEngine::CurrentSearchMode();
 	if (searchedMode >= 0 && currentMode >= 0 && currentMode != searchedMode)
@@ -1175,12 +1176,12 @@ QueryCompared CompareQueryWithSearch()
 	// It writes back the value it just read, so calling it here AND from a caller that asks this
 	// question twice changes nothing: it states the mode, it does not choose one.
 	//
-	// IT HAS TO HAPPEN BEFORE THE COMPARISON BELOW, and that is not a detail. The search
-	// records its signature after committing the mode too (KFCSearchEngine::SearchBook). Committing a
-	// mode is a declaration and, as CommitSearchMode's own comment says, "there is no promise anywhere
-	// that it leaves that mode's other settings untouched" - so a signature taken on one side of that
-	// command and compared against one taken on the other side could differ with nothing having
-	// changed, and would then refuse every replace there is. Both are taken on the same side.
+	// IT HAS TO HAPPEN BEFORE THE COMPARISON BELOW, and that is not a detail. The search records its signature after
+	// committing the mode too (KFCSearchEngine::RunSearch commits it, then WriteListHeader records the signature).
+	// Committing a mode is a declaration and, as CommitSearchMode's own comment says, "there is no promise anywhere
+	// that it leaves that mode's other settings untouched" - so a signature taken on one side of that command and
+	// compared against one taken on the other side could differ with nothing having changed, and would then refuse
+	// every replace there is. Both are taken on the same side.
 	//
 	// Deliberately OUTSIDE any command sequence: this processes a command of its own, and a
 	// session-setting command inside the replace's sequence would become part of its undo step. Every
@@ -1194,8 +1195,8 @@ QueryCompared CompareQueryWithSearch()
 	// leaves the panel be.
 	//
 	// NOT FOR THE OBJECT TAB: its walk is the service's own object search, which no text walker mode steers, and
-	// CommitSearchMode turns that tab away by design; SearchBook commits nothing for it either, so the signatures below
-	// are still taken on the same side (KFCSearchEngine::SearchBook's note on it).
+	// CommitSearchMode turns that tab away by design; the search commits nothing for it either
+	// (KFCSearchEngine::RunSearch's note on it), so the signatures below are still taken on the same side.
 	if (currentMode != IFindChangeOptions::kObjectSearch && !KFCSearchEngine::CommitSearchMode())
 		return kQueryTabNotStated;
 
@@ -1280,12 +1281,12 @@ bool KFCReplaceEngine::QueryUnchangedSinceSearch()
 }
 
 // ======================================================================================================
-// REPLACE A ROW - OR THE ROWS SELECTED TOGETHER - FROM ITS RIGHT-CLICK MENU OR RETURN (the author's calls -
-// spec F16). No prompt. The list stays a WORK LIST, so a row written shows its new text and every
-// other row is carried to where its text now stands, ready for the next Replace. One undo step ("Replace"). Its doors
+// REPLACE A ROW - OR THE ROWS SELECTED TOGETHER - FROM ITS RIGHT-CLICK MENU OR RETURN (the author's calls - the
+// no-track spec's F16). No prompt. The list stays a WORK LIST, so a row written shows its new text and every other row
+// is carried to where its text now stands, ready for the next Replace. One undo step ("Replace"). Its doors
 // (ReplaceRowsNow): the query unchanged (RefuseChangedQuery), every document of several still open once the last is
 // reached, and the verify walk's three questions (ChapterMovedUnderRows). Nothing is accepted, and nothing recorded of
-// KFC's own (spec F1).
+// KFC's own (the no-track spec's F1).
 // ======================================================================================================
 
 bool KFCReplaceEngine::CanReplaceHit(int32 chapterIdx, int32 hitIdx)
@@ -1454,14 +1455,6 @@ KFCReplaceEngine::DocsAfterWrite::~DocsAfterWrite()
 	}
 }
 
-// The rows replaced now, in ONE undo step - a hit row's Replace (its right-click menu or Return - spec F16), or the text
-// rows selected together (the author's call: replaced together, as object rows are) - of one document or of several
-// (one step for every document of them - the header's WriteStep).
-// The caller has asked CanReplaceHit of every row. All or nothing, as one row's has always been: a row the check finds
-// moved refuses them all before a character is written, and a write that does not land on every one is rolled back
-// whole. greyed = the rows selected with them whose Replace was greyed, counted by reason (WhyGreyed - all 0 for one row's
-// Replace): one row's sentences are its own ("this row", "the match"); several rows' say "a selected row", and the rows
-// left are counted by their reason.
 // ======================================================================================================
 // THE COPIES A ROW'S REPLACE TAKES, FOR ITS RESTORE FROM COPY
 // (docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md C3 / C4): taken after every door of the write and
@@ -1474,11 +1467,12 @@ namespace
 
 // WHICH ROW, IN A WRITE'S MESSAGE (the user's report: replacing row after row with Return, every message read the same
 // "Replaced." and which one had just happened could not be told). The author's choice: the story's UID and the hit's
-// place among that story's results - "Replaced ID:262 #3." (the author's spelling) - the story row and its third hit row
-// in the list (the tree's middle level is one group per story, BuildFontGroups; GetHitFontGroupPos is the hit's place
-// under it, from 0), and the UID a script reaches the story by (stories.itemByID). A story UID is the document's own
-// number: in a book the chapter row above says which document. One place for the Replace's message and Restore
-// Original's. "ID:262 #3" for one row - empty when its story or its place under the story row cannot be read.
+// place among that story's results - "Replaced ID:262 #3." (the author's spelling) - the story row and its third hit
+// row in the list (the tree's middle level is one group per story, BuildFontGroups; GetHitFontGroupPos is the hit's
+// place under it, from 0), and the UID a script reaches the story by (stories.itemByID). A story UID is the document's
+// own number: in a book the chapter row above says which document. One place for the messages of every write of text
+// rows (SayRowsWritten - the Replace, Restore from Copy, Create Outlines). "ID:262 #3" for one row - empty when its
+// story or its place under the story row cannot be read.
 PMString RowName(int32 chapterIdx, int32 hitIdx)
 {
 	PMString name;
@@ -1496,14 +1490,14 @@ PMString RowName(int32 chapterIdx, int32 hitIdx)
 	return name;
 }
 
-// WHAT A WRITE OF THE LIST DID - the one message of the Replace, Restore from Copy and Create Outlines (spec F16 / F19
-// / F20, the copy-restore spec's C12, the outlines spec's X8), which says nothing of Ctrl+Z (the author's call). One
-// row by its name (RowName): "Replaced ID:262 #3." ("Replaced." when its name cannot be read). Several counted -
-// "Replaced 3 rows: ID:262 #1, ID:262 #3, ID:270 #1." - up to kNamedRows of them named, each chapter's in `written`'s
-// order; with rows left, "Replaced 2 of 3 rows: ... Left as they were: <left>."; rows of several documents name each
-// document before its rows: "Replaced 3 rows in 2 documents: a.indd ID:262 #1, ID:262 #3; b.indd ID:270 #1." `written`
-// = each chapter's rows written (a chapter with none left out); `selected` = the rows the command was given; `left` =
-// the others, counted by why.
+// WHAT A WRITE OF THE LIST DID - the one message of the Replace, Restore from Copy and Create Outlines (the no-track
+// spec's F16 / F19 / F20, the copy-restore spec's C12, the outlines spec's X8), which says nothing of Ctrl+Z (the
+// author's call). One row by its name (RowName): "Replaced ID:262 #3." ("Replaced." when its name cannot be read).
+// Several counted - "Replaced 3 rows: ID:262 #1, ID:262 #3, ID:270 #1." - up to kNamedRows of them named, each
+// chapter's in `written`'s order; with rows left, "Replaced 2 of 3 rows: ... Left as they were: <left>."; rows of
+// several documents name each document before its rows: "Replaced 3 rows in 2 documents: a.indd ID:262 #1, ID:262 #3;
+// b.indd ID:270 #1." `written` = each chapter's rows written (a chapter with none left out); `selected` = the rows the
+// command was given; `left` = the others, counted by why.
 typedef std::vector<std::pair<int32, std::vector<int32> > > RowsWritten;		// (the chapter, its rows written)
 void SayRowsWritten(PMString& out, const char* verb, const char* noun, const RowsWritten& written, size_t selected,
 	const PMString& left)
@@ -1601,9 +1595,9 @@ RowsWritten RowsDone(const std::vector<Chapter>& chapters)
 	return written;
 }
 
-// DOES THE CHANGE SIDE SET PARAGRAPH FORMATTING - a paragraph style, or a paragraph attribute in Change Format, on the tab
-// the write is stated in? Its Replace then changes the paragraphs the rows stand in, which a copy of the match does not
-// put back (TakeRowCopy - measured live, R13 / R13b).
+// DOES THE CHANGE SIDE SET PARAGRAPH FORMATTING - a paragraph style, or a paragraph attribute in Change Format, on the
+// tab the write is stated in? Its Replace then changes the paragraphs the rows stand in, which a copy of the match does
+// not put back (TakeRowCopy - measured live, the copy-restore spec's R13 / R13b).
 bool ChangeSideTouchesParagraphs(IDataBase* db)
 {
 	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
@@ -1634,13 +1628,13 @@ struct LinkAt
 	LinkAt() : source(kInvalidUID), hyperlink(kInvalidUID), start(kInvalidTextIndex), length(0), xref(false) {}
 };
 
-// THE HYPERLINK TEXT SOURCES ON [from, to) OF A STORY (the spec's C15): those the range tree names there - inside the range
-// or across its edge (IHyperlinkUtils::GetRangeContainedHyperlinks) and one around it (IsRangeContainedByAHyperlink) - each
-// read off its range's node: the source is the text object the range is of (ITextRangeNode::GetBaseUIDRef - the source
-// the document's hyperlink table names for that range, measured in KT), where its range stands is the node's, and the
-// table (reached as SnpCreateCrossReference.cpp reaches it) gives its link and whether that is a cross-reference. A
-// source both questions name (the range is its whole text) is listed once. False when the range tree or the table
-// cannot be asked, or a range named cannot be read.
+// THE HYPERLINK TEXT SOURCES ON [from, to) OF A STORY (the copy-restore spec's C15): those the range tree names there -
+// inside the range or across its edge (IHyperlinkUtils::GetRangeContainedHyperlinks) and one around it
+// (IsRangeContainedByAHyperlink) - each read off its range's node: the source is the text object the range is of
+// (ITextRangeNode::GetBaseUIDRef - the source the document's hyperlink table names for that range, measured in KT),
+// where its range stands is the node's, and the table (reached as SnpCreateCrossReference.cpp reaches it) gives its
+// link and whether that is a cross-reference. A source both questions name (the range is its whole text) is listed
+// once. False when the range tree or the table cannot be asked, or a range named cannot be read.
 bool LinksOn(ITextModel* model, const UIDRef& storyRef, TextIndex from, TextIndex to, std::vector<LinkAt>& out)
 {
 	Utils<IHyperlinkUtils> utils;
@@ -1699,22 +1693,21 @@ bool ParagraphOf(ITextModel* model, TextIndex at, TextIndex& outStart, int32& ou
 // merged paragraph's, its own first paragraph's when the Change side sets no paragraph formatting.
 // A ROW WHOSE CHANGE SIDE SETS PARAGRAPH FORMATTING (`paragraphChange`) ALSO KEEPS THE FORMATTING OF THE PARAGRAPH IT
 // STARTS IN - its style and its own overrides (the paragraph strand, SnpManipulateTextStyle.cpp's road) - which
-// RestoreInChapter puts back after the paste (the spec's C16, the author's call of 2026-10-17 evening). Measured live the
-// same day, the copy alone cannot: inside one paragraph (R13) the copy put the text back and left the paragraph style the
-// Replace set; over a return (R13b) the paragraph the match starts in kept it - a paste's first paragraph takes the
-// attributes of the paragraph it is pasted into. (A copy of the whole paragraph, head to return, would carry them, and
-// would collide with every other row replaced in it - each copy holding the others' text from before them.)
+// RestoreInChapter puts back after the paste (the copy-restore spec's C16, the author's call). Measured live, the copy
+// alone cannot: inside one paragraph (R13) the copy put the text back and left the paragraph style the Replace set;
+// over a return (R13b) the paragraph the match starts in kept it - a paste's first paragraph takes the attributes of
+// the paragraph it is pasted into. (A copy of the whole paragraph, head to return, would carry them, and would collide
+// with every other row replaced in it - each copy holding the others' text from before them.)
 // A HYPERLINK SOURCE THE COPY TOUCHES - strictly inside the match, around it, across its edge - is kept with where it
-// stood (HitCopy::links), for RestoreInChapter to put the ONE link back (PutLinksBack - the spec's C15, the author's
-// call of 2026-10-17 evening: "delete one of the duplicated links, perhaps"). Measured live the same day with the doors
-// open (switch copy-links, H1-H5): one the match crossed is cut back to its part outside the match (set back where it
+// stood (HitCopy::links), for RestoreInChapter to put the ONE link back (PutLinksBack - the copy-restore spec's C15,
+// the author's call: "delete one of the duplicated links, perhaps"). Measured live with the doors open (switch
+// copy-links - the spec's H1-H5): one the match crossed is cut back to its part outside the match (set back where it
 // stood); one around the match comes back as it was, and so does one strictly inside it - in the part of the match the
 // Replace deletes, the link goes with it and the paste brings it back under its own name (H4); on what the Replace
 // writes over, the Replace keeps it on what it wrote, and the Restore moves it out of the paste's way and sets it back
 // (MoveLinksOutOfPaste - measured, case restore-link-inside-named). One the paste would replace WHOLE - the match
 // itself (InDesign's replace keeps it on what it writes), one in the run-on rest, one at the match's edge - keeps no
-// copy: the paste brings a second link over it and leaves it with no story, and setting it again crashed InDesign
-// (16:34 the same day).
+// copy: the paste brings a second link over it and leaves it with no story, and setting it again crashed InDesign.
 // NONE is taken - the row says why - for a match outside the story's primary thread (a table cell's, a footnote's or a
 // note's: a copy run across threads crashed InDesign), one that touches a CROSS-REFERENCE source (its text is made by
 // InDesign - unmeasured), and a run-on rest holding an object or a marker (pasted again over itself, such a thing is made
@@ -1731,9 +1724,8 @@ KFCResultModel::HitCopy TakeRowCopy(const UIDRef& storyRef, TextIndex start, Tex
 		return copy;
 	}
 	// THE MATCH, READ ONCE: does it hold a return (the copy then runs on, below)? AN ANCHORED OR INLINE OBJECT IN IT
-	// KEEPS NO COPY (the author's call of 2026-10-17 evening: its UID changing is the problem) - put back, it would be
-	// a copy of the object under a new UID (measured live the same day, R19c: the same rectangle in all but its
-	// identity).
+	// KEEPS NO COPY (the author's call: its UID changing is the problem) - put back, it would be a copy of the object
+	// under a new UID (measured live - the copy-restore spec's R19c: the same rectangle in all but its identity).
 	bool holdsReturn = false;
 	{
 		TextIterator it(model, start);
@@ -1816,8 +1808,8 @@ KFCResultModel::HitCopy TakeRowCopy(const UIDRef& storyRef, TextIndex start, Tex
 				copy.whyNot = KFCResultModel::kCopyTouchesHyperlink;
 				return copy;
 			}
-			// A SOURCE THE PASTE WOULD REPLACE WHOLE keeps no copy (the crash of 2026-10-17 16:34): one inside what the
-			// copy covers that is not strictly inside the match - the match itself (the Replace keeps it on what it
+			// A SOURCE THE PASTE WOULD REPLACE WHOLE keeps no copy (the copy-restore spec's H1 - H5): one inside what
+			// the copy covers that is not strictly inside the match - the match itself (the Replace keeps it on what it
 			// writes, H1), one in the run-on rest (H5), one at the match's edge - is left with no story once the copy
 			// is pasted over its text, and setting it again took InDesign down (HYPERLINKS.RPLN, under
 			// IHyperlinkFacade::ChangeTextSource). Strictly inside the match the Replace deletes it and the paste
@@ -1862,6 +1854,14 @@ struct ChapterWrite
 	ChapterWrite() : chapterIdx(-1) {}
 };
 
+// The rows replaced now, in ONE undo step - a hit row's Replace (its right-click menu or Return - the no-track spec's
+// F16), or the text rows selected together (the author's call: replaced together, as object rows are) - of one document
+// or of several (one step for every document of them - the header's WriteStep).
+// The caller has asked CanReplaceHit of every row. All or nothing, as one row's has always been: a row the check finds
+// moved refuses them all before a character is written, and a write that does not land on every one is rolled back
+// whole. greyed = the rows selected with them whose Replace was greyed, counted by reason (WhyGreyed - all 0 for one
+// row's Replace): one row's sentences are its own ("this row", "the match"); several rows' say "a selected row", and
+// the rows left are counted by their reason.
 static bool ReplaceRowsNow(std::vector<ChapterWrite>& chapters,
 	const int32 (&greyed)[KFCReplaceEngine::kGreyedReasonCount], PMString& outStatus)
 {
@@ -1936,16 +1936,15 @@ static bool ReplaceRowsNow(std::vector<ChapterWrite>& chapters,
 	KFCSearchEngine::GetKFCWalkerScopeOptions(scopeOptions);
 	// THE VERIFY WALK'S THREE QUESTIONS, OVER THESE ROWS. Each one's story at the version KFC last recorded, the row
 	// still reading as it was found - match and line - and a match of the walk at its start and length
-	// (ChapterMovedUnderRows). Not the match's hash alone: a row an Undo has left on the next occurrence of
-	// its own text passes that, and would be written there.
-	// Forward, like the search - the scope at the head of this function.
-	// THE ROWS FOLLOW THEIR FOCI FIRST (KFCSearchEngine::FollowStoryFoci - the author's call of 2026-10-14 night). For
-	// each story of the rows to write: a story whose foci all followed every edit and every Undo takes their places and
-	// its version as it stands, so the doors below go by where the text is now; a story with a focus that could not
-	// follow (an Undo of an edit older than the search) is refused here - its version can have come back to the number
-	// on record with other text in it; a story with no foci is left to the version rule, as before. They are the
-	// stories the write moves (writtenStories): at the versions on record, as the doors below say, they take their new
-	// versions once it has gone through (NoteStoryVersions, below).
+	// (ChapterMovedUnderRows). Not the match's hash alone: a row an Undo has left on the next occurrence of its own
+	// text passes that, and would be written there. Forward, like the search - the scope at the head of this function.
+	// THE ROWS FOLLOW THEIR FOCI FIRST (KFCSearchEngine::FollowStoryFoci - the author's call). For each story of the
+	// rows to write: a story whose foci all followed every edit and every Undo takes their places and its version as it
+	// stands, so the doors below go by where the text is now; a story with a focus that could not follow (an Undo of an
+	// edit older than the search) is refused here - its version can have come back to the number on record with other
+	// text in it; a story with no foci is left to the version rule, as before. They are the stories the write moves
+	// (writtenStories): at the versions on record, as the doors below say, they take their new versions once it has
+	// gone through (NoteStoryVersions, below).
 	for (size_t k = 0; k < chapters.size(); ++k)
 	{
 		ChapterWrite& c = chapters[k];
@@ -1984,10 +1983,10 @@ static bool ReplaceRowsNow(std::vector<ChapterWrite>& chapters,
 			return false;
 		}
 	}
-	// THE COPIES RESTORE FROM COPY PUTS BACK (the spec's C3 / C4 - TakeRowCopy): every row to write, copied now - after
-	// every door, at the places they have just confirmed, and before the step opens, so nothing of it is in the
-	// document's undo step. A row with none is written all the same (its Restore from Copy says why); each row takes
-	// its copy once the write has gone through (SetHitCopy, below).
+	// THE COPIES RESTORE FROM COPY PUTS BACK (the copy-restore spec's C3 / C4 - TakeRowCopy): every row to write,
+	// copied now - after every door, at the places they have just confirmed, and before the step opens, so nothing of
+	// it is in the document's undo step. A row with none is written all the same (its Restore from Copy says why); each
+	// row takes its copy once the write has gone through (SetHitCopy, below).
 	std::vector<std::vector<std::pair<int32, KFCResultModel::HitCopy> > > copies(chapters.size());
 	for (size_t k = 0; k < chapters.size(); ++k)
 	{
@@ -2116,8 +2115,8 @@ static bool ReplaceRowsNow(std::vector<ChapterWrite>& chapters,
 		NoteStoryVersions(c.chapterIdx, c.docRef.GetDataBase(), c.writtenStories);	// the next Replace finds it as KFC left it
 		// (The written stories' foci were put on the rows' places inside the step, above.)
 	}
-	// Each row written takes the copy taken for it (the spec's C6) - inside the row backup, so the Undo of this Replace puts
-	// the row's earlier copy back with it.
+	// Each row written takes the copy taken for it (the copy-restore spec's C6) - inside the row backup, so the Undo of
+	// this Replace puts the row's earlier copy back with it.
 	for (size_t k = 0; k < chapters.size(); ++k)
 		for (size_t r = 0; r < copies[k].size(); ++r)
 			KFCResultModel::SetHitCopy(chapters[k].chapterIdx, copies[k][r].first, copies[k][r].second);
@@ -2219,12 +2218,11 @@ bool KFCReplaceEngine::ReplaceHits(const KFCRowsByChapter& rowsByChapter, PMStri
 }
 
 // ======================================================================================================
-// RESTORE FROM COPY (docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md - the author, 10-17: "copy back,
-// from the row's right-click menu"; the calls C1 - C14 are mine, for the author to confirm). A text row a Replace of the
-// list wrote gets back the text that Replace wrote over: the copy taken just before it (TakeRowCopy) pasted over what it
-// wrote - and, for a copy run on to its paragraph's return, over the rest of that paragraph too, which the copy holds as
-// it read then (C4). ONE undo step ("Restore from Copy" - WriteStep), KFC's mark in it: the panel follows its Ctrl+Z and
-// Redo as it follows a Replace's.
+// RESTORE FROM COPY (docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md - the author: "copy back, from
+// the row's right-click menu"). A text row a Replace of the list wrote gets back the text that Replace wrote over: the
+// copy taken just before it (TakeRowCopy) pasted over what it wrote - and, for a copy run on to its paragraph's return,
+// over the rest of that paragraph too, which the copy holds as it read then (C4). ONE undo step ("Restore from Copy" -
+// WriteStep), KFC's mark in it: the panel follows its Ctrl+Z and Redo as it follows a Replace's.
 // THE ROW'S OWN PLACE IS WHAT IS TRUSTED, NOT THE STORY'S VERSION (C8): the rows of its story follow their foci first
 // (KFCSearchEngine::FollowStoryFoci), and a row is put back only where its own focus stands exactly on its place and that
 // place still reads what its Replace wrote - so an edit anywhere else in the story, made since, does not stop it (what
@@ -2277,7 +2275,8 @@ const char* RestoreWords(RestoreRefusal why)
 	}
 }
 
-// One row's refusal, after "Restore from Copy: ". A row with no copy says why it has none (HitCopy::whyNot - C12).
+// One row's refusal, after "Restore from Copy: ". A row with no copy says why it has none (HitCopy::whyNot - the
+// copy-restore spec's C12).
 const char* RestoreSentence(RestoreRefusal why, int32 whyNoCopy)
 {
 	switch (why)
@@ -2333,9 +2332,9 @@ void SayNoneRestored(PMString& out, size_t total, RestoreRefusal oneWhy, int32 o
 	out.SetTranslatable(kFalse);
 }
 
-// IS THE ROW ONE TO PUT BACK, BY THE ROW ALONE (C7) - asked in one place: the menu greys Restore from Copy by it
-// (CanRestoreHit), and RestoreHits' first door counts a row by it. A text row a Replace of the list wrote, with its
-// copy kept (outCopy - read when the row gets that far).
+// IS THE ROW ONE TO PUT BACK, BY THE ROW ALONE (the copy-restore spec's C7) - asked in one place: the menu greys
+// Restore from Copy by it (CanRestoreHit), and RestoreHits' first door counts a row by it. A text row a Replace of the
+// list wrote, with its copy kept (outCopy - read when the row gets that far).
 RestoreRefusal RestoreRowRefusal(int32 chapterIdx, int32 hitIdx, KFCResultModel::HitCopy& outCopy)
 {
 	bool replaced = false, locked = false;
@@ -2348,14 +2347,14 @@ RestoreRefusal RestoreRowRefusal(int32 chapterIdx, int32 hitIdx, KFCResultModel:
 	return kRestoreOk;
 }
 
-// WHERE A ROW STANDS NOW, ITS STORY FOLLOWED - Restore from Copy's rule (C8) and Create Outlines' (X4). The rows of
-// each story follow their foci once, before any row is asked (FollowStoriesOf - KFCSearchEngine::FollowStoryFoci, a
-// Replace's way); then a row's place (out*, read after the follow) stands when its own focus is exactly on it - it
-// followed every edit since, and FollowStoryFoci put the row there because its focus reads the row's text - or, in a
-// story with no foci (its document was not open when the rows took theirs), when the story is at the version on record
-// (the version rule, StoryAsKFCLeftIt). kPlaceNotFollowed: the story changed in a way its foci could not follow, or,
-// with no foci, its version moved. kPlaceEdited: the row cannot be read, or its focus is elsewhere - its own text was
-// edited.
+// WHERE A ROW STANDS NOW, ITS STORY FOLLOWED - Restore from Copy's rule (the copy-restore spec's C8) and
+// Create Outlines' (the outlines spec's X4). The rows of each story follow their foci once, before any row is asked
+// (FollowStoriesOf - KFCSearchEngine::FollowStoryFoci, a Replace's way); then a row's place (out*, read after the
+// follow) stands when its own focus is exactly on it - it followed every edit since, and FollowStoryFoci put the row
+// there because its focus reads the row's text - or, in a story with no foci (its document was not open when the rows
+// took theirs), when the story is at the version on record (the version rule, StoryAsKFCLeftIt). kPlaceNotFollowed: the
+// story changed in a way its foci could not follow, or, with no foci, its version moved. kPlaceEdited: the row cannot
+// be read, or its focus is elsewhere - its own text was edited.
 enum PlaceFollowed { kPlaceStands, kPlaceNotFollowed, kPlaceEdited };
 
 template <class Row>
@@ -2441,14 +2440,14 @@ void DestinationsOf(IDataBase* db, std::set<UID>& out)
 // text put back, "L1" on none - cases restore-link-inside*), and giving such a source its story back took InDesign down
 // (PutLinksBack). One of the row's kept links can be one: InDesign's replace writes the Change To over the match where
 // it can, so a link strictly inside the match but on what it wrote over stays on what it wrote ("at sa" of "cat sat"
-// stood on "og" of "dog"; H4 was a link in the part it deletes, which goes with it). Such a kept source is moved onto a
-// character beside the paste that no source stands on - right after it, else right before it; not the story's last
-// return, not a character an object or a marker stands on, not a table's - so the paste leaves it whole, and
-// PutLinksBack sets it back where it stood: the one link, its name and destination as they were (REP-38), the paste's
-// copy of it deleted. Any other source the paste would replace whole - one made on what the Replace wrote since (case
-// restore-link-made-after) - leaves the row as it is (outInTheWay), as does a kept one with no character beside the
-// paste to stand on. `before` = the sources on [at, pasteEnd) now (LinksOn). False = a range could not be read, or
-// InDesign would not move a source: the caller takes the step back.
+// stood on "og" of "dog"; the copy-restore spec's H4 was a link in the part it deletes, which goes with it). Such a
+// kept source is moved onto a character beside the paste that no source stands on - right after it, else right before
+// it; not the story's last return, not a character an object or a marker stands on, not a table's - so the paste leaves
+// it whole, and PutLinksBack sets it back where it stood: the one link, its name and destination as they were (REP-38),
+// the paste's copy of it deleted. Any other source the paste would replace whole - one made on what the Replace wrote
+// since (case restore-link-made-after) - leaves the row as it is (outInTheWay), as does a kept one with no character
+// beside the paste to stand on. `before` = the sources on [at, pasteEnd) now (LinksOn). False = a range could not be
+// read, or InDesign would not move a source: the caller takes the step back.
 bool MoveLinksOutOfPaste(ITextModel* model, const UIDRef& storyRef, TextIndex at, TextIndex pasteEnd,
 	const std::vector<KFCResultModel::HitLink>& kept, const std::vector<LinkAt>& before, bool& outInTheWay)
 {
@@ -2465,7 +2464,8 @@ bool MoveLinksOutOfPaste(ITextModel* model, const UIDRef& storyRef, TextIndex at
 	std::vector<std::pair<UID, TextIndex> > moves;
 	for (size_t b = 0; b < before.size(); ++b)
 	{
-		// Part of it outside the paste stays, and it is set back from there (H2, H3); one of no text loses nothing.
+		// Part of it outside the paste stays, and it is set back from there (the copy-restore spec's H2, H3); one of no
+		// text loses nothing.
 		if (before[b].length <= 0 || before[b].start < at || before[b].start + before[b].length > pasteEnd)
 			continue;
 		bool ours = false;
@@ -2512,15 +2512,15 @@ bool MoveLinksOutOfPaste(ITextModel* model, const UIDRef& storyRef, TextIndex at
 	return true;
 }
 
-// ONE LINK PUT BACK WHERE IT STOOD, once the copy is pasted over [at, at + copied) (the spec's C15 - measured live
-// 2026-10-17, H1-H5). (1) A source the paste made there - one not on the range before the paste (`before`) and not a
-// kept one - over which a kept source still in the document is to stand is deleted with its link: the Replace had kept
-// the original on what it wrote, and the copy brought a second (one the paste would have replaced whole was moved out
-// of its way first - MoveLinksOutOfPaste). A source the paste made where the Replace had deleted the original stays -
-// it IS the link put back (H4). (2) Every kept source still in the document is set where it stood: its part in the copy
-// at the same place from `at`, a part outside the copy where it stands now (H3: one the match crossed had lost what the
-// paste replaced; H2: one around the match stands as it was). (3) The destinations the paste made that no link names
-// now are let go (the facade lets a hidden one go with its link; a shared one stays).
+// ONE LINK PUT BACK WHERE IT STOOD, once the copy is pasted over [at, at + copied) (the copy-restore spec's C15 -
+// measured live, its H1-H5). (1) A source the paste made there - one not on the range before the paste (`before`) and
+// not a kept one - over which a kept source still in the document is to stand is deleted with its link: the Replace had
+// kept the original on what it wrote, and the copy brought a second (one the paste would have replaced whole was moved
+// out of its way first - MoveLinksOutOfPaste). A source the paste made where the Replace had deleted the original
+// stays - it IS the link put back (H4). (2) Every kept source still in the document is set where it stood: its part in
+// the copy at the same place from `at`, a part outside the copy where it stands now (H3: one the match crossed had lost
+// what the paste replaced; H2: one around the match stands as it was). (3) The destinations the paste made that no link
+// names now are let go (the facade lets a hidden one go with its link; a shared one stays).
 bool PutLinksBack(ITextModel* model, const UIDRef& storyRef, TextIndex at, int32 copied,
 				  const std::vector<KFCResultModel::HitLink>& kept, const std::vector<LinkAt>& before,
 				  const std::set<UID>& destinationsBefore)
@@ -2531,10 +2531,10 @@ bool PutLinksBack(ITextModel* model, const UIDRef& storyRef, TextIndex at, int32
 	if (!facade || table == nil)
 		return false;
 	// Where each kept source still in this story is to stand. ONE WITH NO STORY IS NEVER TOUCHED: a source whose text
-	// the paste replaced whole reads no owning story (measured live 2026-10-17, H1 and H5 - the DOM's sourceText an
-	// error), and IHyperlinkFacade::ChangeTextSource giving it the story back took InDesign down (HYPERLINKS.RPLN,
-	// 16:34) - TakeRowCopy keeps no copy where that can happen, and MoveLinksOutOfPaste moves a kept one out of the
-	// paste's way; this is the backstop.
+	// the paste replaced whole reads no owning story (measured live, the copy-restore spec's H1 and H5 - the DOM's
+	// sourceText an error), and IHyperlinkFacade::ChangeTextSource giving it the story back took InDesign down
+	// (HYPERLINKS.RPLN) - TakeRowCopy keeps no copy where that can happen, and MoveLinksOutOfPaste moves a kept one out
+	// of the paste's way; this is the backstop.
 	struct Wanted
 	{
 		UID			source;
@@ -2627,10 +2627,11 @@ bool PutLinksBack(ITextModel* model, const UIDRef& storyRef, TextIndex at, int32
 	return true;
 }
 
-// THE FORMATTING OF THE PARAGRAPH A MATCH STARTS IN, PUT BACK once its copy is pasted (the spec's C16): the style it had,
-// with what the Replace left on it cleared, then its own overrides as they read before the write (TakeRowCopy). The
-// paste cannot - its first paragraph takes the attributes of the paragraph it is pasted into (measured live, R13b). The
-// paragraph is the one that holds `at`, with its return (ParagraphOf - the paragraph the copy's run-on rest ends at).
+// THE FORMATTING OF THE PARAGRAPH A MATCH STARTS IN, PUT BACK once its copy is pasted (the copy-restore spec's C16):
+// the style it had, with what the Replace left on it cleared, then its own overrides as they read before the write
+// (TakeRowCopy). The paste cannot - its first paragraph takes the attributes of the paragraph it is pasted into
+// (measured live, R13b). The paragraph is the one that holds `at`, with its return (ParagraphOf - the paragraph the
+// copy's run-on rest ends at).
 bool PutParagraphBack(ITextModel* model, TextIndex at, const KFCResultModel::HitCopy& copy)
 {
 	InterfacePtr<ITextModelCmds> cmds(model, UseDefaultIID());
@@ -2651,9 +2652,9 @@ bool PutParagraphBack(ITextModel* model, TextIndex at, const KFCResultModel::Hit
 	return true;
 }
 
-// IS THE PARAGRAPH STYLE A COPY PUTS BACK (the spec's C16 - PutParagraphBack) STILL ONE OF THE DOCUMENT'S? A style
-// deleted since the Replace would be given to InDesign by a UID nothing holds - what ApplyStyleCmd does with one is not
-// known, and is not tried: the row is left as it is (RestoreHits' doors).
+// IS THE PARAGRAPH STYLE A COPY PUTS BACK (the copy-restore spec's C16 - PutParagraphBack) STILL ONE OF THE DOCUMENT'S?
+// A style deleted since the Replace would be given to InDesign by a UID nothing holds - what ApplyStyleCmd does with
+// one is not known, and is not tried: the row is left as it is (RestoreHits' doors).
 bool ParagraphStyleStands(IDataBase* db, UID style)
 {
 	if (db == nil || style == kInvalidUID || !db->IsValidUID(style))
@@ -2754,11 +2755,11 @@ bool RestoreInChapter(RestoreChapter& chapter, int32 (&counts)[kRestoreRefusalCo
 			}
 			const KFCCopyStore::CopyRef ref(RefOf(row.copy));
 			const int32 copied = KFCCopyStore::Length(ref);
-			// The links on the range before the paste (the spec's C15) and, when the copy touched some, the document's
-			// destinations - so that what the paste makes is told from what was there. A link the paste would replace
-			// whole is moved out of its way first, or the row is left (MoveLinksOutOfPaste). (Fault switch
-			// restore-link-in-way, a test build's only - KFCDiag.h: neither, the old way - the paste leaves such a
-			// source with no text.)
+			// The links on the range before the paste (the copy-restore spec's C15) and, when the copy touched some,
+			// the document's destinations - so that what the paste makes is told from what was there. A link the paste
+			// would replace whole is moved out of its way first, or the row is left (MoveLinksOutOfPaste). (Fault
+			// switch restore-link-in-way, a test build's only - KFCDiag.h: neither, the old way - the paste leaves such
+			// a source with no text.)
 			std::vector<LinkAt> linksBefore;
 			std::set<UID> destinationsBefore;
 			if ((pasteEnd > at || !row.copy.links.empty()) && !LinksOn(model, storyRef, at, pasteEnd, linksBefore))
@@ -2776,11 +2777,11 @@ bool RestoreInChapter(RestoreChapter& chapter, int32 (&counts)[kRestoreRefusalCo
 				DestinationsOf(db, destinationsBefore);
 			if (copied < row.copy.rest || !KFCCopyStore::PasteOver(ref, storyRef, at, pasteEnd))
 				return false;
-			// A Replace that set paragraph formatting: the starting paragraph's own put back (the spec's C16) - no length
-			// changes, so the rows' places below hold.
+			// A Replace that set paragraph formatting: the starting paragraph's own put back (the copy-restore spec's
+			// C16) - no length changes, so the rows' places below hold.
 			if (row.copy.paraStyle != kInvalidUID && !PutParagraphBack(model, at, row.copy))
 				return false;
-			// The one link back where it stood (the spec's C15) - no length changes either.
+			// The one link back where it stood (the copy-restore spec's C15) - no length changes either.
 			if (!row.copy.links.empty()
 				&& !PutLinksBack(model, storyRef, at, copied, row.copy.links, linksBefore, destinationsBefore))
 				return false;
@@ -2827,9 +2828,9 @@ bool RestoreInChapter(RestoreChapter& chapter, int32 (&counts)[kRestoreRefusalCo
 
 }	// anonymous namespace
 
-// A replaced text row WITH ITS COPY, by the row alone (RestoreRowRefusal - the spec's C7, the author, 2026-10-17: a
-// menu item that cannot run is greyed). What only the document can tell - edited since, the rest changed, locked - the
-// doors say when it is pressed.
+// A replaced text row WITH ITS COPY, by the row alone (RestoreRowRefusal - the copy-restore spec's C7; the author's
+// call: a menu item that cannot run is greyed). What only the document can tell - edited since, the rest changed,
+// locked, a hyperlink in the way, the paragraph style deleted - the doors say when it is pressed.
 bool KFCReplaceEngine::CanRestoreHit(int32 chapterIdx, int32 hitIdx)
 {
 	KFCResultModel::HitCopy copy;
@@ -2851,7 +2852,8 @@ bool KFCReplaceEngine::RestoreHits(const KFCRowsByChapter& rowsByChapter, PMStri
 	if (total == 0)
 		return false;
 
-	// THE DOORS, ROW BY ROW (C8) - nothing written yet. What each document is left as is DocsAfterWrite's, on every way out.
+	// THE DOORS, ROW BY ROW (the copy-restore spec's C8) - nothing written yet. What each document is left as is
+	// DocsAfterWrite's, on every way out.
 	int32 counts[kRestoreRefusalCount] = {};
 	RestoreRefusal lastWhy = kRestoreOk;
 	int32 lastWhyNoCopy = KFCResultModel::kCopyNone;
@@ -2969,7 +2971,8 @@ bool KFCReplaceEngine::RestoreHits(const KFCRowsByChapter& rowsByChapter, PMStri
 		}
 	}
 
-	// RECORDED FOR THE PANEL'S FOLLOWING OF UNDO (C11): one step for every document of it, by its name.
+	// RECORDED FOR THE PANEL'S FOLLOWING OF UNDO (the copy-restore spec's C11): one step for every document of it, by
+	// its name.
 	std::vector<int32> chapterIdxs;
 	for (size_t c = 0; c < chapters.size(); ++c)
 		chapterIdxs.push_back(chapters[c].chapterIdx);
@@ -2999,8 +3002,8 @@ bool KFCReplaceEngine::RestoreHits(const KFCRowsByChapter& rowsByChapter, PMStri
 			for (size_t c = 0; c < chapters.size(); ++c)
 				if (chapters[c].restored > 0)
 					KFCUndoFollow::MarkWrite(chapters[c].docRef.GetDataBase());	// in this step, so its Undo / Redo is heard
-		// THE STORIES' FOCI ON THE ROWS, IN THIS STEP (a Replace's D7): the pastes moved them, and a row put back has its own
-		// focus put on the text it reads now - so this step's Undo and Redo hold them.
+		// THE STORIES' FOCI ON THE ROWS, IN THIS STEP (the row-focus plan's D7): the pastes moved them, and a row put
+		// back has its own focus put on the text it reads now - so this step's Undo and Redo hold them.
 		if (ok)
 			for (size_t c = 0; c < chapters.size(); ++c)
 				for (std::set<UID>::const_iterator s = chapters[c].stories.begin(); s != chapters[c].stories.end(); ++s)
@@ -3042,9 +3045,9 @@ bool KFCReplaceEngine::RestoreHits(const KFCRowsByChapter& rowsByChapter, PMStri
 		KFC_DIAG_NOTE_WRITE(chapters[c].docRef);
 	}
 
-	// WHAT IT DID (C12) - the Replace's words (SayRowsWritten): "Restored ID:262 #3." / "Restored 2 of 3 rows: ID:262
-	// #1, ID:262 #3. Left as they were: 1 edited since." / "Restored 3 rows in 2 documents: a.indd ID:262 #1, ID:262
-	// #3; b.indd ID:270 #1."
+	// WHAT IT DID (the copy-restore spec's C12) - the Replace's words (SayRowsWritten): "Restored ID:262 #3." /
+	// "Restored 2 of 3 rows: ID:262 #1, ID:262 #3. Left as they were: 1 edited since." /
+	// "Restored 3 rows in 2 documents: a.indd ID:262 #1, ID:262 #3; b.indd ID:270 #1."
 	PMString leftWords;
 	AppendCountsByWhy(leftWords, counts, RestoreWords);
 	SayRowsWritten(outStatus, "Restored", "rows", RowsDone(chapters), total, leftWords);
@@ -3052,15 +3055,15 @@ bool KFCReplaceEngine::RestoreHits(const KFCRowsByChapter& rowsByChapter, PMStri
 }
 
 // ======================================================================================================
-// A TEXT ROW'S SPECIAL OPERATIONS > CREATE OUTLINES (docs/superpowers/specs/2026-10-18-kfc-text-outlines-design.md - the
-// author, 2026-10-18: "only the matched characters, Create Outlines - a special operation for text"). The rows' matches
-// outlined as InDesign's Type > Create Outlines does them (ICreateOutlinesUtils::CreateCOTextCmd - SnpInspectPathInfo.cpp's
-// call, with the original deleted: the outlines go in as inline objects, one a line of the match - M7). Restore from Copy's
-// shape: the doors row by row (its place followed by its focus, its text as the row holds it, not locked, not overset), the
-// rows written story by story in text order, each checked again just before its command, every other row carried past
-// what the command turned the match into - by the story's length before and after it, since that is not a fixed number
-// (M7: "aaaa bbbb" over two lines becomes outline, space, outline). ONE undo step ("Create Outlines" - the object rows'
-// name), KFC's mark in it.
+// A TEXT ROW'S SPECIAL OPERATIONS > CREATE OUTLINES (docs/superpowers/specs/2026-10-18-kfc-text-outlines-design.md -
+// the author: "only the matched characters, Create Outlines - a special operation for text"). The rows' matches
+// outlined as InDesign's Type > Create Outlines does them (ICreateOutlinesUtils::CreateCOTextCmd -
+// SnpInspectPathInfo.cpp's call, with the original deleted: the outlines go in as inline objects, one a line of the
+// match - M7). Restore from Copy's shape: the doors row by row (its place followed by its focus, its text as the row
+// holds it, not locked, not overset), the rows written story by story in text order, each checked again just before its
+// command, every other row carried past what the command turned the match into - by the story's length before and after
+// it, since that is not a fixed number (M7: "aaaa bbbb" over two lines becomes outline, space, outline). ONE undo step
+// ("Create Outlines" - the object rows' name), KFC's mark in it.
 // ======================================================================================================
 
 namespace
@@ -3077,7 +3080,7 @@ enum OutlineRefusal
 	kOutlineNotOpened,		// ...or not opened
 	kOutlineNotFollowed,	// its story changed in a way its foci could not follow
 	kOutlineEdited,			// its text has been edited since
-	kOutlineOverset,		// in overset text - InDesign refuses it (M7: error 80650)
+	kOutlineOverset,		// in overset text - InDesign refuses it (the outlines spec's M7: error 80650)
 	kOutlineLocked,			// locked
 	kOutlineRefusalCount
 };
@@ -3135,9 +3138,9 @@ void SayNoneOutlined(PMString& out, size_t total, OutlineRefusal oneWhy, const i
 	out.SetTranslatable(kFalse);
 }
 
-// CAN THE ROW BE OUTLINED, BY THE ROW ALONE (X9) - asked in one place: the menu greys Create Outlines by it
-// (CanOutlineHit), and OutlineHits' first door counts a row by it. A text row not outlined yet, not locked, not in
-// overset text, not of zero width - one reason a row, in that order.
+// CAN THE ROW BE OUTLINED, BY THE ROW ALONE (the outlines spec's X9) - asked in one place: the menu greys
+// Create Outlines by it (CanOutlineHit), and OutlineHits' first door counts a row by it. A text row not outlined yet,
+// not locked, not in overset text, not of zero width - one reason a row, in that order.
 OutlineRefusal OutlineRowRefusal(int32 chapterIdx, int32 hitIdx)
 {
 	KFCResultModel::RowDisplay look;
@@ -3254,8 +3257,8 @@ bool OutlineInChapter(OutlineChapter& chapter, int32 (&counts)[kOutlineRefusalCo
 		InterfacePtr<ICommand> cmd(outlines->CreateCOTextCmd(storyRef, at, at + length, kTrue /*deleteOriginal*/));
 		if (cmd == nil || CmdUtils::ProcessCommand(cmd) != kSuccess)
 			return false;
-		// WHAT THE MATCH BECAME (M7): its characters minus what the story lost - an inline a line, the spaces and returns
-		// between kept as text.
+		// WHAT THE MATCH BECAME (the outlines spec's M7): its characters minus what the story lost - an inline a line,
+		// the spaces and returns between kept as text.
 		const int32 became = length + (model->TotalLength() - before);
 		KFC_DIAG_LOG("TEXTOUTLINE chapter=%d row=%d story=%u at=%d length=%d became=%d items=%d", chapterIdx, row.hit,
 			row.story.Get(), (int)at, (int)length, (int)became, (int)cmd->GetItemList()->Length());
@@ -3318,7 +3321,8 @@ bool KFCReplaceEngine::OutlineHits(const KFCRowsByChapter& rowsByChapter, PMStri
 	if (total == 0)
 		return false;
 
-	// THE DOORS, ROW BY ROW (X4) - nothing written yet. What each document is left as is DocsAfterWrite's, on every way out.
+	// THE DOORS, ROW BY ROW (the outlines spec's X4) - nothing written yet. What each document is left as is
+	// DocsAfterWrite's, on every way out.
 	int32 counts[kOutlineRefusalCount] = {};
 	OutlineRefusal lastWhy = kOutlineOk;
 	std::vector<OutlineChapter> chapters;
@@ -3431,7 +3435,8 @@ bool KFCReplaceEngine::OutlineHits(const KFCRowsByChapter& rowsByChapter, PMStri
 		}
 	}
 
-	// RECORDED FOR THE PANEL'S FOLLOWING OF UNDO (X5): one step for every document of it, by the object rows' name.
+	// RECORDED FOR THE PANEL'S FOLLOWING OF UNDO (the outlines spec's X5): one step for every document of it, by the
+	// object rows' name.
 	std::vector<int32> chapterIdxs;
 	for (size_t c = 0; c < chapters.size(); ++c)
 		chapterIdxs.push_back(chapters[c].chapterIdx);
@@ -3461,7 +3466,7 @@ bool KFCReplaceEngine::OutlineHits(const KFCRowsByChapter& rowsByChapter, PMStri
 			for (size_t c = 0; c < chapters.size(); ++c)
 				if (chapters[c].outlined > 0)
 					KFCUndoFollow::MarkWrite(chapters[c].docRef.GetDataBase());	// in this step, so its Undo / Redo is heard
-		// THE STORIES' FOCI ON THE ROWS, IN THIS STEP (a Replace's D7).
+		// THE STORIES' FOCI ON THE ROWS, IN THIS STEP (the row-focus plan's D7).
 		if (ok)
 			for (size_t c = 0; c < chapters.size(); ++c)
 				for (std::set<UID>::const_iterator s = chapters[c].stories.begin(); s != chapters[c].stories.end(); ++s)
@@ -3500,9 +3505,9 @@ bool KFCReplaceEngine::OutlineHits(const KFCRowsByChapter& rowsByChapter, PMStri
 		KFC_DIAG_NOTE_WRITE(chapters[c].docRef);
 	}
 
-	// WHAT IT DID (X8 - SayRowsWritten): "Outlined ID:262 #3." / "Outlined 2 of 3 matches: ID:262 #1, ID:262 #3. Left
-	// as they were: 1 in overset text." / "Outlined 3 matches in 2 documents: a.indd ID:262 #1, ID:262 #3; b.indd
-	// ID:270 #1."
+	// WHAT IT DID (the outlines spec's X8 - SayRowsWritten): "Outlined ID:262 #3." /
+	// "Outlined 2 of 3 matches: ID:262 #1, ID:262 #3. Left as they were: 1 in overset text." /
+	// "Outlined 3 matches in 2 documents: a.indd ID:262 #1, ID:262 #3; b.indd ID:270 #1."
 	PMString leftWords;
 	AppendCountsByWhy(leftWords, counts, OutlineWords);
 	SayRowsWritten(outStatus, "Outlined", "matches", RowsDone(chapters), total, leftWords);
@@ -3580,8 +3585,9 @@ bool KFCReplaceEngine::PreviewHit(int32 chapterIdx, int32 hitIdx, PMString& outA
 			ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 		}
 	}
-	// The preview wrote and took it back: the foci of the story moved with the write and not back with the abort
-	// (spec T13). The story was as KFC knew it (StoryAsKFCLeftIt above), so the rows' stored places are exact.
+	// The preview wrote and took it back: the foci of the story moved with the write and not back with the abort (the
+	// text-focus-jump spec's T13). The story was as KFC knew it (StoryAsKFCLeftIt above), so the rows' stored places
+	// are exact.
 	KFCRowFoci::ReanchorStory(chapterIdx, story);
 	if (!shown)
 		outAfter.Clear();
