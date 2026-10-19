@@ -248,7 +248,7 @@
   **写しを取らない**（行は灰色・押せば理由を言う）＝表のセル・脚注・ノートの中の一致／**一致がアンカー付き・インラインの物を含む**（作者「UID が変わるのが問題」＝写しで戻すと別の UID の物になる）／**貼り付けがリンクの元の文字を丸ごと置き換える形**（一致そのものがリンクの元・広げた後ろにリンク・一致の端に接したリンク＝付け直しで InDesign が落ちた）と相互参照／広げる後ろに物の文字や印がある／写せなかった。
   押した後に断る（行はそのまま・何行なら数えて言う）＝置換で書いた文字を後で直した `edited since`・広げた後ろが変わった `rest of paragraph changed`・ストーリーを追えない `not followed`・ロック `locked`・文書を開けない。閉じたブックの章は、置換と同じく窓なしで開いて戻し、窓を出す。
   文＝`Restored ID:262 #3.`／`Restored 2 of 3 rows: ID:262 #1, ID:262 #3. Left as they were: 1 edited since.`／`Restored 3 rows in 2 documents: a.indd ID:262 #1; b.indd ID:270 #1.`／1行の断り `Restore from Copy: <理由>`（例 `Restore from Copy: no copy was kept when this row was replaced - its match holds an anchored object, which a copy would put back as a new object (a new ID).`）。
-  写しの置き場は InDesign を終えるまで残る（保存していない文書の分は閉じたときに捨てる）・キャッシュフォルダに1つ約120KB のファイル（`KohakuFindChangeCopyStore<番号>`）。実機＝設計書 §7（テスト用ビルド・KIDMCP）。回帰＝`restore-from-copy`・`restore-two-rows`（まとめて選んだ2行）・`restore-one-edited`（書いた文字を後で直した行＝1行の断り）・`restore-two-one-edited`（2行のうち直した1行を数えて残す）＝2026-10-19 に合格（`tier-cases.tsv`）。（1.4.0）
+  写しの置き場は InDesign を終えるまで残る（保存していない文書の分は閉じたときに捨てる）・キャッシュフォルダに1つ約120KB のファイル（`KohakuFindChangeCopyStore<番号>`）。実機＝設計書 §7（テスト用ビルド・KIDMCP）。回帰＝`restore-from-copy`・`restore-two-rows`（まとめて選んだ2行）・`restore-one-edited`（書いた文字を後で直した行＝1行の断り）・`restore-two-one-edited`（2行のうち直した1行を数えて残す）＝2026-10-19 に合格（`tier-cases.tsv`）。同じ日（ブロック9の監査）に＝`restore-para-style`（置換が段落スタイルを当てた行＝段落のスタイルと上書きが戻る）・`restore-run-on`（⏎をまたぐ一致＝2段落目の揃えが戻る）・`restore-link-around`／`restore-link-edge`（リンクが一致を囲む／一致の端をまたぐ＝リンク1本で元の範囲）・`restore-link-whole`／`restore-link-rest`（一致そのものがリンク／後ろにリンク＝写しを取らない＝灰色）＝合格・`restore-link-inside`＝下の⬜。（1.4.0）
   - 訂正:
 
 - **REP-39** ★**文字の行の Special Operations ▸ Create Outlines**（ヒットの行の右クリック・Restore from Copy の下・2026-10-18 作者「Text 一致の文字だけを Create Outlines。テキスト用のスペシャルの機能ですね（オブジェクト以外用）」＝設計書 `docs/superpowers/specs/2026-10-18-kfc-text-outlines-design.md`）――
@@ -265,6 +265,8 @@
 ## ⬜ この章で未確認
 
 この章を書くにあたって**確かめていない**もの。「書いていない＝そういう決まりが無い」ではない。
+
+- ⬜（2026-10-19 ブロック9の監査の新しいケースで見つけた・次の「9 不具合」の回で直す）REP-38：**一致の中のリンクを置換が消さずに書いた文字の上に残す形**（`the cat sat one` の `at sa` にリンク・`cat sat`→`dog`＝置換は文字を上書きで書き、リンクは `og` に残った）では、Restore from Copy の後にリンクが2本になる＝写しが持ち込んだリンク（名前 `L1 1`・元の範囲）と、文字を失った元の `L1`（REP-38 の「リンク1本」と違う）。10-17 の実測（H4＝中のリンクは置換が消す）は、リンクが書いた文字より後ろ（消える側）にある形だった見込み。回帰＝`restore-link-inside`（RED・期待は REP-38）。
 
 - ✅（2026-10-11 全件の点検で確かめた）REP-01：置換形式（Change Format）は書かれる＝回帰 `hd-cf-char`・`hd-cf-formatonly`・`hd-cf-formatonly-undo`（本体の「すべてを置換」と同じ結果）。
 - ✅（2026-10-13 実機で確かめた）REP-16：取り消しの名前は日本語 UI でも `Replace`（行の Replace の後の `app.activeDocument.undoName`＝探りの表 `work/kbs-regress/archive/probe-undoname-1013.tsv`）。「編集」メニューの絵では見ていない。Change All・Run Queries の名前と進捗バーの題は同じ仕組み（文字列表のキー）で、実機では読んでいない。
