@@ -202,6 +202,12 @@ namespace KFCResultHistory
 	    when the copy has no such row; nothing at all when no copy has that result set. */
 	void KeptChapterGone(uint32 set, int32 chapterIdx, int32 replaced, int32 hits);
 
+	/** A DOCUMENT SAVED AS ANOTHER FILE, IN A GREY TIER (KFCTierStore::RenameDocument - the author's call: the copy
+	    reads the new name at once, not at the next switch): kept tier `set`'s copy gives chapter `chapterIdx`'s
+	    document row `name` - its counts and note as they were drawn - and the tree redraws that row where the last
+	    rebuild drew the tier. Nothing when no copy has that result set, or the copy has no such row. */
+	void KeptChapterRenamed(uint32 set, int32 chapterIdx, const PMString& name);
+
 	/** The controlled shutdown (KFCUIStartupShutdown): every static here holding storage emptied by a fresh value
 	    (KFCResultTree::ShutdownCleanup's rule - Clear() keeps a container's storage), and the switch's timer stopped and let
 	    go (its callback is a raw pointer into this .pln). */

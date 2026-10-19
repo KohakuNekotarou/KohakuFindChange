@@ -64,6 +64,15 @@ void KFCNotifyKeptChapterGone(uint32 set, int32 chapterIdx, int32 replaced, int3
 	Emit(payload);
 }
 
+void KFCNotifyKeptChapterRenamed(uint32 set, int32 chapterIdx, const PMString& name)
+{
+	KFCNotifyPayload payload(KFCNotifyPayload::kKeptChapterRenamed);
+	payload.set = set;
+	payload.chapterIdx = chapterIdx;
+	payload.text = &name;
+	Emit(payload);
+}
+
 void KFCNotifyStatus(const PMString& message)
 {
 	KFCNotifyPayload payload(KFCNotifyPayload::kStatus);

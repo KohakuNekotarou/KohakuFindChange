@@ -944,6 +944,47 @@ void KFCResultHistory::KeptChapterGone(uint32 set, int32 chapterIdx, int32 repla
 		static_cast<int>(chapterIdx), found ? 1 : 0, drawn ? 1 : 0, static_cast<int>(replaced), static_cast<int>(hits));
 }
 
+void KFCResultHistory::KeptChapterRenamed(uint32 set, int32 chapterIdx, const PMString& name)
+{
+	const int32 tier = TierOfSet(set);
+	if (tier < 0)
+		return;
+	KeptTier& kept = gKept[static_cast<size_t>(tier)];
+	for (size_t i = 0; i < kept.top.size(); ++i)
+	{
+		const int32 row = kept.top[i];
+		KeptRow& doc = kept.rows[static_cast<size_t>(row)];
+		TreeNodePtr<KFCResultNodeID> id(doc.live);
+		if (id == nil || !id->IsDocumentRow() || id->GetChapter() != chapterIdx)
+			continue;
+		// "<name>  (R/N)", a note between as it was drawn (" (no window)" - KFCResultTree::GetRowLook): the name in
+		// front is the one given anew, the rest kept. A label that does not begin with the row's name is left as it was
+		// drawn.
+		if (doc.look.label.IndexOfString(doc.look.name) != 0)
+		{
+			KFC_DIAG_LOG("STACK kept chapter renamed set=%u chapter=%d - its label does not begin with its name", set,
+				static_cast<int>(chapterIdx));
+			return;
+		}
+		PMString rest(doc.look.label);
+		rest.Remove(0, doc.look.name.CharCount());
+		doc.look.label = name;
+		doc.look.label.Append(rest);
+		doc.look.label.SetTranslatable(kFalse);
+		doc.look.name = name;
+		doc.look.name.SetTranslatable(kFalse);
+		// THE TREE IS TOLD ONLY WHERE THE LAST REBUILD DREW THIS TIER, AT THIS PLACE (KeptChapterGone says why).
+		InterfacePtr<ITreeViewMgr> treeMgr(KFCResultTree::QueryResultTreeMgr());
+		const bool drawn = treeMgr != nil && tier < static_cast<int32>(gDrawnSets.size())
+			&& gDrawnSets[static_cast<size_t>(tier)] == set;
+		if (drawn)
+			treeMgr->NodeChanged(KFCResultNodeID::CreateKept(tier, row));
+		KFC_DIAG_LOG("STACK kept chapter renamed set=%u chapter=%d row=%d", set, static_cast<int>(chapterIdx),
+			static_cast<int>(row));
+		return;
+	}
+}
+
 void KFCResultHistory::RenameLiveFromQuery(uint32 set)
 {
 	if (set == 0 || set != gLive.set || gLive.set != KFCResults()->GetResultSetId() || gLive.label.IsEmpty())

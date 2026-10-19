@@ -66,9 +66,9 @@ namespace KFCTierStore
 	/** A DOCUMENT SAVED AS ANOTHER FILE (KFCSaveAsDocResponder - the spec map's LIFE-14): in every tier but a book's,
 	    its chapters - by their binding, compared and never followed - take its new name, as the live list's do
 	    (KFCResultModel::RenameDocumentChapters) and the lists kept for a query run's Undo
-	    (KFCUndoFollow::RenameDocument), so a switch back to a tier does not bring the old name back. A book's tier
-	    keeps its names (LIFE-14's rule: its rows stand for the book's chapters). The panel's grey copy of a tier is not
-	    told - it reads the new name once the tier is switched to. */
+	    (KFCUndoFollow::RenameDocument), so a switch back to a tier does not bring the old name back. The panel's grey
+	    copy of each such tier is told as well (KFCNotifyKeptChapterRenamed - the author's call): it reads the new name
+	    at once. A book's tier keeps its names (LIFE-14's rule: its rows stand for the book's chapters). */
 	void RenameDocument(const UIDRef& docRef, const PMString& newName);
 
 	/** The chapters of kept tier `set`'s list that are the document `db` - by file first, as ForgetDocument finds them (the

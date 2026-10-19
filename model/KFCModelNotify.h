@@ -46,6 +46,11 @@ void KFCNotifyChapterRowGoes(int32 chapterIdx);
     (KFCResultHistory::KeptChapterGone). */
 void KFCNotifyKeptChapterGone(uint32 set, int32 chapterIdx, int32 replaced, int32 hits);
 
+/** Kept tier `set`'s chapter chapterIdx took `name` - its document saved as another file
+    (KFCTierStore::RenameDocument): the grey copy's document row reads it at once
+    (KFCResultHistory::KeptChapterRenamed). */
+void KFCNotifyKeptChapterRenamed(uint32 set, int32 chapterIdx, const PMString& name);
+
 /** Say this on the panel's message line. */
 void KFCNotifyStatus(const PMString& message);
 

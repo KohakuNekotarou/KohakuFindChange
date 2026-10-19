@@ -10,8 +10,9 @@
 //  the name the search read: with B.indd saved as C.indd and B.indd's file opened again, the row "B.indd" wrote into
 //  C.indd, the right document under the wrong name (measured without this responder - case ad-saveas-reopen-replace).
 //  A book's list keeps its names: its rows stand for the book's chapters (KFCResultModel::RenameDocumentChapters).
-//  The kept tiers' lists take the name as well (KFCTierStore::RenameDocument), and the lists kept for a query run's
-//  Undo (KFCUndoFollow::RenameDocument) - a switch back or an Undo does not bring the old name back.
+//  The kept tiers' lists take the name as well (KFCTierStore::RenameDocument - and their grey copies on the panel at
+//  once), and the lists kept for a query run's Undo (KFCUndoFollow::RenameDocument) - a switch back or an Undo does not
+//  bring the old name back.
 //  The name is read the way the SDK's docwatch reads it (DocWchUtils::DwAlert: IDocumentSignalData::GetDocument, then
 //  IDocument::GetName).
 //

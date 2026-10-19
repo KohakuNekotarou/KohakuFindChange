@@ -18,7 +18,7 @@
 #include "IDataBase.h"		// GetSysFile - a closing document's file, kept on a tier's emptied chapter
 #include "KFCBookScope.h"	// GetSearchedBookPath - the book a list was searched in; FindOpenChapterDoc - a chapter, by its file
 #include "KFCDiag.h"		// the TIER lines - test builds only
-#include "KFCModelNotify.h"	// KFCNotifyKeptChapterGone - a grey copy lets a closed document's rows go
+#include "KFCModelNotify.h"	// KFCNotifyKeptChapterGone / Renamed - a grey copy follows a closed or renamed document
 #include "KFCRowFoci.h"	// a tier's rows keep their text foci while it is grey (HandOver / TakeBack)
 #include "KFCRunGuard.h"	// no switch while a run of ours is under way
 #include "KFCSearchEngine.h"	// RememberFindFormatOf - the switched list's own Find Format, for the replace's door
@@ -186,6 +186,8 @@ void KFCTierStore::RenameDocument(const UIDRef& docRef, const PMString& newName)
 				continue;
 			chapters[c].name = newName;
 			chapters[c].name.SetTranslatable(kFalse);
+			// ...and the panel's grey copy of the tier reads it now, not at the next switch (the author's call).
+			KFCNotifyKeptChapterRenamed(gTiers[t].set, static_cast<int32>(c), chapters[c].name);
 		}
 	}
 }
