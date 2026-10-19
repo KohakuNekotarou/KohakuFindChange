@@ -248,8 +248,8 @@
 
 この章を書くにあたって**確かめていない**もの。「書いていない＝そういう決まりが無い」ではない。
 
-- ⬜（2026-10-19 ブロック8の監査）OBJ-22：パス上の文字の一致＝そのパス。それまでは一致の枠から階層を上がって最初の「枠」で止まる形で、パス上の文字では本体が描かない別の物（`kTOPSplineItemBoss`＝パスとは階層でつながっていない）の行になる見込みだった（設計書の N5「パス上の文字はそのパス」と違う・作り始めの実測 M3 の答えは設計書に無い・回帰 `nd-frames` にパス上の文字は無い）→公式の2手（`ITOPFrameData::GetMainSplineItemUID`／`ITextUtils::QuerySplineFromTextFrame`＝`SDKLayoutHelper::GetGraphicFrameRef`）に寄せた。実機はまだ＝回帰 `nd-frames-path`（行は楕円 pathOval）・`-armed`（故障スイッチ `frame-owner-climb`＝前の形）は全件の回。
-- ⬜（2026-10-19 ブロック8の再検査・実機は未測）OBJ-22：文書の一部を探した段から Frames of These Matches で絞った一覧＝文は `frame(s)`・あふれの一致の数・上限は物の一覧の 1000（D8-5＝その道だけ文字の一覧として扱っていた）。回帰＝`nd-frames-part`（To End of Story の段・2 frame(s)・あふれ1）／`-armed`（故障スイッチ `part-narrow-as-text`＝前の形）＝全件の回。上限 1000 は回帰に無い（コードで読んだ）。
+- ✅（2026-10-19 ブロック8の監査・同じ日に実機で確かめた）OBJ-22：パス上の文字の一致＝そのパス。それまでは一致の枠から階層を上がって最初の「枠」で止まる形で、パス上の文字では本体が描かない別の物（`kTOPSplineItemBoss`＝パスとは階層でつながっていない）の行になる見込みだった（設計書の N5「パス上の文字はそのパス」と違う・作り始めの実測 M3 の答えは設計書に無い・回帰 `nd-frames` にパス上の文字は無い）→公式の2手（`ITOPFrameData::GetMainSplineItemUID`／`ITextUtils::QuerySplineFromTextFrame`＝`SDKLayoutHelper::GetGraphicFrameRef`）に寄せた。実機＝回帰 `nd-frames-path`（行は楕円 `pathOval`）合格・`-armed`（故障スイッチ `frame-owner-climb`＝前の形）は本体の描かない物の行 `<cat path>`＝見込みどおり（どちらも合格）。
+- ✅（2026-10-19 ブロック8の再検査・同じ日に実機で確かめた）OBJ-22：文書の一部を探した段から Frames of These Matches で絞った一覧＝文は `frame(s)`・あふれの一致の数・上限は物の一覧の 1000（D8-5＝その道だけ文字の一覧として扱っていた）。回帰＝`nd-frames-part`（To End of Story の段・2 frame(s)・あふれ1）／`-armed`（故障スイッチ `part-narrow-as-text`＝前の形＝`2 hit(s)`・あふれの注なし）＝どちらも合格。上限 1000 は回帰に無い（コードで読んだ）。
 
 - ⬜（2026-10-17 夜・実機は主な道だけ）OBJ-21：試していない＝ブック（章ごとの同じ名前のレイヤー）・マスターの物・インライン／アンカー付きの物（どのレイヤーで数えるか）・非表示／ロックしたレイヤーが選ばれているとき・Search This Document Again でレイヤーが無くなった文書（断る文）・300行の上限の近く・回帰のケース（台本を段に合わせた後の全件の回に足す）。
 - ⬜（2026-10-17 夜・実機は主な道だけ）OBJ-20：試していない＝All Documents で2つの文書の行をまとめて選んだ書き込み（KIDMCP の `click_widget` に修飾キーが無い＝ブックの Select All Rows で2文書を測った）・インライン／アンカー付きの物（回転・削除で本文が動く）・マスターの物・非表示のレイヤーの物・300行の上限の近く・灰色の判定の重さ（行が多いときの右クリック）・回帰のケース（全件の回に足す）。値の要る4つ（段2）は実機で主な道だけ（Move の距離と角度・確定で単位つき・Scale の鎖の絵・Shear の垂直＝本体と行列一致・Enter で OK・Escape で Cancel）＝インチ／パイカの文書・鎖を外した縦横別・-90/90 の端・負の拡大は試していない。Run Script は見送り。
