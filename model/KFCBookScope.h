@@ -546,17 +546,15 @@ namespace KFCBookScope
 	    list without closing anything - the quitting application closes every document itself. */
 	void ShutdownCleanup();
 
-	/** THE TARGETS' SIZES FOR A PROGRESS BAR (docs/superpowers/specs/2026-10-18-kfc-copy-results-progress-share-design.md - the
-	    author's yes of 2026-10-18 to "the bar divided by the chapters' sizes"): a chapter of the book the run is against
-	    (contentUID valid) - the size its book records for it (IBookContent::GetSize: nothing opened); a document-scope
-	    target - its page count (IPageList, the document open). 0 = not read. */
-	std::vector<uint64> TargetSizes(const std::vector<ChapterDoc>& targets);
-
-	/** A BAR'S RANGE SPLIT AMONG THE TARGETS by those sizes: out[i] is where target i's stretch starts and out[n] == total
-	    (n = sizes.size()). A size not read counts as the average of those read; every stretch is at least a quarter of an
-	    even share, so a small chapter still moves the bar - and none is empty. Until this a bar gave each target an even
-	    share, and a book's one big chapter held it still while the small ones flew past. */
-	std::vector<int32> ProgressBases(const std::vector<uint64>& sizes, int32 total);
+	/** A BAR'S RANGE SPLIT AMONG A RUN'S TARGETS BY THEIR SIZES
+	    (docs/superpowers/specs/2026-10-18-kfc-copy-results-progress-share-design.md - the author's yes of 2026-10-18 to
+	    "the bar divided by the chapters' sizes"): out[i] is where target i's stretch starts and out[n] == total
+	    (n = targets.size()). A target's size: a chapter of the book the run is against (contentUID valid) - the size
+	    its book records for it (IBookContent::GetSize: nothing opened); a document-scope target - its page count
+	    (IPageList, the document open). A size not read counts as the average of those read; every stretch is at least a
+	    quarter of an even share, so a small chapter still moves the bar - and none is empty. Until this a bar gave each
+	    target an even share, and a book's one big chapter held it still while the small ones flew past. */
+	std::vector<int32> ProgressBases(const std::vector<ChapterDoc>& targets, int32 total);
 }
 
 #endif // __KFCBookScope_h__

@@ -735,6 +735,11 @@ namespace KFCResultModel
 	    needs this without going through a hit. false = index out of range. */
 	bool GetChapterLocation(int32 chapterIdx, UIDRef& outDocRef, IDFile& outFile);
 
+	/** The chapter BOUND to this document (Chapter::docRef - compared, never followed: IsDocStillOpen's rule), the
+	    first if several are; -1 = none. How a closing document finds its chapter (KFCCloseDocResponder,
+	    KFCUndoFollow::ForgetDocument). By its binding, not its file - KFCBookScope::FindOpenChapterDoc asks that. */
+	int32 GetDocumentChapter(const UIDRef& docRef);
+
 	/** The file a chapter's document was closed from (Chapter::closedFile - empty for a chapter never closed, or one
 	    whose document was never saved). false = index out of range. */
 	bool GetChapterClosedFile(int32 chapterIdx, IDFile& outFile);

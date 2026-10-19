@@ -27,7 +27,7 @@
 #include "IActiveContext.h"		// GetContextDocument - ActiveDocument, the document-scope half of HasScopeTarget
 #include "IOpenFileCmdData.h"	// kOpenDefault / kUseLockFile
 #include "IOpenedFileInfo.h"	// the file an older-version chapter's conversion was opened from
-#include "IPageList.h"			// TargetSizes - an open document's page count
+#include "IPageList.h"			// KFCTargetSizes - an open document's page count
 #include "ISession.h"
 
 // General includes:
@@ -250,6 +250,16 @@ namespace
 		// IBook::IsOpen is the flag the close clears. Do not drop this test when tidying: the lookup
 		// above answers a different question from the one this function is asked.
 		return book->IsOpen() ? book : nil;
+	}
+
+	/** The database of the searched book (gSearchedBookPath), found again by its path rather than carried between calls
+	    in a static: a book pointer parked there goes stale the moment the user closes the book, and a run pumps events
+	    through its progress bar. Costs one IBookManager::FindOpenBookByName. nil = no open book has that path - the
+	    results are not a book's, or the book has closed since. */
+	IDataBase* SearchedBookDB()
+	{
+		IBook* const book = FindOpenBookByPath(gSearchedBookPath);	// non-owning
+		return (book != nil) ? ::GetDataBase(book) : nil;
 	}
 
 	/** The book a book-scope run would be against: the book the BOOK PANEL is showing, and failing
@@ -1319,15 +1329,12 @@ bool KFCBookScope::OpenChapterDoc(ChapterDoc& ioChapter, std::vector<SkippedChap
 {
 	ioChapter.docRef = UIDRef::gNull;
 
-	// The book this chapter belongs to, found again by path rather than carried along in a static:
-	// a book pointer parked between calls goes stale the moment the user closes the book, and a run
-	// pumps events through its progress bar. Looking it up costs one IBookManager::FindOpenBookByName.
+	// The database of the book this chapter belongs to, found again by its path (SearchedBookDB).
 	//
 	// A nil answer here is not fatal - it only costs the two things that need the book itself (the
 	// already-open lookup by content UID, and the reason text for a chapter that will not open).
 	// The open below goes by FILE and works either way.
-	IBook* book = FindOpenBookByPath(gSearchedBookPath);
-	IDataBase* bookDB = (book != nil) ? ::GetDataBase(book) : nil;
+	IDataBase* const bookDB = SearchedBookDB();
 	bool16 isMissingPlugins = kFalse;
 
 	// Is it already open? Ask the book API first, by CONTENT UID - the purpose-built question
@@ -1449,13 +1456,15 @@ bool KFCBookScope::OpenChapterDoc(ChapterDoc& ioChapter, std::vector<SkippedChap
 	return false;
 }
 
-std::vector<uint64> KFCBookScope::TargetSizes(const std::vector<ChapterDoc>& targets)
+// A TARGET'S SIZE FOR THE BAR (ProgressBases): a chapter of the book the run is against (contentUID valid) - the size
+// its book records for it (IBookContent::GetSize: nothing opened); a document-scope target - its page count (IPageList,
+// the document open). 0 = not read.
+static std::vector<uint64> KFCTargetSizes(const std::vector<KFCBookScope::ChapterDoc>& targets)
 {
 	std::vector<uint64> sizes(targets.size(), 0);
-	// The book found again by its path, as OpenChapterDoc finds it (no book pointer carried between calls). Nil (not a book's
-	// run, or the book closed since): the book's chapters read as not read - each then the average (ProgressBases).
-	IBook* book = gSearchedBookPath.IsEmpty() ? nil : FindOpenBookByPath(gSearchedBookPath);
-	IDataBase* bookDB = (book != nil) ? ::GetDataBase(book) : nil;
+	// The searched book's database (SearchedBookDB). Nil (not a book's run, or the book closed since): the book's
+	// chapters read as not read - each then the average (ProgressBases).
+	IDataBase* const bookDB = SearchedBookDB();
 	for (size_t i = 0; i < targets.size(); ++i)
 	{
 		if (targets[i].contentUID != kInvalidUID)
@@ -1470,15 +1479,17 @@ std::vector<uint64> KFCBookScope::TargetSizes(const std::vector<ChapterDoc>& tar
 		else if (targets[i].docRef.GetDataBase() != nil)
 		{
 			InterfacePtr<IPageList> pages(targets[i].docRef, UseDefaultIID());
-			if (pages != nil && pages->GetPageCount() > 0)
-				sizes[i] = static_cast<uint64>(pages->GetPageCount());
+			const int32 pageCount = (pages != nil) ? pages->GetPageCount() : 0;
+			if (pageCount > 0)
+				sizes[i] = static_cast<uint64>(pageCount);
 		}
 	}
 	return sizes;
 }
 
-std::vector<int32> KFCBookScope::ProgressBases(const std::vector<uint64>& sizes, int32 total)
+std::vector<int32> KFCBookScope::ProgressBases(const std::vector<ChapterDoc>& targets, int32 total)
 {
+	const std::vector<uint64> sizes(KFCTargetSizes(targets));
 	const size_t n = sizes.size();
 	std::vector<int32> bases(n + 1, 0);
 	if (n == 0)

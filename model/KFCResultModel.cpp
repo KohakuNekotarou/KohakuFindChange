@@ -1070,6 +1070,16 @@ bool KFCResultModel::GetChapterLocation(int32 chapterIdx, UIDRef& outDocRef, IDF
 	return true;
 }
 
+int32 KFCResultModel::GetDocumentChapter(const UIDRef& docRef)
+{
+	for (size_t i = 0; i < gChapters.size(); ++i)
+	{
+		if (gChapters[i].docRef == docRef)
+			return static_cast<int32>(i);
+	}
+	return -1;
+}
+
 bool KFCResultModel::GetChapterClosedFile(int32 chapterIdx, IDFile& outFile)
 {
 	const Chapter* c = ChapterAt(chapterIdx);

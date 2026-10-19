@@ -924,7 +924,7 @@ void KFCObjectSearch::CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targ
 		// documents by their sizes (the progress-share spec - KFCBookScope::ProgressBases: a book's chapter by the size its book
 		// records, an open document by its pages).
 		const int32 barEnd = static_cast<int32>(targets.size()) * kDocSpan;
-		const std::vector<int32> shares(KFCBookScope::ProgressBases(KFCBookScope::TargetSizes(targets), barEnd));
+		const std::vector<int32> shares(KFCBookScope::ProgressBases(targets, barEnd));
 		KFCProgressBar bar(title, 0, barEnd, kTrue, kTrue);
 		bar.DisableChildProgressBars(kTrue);
 		int32 objectLimit = KFCResultModel::kKFCCollectObjectLimit;	// the object lists' own (KFCResultModel.h)

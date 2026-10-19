@@ -1061,15 +1061,8 @@ void KFCUndoFollow::ForgetClosingDocument(const UIDRef& docRef)
 
 void KFCUndoFollow::ForgetDocument(const UIDRef& docRef)
 {
-	// Its chapter in the list - by its binding, as the close responder finds it (KFCCloseDocResponder).
-	int32 closing = -1;
-	for (int32 c = 0; c < KFCResultModel::GetChapterCount() && closing < 0; ++c)
-	{
-		UIDRef chapterDoc;
-		IDFile chapterFile;
-		if (KFCResultModel::GetChapterLocation(c, chapterDoc, chapterFile) && chapterDoc == docRef)
-			closing = c;
-	}
+	// Its chapter in the list - by its binding, as the close responder finds it (KFCResultModel::GetDocumentChapter).
+	const int32 closing = KFCResultModel::GetDocumentChapter(docRef);
 	const uint32 current = KFCResultModel::GetResultSetId();
 	for (size_t i = gSteps.size(); i-- > 0; )
 	{

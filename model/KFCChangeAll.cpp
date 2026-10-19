@@ -413,7 +413,7 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 		// (docs/superpowers/specs/2026-10-18-kfc-copy-results-progress-share-design.md - KFCBookScope::ProgressBases):
 		// a chapter's step as long as its size makes it, not one each.
 		const int32 barTotal = static_cast<int32>(targets.size()) * 100;
-		const std::vector<int32> shares(KFCBookScope::ProgressBases(KFCBookScope::TargetSizes(targets), barTotal));
+		const std::vector<int32> shares(KFCBookScope::ProgressBases(targets, barTotal));
 		KFCProgressBar bar(kKFCChangeAllStepKey, 0, barTotal, kTrue, kTrue);
 		for (size_t d = 0; d < targets.size(); ++d)
 		{

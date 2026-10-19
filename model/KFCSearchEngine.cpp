@@ -2628,7 +2628,7 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 	// THE BAR SPLIT BY THE TARGETS' SIZES (docs/superpowers/specs/2026-10-18-kfc-copy-results-progress-share-design.md): a book's
 	// chapter takes the share its size gives it, an open document the share its pages give it (KFCBookScope::ProgressBases) -
 	// the total as before. shares[t] is where target t's stretch starts, shares[t + 1] where it ends.
-	const std::vector<int32> shares(KFCBookScope::ProgressBases(KFCBookScope::TargetSizes(targets), progressTotal));
+	const std::vector<int32> shares(KFCBookScope::ProgressBases(targets, progressTotal));
 
 	// The title names the scope, because the bar does not imply it: "Searching book..." when it
 	// really is a book, plain "Searching..." for a single document.
@@ -4605,7 +4605,7 @@ bool SearchPartsAgain(const PMString& lead, PMString& outStatus, const KFCSearch
 		for (size_t k = 0; k < chapters.size(); ++k)
 			sized[k].docRef = chapters[k].docRef;
 		const int32 barTotal = static_cast<int32>(chapters.size()) * kKFCChapterProgressSpan;
-		const std::vector<int32> shares(KFCBookScope::ProgressBases(KFCBookScope::TargetSizes(sized), barTotal));
+		const std::vector<int32> shares(KFCBookScope::ProgressBases(sized, barTotal));
 		KFCProgressBar bar(title, 0, barTotal, kTrue, kTrue);
 		bar.DisableChildProgressBars(kTrue);
 		int32 reported = 0;

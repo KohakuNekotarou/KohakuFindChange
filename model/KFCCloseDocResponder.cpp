@@ -220,25 +220,12 @@ void KFCCloseDocResponder::Respond(ISignalMgr* signalMgr)
 
 	// Nothing on display, nothing to retire. This signal fires for every document close in the
 	// session, so past the held-list bookkeeping above it leaves as early as it can.
-	const int32 chapterCount = KFCResultModel::GetChapterCount();
-	if (chapterCount <= 0)
+	if (KFCResultModel::GetChapterCount() <= 0)
 		return;
 
-	// A Document / Story / Selection result set is one chapter - the searched document - and an All
-	// Documents one is a chapter per open document, so every chapter is compared.
-	int32 closingChapter = -1;
-	for (int32 ci = 0; ci < chapterCount; ++ci)
-	{
-		UIDRef chapterDocRef;
-		IDFile chapterFile;
-		if (!KFCResultModel::GetChapterLocation(ci, chapterDocRef, chapterFile))
-			continue;
-		if (chapterDocRef == closingDocRef)
-		{
-			closingChapter = ci;
-			break;
-		}
-	}
+	// A Document / Story / Selection result set is one chapter - the searched document - and an All Documents one is a
+	// chapter per open document: the closing one's, found by its binding (KFCResultModel::GetDocumentChapter).
+	const int32 closingChapter = KFCResultModel::GetDocumentChapter(closingDocRef);
 	if (closingChapter < 0)
 	{
 		KFC_DIAG_LOG("CLOSE - not a document of the list");

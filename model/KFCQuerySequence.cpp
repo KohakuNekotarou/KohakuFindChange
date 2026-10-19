@@ -271,7 +271,7 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 		// not one each. `unit` still counts the steps (the test build's queries-cancel names one); the bar's place is
 		// Place(q, d).
 		const int32 perQueryBar = static_cast<int32>(targets.size()) * 100;
-		const std::vector<int32> shares(KFCBookScope::ProgressBases(KFCBookScope::TargetSizes(targets), perQueryBar));
+		const std::vector<int32> shares(KFCBookScope::ProgressBases(targets, perQueryBar));
 		const int32 units = static_cast<int32>(queries.size()) * perQueryBar;
 		auto Place = [&](size_t q, size_t d) { return static_cast<int32>(q) * perQueryBar + shares[d]; };
 		KFCProgressBar runBar(kKFCRunQueriesStepKey, 0, units, kTrue, kTrue);
