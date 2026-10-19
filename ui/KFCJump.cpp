@@ -1033,11 +1033,15 @@ NotSelected SelectMatchOnClick(int32 chapterIdx, int32 hitIdx, const UIDRef& sto
 	// selection it will convert, only for the next line to throw the result away.
 	if (!PutTypeToolOn())
 		return kNotSelectedQuietly;
-	// ! RangeData's two-argument form is (start, END) - not (start, length). Getting that wrong selects from the match
-	//   to a point measured from the start of the STORY. A zero-width match (start == end) is a caret there.
+	// ! RangeData is (start, END) - not (start, length). Getting that wrong selects from the match to a point measured
+	//   from the start of the STORY. A zero-width match (start == end) is a caret there, and a caret is given its lean:
+	//   RangeData.h asks for one whenever start == end - "RangeData( 34, 34); //incorrect", the two-index form, which
+	//   ASSERTs in a Debug build. kLeanForward is the lean that form gives in a release build, so the caret is the
+	//   one the zero-width cases of JMP-31 were tested with.
 	// kDontScrollSelection: the jump has already centred the match (IPanorama::ScrollContentLocationToFrameCenter) - or,
 	// overset, gone to the frame's "+" (the author: the jump as it was); kScrollIntoView would undo either.
-	if (textSelectionSuite->SetTextSelection(storyRef, RangeData(start, end), Selection::kDontScrollSelection, nil) == kFalse)
+	if (textSelectionSuite->SetTextSelection(storyRef, RangeData(start, end, RangeData::kLeanForward),
+		Selection::kDontScrollSelection, nil) == kFalse)
 		return kNotSelectedQuietly;
 	return hidden ? kSelectedHidden : kSelected;
 }
