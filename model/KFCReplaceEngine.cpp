@@ -758,6 +758,41 @@ bool RowStillStands(int32 chapterIdx, int32 hitIdx, IDataBase* db)
 	return KFCSearchEngine::RowReadsAsFound(chapterIdx, hitIdx, db);
 }
 
+// A ROW A WRITE DOES NOT TOUCH - every other row of a Replace's chapter, of a Restore from Copy's, of a
+// Create Outlines': carried and read back only when its stored place is still its text (RowStillStands). One an edit
+// has moved is left as it is, never read back at a place that is no longer its own: its place is taken only here, after
+// RowStillStands, so a row that does not stand stays unknown - neither carried nor read back. (RowStillStands only
+// asks; it moves no row.)
+void KeepRowIfItStands(int32 chapterIdx, int32 hitIdx, IDataBase* db, std::vector<RowNow>& rowNow,
+	std::vector<int32>& keptRows)
+{
+	if (!RowStillStands(chapterIdx, hitIdx, db))
+		return;
+	UID story = kInvalidUID;
+	TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
+	uint64 hash = 0;
+	if (KFCResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, story, start, end, hash))
+		SetRowAt(db, rowNow[static_cast<size_t>(hitIdx)], story, start, end);
+	keptRows.push_back(hitIdx);
+}
+
+// EVERY ROW THE LIST KEEPS, WHERE ITS TEXT STANDS NOW - its range and its line, read once the chapter has stopped
+// changing: a line read as its own match was written would still show the later matches of its paragraph as they were.
+// A row whose thread went with an object a write took away is left as it is.
+void ReadBackRows(int32 chapterIdx, IDataBase* db, const std::vector<RowNow>& rowNow, const std::vector<int32>& rows)
+{
+	for (size_t k = 0; k < rows.size(); ++k)
+	{
+		const RowNow& kept = rowNow[static_cast<size_t>(rows[k])];
+		TextIndex keptStart = kInvalidTextIndex;
+		if (!RowStartNow(db, kept, keptStart))
+			continue;
+		const TextIndex keptEnd = keptStart + kept.length;
+		KFCResultModel::SetHitRange(chapterIdx, rows[k], kept.thread.story, keptStart, keptEnd);
+		KFCSearchEngine::RereadRowText(chapterIdx, rows[k], UIDRef(db, kept.thread.story), keptStart, keptEnd);
+	}
+}
+
 // ======================================================================================================
 // A STORY'S VERSION (the author's call: "safety first"). A row's place is carried past every change KFC makes
 // and past nothing else: typing, Ctrl+Z / Ctrl+Shift+Z, the Track Changes panel or a script can move the text
@@ -849,21 +884,9 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 			&& KFCResultModel::IsWorkOutcome(KFCResultModel::GetHitOutcome(chapterIdx, i));
 		if (!target)
 		{
-			// Every other row - replaced, locked, with an outcome or not - has to stand where its text is afterwards.
-			// ONLY a row whose stored place is still its text (RowStillStands - a replaced row must still hold what it
-			// wrote, or, having written nothing, sit in a story as KFC left it): one an edit has moved is left as it
-			// is, never read back at a place that is no longer its own. Its place is taken only here, after
-			// RowStillStands: a row that does not stand stays unknown - neither carried nor read back. (RowStillStands only
-			// asks; it moves no row.)
-			if (RowStillStands(chapterIdx, i, db))
-			{
-				UID s2 = kInvalidUID;
-				TextIndex a2 = kInvalidTextIndex, b2 = kInvalidTextIndex;
-				uint64 h2 = 0;
-				if (KFCResultModel::GetHitMatchIdentity(chapterIdx, i, s2, a2, b2, h2))
-					SetRowAt(db, rowNow[static_cast<size_t>(i)], s2, a2, b2);
-				keptRows.push_back(i);
-			}
+			// Every other row - replaced, locked, with an outcome or not - has to stand where its text is afterwards:
+			// only one whose stored place is still its text (KeepRowIfItStands).
+			KeepRowIfItStands(chapterIdx, i, db, rowNow, keptRows);
 			continue;
 		}
 		UID story = kInvalidUID;
@@ -927,21 +950,9 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 			KFCResultModel::SetHitOutcome(chapterIdx, *p, KFCResultModel::kOutcomeMissing);
 		}
 	}
-	// ----- every row the report keeps, where its text stands now: its range and its line. Read once the
-	// chapter has stopped changing: a line read as its own match was written would still show the later
-	// matches of its paragraph as they were. (What a replaced row wrote - what its jump looks for it by
-	// once it has moved - is taken when it is written, WalkStoryReplacing.)
-	for (size_t k = 0; k < keptRows.size(); ++k)
-	{
-		const int32 hitIdx = keptRows[k];
-		const RowNow& kept = rowNow[static_cast<size_t>(hitIdx)];
-		TextIndex keptStart = kInvalidTextIndex;
-		if (!RowStartNow(db, kept, keptStart))
-			continue;		// its thread went with an object another replace deleted
-		const TextIndex keptEnd = keptStart + kept.length;
-		KFCResultModel::SetHitRange(chapterIdx, hitIdx, kept.thread.story, keptStart, keptEnd);
-		KFCSearchEngine::RereadRowText(chapterIdx, hitIdx, UIDRef(db, kept.thread.story), keptStart, keptEnd);
-	}
+	// ----- every row the report keeps, where its text stands now (ReadBackRows). (What a replaced row wrote - what its
+	// jump looks for it by once it has moved - is taken when it is written, WalkStoryReplacing.)
+	ReadBackRows(chapterIdx, db, rowNow, keptRows);
 	return true;
 }
 
@@ -1301,13 +1312,16 @@ KFCReplaceEngine::GreyedReason KFCReplaceEngine::WhyGreyed(int32 chapterIdx, int
 	return kGreyedNot;
 }
 
-// The greyed rows counted by reason, after "Left as they were: " - "1 already replaced, 2 locked" - in GreyedReason's order.
-static void AppendGreyedCounts(PMString& out, const int32 (&counts)[KFCReplaceEngine::kGreyedReasonCount])
+namespace
 {
-	static const char* const kWords[KFCReplaceEngine::kGreyedReasonCount] =
-		{ "", "already replaced", "missing", "locked", "refused" };
+// THE ROWS LEFT, COUNTED BY WHY - "1 already replaced, 2 locked": each reason that counts a row, in its enum's order
+// from 1 (0 is "written"), in its few words (`words`). One shape for the reasons of the Replace (GreyedReason), of
+// Restore from Copy and of Create Outlines.
+template <class Why, size_t N>
+void AppendCountsByWhy(PMString& out, const int32 (&counts)[N], const char* (*words)(Why))
+{
 	bool first = true;
-	for (int32 why = KFCReplaceEngine::kGreyedReplaced; why < KFCReplaceEngine::kGreyedReasonCount; ++why)
+	for (size_t why = 1; why < N; ++why)
 	{
 		if (counts[why] == 0)
 			continue;
@@ -1315,8 +1329,22 @@ static void AppendGreyedCounts(PMString& out, const int32 (&counts)[KFCReplaceEn
 			out.Append(", ");
 		out.AppendNumber(counts[why]);
 		out.Append(" ");
-		out.Append(kWords[why]);
+		out.Append(words(static_cast<Why>(why)));
 		first = false;
+	}
+}
+}	// anonymous namespace
+
+// A greyed row's reason in a few words, for a count of rows (AppendCountsByWhy): "2 locked".
+static const char* GreyedWords(KFCReplaceEngine::GreyedReason why)
+{
+	switch (why)
+	{
+		case KFCReplaceEngine::kGreyedReplaced:	return "already replaced";
+		case KFCReplaceEngine::kGreyedMissing:	return "missing";
+		case KFCReplaceEngine::kGreyedLocked:	return "locked";
+		case KFCReplaceEngine::kGreyedRefused:	return "refused";
+		default:								return "";
 	}
 }
 
@@ -1324,6 +1352,20 @@ static void AppendGreyedCounts(PMString& out, const int32 (&counts)[KFCReplaceEn
 static void StartStatus(PMString& out)
 {
 	out = "Replace: ";
+}
+
+// THE STORY, NOT THE ROW (the author's call): a row whose story changed since the search - an edit anywhere in it by
+// typing, an Undo, the Track Changes panel or a script (StoryAsKFCLeftIt), or one its foci could not follow
+// (FollowStoryFoci) - is told of its story, the row's own text untouched or not; not "the text of this row".
+// FOUR LINES AT THE FLOOR (KFCPanelMetrics.cpp, kKFCMessageLines): what to do comes last and has to be read, so the
+// line is kept under about 117 characters, "Replace: " included (with "(edited or undone somewhere in it, not by
+// KohakuFindChange) - search again, or" it ran to 200, and the panel cut it at "or ri..." - measured, case
+// msg-story-changed-shot).
+static const char* StoryChangedWords(bool several)
+{
+	return several
+		? "a selected row's story has changed since the search - right-click the story row: Search This Story Again."
+		: "the story of this row has changed since the search - right-click the story row: Search This Story Again.";
 }
 
 // ONE UNDO STEP FOR A WRITE FROM THE LIST - see the header (WriteStep): the rule for one document and for several.
@@ -1452,6 +1494,111 @@ PMString RowName(int32 chapterIdx, int32 hitIdx)
 	return name;
 }
 
+// WHAT A WRITE OF THE LIST DID - the one message of the Replace, Restore from Copy and Create Outlines (spec F16 / F19
+// / F20, the copy-restore spec's C12, the outlines spec's X8), which says nothing of Ctrl+Z (the author's call). One
+// row by its name (RowName): "Replaced ID:262 #3." ("Replaced." when its name cannot be read). Several counted -
+// "Replaced 3 rows: ID:262 #1, ID:262 #3, ID:270 #1." - up to kNamedRows of them named, each chapter's in `written`'s
+// order; with rows left, "Replaced 2 of 3 rows: ... Left as they were: <left>."; rows of several documents name each
+// document before its rows: "Replaced 3 rows in 2 documents: a.indd ID:262 #1, ID:262 #3; b.indd ID:270 #1." `written`
+// = each chapter's rows written (a chapter with none left out); `selected` = the rows the command was given; `left` =
+// the others, counted by why.
+typedef std::vector<std::pair<int32, std::vector<int32> > > RowsWritten;		// (the chapter, its rows written)
+void SayRowsWritten(PMString& out, const char* verb, const char* noun, const RowsWritten& written, size_t selected,
+	const PMString& left)
+{
+	size_t count = 0;
+	for (size_t c = 0; c < written.size(); ++c)
+		count += written[c].second.size();
+	out = verb;
+	if (selected == 1)
+	{
+		const PMString name(count > 0 ? RowName(written[0].first, written[0].second[0]) : PMString());
+		if (!name.IsEmpty())
+		{
+			out.Append(" ");
+			out.Append(name);
+		}
+		out.Append(".");
+		out.SetTranslatable(kFalse);
+		return;
+	}
+	const size_t kNamedRows = 8;
+	const bool severalDocuments = written.size() > 1;
+	out.Append(" ");
+	out.AppendNumber(static_cast<int32>(count));
+	if (count < selected)
+	{
+		out.Append(" of ");
+		out.AppendNumber(static_cast<int32>(selected));
+	}
+	out.Append(" ");
+	out.Append(noun);
+	if (severalDocuments)
+	{
+		out.Append(" in ");
+		out.AppendNumber(static_cast<int32>(written.size()));
+		out.Append(" documents");
+	}
+	out.Append(": ");
+	size_t named = 0;
+	for (size_t c = 0; c < written.size() && named < kNamedRows; ++c)
+	{
+		if (severalDocuments)
+		{
+			if (c > 0)
+				out.Append("; ");
+			PMString docName;
+			int32 rowsNow = 0;
+			if (KFCResultModel::GetChapterDisplay(written[c].first, docName, rowsNow))
+			{
+				out.Append(docName);
+				out.Append(" ");
+			}
+		}
+		bool first = true;
+		const std::vector<int32>& hits = written[c].second;
+		for (size_t r = 0; r < hits.size() && named < kNamedRows; ++r)
+		{
+			const PMString name(RowName(written[c].first, hits[r]));
+			if (name.IsEmpty())
+				continue;
+			if (!first || (!severalDocuments && named > 0))
+				out.Append(", ");
+			out.Append(name);
+			first = false;
+			++named;
+		}
+	}
+	if (count > kNamedRows)
+		out.Append(", ...");
+	out.Append(".");
+	if (count < selected)
+	{
+		out.Append(" Left as they were: ");
+		out.Append(left);
+		out.Append(".");
+	}
+	out.SetTranslatable(kFalse);
+}
+
+// The rows a write put through, chapter by chapter, for SayRowsWritten: each chapter's rows done, in its order (a
+// chapter with none left out) - Restore from Copy's and Create Outlines'.
+template <class Chapter>
+RowsWritten RowsDone(const std::vector<Chapter>& chapters)
+{
+	RowsWritten written;
+	for (size_t c = 0; c < chapters.size(); ++c)
+	{
+		std::vector<int32> done;
+		for (size_t k = 0; k < chapters[c].rows.size(); ++k)
+			if (chapters[c].rows[k].done)
+				done.push_back(chapters[c].rows[k].hit);
+		if (!done.empty())
+			written.push_back(std::make_pair(chapters[c].chapterIdx, done));
+	}
+	return written;
+}
+
 // DOES THE CHANGE SIDE SET PARAGRAPH FORMATTING - a paragraph style, or a paragraph attribute in Change Format, on the tab
 // the write is stated in? Its Replace then changes the paragraphs the rows stand in, which a copy of the match does not
 // put back (TakeRowCopy - measured live, R13 / R13b).
@@ -1569,24 +1716,23 @@ KFCResultModel::HitCopy TakeRowCopy(const UIDRef& storyRef, TextIndex start, Tex
 		copy.whyNot = KFCResultModel::kCopyOutsideMainText;
 		return copy;
 	}
+	// THE MATCH, READ ONCE: does it hold a return (the copy then runs on, below)? AN ANCHORED OR INLINE OBJECT IN IT
+	// KEEPS NO COPY (the author's call of 2026-10-17 evening: its UID changing is the problem) - put back, it would be
+	// a copy of the object under a new UID (measured live the same day, R19c: the same rectangle in all but its
+	// identity).
 	bool holdsReturn = false;
-	{
-		TextIterator it(model, start);
-		for (TextIndex i = start; i < end && !holdsReturn && !it.IsNull(); ++i, ++it)
-			holdsReturn = ((*it).GetValue() == kTextChar_CR);
-	}
-	// AN ANCHORED OR INLINE OBJECT IN THE MATCH KEEPS NO COPY (the author's call of 2026-10-17 evening: its UID changing is
-	// the problem) - put back, it would be a copy of the object under a new UID (measured live the same day, R19c: the same
-	// rectangle in all but its identity).
 	{
 		TextIterator it(model, start);
 		for (TextIndex i = start; i < end && !it.IsNull(); ++i, ++it)
 		{
-			if ((*it).GetValue() == kTextChar_ObjectReplacementCharacter)
+			const UTF32TextChar c = *it;
+			if (c.GetValue() == kTextChar_ObjectReplacementCharacter)
 			{
 				copy.whyNot = KFCResultModel::kCopyHoldsAnchoredObject;
 				return copy;
 			}
+			if (c.GetValue() == kTextChar_CR)
+				holdsReturn = true;
 		}
 	}
 	if (paragraphChange)
@@ -1614,23 +1760,21 @@ KFCResultModel::HitCopy TakeRowCopy(const UIDRef& storyRef, TextIndex start, Tex
 	TextIndex copyEnd = end;
 	if (holdsReturn)
 	{
-		copyEnd = primary;		// the last paragraph's: up to the story's own return
+		// The run-on rest, read once: up to the return of the paragraph the match ends in (the last paragraph's: the
+		// story's own), with no character an object or a marker stands on (KFCResultModel::IsMarkerNotShown - the ones
+		// a row does not show - and a table's two).
+		copyEnd = primary;
 		TextIterator it(model, end);
 		for (TextIndex i = end; i < primary && !it.IsNull(); ++i, ++it)
 		{
-			if ((*it).GetValue() == kTextChar_CR)
+			const UTF32TextChar c = *it;
+			if (c.GetValue() == kTextChar_CR)
 			{
 				copyEnd = i;
 				break;
 			}
-		}
-		// The run-on rest: no character an object or a marker stands on (KFCResultModel::IsMarkerNotShown - the ones a
-		// row does not show - and a table's two).
-		TextIterator r(model, end);
-		for (TextIndex i = end; i < copyEnd && !r.IsNull(); ++i, ++r)
-		{
-			const UTF32TextChar c = *r;
-			if (KFCResultModel::IsMarkerNotShown(c) || c.GetValue() == kTextChar_Table || c.GetValue() == kTextChar_TableContinued)
+			if (KFCResultModel::IsMarkerNotShown(c) || c.GetValue() == kTextChar_Table
+				|| c.GetValue() == kTextChar_TableContinued)
 			{
 				copy.whyNot = KFCResultModel::kCopyRestHoldsObject;
 				return copy;
@@ -1781,26 +1925,26 @@ static bool ReplaceRowsNow(std::vector<ChapterWrite>& chapters,
 	// each story of the rows to write: a story whose foci all followed every edit and every Undo takes their places and
 	// its version as it stands, so the doors below go by where the text is now; a story with a focus that could not
 	// follow (an Undo of an edit older than the search) is refused here - its version can have come back to the number
-	// on record with other text in it; a story with no foci is left to the version rule, as before.
+	// on record with other text in it; a story with no foci is left to the version rule, as before. They are the
+	// stories the write moves (writtenStories): at the versions on record, as the doors below say, they take their new
+	// versions once it has gone through (NoteStoryVersions, below).
 	for (size_t k = 0; k < chapters.size(); ++k)
 	{
-		const ChapterWrite& c = chapters[k];
-		std::set<UID> stories;
+		ChapterWrite& c = chapters[k];
 		for (std::set<int32>::const_iterator row = c.rows.begin(); row != c.rows.end(); ++row)
 		{
 			UID story = kInvalidUID;
 			TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
 			uint64 hash = 0;
 			if (KFCResultModel::GetHitMatchIdentity(c.chapterIdx, *row, story, start, end, hash) && story != kInvalidUID)
-				stories.insert(story);
+				c.writtenStories.insert(story);
 		}
-		for (std::set<UID>::const_iterator s = stories.begin(); s != stories.end(); ++s)
+		for (std::set<UID>::const_iterator s = c.writtenStories.begin(); s != c.writtenStories.end(); ++s)
 		{
 			if (KFCSearchEngine::FollowStoryFoci(c.chapterIdx, c.docRef.GetDataBase(), *s) == KFCSearchEngine::kFollowBroken)
 			{
 				StartStatus(outStatus);
-				outStatus.Append(several ? "a selected row's story has changed since the search - right-click the story row: Search This Story Again."
-					: "the story of this row has changed since the search - right-click the story row: Search This Story Again.");
+				outStatus.Append(StoryChangedWords(several));
 				return false;
 			}
 		}
@@ -1814,34 +1958,12 @@ static bool ReplaceRowsNow(std::vector<ChapterWrite>& chapters,
 			StartStatus(outStatus);
 			if (movedWhy == kMovedStory)
 			{
-				// THE STORY, NOT THE ROW (the author's call). An edit anywhere in the story - typing, Undo, the
-				// Track Changes panel, a script - stops it (StoryAsKFCLeftIt), the row's own text untouched or not;
-				// so the line names the story, not "the text of this row".
-				// FOUR LINES AT THE FLOOR (KFCPanelMetrics.cpp, kKFCMessageLines): what to do comes last and has to be read, so
-				// the line is kept under about 117 characters, "Replace: " included (with "(edited or undone somewhere in it,
-				// not by KohakuFindChange) - search again, or" it ran to 200, and the panel cut it at "or ri..." - measured,
-				// case msg-story-changed-shot).
-				outStatus.Append(several ? "a selected row's story has changed since the search - right-click the story row: Search This Story Again."
-					: "the story of this row has changed since the search - right-click the story row: Search This Story Again.");
+				outStatus.Append(StoryChangedWords(several));		// the story, not the row
 				return false;
 			}
 			outStatus.Append(several ? "the text of a selected row has changed since the search (edited, or undone) - search again."
 				: "the text of this row has changed since the search (edited, or undone) - search again.");
 			return false;
-		}
-	}
-	// The stories this writes to - at the versions on record, as the check has just said - take their new versions
-	// once it has gone through (NoteStoryVersions, below).
-	for (size_t k = 0; k < chapters.size(); ++k)
-	{
-		ChapterWrite& c = chapters[k];
-		for (std::set<int32>::const_iterator r = c.rows.begin(); r != c.rows.end(); ++r)
-		{
-			UID story = kInvalidUID;
-			TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
-			uint64 hash = 0;
-			if (KFCResultModel::GetHitMatchIdentity(c.chapterIdx, *r, story, start, end, hash))
-				c.writtenStories.insert(story);
 		}
 	}
 	// THE COPIES RESTORE FROM COPY PUTS BACK (the spec's C3 / C4 - TakeRowCopy): every row to write, copied now - after
@@ -1993,81 +2115,15 @@ static bool ReplaceRowsNow(std::vector<ChapterWrite>& chapters,
 			chapters[k].docRef.GetDataBase()->SetModified(kFalse);
 	}
 	// (What each row wrote - Hit::replacedText - is taken by the walk that writes it, WalkStoryReplacing.)
-	// WHAT IT DID (spec F16 / F19 / F20): the row's Replace is one undo step. The
-	// message says nothing of Ctrl+Z (the author's call). Which row, in the message: RowName ("ID:262 #3").
-	if (!several)
-	{
-		const PMString name(RowName(chapters[0].chapterIdx, *chapters[0].rows.begin()));
-		outStatus = name.IsEmpty() ? PMString("Replaced.") : PMString("Replaced ");
-		if (!name.IsEmpty())
-		{
-			outStatus.Append(name);
-			outStatus.Append(".");
-		}
-	}
-	else
-	{
-		// SEVERAL: "Replaced 3 rows: ID:262 #1, ID:262 #3, ID:270 #1." - the rows in the chapter's own order (the
-		// search's page order), up to kNamedRows of them; with rows left, "Replaced 2 of 3 rows: ... Left as they were:
-		// 1 locked." - counted by reason (WhyGreyed - the object rows' form, KFCObjectReplace::ReplaceRows). Rows of
-		// several documents name each document before its rows: "Replaced 3 rows in 2 documents:
-		// a.indd ID:262 #1, ID:262 #3; b.indd ID:270 #1."
-		const size_t kNamedRows = 8;
-		outStatus = "Replaced ";
-		outStatus.AppendNumber(toWrite);
-		if (toWrite < selectedCount)
-		{
-			outStatus.Append(" of ");
-			outStatus.AppendNumber(selectedCount);
-		}
-		outStatus.Append(" rows");
-		if (acrossDocuments)
-		{
-			outStatus.Append(" in ");
-			outStatus.AppendNumber(static_cast<int32>(chapters.size()));
-			outStatus.Append(" documents");
-		}
-		outStatus.Append(": ");
-		size_t named = 0;
-		for (size_t k = 0; k < chapters.size() && named < kNamedRows; ++k)
-		{
-			const ChapterWrite& c = chapters[k];
-			bool first = true;
-			if (acrossDocuments)
-			{
-				if (k > 0)
-					outStatus.Append("; ");
-				PMString docName;
-				int32 rowsNow = 0;
-				if (KFCResultModel::GetChapterDisplay(c.chapterIdx, docName, rowsNow))
-				{
-					outStatus.Append(docName);
-					outStatus.Append(" ");
-				}
-			}
-			for (std::set<int32>::const_iterator r = c.rows.begin(); r != c.rows.end() && named < kNamedRows; ++r)
-			{
-				const PMString name(RowName(c.chapterIdx, *r));
-				if (name.IsEmpty())
-					continue;
-				if (!first || (!acrossDocuments && named > 0))
-					outStatus.Append(", ");
-				outStatus.Append(name);
-				first = false;
-				++named;
-			}
-		}
-		if (static_cast<size_t>(toWrite) > kNamedRows)
-			outStatus.Append(", ...");
-		outStatus.Append(".");
-		if (left > 0)
-		{
-			outStatus.Append(" Left as they were: ");
-			AppendGreyedCounts(outStatus, greyed);
-			outStatus.Append(".");
-		}
-	}
-	outStatus.SetTranslatable(kFalse);
+	// WHAT IT DID (SayRowsWritten): the rows in the chapter's own order (the search's page order); the rows left
+	// counted by reason (WhyGreyed - the object rows' form, KFCObjectReplace::ReplaceRows).
+	RowsWritten written;
+	for (size_t k = 0; k < chapters.size(); ++k)
+		written.push_back(std::make_pair(chapters[k].chapterIdx,
+			std::vector<int32>(chapters[k].rows.begin(), chapters[k].rows.end())));
+	PMString leftWords;
+	AppendCountsByWhy(leftWords, greyed, GreyedWords);
+	SayRowsWritten(outStatus, "Replaced", "rows", written, static_cast<size_t>(selectedCount), leftWords);
 	return true;
 }
 
@@ -2136,7 +2192,7 @@ bool KFCReplaceEngine::ReplaceHits(const KFCRowsByChapter& rowsByChapter, PMStri
 		outStatus = "Replace: none of the ";
 		outStatus.AppendNumber(static_cast<int32>(total));
 		outStatus.Append(" selected rows can be replaced - ");
-		AppendGreyedCounts(outStatus, greyed);
+		AppendCountsByWhy(outStatus, greyed, GreyedWords);
 		outStatus.Append(".");
 		outStatus.SetTranslatable(kFalse);
 		return false;
@@ -2232,21 +2288,82 @@ const char* RestoreSentence(RestoreRefusal why, int32 whyNoCopy)
 	}
 }
 
-// "1 edited since, 2 no copy kept" - the reasons counted, in the order of the enum.
-void AppendRestoreCounts(PMString& out, const int32 (&counts)[kRestoreRefusalCount])
+// A RESTORE FROM COPY THAT PUT NOTHING BACK: one row's reason in full (RestoreSentence), several rows' counted by
+// reason - "1 edited since, 2 no copy kept".
+void SayNoneRestored(PMString& out, size_t total, RestoreRefusal oneWhy, int32 oneWhyNoCopy,
+	const int32 (&counts)[kRestoreRefusalCount])
 {
-	bool first = true;
-	for (int32 why = kRestoreNotText; why < kRestoreRefusalCount; ++why)
+	out = "Restore from Copy: ";
+	if (total == 1)
+		out.Append(RestoreSentence(oneWhy, oneWhyNoCopy));
+	else
 	{
-		if (counts[why] == 0)
-			continue;
-		if (!first)
-			out.Append(", ");
-		out.AppendNumber(counts[why]);
-		out.Append(" ");
-		out.Append(RestoreWords(static_cast<RestoreRefusal>(why)));
-		first = false;
+		out.Append("none of the ");
+		out.AppendNumber(static_cast<int32>(total));
+		out.Append(" selected rows can be restored - ");
+		AppendCountsByWhy(out, counts, RestoreWords);
+		out.Append(".");
 	}
+	out.SetTranslatable(kFalse);
+}
+
+// IS THE ROW ONE TO PUT BACK, BY THE ROW ALONE (C7) - asked in one place: the menu greys Restore from Copy by it
+// (CanRestoreHit), and RestoreHits' first door counts a row by it. A text row a Replace of the list wrote, with its
+// copy kept (outCopy - read when the row gets that far).
+RestoreRefusal RestoreRowRefusal(int32 chapterIdx, int32 hitIdx, KFCResultModel::HitCopy& outCopy)
+{
+	bool replaced = false, locked = false;
+	if (KFCResultModel::GetHitItem(chapterIdx, hitIdx) != kInvalidUID)
+		return kRestoreNotText;
+	if (!KFCResultModel::GetHitFlags(chapterIdx, hitIdx, replaced, locked) || !replaced)
+		return kRestoreNotReplaced;
+	if (!KFCResultModel::GetHitCopy(chapterIdx, hitIdx, outCopy) || outCopy.whyNot != KFCResultModel::kCopyKept)
+		return kRestoreNoCopy;
+	return kRestoreOk;
+}
+
+// WHERE A ROW STANDS NOW, ITS STORY FOLLOWED - Restore from Copy's rule (C8) and Create Outlines' (X4). The rows of
+// each story follow their foci once, before any row is asked (FollowStoriesOf - KFCSearchEngine::FollowStoryFoci, a
+// Replace's way); then a row's place (out*, read after the follow) stands when its own focus is exactly on it - it
+// followed every edit since, and FollowStoryFoci put the row there because its focus reads the row's text - or, in a
+// story with no foci (its document was not open when the rows took theirs), when the story is at the version on record
+// (the version rule, StoryAsKFCLeftIt). kPlaceNotFollowed: the story changed in a way its foci could not follow, or,
+// with no foci, its version moved. kPlaceEdited: the row cannot be read, or its focus is elsewhere - its own text was
+// edited.
+enum PlaceFollowed { kPlaceStands, kPlaceNotFollowed, kPlaceEdited };
+
+template <class Row>
+void FollowStoriesOf(int32 chapterIdx, IDataBase* db, const std::vector<Row>& rows,
+	std::map<UID, KFCSearchEngine::FollowResult>& followed)
+{
+	for (size_t k = 0; k < rows.size(); ++k)
+	{
+		UID story = kInvalidUID;
+		TextIndex a = kInvalidTextIndex, b = kInvalidTextIndex;
+		uint64 hash = 0;
+		if (db != nil && KFCResultModel::GetHitMatchIdentity(chapterIdx, rows[k].hit, story, a, b, hash)
+			&& story != kInvalidUID && followed.find(story) == followed.end())
+			followed[story] = KFCSearchEngine::FollowStoryFoci(chapterIdx, db, story);
+	}
+}
+
+PlaceFollowed RowPlaceFollowed(int32 chapterIdx, int32 hitIdx, IDataBase* db,
+	const std::map<UID, KFCSearchEngine::FollowResult>& followed, UID& outStory, TextIndex& outStart, TextIndex& outEnd)
+{
+	uint64 hash = 0;
+	if (db == nil || !KFCResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, outStory, outStart, outEnd, hash)
+		|| outStory == kInvalidUID || !db->IsValidUID(outStory))
+		return kPlaceEdited;
+	const std::map<UID, KFCSearchEngine::FollowResult>::const_iterator f = followed.find(outStory);
+	if (f == followed.end())
+		return kPlaceEdited;
+	if (f->second == KFCSearchEngine::kFollowBroken)
+		return kPlaceNotFollowed;
+	if (f->second == KFCSearchEngine::kFollowNone)
+		return StoryAsKFCLeftIt(chapterIdx, db, outStory) ? kPlaceStands : kPlaceNotFollowed;
+	TextIndex fs = kInvalidTextIndex, fe = kInvalidTextIndex;
+	return (KFCRowFoci::Where(chapterIdx, hitIdx, db, fs, fe) == KFCRowFoci::kFocused && fs == outStart && fe == outEnd)
+		? kPlaceStands : kPlaceEdited;
 }
 
 // One row to put back, as the doors found it.
@@ -2479,15 +2596,8 @@ bool RestoreInChapter(RestoreChapter& chapter, int32 (&counts)[kRestoreRefusalCo
 			SetRowAt(db, rowNow[static_cast<size_t>(i)], row.story, row.start, row.end);	// the doors have just read it there
 			continue;
 		}
-		// ONLY A ROW WHOSE STORED PLACE IS STILL ITS TEXT is carried and read back (RowStillStands - a Replace's rule).
-		if (!RowStillStands(chapterIdx, i, db))
-			continue;
-		UID s2 = kInvalidUID;
-		TextIndex a2 = kInvalidTextIndex, b2 = kInvalidTextIndex;
-		uint64 h2 = 0;
-		if (KFCResultModel::GetHitMatchIdentity(chapterIdx, i, s2, a2, b2, h2))
-			SetRowAt(db, rowNow[static_cast<size_t>(i)], s2, a2, b2);
-		keptRows.push_back(i);
+		// ONLY A ROW WHOSE STORED PLACE IS STILL ITS TEXT is carried and read back (a Replace's rule).
+		KeepRowIfItStands(chapterIdx, i, db, rowNow, keptRows);
 	}
 
 	std::set<UID> pastedStories;
@@ -2588,18 +2698,10 @@ bool RestoreInChapter(RestoreChapter& chapter, int32 (&counts)[kRestoreRefusalCo
 	if (chapter.restored == 0)
 		return true;		// nothing pasted here: nothing moved, nothing to read back
 
-	// EVERY ROW WHERE ITS TEXT STANDS NOW - read once the chapter has stopped changing (a Replace's read-back): the rows
-	// carried, the rows left (replaced still, moved by the pastes before them), and the ones put back, as before their
-	// Replace.
-	for (size_t k = 0; k < keptRows.size(); ++k)
-	{
-		const RowNow& kept = rowNow[static_cast<size_t>(keptRows[k])];
-		TextIndex keptStart = kInvalidTextIndex;
-		if (!RowStartNow(db, kept, keptStart))
-			continue;		// its thread went with an object a paste took away
-		KFCResultModel::SetHitRange(chapterIdx, keptRows[k], kept.thread.story, keptStart, keptStart + kept.length);
-		KFCSearchEngine::RereadRowText(chapterIdx, keptRows[k], UIDRef(db, kept.thread.story), keptStart, keptStart + kept.length);
-	}
+	// EVERY ROW WHERE ITS TEXT STANDS NOW - read once the chapter has stopped changing (a Replace's read-back,
+	// ReadBackRows): the rows carried, the rows left (replaced still, moved by the pastes before them), and the ones
+	// put back, as before their Replace.
+	ReadBackRows(chapterIdx, db, rowNow, keptRows);
 	for (size_t k = 0; k < chapter.rows.size(); ++k)
 	{
 		const RestoreRow& row = chapter.rows[k];
@@ -2621,15 +2723,13 @@ bool RestoreInChapter(RestoreChapter& chapter, int32 (&counts)[kRestoreRefusalCo
 
 }	// anonymous namespace
 
-// A replaced text row WITH ITS COPY (the spec's C7 - the author, 2026-10-17: a menu item that cannot run is greyed). What
-// only the document can tell - edited since, the rest changed, locked - the doors say when it is pressed.
+// A replaced text row WITH ITS COPY, by the row alone (RestoreRowRefusal - the spec's C7, the author, 2026-10-17: a
+// menu item that cannot run is greyed). What only the document can tell - edited since, the rest changed, locked - the
+// doors say when it is pressed.
 bool KFCReplaceEngine::CanRestoreHit(int32 chapterIdx, int32 hitIdx)
 {
-	bool replaced = false, locked = false;
 	KFCResultModel::HitCopy copy;
-	return KFCResultModel::GetHitFlags(chapterIdx, hitIdx, replaced, locked) && replaced
-		&& KFCResultModel::GetHitItem(chapterIdx, hitIdx) == kInvalidUID
-		&& KFCResultModel::GetHitCopy(chapterIdx, hitIdx, copy) && copy.whyNot == KFCResultModel::kCopyKept;
+	return RestoreRowRefusal(chapterIdx, hitIdx, copy) == kRestoreOk;
 }
 
 bool KFCReplaceEngine::RestoreHits(const KFCRowsByChapter& rowsByChapter, PMString& outStatus)
@@ -2665,14 +2765,9 @@ bool KFCReplaceEngine::RestoreHits(const KFCRowsByChapter& rowsByChapter, PMStri
 		{
 			RestoreRow row;
 			row.hit = hits[k];
-			RestoreRefusal why = kRestoreOk;
-			bool replaced = false, locked = false;
-			if (KFCResultModel::GetHitItem(chapter.chapterIdx, row.hit) != kInvalidUID)
-				why = kRestoreNotText;
-			else if (!KFCResultModel::GetHitFlags(chapter.chapterIdx, row.hit, replaced, locked) || !replaced)
-				why = kRestoreNotReplaced;
-			else if (!KFCResultModel::GetHitCopy(chapter.chapterIdx, row.hit, row.copy)
-				|| row.copy.whyNot != KFCResultModel::kCopyKept || KFCCopyStore::Length(RefOf(row.copy)) < 0)
+			// The menu's question (RestoreRowRefusal), and the copy still held by its store.
+			RestoreRefusal why = RestoreRowRefusal(chapter.chapterIdx, row.hit, row.copy);
+			if (why == kRestoreOk && KFCCopyStore::Length(RefOf(row.copy)) < 0)
 				why = kRestoreNoCopy;
 			if (why != kRestoreOk)
 			{
@@ -2701,46 +2796,20 @@ bool KFCReplaceEngine::RestoreHits(const KFCRowsByChapter& rowsByChapter, PMStri
 		}
 		KFCResultModel::RebindChapterDoc(chapter.chapterIdx, chapter.docRef);
 		IDataBase* const db = chapter.docRef.GetDataBase();
-		// THE ROWS OF EACH STORY FOLLOW THEIR FOCI FIRST (as a Replace's do - FollowStoryFoci), once per story.
+		// THE ROWS OF EACH STORY FOLLOW THEIR FOCI FIRST (as a Replace's do), once per story - then each row's place
+		// (RowPlaceFollowed).
 		std::map<UID, KFCSearchEngine::FollowResult> followed;
-		for (size_t k = 0; k < candidates.size(); ++k)
-		{
-			UID story = kInvalidUID;
-			TextIndex a = kInvalidTextIndex, b = kInvalidTextIndex;
-			uint64 hash = 0;
-			if (db != nil && KFCResultModel::GetHitMatchIdentity(chapter.chapterIdx, candidates[k].hit, story, a, b, hash)
-				&& story != kInvalidUID && followed.find(story) == followed.end())
-				followed[story] = KFCSearchEngine::FollowStoryFoci(chapter.chapterIdx, db, story);
-		}
+		FollowStoriesOf(chapter.chapterIdx, db, candidates, followed);
 		for (size_t k = 0; k < candidates.size(); ++k)
 		{
 			RestoreRow& row = candidates[k];
-			uint64 hash = 0;
+			const PlaceFollowed place = RowPlaceFollowed(chapter.chapterIdx, row.hit, db, followed, row.story,
+				row.start, row.end);
 			RestoreRefusal why = kRestoreOk;
-			if (db == nil || !KFCResultModel::GetHitMatchIdentity(chapter.chapterIdx, row.hit, row.story, row.start, row.end, hash)
-				|| row.story == kInvalidUID || !db->IsValidUID(row.story) || followed.find(row.story) == followed.end())
+			if (place == kPlaceNotFollowed)
+				why = kRestoreNotFollowed;
+			else if (place == kPlaceEdited)
 				why = kRestoreEdited;
-			else
-			{
-				const KFCSearchEngine::FollowResult f = followed[row.story];
-				if (f == KFCSearchEngine::kFollowBroken)
-					why = kRestoreNotFollowed;
-				else if (f == KFCSearchEngine::kFollowNone)
-				{
-					// No focus in the story (its document was not open when the rows took theirs): the version rule.
-					if (!StoryAsKFCLeftIt(chapter.chapterIdx, db, row.story))
-						why = kRestoreNotFollowed;
-				}
-				else
-				{
-					// ITS OWN FOCUS EXACTLY ON ITS PLACE: it followed every edit since, and FollowStoryFoci put the row there
-					// because its focus reads what the Replace wrote. A row left elsewhere had its own text edited.
-					TextIndex fs = kInvalidTextIndex, fe = kInvalidTextIndex;
-					if (KFCRowFoci::Where(chapter.chapterIdx, row.hit, db, fs, fe) != KFCRowFoci::kFocused
-						|| fs != row.start || fe != row.end)
-						why = kRestoreEdited;
-				}
-			}
 			// What its Replace wrote, still at its place.
 			if (why == kRestoreOk && (!KFCResultModel::GetHitWrittenText(chapter.chapterIdx, row.hit, row.written)
 				|| KFCSearchEngine::ReadText(UIDRef(db, row.story), row.start, row.end - row.start) != row.written))
@@ -2777,18 +2846,7 @@ bool KFCReplaceEngine::RestoreHits(const KFCRowsByChapter& rowsByChapter, PMStri
 	}
 	if (toWrite == 0)
 	{
-		outStatus = "Restore from Copy: ";
-		if (total == 1)
-			outStatus.Append(RestoreSentence(lastWhy, lastWhyNoCopy));
-		else
-		{
-			outStatus.Append("none of the ");
-			outStatus.AppendNumber(static_cast<int32>(total));
-			outStatus.Append(" selected rows can be restored - ");
-			AppendRestoreCounts(outStatus, counts);
-			outStatus.Append(".");
-		}
-		outStatus.SetTranslatable(kFalse);
+		SayNoneRestored(outStatus, total, lastWhy, lastWhyNoCopy, counts);
 		return false;
 	}
 	// EVERY DOCUMENT TO WRITE STILL OPEN once the last is reached (a Replace's rule: reaching a closed chapter runs the
@@ -2850,124 +2908,39 @@ bool KFCReplaceEngine::RestoreHits(const KFCRowsByChapter& rowsByChapter, PMStri
 		for (size_t c = 0; c < chapters.size(); ++c)
 			for (std::set<UID>::const_iterator s = chapters[c].stories.begin(); s != chapters[c].stories.end(); ++s)
 				KFCRowFoci::ReanchorStory(chapters[c].chapterIdx, *s);
-		outStatus = "Restore from Copy: ";
 		if (pasteFailed || restored > 0)
-			outStatus.Append("InDesign would not put a copy back - nothing was changed.");
-		else if (total == 1)
 		{
-			// The one row passed the doors and its check in the step did not: its own reason from there.
-			RestoreRefusal why = kRestoreEdited;
-			for (size_t c = 0; c < chapters.size(); ++c)
-				for (size_t k = 0; k < chapters[c].rows.size(); ++k)
-					if (chapters[c].rows[k].why != kRestoreOk)
-						why = chapters[c].rows[k].why;
-			outStatus.Append(RestoreSentence(why, KFCResultModel::kCopyKept));
+			outStatus = "Restore from Copy: InDesign would not put a copy back - nothing was changed.";
+			outStatus.SetTranslatable(kFalse);
+			return false;
 		}
-		else
-		{
-			outStatus.Append("none of the ");
-			outStatus.AppendNumber(static_cast<int32>(total));
-			outStatus.Append(" selected rows can be restored - ");
-			AppendRestoreCounts(outStatus, counts);
-			outStatus.Append(".");
-		}
-		outStatus.SetTranslatable(kFalse);
+		// One row passed the doors and its check in the step did not: its own reason from there (several are counted).
+		RestoreRefusal why = kRestoreEdited;
+		for (size_t c = 0; c < chapters.size(); ++c)
+			for (size_t k = 0; k < chapters[c].rows.size(); ++k)
+				if (chapters[c].rows[k].why != kRestoreOk)
+					why = chapters[c].rows[k].why;
+		SayNoneRestored(outStatus, total, why, KFCResultModel::kCopyKept, counts);
 		return false;
 	}
 	for (size_t c = 0; c < chapters.size(); ++c)
 		NoteStoryVersions(chapters[c].chapterIdx, chapters[c].docRef.GetDataBase(), chapters[c].stories);	// as KFC left them
 	// Kept AFTER the versions are noted - they are the "after" an Undo's "before" is put back over.
 	recorder.Keep();
-	size_t writtenDocuments = 0;
 	for (size_t c = 0; c < chapters.size(); ++c)
 	{
 		if (chapters[c].restored == 0)
 			continue;
-		++writtenDocuments;
 		docsAfter.Wrote(chapters[c].docRef);		// written to: a chapter of ours has to be seen and saved
 		KFC_DIAG_NOTE_WRITE(chapters[c].docRef);
 	}
 
-	// WHAT IT DID (C12) - the Replace's words: "Restored ID:262 #3." / "Restored 2 of 3 rows: ID:262 #1, ID:262 #3. Left as
-	// they were: 1 edited since." / "Restored 3 rows in 2 documents: a.indd ID:262 #1, ID:262 #3; b.indd ID:270 #1."
-	const size_t kNamedRows = 8;
-	if (total == 1)
-	{
-		PMString name;
-		for (size_t c = 0; c < chapters.size() && name.IsEmpty(); ++c)
-			for (size_t k = 0; k < chapters[c].rows.size() && name.IsEmpty(); ++k)
-				if (chapters[c].rows[k].done)
-					name = RowName(chapters[c].chapterIdx, chapters[c].rows[k].hit);
-		outStatus = name.IsEmpty() ? PMString("Restored.") : PMString("Restored ");
-		if (!name.IsEmpty())
-		{
-			outStatus.Append(name);
-			outStatus.Append(".");
-		}
-	}
-	else
-	{
-		outStatus = "Restored ";
-		outStatus.AppendNumber(restored);
-		if (static_cast<size_t>(restored) < total)
-		{
-			outStatus.Append(" of ");
-			outStatus.AppendNumber(static_cast<int32>(total));
-		}
-		outStatus.Append(" rows");
-		if (writtenDocuments > 1)
-		{
-			outStatus.Append(" in ");
-			outStatus.AppendNumber(static_cast<int32>(writtenDocuments));
-			outStatus.Append(" documents");
-		}
-		outStatus.Append(": ");
-		size_t named = 0;
-		bool firstDocument = true;
-		for (size_t c = 0; c < chapters.size() && named < kNamedRows; ++c)
-		{
-			const RestoreChapter& chapter = chapters[c];
-			if (chapter.restored == 0)
-				continue;
-			if (writtenDocuments > 1)
-			{
-				if (!firstDocument)
-					outStatus.Append("; ");
-				PMString docName;
-				int32 rowsNow = 0;
-				if (KFCResultModel::GetChapterDisplay(chapter.chapterIdx, docName, rowsNow))
-				{
-					outStatus.Append(docName);
-					outStatus.Append(" ");
-				}
-			}
-			firstDocument = false;
-			bool firstInDocument = true;
-			for (size_t k = 0; k < chapter.rows.size() && named < kNamedRows; ++k)
-			{
-				if (!chapter.rows[k].done)
-					continue;
-				const PMString name(RowName(chapter.chapterIdx, chapter.rows[k].hit));
-				if (name.IsEmpty())
-					continue;
-				if (!firstInDocument || (writtenDocuments <= 1 && named > 0))
-					outStatus.Append(", ");
-				outStatus.Append(name);
-				firstInDocument = false;
-				++named;
-			}
-		}
-		if (static_cast<size_t>(restored) > kNamedRows)
-			outStatus.Append(", ...");
-		outStatus.Append(".");
-		if (static_cast<size_t>(restored) < total)
-		{
-			outStatus.Append(" Left as they were: ");
-			AppendRestoreCounts(outStatus, counts);
-			outStatus.Append(".");
-		}
-	}
-	outStatus.SetTranslatable(kFalse);
+	// WHAT IT DID (C12) - the Replace's words (SayRowsWritten): "Restored ID:262 #3." / "Restored 2 of 3 rows: ID:262
+	// #1, ID:262 #3. Left as they were: 1 edited since." / "Restored 3 rows in 2 documents: a.indd ID:262 #1, ID:262
+	// #3; b.indd ID:270 #1."
+	PMString leftWords;
+	AppendCountsByWhy(leftWords, counts, RestoreWords);
+	SayRowsWritten(outStatus, "Restored", "rows", RowsDone(chapters), total, leftWords);
 	return true;
 }
 
@@ -3037,21 +3010,45 @@ const char* OutlineSentence(OutlineRefusal why)
 	}
 }
 
-// "2 in overset text, 1 locked" - the reasons counted, in the order of the enum.
-void AppendOutlineCounts(PMString& out, const int32 (&counts)[kOutlineRefusalCount])
+// A CREATE OUTLINES THAT OUTLINED NOTHING: one row's reason in full (OutlineSentence), several rows' counted by
+// reason - "2 in overset text, 1 locked".
+void SayNoneOutlined(PMString& out, size_t total, OutlineRefusal oneWhy, const int32 (&counts)[kOutlineRefusalCount])
 {
-	bool first = true;
-	for (int32 why = kOutlineNotText; why < kOutlineRefusalCount; ++why)
+	out = "Create Outlines: ";
+	if (total == 1)
+		out.Append(OutlineSentence(oneWhy));
+	else
 	{
-		if (counts[why] == 0)
-			continue;
-		if (!first)
-			out.Append(", ");
-		out.AppendNumber(counts[why]);
-		out.Append(" ");
-		out.Append(OutlineWords(static_cast<OutlineRefusal>(why)));
-		first = false;
+		out.Append("none of the ");
+		out.AppendNumber(static_cast<int32>(total));
+		out.Append(" selected rows can be outlined - ");
+		AppendCountsByWhy(out, counts, OutlineWords);
+		out.Append(".");
 	}
+	out.SetTranslatable(kFalse);
+}
+
+// CAN THE ROW BE OUTLINED, BY THE ROW ALONE (X9) - asked in one place: the menu greys Create Outlines by it
+// (CanOutlineHit), and OutlineHits' first door counts a row by it. A text row not outlined yet, not locked, not in
+// overset text, not of zero width - one reason a row, in that order.
+OutlineRefusal OutlineRowRefusal(int32 chapterIdx, int32 hitIdx)
+{
+	KFCResultModel::RowDisplay look;
+	bool replaced = false, locked = false;
+	UID story = kInvalidUID;
+	TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
+	uint64 hash = 0;
+	if (KFCResultModel::GetHitItem(chapterIdx, hitIdx) != kInvalidUID)
+		return kOutlineNotText;
+	if (!KFCResultModel::GetHitRow(chapterIdx, hitIdx, look) || look.outlined)
+		return kOutlineDone;
+	if (!KFCResultModel::GetHitFlags(chapterIdx, hitIdx, replaced, locked) || locked)
+		return kOutlineLocked;
+	if (KFCResultModel::IsHitOverset(chapterIdx, hitIdx))
+		return kOutlineOverset;
+	if (!KFCResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, story, start, end, hash) || end <= start)
+		return kOutlineEmpty;
+	return kOutlineOk;
 }
 
 // One row to outline, as the doors found it.
@@ -3105,14 +3102,7 @@ bool OutlineInChapter(OutlineChapter& chapter, int32 (&counts)[kOutlineRefusalCo
 			SetRowAt(db, rowNow[static_cast<size_t>(i)], row.story, row.start, row.end);	// the doors have just read it there
 			continue;
 		}
-		if (!RowStillStands(chapterIdx, i, db))
-			continue;
-		UID s2 = kInvalidUID;
-		TextIndex a2 = kInvalidTextIndex, b2 = kInvalidTextIndex;
-		uint64 h2 = 0;
-		if (KFCResultModel::GetHitMatchIdentity(chapterIdx, i, s2, a2, b2, h2))
-			SetRowAt(db, rowNow[static_cast<size_t>(i)], s2, a2, b2);
-		keptRows.push_back(i);
+		KeepRowIfItStands(chapterIdx, i, db, rowNow, keptRows);
 	}
 
 	// The rows to outline in text order (their story, then where they start now).
@@ -3177,16 +3167,9 @@ bool OutlineInChapter(OutlineChapter& chapter, int32 (&counts)[kOutlineRefusalCo
 	if (chapter.outlined == 0)
 		return true;		// nothing outlined here: nothing moved, nothing to read back
 
-	// EVERY ROW WHERE ITS TEXT STANDS NOW (a Replace's read-back): the rows carried, the rows left, and the outlined ones.
-	for (size_t k = 0; k < keptRows.size(); ++k)
-	{
-		const RowNow& kept = rowNow[static_cast<size_t>(keptRows[k])];
-		TextIndex keptStart = kInvalidTextIndex;
-		if (!RowStartNow(db, kept, keptStart))
-			continue;
-		KFCResultModel::SetHitRange(chapterIdx, keptRows[k], kept.thread.story, keptStart, keptStart + kept.length);
-		KFCSearchEngine::RereadRowText(chapterIdx, keptRows[k], UIDRef(db, kept.thread.story), keptStart, keptStart + kept.length);
-	}
+	// EVERY ROW WHERE ITS TEXT STANDS NOW (a Replace's read-back, ReadBackRows): the rows carried, the rows left, and
+	// the outlined ones.
+	ReadBackRows(chapterIdx, db, rowNow, keptRows);
 	for (size_t k = 0; k < chapter.rows.size(); ++k)
 	{
 		const OutlineRow& row = chapter.rows[k];
@@ -3210,16 +3193,7 @@ bool OutlineInChapter(OutlineChapter& chapter, int32 (&counts)[kOutlineRefusalCo
 
 bool KFCReplaceEngine::CanOutlineHit(int32 chapterIdx, int32 hitIdx)
 {
-	KFCResultModel::RowDisplay row;
-	bool replaced = false, locked = false;
-	UID story = kInvalidUID;
-	TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
-	uint64 hash = 0;
-	return KFCResultModel::GetHitItem(chapterIdx, hitIdx) == kInvalidUID
-		&& KFCResultModel::GetHitRow(chapterIdx, hitIdx, row) && !row.outlined
-		&& KFCResultModel::GetHitFlags(chapterIdx, hitIdx, replaced, locked) && !locked
-		&& !KFCResultModel::IsHitOverset(chapterIdx, hitIdx)
-		&& KFCResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, story, start, end, hash) && end > start;
+	return OutlineRowRefusal(chapterIdx, hitIdx) == kOutlineOk;
 }
 
 bool KFCReplaceEngine::OutlineHits(const KFCRowsByChapter& rowsByChapter, PMString& outStatus)
@@ -3254,22 +3228,7 @@ bool KFCReplaceEngine::OutlineHits(const KFCRowsByChapter& rowsByChapter, PMStri
 		{
 			OutlineRow row;
 			row.hit = hits[k];
-			OutlineRefusal why = kOutlineOk;
-			KFCResultModel::RowDisplay look;
-			bool replaced = false, locked = false;
-			UID s = kInvalidUID;
-			TextIndex a = kInvalidTextIndex, b = kInvalidTextIndex;
-			uint64 h = 0;
-			if (KFCResultModel::GetHitItem(chapter.chapterIdx, row.hit) != kInvalidUID)
-				why = kOutlineNotText;
-			else if (!KFCResultModel::GetHitRow(chapter.chapterIdx, row.hit, look) || look.outlined)
-				why = kOutlineDone;
-			else if (!KFCResultModel::GetHitFlags(chapter.chapterIdx, row.hit, replaced, locked) || locked)
-				why = kOutlineLocked;
-			else if (KFCResultModel::IsHitOverset(chapter.chapterIdx, row.hit))
-				why = kOutlineOverset;
-			else if (!KFCResultModel::GetHitMatchIdentity(chapter.chapterIdx, row.hit, s, a, b, h) || b <= a)
-				why = kOutlineEmpty;
+			const OutlineRefusal why = OutlineRowRefusal(chapter.chapterIdx, row.hit);		// the menu's question
 			if (why != kOutlineOk)
 			{
 				++counts[why];
@@ -3295,45 +3254,20 @@ bool KFCReplaceEngine::OutlineHits(const KFCRowsByChapter& rowsByChapter, PMStri
 		}
 		KFCResultModel::RebindChapterDoc(chapter.chapterIdx, chapter.docRef);
 		IDataBase* const db = chapter.docRef.GetDataBase();
-		// THE ROWS OF EACH STORY FOLLOW THEIR FOCI FIRST (a Replace's way - FollowStoryFoci), once per story.
+		// THE ROWS OF EACH STORY FOLLOW THEIR FOCI FIRST (a Replace's way), once per story - then each row's place
+		// (RowPlaceFollowed - Restore from Copy's rule).
 		std::map<UID, KFCSearchEngine::FollowResult> followed;
-		for (size_t k = 0; k < candidates.size(); ++k)
-		{
-			UID story = kInvalidUID;
-			TextIndex a = kInvalidTextIndex, b = kInvalidTextIndex;
-			uint64 hash = 0;
-			if (db != nil && KFCResultModel::GetHitMatchIdentity(chapter.chapterIdx, candidates[k].hit, story, a, b, hash)
-				&& story != kInvalidUID && followed.find(story) == followed.end())
-				followed[story] = KFCSearchEngine::FollowStoryFoci(chapter.chapterIdx, db, story);
-		}
+		FollowStoriesOf(chapter.chapterIdx, db, candidates, followed);
 		for (size_t k = 0; k < candidates.size(); ++k)
 		{
 			OutlineRow& row = candidates[k];
-			uint64 hash = 0;
+			const PlaceFollowed place = RowPlaceFollowed(chapter.chapterIdx, row.hit, db, followed, row.story,
+				row.start, row.end);
 			OutlineRefusal why = kOutlineOk;
-			if (db == nil || !KFCResultModel::GetHitMatchIdentity(chapter.chapterIdx, row.hit, row.story, row.start, row.end, hash)
-				|| row.story == kInvalidUID || !db->IsValidUID(row.story) || followed.find(row.story) == followed.end())
+			if (place == kPlaceNotFollowed)
+				why = kOutlineNotFollowed;
+			else if (place == kPlaceEdited)
 				why = kOutlineEdited;
-			else
-			{
-				const KFCSearchEngine::FollowResult f = followed[row.story];
-				if (f == KFCSearchEngine::kFollowBroken)
-					why = kOutlineNotFollowed;
-				else if (f == KFCSearchEngine::kFollowNone)
-				{
-					// No focus in the story (its document was not open when the rows took theirs): the version rule.
-					if (!StoryAsKFCLeftIt(chapter.chapterIdx, db, row.story))
-						why = kOutlineNotFollowed;
-				}
-				else
-				{
-					// ITS OWN FOCUS EXACTLY ON ITS PLACE (Restore from Copy's rule): a row left elsewhere had its text edited.
-					TextIndex fs = kInvalidTextIndex, fe = kInvalidTextIndex;
-					if (KFCRowFoci::Where(chapter.chapterIdx, row.hit, db, fs, fe) != KFCRowFoci::kFocused
-						|| fs != row.start || fe != row.end)
-						why = kOutlineEdited;
-				}
-			}
 			// ITS TEXT AS THE ROW HOLDS IT: what its Replace wrote for a replaced row (the author's call - a replaced row can be
 			// outlined), the match as it was found for any other (RowReadsAsFound - its line and its hash).
 			if (why == kOutlineOk)
@@ -3375,18 +3309,7 @@ bool KFCReplaceEngine::OutlineHits(const KFCRowsByChapter& rowsByChapter, PMStri
 	}
 	if (toWrite == 0)
 	{
-		outStatus = "Create Outlines: ";
-		if (total == 1)
-			outStatus.Append(OutlineSentence(lastWhy));
-		else
-		{
-			outStatus.Append("none of the ");
-			outStatus.AppendNumber(static_cast<int32>(total));
-			outStatus.Append(" selected rows can be outlined - ");
-			AppendOutlineCounts(outStatus, counts);
-			outStatus.Append(".");
-		}
-		outStatus.SetTranslatable(kFalse);
+		SayNoneOutlined(outStatus, total, lastWhy, counts);
 		return false;
 	}
 	// EVERY DOCUMENT TO WRITE STILL OPEN once the last is reached (a Replace's rule).
@@ -3444,122 +3367,38 @@ bool KFCReplaceEngine::OutlineHits(const KFCRowsByChapter& rowsByChapter, PMStri
 		for (size_t c = 0; c < chapters.size(); ++c)
 			for (std::set<UID>::const_iterator s = chapters[c].stories.begin(); s != chapters[c].stories.end(); ++s)
 				KFCRowFoci::ReanchorStory(chapters[c].chapterIdx, *s);
-		outStatus = "Create Outlines: ";
 		if (failed || outlinedRows > 0)
-			outStatus.Append("InDesign would not outline a match - nothing was changed.");
-		else if (total == 1)
 		{
-			OutlineRefusal why = kOutlineEdited;
-			for (size_t c = 0; c < chapters.size(); ++c)
-				for (size_t k = 0; k < chapters[c].rows.size(); ++k)
-					if (chapters[c].rows[k].why != kOutlineOk)
-						why = chapters[c].rows[k].why;
-			outStatus.Append(OutlineSentence(why));
+			outStatus = "Create Outlines: InDesign would not outline a match - nothing was changed.";
+			outStatus.SetTranslatable(kFalse);
+			return false;
 		}
-		else
-		{
-			outStatus.Append("none of the ");
-			outStatus.AppendNumber(static_cast<int32>(total));
-			outStatus.Append(" selected rows can be outlined - ");
-			AppendOutlineCounts(outStatus, counts);
-			outStatus.Append(".");
-		}
-		outStatus.SetTranslatable(kFalse);
+		// One row passed the doors and its check in the step did not: its own reason from there (several are counted).
+		OutlineRefusal why = kOutlineEdited;
+		for (size_t c = 0; c < chapters.size(); ++c)
+			for (size_t k = 0; k < chapters[c].rows.size(); ++k)
+				if (chapters[c].rows[k].why != kOutlineOk)
+					why = chapters[c].rows[k].why;
+		SayNoneOutlined(outStatus, total, why, counts);
 		return false;
 	}
 	for (size_t c = 0; c < chapters.size(); ++c)
 		NoteStoryVersions(chapters[c].chapterIdx, chapters[c].docRef.GetDataBase(), chapters[c].stories);	// as KFC left them
 	recorder.Keep();
-	size_t writtenDocuments = 0;
 	for (size_t c = 0; c < chapters.size(); ++c)
 	{
 		if (chapters[c].outlined == 0)
 			continue;
-		++writtenDocuments;
 		docsAfter.Wrote(chapters[c].docRef);
 		KFC_DIAG_NOTE_WRITE(chapters[c].docRef);
 	}
 
-	// WHAT IT DID (X8): "Outlined ID:262 #3." / "Outlined 2 of 3 matches: ID:262 #1, ID:262 #3. Left as they were: 1 in
-	// overset text." / "Outlined 3 matches in 2 documents: a.indd ID:262 #1, ID:262 #3; b.indd ID:270 #1."
-	const size_t kNamedRows = 8;
-	if (total == 1)
-	{
-		PMString name;
-		for (size_t c = 0; c < chapters.size() && name.IsEmpty(); ++c)
-			for (size_t k = 0; k < chapters[c].rows.size() && name.IsEmpty(); ++k)
-				if (chapters[c].rows[k].done)
-					name = RowName(chapters[c].chapterIdx, chapters[c].rows[k].hit);
-		outStatus = name.IsEmpty() ? PMString("Outlined.") : PMString("Outlined ");
-		if (!name.IsEmpty())
-		{
-			outStatus.Append(name);
-			outStatus.Append(".");
-		}
-	}
-	else
-	{
-		outStatus = "Outlined ";
-		outStatus.AppendNumber(outlinedRows);
-		if (static_cast<size_t>(outlinedRows) < total)
-		{
-			outStatus.Append(" of ");
-			outStatus.AppendNumber(static_cast<int32>(total));
-		}
-		outStatus.Append(" matches");
-		if (writtenDocuments > 1)
-		{
-			outStatus.Append(" in ");
-			outStatus.AppendNumber(static_cast<int32>(writtenDocuments));
-			outStatus.Append(" documents");
-		}
-		outStatus.Append(": ");
-		size_t named = 0;
-		bool firstDocument = true;
-		for (size_t c = 0; c < chapters.size() && named < kNamedRows; ++c)
-		{
-			const OutlineChapter& chapter = chapters[c];
-			if (chapter.outlined == 0)
-				continue;
-			if (writtenDocuments > 1)
-			{
-				if (!firstDocument)
-					outStatus.Append("; ");
-				PMString docName;
-				int32 rowsNow = 0;
-				if (KFCResultModel::GetChapterDisplay(chapter.chapterIdx, docName, rowsNow))
-				{
-					outStatus.Append(docName);
-					outStatus.Append(" ");
-				}
-			}
-			firstDocument = false;
-			bool firstInDocument = true;
-			for (size_t k = 0; k < chapter.rows.size() && named < kNamedRows; ++k)
-			{
-				if (!chapter.rows[k].done)
-					continue;
-				const PMString name(RowName(chapter.chapterIdx, chapter.rows[k].hit));
-				if (name.IsEmpty())
-					continue;
-				if (!firstInDocument || (writtenDocuments <= 1 && named > 0))
-					outStatus.Append(", ");
-				outStatus.Append(name);
-				firstInDocument = false;
-				++named;
-			}
-		}
-		if (static_cast<size_t>(outlinedRows) > kNamedRows)
-			outStatus.Append(", ...");
-		outStatus.Append(".");
-		if (static_cast<size_t>(outlinedRows) < total)
-		{
-			outStatus.Append(" Left as they were: ");
-			AppendOutlineCounts(outStatus, counts);
-			outStatus.Append(".");
-		}
-	}
-	outStatus.SetTranslatable(kFalse);
+	// WHAT IT DID (X8 - SayRowsWritten): "Outlined ID:262 #3." / "Outlined 2 of 3 matches: ID:262 #1, ID:262 #3. Left
+	// as they were: 1 in overset text." / "Outlined 3 matches in 2 documents: a.indd ID:262 #1, ID:262 #3; b.indd
+	// ID:270 #1."
+	PMString leftWords;
+	AppendCountsByWhy(leftWords, counts, OutlineWords);
+	SayRowsWritten(outStatus, "Outlined", "matches", RowsDone(chapters), total, leftWords);
 	return true;
 }
 
