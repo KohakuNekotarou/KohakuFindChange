@@ -56,7 +56,7 @@
 - **REP-10** ★**検索文字列・スイッチ**（大文字小文字・単語単位・かな・全角半角・範囲の5項目）・**検索形式**が変わった →
   **結果を消して**断る：`The Find/Change query has changed since this search - the results have been cleared. Search again.`
   （2026-08-03 の決定＝ほかの断りはすべて結果を残すが、これだけは例外。残しても、もう使えない一覧なので）
-  - 訂正: ★v2（2026-10-14 夜・作者が承認＝設計書 `docs/superpowers/specs/2026-10-14-kfc-tier-switch-v2-design.md` 2-3）＝**一覧が検索の条件の写しを持っていれば、消さずにその一覧の条件で行う**。行の Replace・Return・Shift+Return・まとめて選んだ行・物の行の確かめと置換・GREP の Preview Text・Search This Story／Document Again は、入口で「検索と置換」の検索側（タブ・署名・Find Format）が今の一覧と同じかを問い、**同じなら今までどおり**（置換側はダイアログの値＝検索の後で打った Change to が効く）、**違えば**一覧の条件を中断できるまとまりの中で一時的に入れて3重に検算（項目ごと・署名・段の見出しを読み返す）してから行い、終わったら「検索と置換」を元に戻す（一覧のタブが画面のタブと違えば2つのタブとも）。メッセージ欄の末尾＝`With this tier's query: <段の見出し> - Find/Change is as you left it.`。検算が合わない＝**行わず**元に戻す＝`Nothing was done: this tier's query could not be put into Find/Change (<何が>) - Find/Change is as you left it.`（戻せなければ `... Find/Change could not be put back as it was (<何が>) - check Edit > Find/Change before replacing.`）。★R3＝一覧は**最後に置換に使った置換側を覚える**＝「検索と置換」のまま置換が通ったら写しを取り直し、今の段の見出しも `C:"<それ>"` に書き直す。この断り（結果を消す）が残るのは写しの無い一覧だけ。✅ 2026-10-14 夜に実機（ROW-42 の✅）。回帰の期待の書き直しが要る＝`ret-shift-refused`・`sr-query-changed-refused`・`ff-format-changed`・`ff-format-alldocs-close`・`dr-query-changed-refused`・`hd-ff-size-changed`・`hd-sw-case-changed`・`obj-refuse-query-changed`。
+  - 訂正: ★v2（2026-10-14 夜・作者が承認＝設計書 `docs/superpowers/specs/2026-10-14-kfc-tier-switch-v2-design.md` 2-3）＝**一覧が検索の条件の写しを持っていれば、消さずにその一覧の条件で行う**。行の Replace・Return・Shift+Return・まとめて選んだ行・物の行の確かめと置換・GREP の Preview Text・Search This Story／Document Again は、入口で「検索と置換」の検索側（タブ・署名・Find Format）が今の一覧と同じかを問い、**同じなら今までどおり**（置換側はダイアログの値＝検索の後で打った Change to が効く）、**違えば**一覧の条件を中断できるまとまりの中で一時的に入れて3重に検算（項目ごと・署名・段の見出しを読み返す）してから行い、終わったら「検索と置換」を元に戻す（一覧のタブが画面のタブと違えば2つのタブとも）。メッセージ欄の末尾＝`With this tier's query: <段の見出し> - Find/Change is as you left it.`。検算が合わない＝**行わず**元に戻す＝`Nothing was done: this tier's query could not be put into Find/Change (<何が>) - Find/Change is as you left it.`（戻せなければ `... Find/Change could not be put back as you left it (<何が>) - check Edit > Find/Change before replacing.`＝戻せなかったときの文はどこでもこの1つ＝Frames の一覧の書き込みも・2026-10-19 夜に作者「一つに統一」）。★R3＝一覧は**最後に置換に使った置換側を覚える**＝「検索と置換」のまま置換が通ったら写しを取り直し、今の段の見出しも `C:"<それ>"` に書き直す。この断り（結果を消す）が残るのは写しの無い一覧だけ。✅ 2026-10-14 夜に実機（ROW-42 の✅）。回帰の期待の書き直しが要る＝`ret-shift-refused`・`sr-query-changed-refused`・`ff-format-changed`・`ff-format-alldocs-close`・`dr-query-changed-refused`・`hd-ff-size-changed`・`hd-sw-case-changed`・`obj-refuse-query-changed`。
 
 - **REP-11** 比べないもの ―― 検索の方向（KFC は前向きだけ＝GEN-22）と、**置換側**の設定（置換文字列など＝何が見つかるかではなく、何を書くかなので）。
   - 訂正:
@@ -206,7 +206,7 @@
   歩き直すときの範囲の端＝ストーリーが記録した版のままなら記録した位置、変わっていればフォーカス（編集に付いてくる）から、**端のすぐ外の8文字が同じに読める一番近い所**（取り消しで古くなったフォーカスも、端のちょうどに打った文字も、これで正しい所に戻る）。
   断る＝範囲が離れたかたまり（2行以上にまたがる表のセルの選択）`... the searched part cannot be searched again on its own (separate stretches) - search again.`（2026-10-09 の最終検査で縮めた＝前の文は約190字で「search again」が切れた）／端のすぐ外の文字が書き換えられた `... the text at the edge of the searched part of this story has changed - search again.`。回帰＝`sr-toend-*`・`sr-selection-*`・`sr-table-*`。
   ★断っても、歩く前に行はフォーカスへ追ってある（行の文の読み直し・一致が書き換わった行に Missing）＝**一覧はそれを描き直す**（2026-10-19 ブロック7の再検査 D7-6＝それまでは描き直さず、次に描き直すまで前の文のままだった・回帰 `sr-toend-edge-repaint`／`-armed`）。
-  KFC が検索の後で閉じた章は、窓なしで開いて歩き、閉じて返す。文は `Searched this story again: N match(es).`。0件ならストーリーの行は消え、それで文書に行が1つも無くなっても文書の行は `(0/0)` で残る（ROW-07・2026-10-13 作者の決定 P-1）。行の並びが変わるので、それより前の KFC の書き込みの取り消しは一覧が追わなくなる（UNDO-14）。回帰＝`sr-*`。
+  KFC が検索の後で閉じた章は、窓なしで開いて歩き、閉じて返す。文は `Searched this story again: N hit(s).`（枠の一覧は `N frame(s).`・0件は `No matches.`・絞った一覧は枠の無いあふれの数とレイヤーの無い文書も言う＝Search These Results Again と同じ組み立て・2026-10-19 夜に作者「おすすめで」）。0件ならストーリーの行は消え、それで文書に行が1つも無くなっても文書の行は `(0/0)` で残る（ROW-07・2026-10-13 作者の決定 P-1）。行の並びが変わるので、それより前の KFC の書き込みの取り消しは一覧が追わなくなる（UNDO-14）。回帰＝`sr-*`。
   - 訂正:
 
 ## 8. まとめて選んだ行の置換と、文書の探し直し（1.4.0）
@@ -232,9 +232,9 @@
   進捗バー（Cancel つき）を出す＝その間は検索と同じく、ほかの実行を断る（GEN-33）。KFC が検索の後で閉じた章は、窓なしで開いて歩き、閉じて返す。
   断る（一覧はそのまま）＝実行中／検索が文書の一部だった（灰色の項目をスクリプトが押したとき）`Search This Document Again: the search was over part of the document (Search: Story) - search again.`（`To End of Story`・`Selection` も）／
   検索と置換の設定が変わった `Search This Document Again: the Find/Change settings have changed since the search - search again.`／開けない `...: the document of this row could not be opened.`／
-  Cancel `...: cancelled - the document's rows are left as they were.`／本体の検索がエラーで止まった `...: InDesign's search stopped with an error - the document's rows are left as they were.`。
+  Cancel `...: cancelled - the document's rows stay as they are.`／本体の検索がエラーで止まった `...: InDesign's search stopped with an error - the document's rows stay as they are.`（行の文字は印へ追った後の形＝「前のまま」とは言わない・2026-10-19 夜）。
   ★Cancel・エラーでも、歩く前に行はフォーカスへ追ってある＝一覧はそれを描き直す（REP-35 と同じ・2026-10-19 D7-6）。
-  文は `Searched this document again: N match(es).`（上限に当たれば ` The list's limit of rows was reached - its other matches are not listed.`）。行の並びが変わるので、それより前の KFC の書き込みの取り消しは一覧が追わなくなる（UNDO-14）。回帰＝`dr-cases.tsv`（`dr-part-refused`＝2026-10-17 から灰色を期待）。（1.4.0）
+  文は `Searched this document again: N hit(s).`（Search This Story Again と同じ組み立て＝枠の一覧は `N frame(s).`・0件は `No matches.`。上限に当たれば ` The list's limit of rows was reached - its other matches are not listed.`）。行の並びが変わるので、それより前の KFC の書き込みの取り消しは一覧が追わなくなる（UNDO-14）。回帰＝`dr-cases.tsv`（`dr-part-refused`＝2026-10-17 から灰色を期待）。（1.4.0）
   - 訂正:
 
 - **REP-38** ★**Restore from Copy**（文字の行の右クリック・Replace の下・2026-10-17 作者の依頼「コピーで戻すは右クリックメニューで」・名前は同じ夜の作者「Copy で戻すというのにしてほしい」＝最初の名前 Restore Original から改名＝作者の不在中に私のおすすめで作り、その夜に作者の決定で直した形＝設計書 `docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md` の C1〜C16）＝**置換した文字の行を、置換の前の文字に戻す**――
