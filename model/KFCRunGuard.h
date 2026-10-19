@@ -5,14 +5,17 @@
 //  KohakuFindChange (KFC)
 //
 //  "Is this plug-in in the middle of a long run?" - ONE definition, because several different things
-//  can be running - a search, a Change All in Book (KFCChangeAll), a query run (KFCQuerySequence) and a row's Replace
-//  (KFCReplaceEngine::IsReplacing) - and every guard has to know about all of them.
-//  A ROW'S REPLACE COUNTS THOUGH IT HAS NO BAR: reopening a closed chapter and giving a written one its window run the
-//  message loop as surely as a bar does (KFCJump.cpp's gActivating says so of a landing's opens), and what that loop
-//  dispatches - a click's landing and its Hide Previous Chapter sweep, a second Return, a run - must wait for it like
-//  for any run. InDesign's own doors - a document closed - are not KFC's to shut: a write that reaches several documents
-//  asks again whether each is still open before it writes (ReplaceRowsNow in KFCReplaceEngine.cpp,
-//  KFCObjectReplace::ReplaceRows, KFCChangeAll::Run, KFCQuerySequence::Run).
+//  can be running - a search (Search This Story / Document Again among them), a Change All in Book (KFCChangeAll), a
+//  query run (KFCQuerySequence) and a write from the list - a row's Replace, Restore from Copy, Create Outlines, a
+//  Special Operation (KFCReplaceEngine::IsReplacing) - and every guard has to know about all of them.
+//  A WRITE FROM THE LIST COUNTS THOUGH IT HAS NO BAR, and so does Search This Story Again: reopening a closed chapter
+//  and giving a written one its window run the message loop as surely as a bar does (KFCJump.cpp's gActivating says so
+//  of a landing's opens), and what that loop dispatches - a click's landing and its Hide Previous Chapter sweep, a
+//  second Return, a run - must wait for it like for any run. So each is counted from its door to its last hand-back,
+//  not around its bar alone (a test build says whether each windowless open and window was counted - REOPEN
+//  and WINDOW in KFCBookScope.cpp). InDesign's own doors - a document closed - are not KFC's to shut: a write
+//  that reaches several documents asks again whether each is still open before it writes (ReplaceRowsNow in
+//  KFCReplaceEngine.cpp, KFCObjectReplace::ReplaceRows, KFCChangeAll::Run, KFCQuerySequence::Run).
 //
 //  WHY THIS IS NEEDED AT ALL
 //
@@ -69,7 +72,7 @@
 
 namespace KFCRunGuard
 {
-	/** Is a search, a Change All, a query run or a row's Replace running right now? */
+	/** Is a search, a Change All, a query run or a write from the list running right now? */
 	bool IsAnyRunning();
 
 	/** IS A ROW'S LANDING UNDER WAY in the panel (the UI half's KFCJump::IsLanding, asked through IKFCUIServices)?

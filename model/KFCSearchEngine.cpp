@@ -4800,6 +4800,9 @@ bool KFCSearchEngine::SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMStrin
 		outStatus.Append(KFCRunGuard::BusyMessage());
 		return false;
 	}
+	// COUNTED AS A SEARCH FROM HERE TO THE HAND-BACK (gSearching): it has no bar, but reopening a chapter the search
+	// handed back runs the message loop, and what that dispatches must not start inside it (KFCRunGuard.h).
+	const SearchingFlagGuard searchingGuard;
 	outStatus.Append("Search This Story Again: ");
 	const UID story = KFCResultModel::GetGroupStory(chapterIdx, groupIdx);
 	if (story == kInvalidUID)
@@ -4938,6 +4941,9 @@ bool KFCSearchEngine::SearchDocumentAgain(int32 chapterIdx, PMString& outStatus)
 		outStatus.Append(KFCRunGuard::BusyMessage());
 		return false;
 	}
+	// COUNTED AS A SEARCH FROM HERE TO THE HAND-BACK (gSearching) - not around the walk's bar alone: reopening
+	// the chapter the search handed back, before the walk, runs the message loop too (KFCRunGuard.h).
+	const SearchingFlagGuard searchingGuard;
 	outStatus.Append("Search This Document Again: ");
 	UIDRef docRef;
 	IDFile file;
@@ -4979,7 +4985,6 @@ bool KFCSearchEngine::SearchDocumentAgain(int32 chapterIdx, PMString& outStatus)
 	std::map<UID, uint32> storyVersions;
 	bool capped = false, cancelled = false, walked = false;
 	{
-		const SearchingFlagGuard searchingGuard;
 		KFCForwardSearchScope forward;		// forward, as the search was
 		// A NARROWED LIST'S CONDITIONS, searched again with it (Narrow Down - Search This Story Again's rule).
 		const KFCNarrow::Filter narrowFilter(KFCResultModel::GetNarrowSteps());

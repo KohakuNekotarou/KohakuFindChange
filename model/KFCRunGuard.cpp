@@ -26,7 +26,7 @@ bool KFCRunGuard::IsAnyRunning()
 	return KFCSearchEngine::IsSearching()
 		|| KFCChangeAll::IsRunning()			// Change All in Book (No List)
 		|| KFCQuerySequence::IsRunning()		// the query run: every query's Change All under one sequence
-		|| KFCReplaceEngine::IsReplacing();		// a row's Replace, Restore from Copy, a text row's Create Outlines
+		|| KFCReplaceEngine::IsReplacing();		// a write from the list (KFCReplaceEngine::WriteUnderWay)
 }
 
 bool KFCRunGuard::IsLandingUnderWay()

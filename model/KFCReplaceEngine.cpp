@@ -77,16 +77,9 @@
 namespace
 {
 
-// A WRITE OF THIS ENGINE'S UNDER WAY - a row's Replace, Restore from Copy, a text row's Create Outlines
-// (KFCReplaceEngine::IsReplacing - KFCRunGuard counts it). A depth, not a flag: ReplaceHits hands one row to
-// ReplaceHit, and the inner one's end must not say the outer one is over.
+// HOW MANY WRITES FROM THE LIST ARE UNDER WAY - KFCReplaceEngine::WriteUnderWay's depth (IsReplacing - KFCRunGuard
+// counts it; the header says who holds one).
 int32 gReplacingDepth = 0;
-
-struct ReplacingScope
-{
-	ReplacingScope() { ++gReplacingDepth; }
-	~ReplacingScope() { --gReplacingDepth; }
-};
 
 // Run one find/change walker command and hand back WHAT IT ANSWERED, not merely whether it landed
 // on something. Only kSuccess fills the story and range; every other answer leaves them invalid,
@@ -2144,6 +2137,16 @@ static bool ReplaceRowsNow(std::vector<ChapterWrite>& chapters,
 	return true;
 }
 
+KFCReplaceEngine::WriteUnderWay::WriteUnderWay()
+{
+	++gReplacingDepth;
+}
+
+KFCReplaceEngine::WriteUnderWay::~WriteUnderWay()
+{
+	--gReplacingDepth;
+}
+
 bool KFCReplaceEngine::IsReplacing()
 {
 	return gReplacingDepth > 0;
@@ -2151,7 +2154,7 @@ bool KFCReplaceEngine::IsReplacing()
 
 bool KFCReplaceEngine::ReplaceHit(int32 chapterIdx, int32 hitIdx, PMString& outStatus)
 {
-	const ReplacingScope replacing;		// counted by KFCRunGuard from the door to the hand-back (IsReplacing)
+	const KFCReplaceEngine::WriteUnderWay replacing;	// counted from the door to the hand-back (IsReplacing)
 	outStatus.Clear();
 	outStatus.SetTranslatable(kFalse);
 	if (!CanReplaceHit(chapterIdx, hitIdx))
@@ -2171,7 +2174,7 @@ bool KFCReplaceEngine::ReplaceHit(int32 chapterIdx, int32 hitIdx, PMString& outS
 
 bool KFCReplaceEngine::ReplaceHits(const KFCRowsByChapter& rowsByChapter, PMString& outStatus)
 {
-	const ReplacingScope replacing;		// (IsReplacing - ReplaceHit's)
+	const KFCReplaceEngine::WriteUnderWay replacing;	// (IsReplacing - ReplaceHit's)
 	outStatus.Clear();
 	outStatus.SetTranslatable(kFalse);
 	int32 firstChapter = -1, firstHit = -1;
@@ -2847,7 +2850,7 @@ bool KFCReplaceEngine::RestoreHits(const KFCRowsByChapter& rowsByChapter, PMStri
 		outStatus.Append(KFCRunGuard::BusyMessage());
 		return false;
 	}
-	const ReplacingScope replacing;		// counted by KFCRunGuard from the door to the hand-back (IsReplacing)
+	const KFCReplaceEngine::WriteUnderWay replacing;	// counted from the door to the hand-back (IsReplacing)
 	const size_t total = KFCRowCount(rowsByChapter);
 	if (total == 0)
 		return false;
@@ -3316,7 +3319,7 @@ bool KFCReplaceEngine::OutlineHits(const KFCRowsByChapter& rowsByChapter, PMStri
 		outStatus.Append(KFCRunGuard::BusyMessage());
 		return false;
 	}
-	const ReplacingScope replacing;		// counted by KFCRunGuard from the door to the hand-back (IsReplacing)
+	const KFCReplaceEngine::WriteUnderWay replacing;	// counted from the door to the hand-back (IsReplacing)
 	const size_t total = KFCRowCount(rowsByChapter);
 	if (total == 0)
 		return false;

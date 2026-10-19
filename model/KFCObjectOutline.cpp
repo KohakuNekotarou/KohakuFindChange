@@ -215,6 +215,7 @@ bool KFCObjectOutline::OutlineRows(const KFCRowsByChapter& rows, PMString& outSt
 		outStatus.Append(KFCRunGuard::BusyMessage());
 		return false;
 	}
+	const KFCReplaceEngine::WriteUnderWay writing;		// counted from the door to the hand-back (KFCRunGuard)
 	const size_t total = KFCRowCount(rows);
 	if (total == 0)
 		return false;

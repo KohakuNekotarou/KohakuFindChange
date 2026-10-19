@@ -230,12 +230,28 @@ namespace KFCReplaceEngine
 	    outcome - WhyGreyed answering kGreyedNot. */
 	bool CanReplaceHit(int32 chapterIdx, int32 hitIdx);
 
-	/** IS A WRITE OF THIS ENGINE'S UNDER WAY - a row's Replace (ReplaceHit or ReplaceHits, text rows or object rows),
-	    Restore from Copy (RestoreHits), a text row's Create Outlines (OutlineHits) - from the door to the last
-	    chapter's hand-back? KFCRunGuard counts it. It has no bar, but reopening a closed chapter and giving a written
-	    one its window RUN THE MESSAGE LOOP, and what that dispatches must not start inside it: a landing (its
-	    Hide Previous Chapter sweep would schedule the close of a chapter this is about to write), a second write, a run
-	    (its commit point would close the chapter this reopened), the book watcher's release, the Undo follow. */
+	/** A WRITE FROM THE LIST UNDER WAY, for as long as this stands - what IsReplacing counts. Every write that
+	    can reopen a closed chapter or give a written one its window holds one from its door (past its busy test) to
+	    the last chapter's hand-back - so it is declared before the write's DocsAfterWrite: this engine's (ReplaceHit
+	    and ReplaceHits, RestoreHits, OutlineHits) and the object rows' Create Outlines and Special Operations
+	    (KFCObjectOutline, KFCObjectSpecial), which reach their chapters the same way. A depth, not a flag:
+	    ReplaceHits hands one row to ReplaceHit, and the inner one's end must not say the outer one is over. */
+	class WriteUnderWay
+	{
+	public:
+		WriteUnderWay();
+		~WriteUnderWay();
+	private:
+		WriteUnderWay(const WriteUnderWay&);
+		WriteUnderWay& operator=(const WriteUnderWay&);
+	};
+
+	/** IS A WRITE FROM THE LIST UNDER WAY (WriteUnderWay, above) - a row's Replace (text rows or object rows), Restore
+	    from Copy, Create Outlines (text rows or object rows), a Special Operation - from the door to the last chapter's
+	    hand-back? KFCRunGuard counts it. It has no bar, but reopening a closed chapter and giving a written one its
+	    window RUN THE MESSAGE LOOP, and what that dispatches must not start inside it: a landing (its Hide Previous
+	    Chapter sweep would schedule the close of a chapter this is about to write), a second write, a run (its commit
+	    point would close the chapter this reopened), the book watcher's release, the Undo follow. */
 	bool IsReplacing();
 
 	/** WHY A ROW'S REPLACE IS GREYED - the one place the reasons are asked (CanReplaceHit is this answering kGreyedNot) -
