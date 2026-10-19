@@ -24,7 +24,6 @@
 #include "TablesID.h"				// kTableModelBoss - a table's cells are its threads
 #include "TextID.h"					// kFootnoteReferenceBoss, kEndnoteStoryBoss
 #include "UIDList.h"
-#include "Utils.h"
 
 #include <cstdio>
 

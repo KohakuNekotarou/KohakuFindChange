@@ -209,11 +209,8 @@ private:
 	DocProgress& operator=(const DocProgress&);
 };
 
-// One object row for one page item (O8) - defined below, beside the questions it asks (Fingerprint, IsOnSpread).
-void BuildObjectHit(const UIDRef& docRef, UID item, KFCResultModel::Hit& out);
-
-// THE SPREAD AN ITEM STANDS ON, ASKED OF THE ITEM (IPasteboardUtils::QuerySpread - IsOnSpread's question): what the bar inside
-// a document moves by (DocProgress). kInvalidUID for an item on no spread - an inline in overset text.
+// THE SPREAD AN ITEM STANDS ON, ASKED OF THE ITEM (IPasteboardUtils::QuerySpread - IsOnSpread asks it too): what the
+// bar inside a document moves by (DocProgress). kInvalidUID for an item on no spread - an inline in overset text.
 // NOT THE SHARED WALKER'S IObjectWalker::GetCurrentSpread - IT BROUGHT InDesign DOWN (the author's Find Objects on Active
 // Layer, 2026-10-18 02:03; reproduced the same day): a walker initialized for Search: = Selection walks the items it was given
 // and puts no document in its document list, while GetCurrentSpread reads that list's first entry whatever the scope (TEXT
@@ -287,32 +284,31 @@ WalkEnd WalkDoc(IFindChangeService* svc, IObjectWalker* shared, const UIDRef& do
 			return kWalkBroke;
 		if (!seen.insert(current.GetUID()).second)
 			return kWalkDone;
-		// NOT MEETING A NARROWED LIST'S CONDITIONS (narrow): built to be asked, then passed over - still moving the bar and
-		// asking Cancel, as a listed item does, so a document whose matches mostly fail them can still be cancelled while it
-		// is walked. The limit below counts only the rows that pass.
+		// NOT MEETING A NARROWED LIST'S CONDITIONS (narrow): built to be asked, then passed over. The limit counts only
+		// the rows that pass.
 		KFCResultModel::Hit hit;
 		const bool built = (narrow != nil);
 		if (built)
-			BuildObjectHit(docRef, current.GetUID(), hit);
+			KFCObjectSearch::BuildRow(docRef, current.GetUID(), hit);
 		if (narrow != nil && !narrow->KeepObject(hit, db))
 		{
 			KFC_DIAG_LOG("NARROWOBJ item=%u pb=%d page=%s - passed over", current.GetUID().Get(), hit.onPasteboard ? 1 : 0,
 				hit.pageString.GetUTF8String().c_str());
-			progress.Listed(SpreadOf(current));
-			if (bar.WasCancelled(kFalse) != kFalse)
-				return kWalkCancelled;
-			continue;
 		}
-		if (outHits.size() >= limit)
+		else
 		{
-			outCapped = true;
-			return kWalkDone;
+			if (outHits.size() >= limit)
+			{
+				outCapped = true;
+				return kWalkDone;
+			}
+			if (!built)
+				KFCObjectSearch::BuildRow(docRef, current.GetUID(), hit);
+			outHits.push_back(std::move(hit));
 		}
-		if (!built)
-			BuildObjectHit(docRef, current.GetUID(), hit);
-		outHits.push_back(std::move(hit));
-		// CANCEL IS ASKED HERE, AT EVERY ITEM LISTED. The bar first, then the question (DocProgress says why both).
-		// kFalse = no global error state.
+		// CANCEL IS ASKED HERE, AT EVERY ITEM - one passed over too, so a document whose matches mostly fail a narrowed
+		// list's conditions can still be cancelled while it is walked. The bar first, then the question (DocProgress
+		// says why both). kFalse = no global error state.
 		progress.Listed(SpreadOf(current));
 		bool cancel = bar.WasCancelled(kFalse) != kFalse;
 #ifdef KFC_DIAG
@@ -761,11 +757,7 @@ bool KFCObjectSearch::WriteReaches(IDataBase* db, const WriteReach& reach, UID i
 
 bool KFCObjectSearch::IsOnSpread(const UIDRef& item)
 {
-	InterfacePtr<IHierarchy> hier(item, UseDefaultIID());
-	if (hier == nil)
-		return false;
-	InterfacePtr<ISpread> spread(Utils<IPasteboardUtils>()->QuerySpread(hier));
-	return spread != nil;
+	return SpreadOf(item) != kInvalidUID;
 }
 
 void KFCObjectSearch::AimSharedWalkerAtFront()
@@ -777,12 +769,10 @@ void KFCObjectSearch::AimSharedWalkerAtFront()
 	shared->Initialize(WalkerOptionsFor(::GetUIDRef(front), nil));
 }
 
-namespace
-{
 // ONE OBJECT ROW FOR ONE PAGE ITEM (O8): its text ("ID<uid>:<name>"), its page and where it stands - grouped, inline,
 // anchored, in overset text - hidden / locked, its fingerprint. The locator is built later, with the chapter's page
 // order (KFCResultModel::OrderHitsByPage).
-void BuildObjectHit(const UIDRef& docRef, UID item, KFCResultModel::Hit& out)
+void KFCObjectSearch::BuildRow(const UIDRef& docRef, UID item, KFCResultModel::Hit& out)
 {
 	IDataBase* const db = docRef.GetDataBase();
 	const UIDRef itemRef(db, item);
@@ -838,12 +828,6 @@ void BuildObjectHit(const UIDRef& docRef, UID item, KFCResultModel::Hit& out)
 
 	(void)KFCObjectSearch::Fingerprint(itemRef, out.itemPrint, out.itemPrintLength);
 }
-}	// anonymous namespace
-
-void KFCObjectSearch::BuildRow(const UIDRef& docRef, UID item, KFCResultModel::Hit& out)
-{
-	BuildObjectHit(docRef, item, out);
-}
 
 bool KFCObjectSearch::ReadItemPlace(const UIDRef& docRef, UID item, KFCResultModel::Hit& io)
 {
@@ -871,11 +855,12 @@ bool KFCObjectSearch::ReadItemPlace(const UIDRef& docRef, UID item, KFCResultMod
 	// a parent page's items and the pasteboard's after them, in the order InDesign walked them - a parent page's by a key
 	// of its own, so each is numbered on its own (NumberHitsWithinPages).
 	const UID page = (hier != nil) ? Utils<ILayoutUtils>()->GetOwnerPageUID(hier) : kInvalidUID;
+	const bool onPage = (page != kInvalidUID && db->GetClass(page) == kPageBoss);
 	io.pageString.Clear();
 	io.pageString.SetTranslatable(kFalse);
 	io.isMaster = false;
-	io.pageUID = (page != kInvalidUID && db->GetClass(page) == kPageBoss) ? page : kInvalidUID;	// (Narrow Down's Pages)
-	if (page == kInvalidUID || db->GetClass(page) != kPageBoss)
+	io.pageUID = onPage ? page : kInvalidUID;	// (Narrow Down's Pages)
+	if (!onPage)
 	{
 		io.onPasteboard = true;
 		io.pageIndex = -1;

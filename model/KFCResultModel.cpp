@@ -775,6 +775,11 @@ bool KFCResultModel::SetHitKept(int32 chapterIdx, int32 hitIdx, bool kept)
 	return true;
 }
 
+bool KFCResultModel::StaysKept(const Hit& hit)
+{
+	return hit.kept && !hit.cleared;
+}
+
 int32 KFCResultModel::CountKeptRows(int32 chapterIdx, UID story)
 {
 	const Chapter* c = ChapterAt(chapterIdx);
@@ -782,7 +787,7 @@ int32 KFCResultModel::CountKeptRows(int32 chapterIdx, UID story)
 		return 0;
 	int32 count = 0;
 	for (size_t i = 0; i < c->hits.size(); ++i)
-		if (c->hits[i].kept && !c->hits[i].cleared && (story == kInvalidUID || c->hits[i].storyUID == story))
+		if (StaysKept(c->hits[i]) && (story == kInvalidUID || c->hits[i].storyUID == story))
 			++count;
 	return count;
 }
@@ -1489,7 +1494,7 @@ int32 KFCResultModel::ReplaceStoryRows(int32 chapterIdx, UID story, std::vector<
 	// carried into the walk's rows (MergeKeptRows) - copied before the story's rows go out below.
 	std::vector<Hit> keptRows;
 	for (size_t i = 0; i < c->hits.size(); ++i)
-		if (c->hits[i].storyUID == story && c->hits[i].kept && !c->hits[i].cleared)	// (a row taken off the list goes - Clear from Results)
+		if (c->hits[i].storyUID == story && StaysKept(c->hits[i]))
 			keptRows.push_back(c->hits[i]);
 	const int32 stayed = MergeKeptRows(storyHits, keptRows);
 	if (outStayed != nil)
@@ -1546,7 +1551,7 @@ int32 KFCResultModel::ReplaceChapterRows(int32 chapterIdx, std::vector<Hit>& doc
 	std::vector<Hit> keptRows;
 	for (size_t i = 0; i < c->hits.size(); ++i)
 	{
-		if (!c->hits[i].kept || c->hits[i].cleared)	// (a row taken off the list goes - Clear from Results)
+		if (!StaysKept(c->hits[i]))
 			continue;
 		keptRows.push_back(c->hits[i]);
 		const UID s = c->hits[i].storyUID;

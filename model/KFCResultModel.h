@@ -578,8 +578,13 @@ namespace KFCResultModel
 	    (replaced, outlined, or given a special operation - the author's call). */
 	bool SetHitKept(int32 chapterIdx, int32 hitIdx, bool kept);
 
-	/** How many rows of a chapter have their eye on - of one story, or of the whole chapter (story = kInvalidUID): the
-	    room a search again leaves them (SearchStoryAgain, SearchDocumentAgain). A row taken off the list is not counted. */
+	/** A ROW THAT STAYS WHEN ITS LIST IS SEARCHED AGAIN: its eye on (Hit::kept), and not taken off the list
+	    (Hit::cleared - Clear from Results). The one test the searches again carry rows by (ReplaceStoryRows,
+	    ReplaceChapterRows, and KFCSearchEngine's Search These Results Again) and CountKeptRows counts them by. */
+	bool StaysKept(const Hit& hit);
+
+	/** How many rows of a chapter stay kept (StaysKept) - of one story, or of the whole chapter (story = kInvalidUID):
+	    the room a search again leaves them (SearchStoryAgain, SearchDocumentAgain). */
 	int32 CountKeptRows(int32 chapterIdx, UID story);
 
 	/** CLEAR FROM RESULTS (docs/superpowers/specs/2026-10-18-kfc-clear-from-results-design.md K3, K5): the rows taken off the

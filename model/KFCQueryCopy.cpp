@@ -172,7 +172,7 @@ namespace
 	}
 
 	// kClearFindFormatCmdBoss / kClearChangeFormatCmdBoss: their one field is the tab (IID_IFINDCHANGEMODEDATA - the SDK's
-	// command list; there is no default IIntData on them, so CreateFindChangeIntCmd does not fit).
+	// command list; there is no default IIntData on them, so CommitFindChangeInt does not fit).
 	bool CommitClearFormat(const ClassID& cmdBoss, int32 mode)
 	{
 		InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(cmdBoss));
@@ -409,10 +409,6 @@ bool KFCQueryCopier::Matches(const KFCQueryCopy& copy, PMString& outWhat)
 	if (differs == nil)
 		return true;
 	return Failed(outWhat, differs);
-}
-
-void KFCQueryCopier::ShutdownCleanup()
-{
 }
 
 #ifdef KFC_DIAG

@@ -83,8 +83,9 @@ namespace KFCObjectSearch
 		std::vector<KFCResultModel::Hit>& outHits, bool& outCapped, bool& outCancelled,
 		const KFCNarrow::Filter* narrow = nil);	// a narrowed list's conditions (CollectTargets'); nil = all
 
-	/** AN OBJECT ROW FOR AN ITEM (the object search's own BuildObjectHit - its text, its place, its fingerprint): what
-	    Frames of These Matches makes of the frame holding a match (KFCSearchEngine's walk - the narrow-down spec's N5). */
+	/** AN OBJECT ROW FOR AN ITEM (its text, its place, its fingerprint): the row the object search lists for each item
+	    it finds, and what Frames of These Matches makes of the frame holding a match (KFCSearchEngine's walk - the
+	    narrow-down spec's N5). */
 	void BuildRow(const UIDRef& docRef, UID item, KFCResultModel::Hit& out);
 
 	/** An item's FINGERPRINT (O12): its own persistent data as the database writes it (IPMPersist::SaveAll into memory),

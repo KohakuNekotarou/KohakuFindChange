@@ -36,10 +36,8 @@ bool KFCFindChangeCmds::ProcessFindChangeCmd(ICommand* cmd)
 	return false;
 }
 
-// Re-state one side of the Glyph tab's query on the find/change options. The command carries two
-// fields: IIntData is the glyph itself, and IBoolData picks the side - kTrue for the glyph being
-// looked for, kFalse for the one that replaces it. This is what SnpFindAndReplace does in
-// Do_FindGlyph and Do_ReplaceGlyph, the only worked glyph example in the SDK.
+// Re-state one side of the Glyph tab's query on the find/change options, for a search or a replace - the command
+// StateGlyphID makes, once an empty find side is set aside (below).
 //
 // THE ANSWER IS RETURNED, NOT SWALLOWED. false means the value was NOT stated, and the engine will
 // therefore walk - or write - with whatever was committed last. On the replace side that is a glyph
@@ -61,39 +59,32 @@ bool KFCFindChangeCmds::CommitGlyphID(Text::GlyphID glyphID, bool16 findSide)
 	// that leftover.
 	if (glyphID == kInvalidGlyphID && findSide)
 		return true;
-
-	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kFindChangeGlyphIDCmdBoss));
-	if (cmd == nil)
-		return false;
-	InterfacePtr<IIntData>  value(cmd, UseDefaultIID());
-	InterfacePtr<IBoolData> side(cmd, UseDefaultIID());
-	if (value == nil || side == nil)
-		return false;
-	value->Set(glyphID);
-	side->Set(findSide);
-	return ProcessFindChangeCmd(cmd);
+	return StateGlyphID(glyphID, findSide);
 }
 
-// One of the find/change option commands that carry a single int, made and filled - the shape of
-// SnpFindAndReplace's ProcessFindChangeCommandInt32: the value in the default IIntData, and which
-// mode's settings are being addressed in IID_IFINDCHANGEMODEDATA where the boss carries one
-// (kFindSearchModeCmdBoss and kFindChangeModeCmdBoss do, both fields kIntDataImpl; the two character-type
-// bosses hold only the value - checked against a live object-model dump - so that field is set only when it
-// answers). nil = not made.
-ICommand* KFCFindChangeCmds::CreateFindChangeIntCmd(const ClassID& cmdBoss, int32 value, int32 mode)
+namespace
 {
-	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(cmdBoss));
-	if (cmd == nil)
-		return nil;
-	InterfacePtr<IIntData> valueData(cmd, UseDefaultIID());
-	if (valueData == nil)
-		return nil;
-	valueData->Set(value);
-	InterfacePtr<IIntData> modeData(cmd, IID_IFINDCHANGEMODEDATA);
-	if (modeData != nil)
-		modeData->Set(mode);
-	return cmd.forget();
-}
+	// One of the find/change option commands that carry a single int, made and filled - the shape of
+	// SnpFindAndReplace's ProcessFindChangeCommandInt32: the value in the default IIntData, and which
+	// mode's settings are being addressed in IID_IFINDCHANGEMODEDATA where the boss carries one
+	// (kFindSearchModeCmdBoss and kFindChangeModeCmdBoss do, both fields kIntDataImpl; the two character-type
+	// bosses hold only the value - checked against a live object-model dump - so that field is set only when it
+	// answers). nil = not made.
+	ICommand* CreateFindChangeIntCmd(const ClassID& cmdBoss, int32 value, int32 mode)
+	{
+		InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(cmdBoss));
+		if (cmd == nil)
+			return nil;
+		InterfacePtr<IIntData> valueData(cmd, UseDefaultIID());
+		if (valueData == nil)
+			return nil;
+		valueData->Set(value);
+		InterfacePtr<IIntData> modeData(cmd, IID_IFINDCHANGEMODEDATA);
+		if (modeData != nil)
+			modeData->Set(mode);
+		return cmd.forget();
+	}
+}	// anonymous namespace
 
 // That command processed. Returns whether the value was stated, for the same reason CommitGlyphID does: the snippet
 // this is shaped after hands its ErrorCode back too, and every caller of it stops on a failure
@@ -114,8 +105,9 @@ bool KFCFindChangeCmds::ScheduleFindChangeInt(const ClassID& cmdBoss, int32 valu
 }
 
 // A command that carries a switch for one tab - the value in the default IBoolData, the tab in IID_IFINDCHANGEMODEDATA:
-// Case Sensitive, Whole Word, Kana / Width Sensitive and the five Include switches (the bosses' data, checked against the
-// SDK's command list - docs/ai-notes/cmdboss-dictionary.md). Whether it was stated, as CommitFindChangeInt says.
+// Case Sensitive, Whole Word, Kana / Width Sensitive, the five Include switches and the search direction
+// (kSearchBackwardsSilentCmdBoss - KFCSearchEngine's direction scopes) - the bosses' data, checked against the SDK's
+// command list (docs/ai-notes/cmdboss-dictionary.md). Whether it was stated, as CommitFindChangeInt says.
 bool KFCFindChangeCmds::CommitFindChangeBool(const ClassID& cmdBoss, bool16 value, int32 mode)
 {
 	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(cmdBoss));
@@ -130,8 +122,9 @@ bool KFCFindChangeCmds::CommitFindChangeBool(const ClassID& cmdBoss, bool16 valu
 	return ProcessFindChangeCmd(cmd);
 }
 
-// Find what or Change to of one tab (kFindStringCmdBoss / kReplaceStringCmdBoss) - the string in the default IStringData,
-// the tab in IID_IFINDCHANGEMODEDATA: KFCSearchEngine::SetQuery's shape (SnpFindAndReplace's ProcessFindChangeCommandString).
+// Find what or Change to of one tab (kFindStringCmdBoss / kReplaceStringCmdBoss) - the string in the default
+// IStringData, the tab in IID_IFINDCHANGEMODEDATA: SnpFindAndReplace's ProcessFindChangeCommandString
+// (KFCSearchEngine::SetQuery's Find what, KFCQueryCopy's both).
 bool KFCFindChangeCmds::CommitFindChangeString(const ClassID& cmdBoss, const PMString& value, int32 mode)
 {
 	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(cmdBoss));
@@ -146,9 +139,11 @@ bool KFCFindChangeCmds::CommitFindChangeString(const ClassID& cmdBoss, const PMS
 	return ProcessFindChangeCmd(cmd);
 }
 
-// One side of the Glyph tab's query stated AS IT IS - -1 (no glyph) included, on either side. CommitGlyphID leaves an
-// empty find side alone, which is right for a search; a query put back (KFCQueryCopy) must state the empty side too, or
-// the glyph standing there before would stay.
+// One side of the Glyph tab's query stated AS IT IS - -1 (no glyph) included, on either side. The command carries two
+// fields: IIntData is the glyph itself, and IBoolData picks the side - kTrue for the glyph being looked for, kFalse for
+// the one that replaces it. This is what SnpFindAndReplace does in Do_FindGlyph and Do_ReplaceGlyph, the only worked
+// glyph example in the SDK. CommitGlyphID leaves an empty find side alone, which is right for a search; a query put
+// back (KFCQueryCopy) must state the empty side too, or the glyph standing there before would stay.
 bool KFCFindChangeCmds::StateGlyphID(Text::GlyphID glyphID, bool16 findSide)
 {
 	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kFindChangeGlyphIDCmdBoss));

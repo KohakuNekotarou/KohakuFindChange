@@ -5,8 +5,9 @@
 //  KohakuFindChange (KFC)
 //
 //  THE FIND/CHANGE SETTINGS' COMMANDS, ONE AT A TIME - each in the shape SnpFindAndReplace gives it, each saying whether
-//  the value was stated. KFCSearchEngine states the dialog's tab and the replace side with them; KFCQueryCopy states a
-//  whole query back with them (docs/superpowers/specs/2026-10-14-kfc-tier-switch-design.md section 3-3). A failure's
+//  the value was stated. KFCSearchEngine states the dialog's tab, the replace side, the search direction and a query of
+//  its own (SetQuery) with them; KFCQueryCopy states a whole query back with them
+//  (docs/superpowers/specs/2026-10-14-kfc-tier-switch-design.md section 3-3). A failure's
 //  error state is cleared at once (ProcessFindChangeCmd): left standing it would fail every find command after it.
 //  Call them OUTSIDE any command sequence unless the caller means them to be part of it (KFCSearchEngine::CommitSearchMode
 //  says why). The main thread only.
@@ -32,19 +33,16 @@ namespace KFCFindChangeCmds
 	    state there; an empty REPLACE side is stated (it deletes every match). */
 	bool CommitGlyphID(Text::GlyphID glyphID, bool16 findSide);
 
-	/** A command that carries one int, made and filled: the value in the default IIntData, and the tab in
-	    IID_IFINDCHANGEMODEDATA where the boss carries one. nil = not made. */
-	ICommand* CreateFindChangeIntCmd(const ClassID& cmdBoss, int32 value, int32 mode);
-
-	/** That command processed - whether the value was stated. */
+	/** A command that carries one int, made, filled and processed: the value in the default IIntData, and the tab in
+	    IID_IFINDCHANGEMODEDATA where the boss carries one. Whether the value was stated. */
 	bool CommitFindChangeInt(const ClassID& cmdBoss, int32 value, int32 mode);
 
 	/** That command SCHEDULED rather than processed - for a caller inside another find/change command's notification.
 	    Whether it was scheduled. */
 	bool ScheduleFindChangeInt(const ClassID& cmdBoss, int32 value, int32 mode);
 
-	/** A switch of one tab (Case Sensitive, Whole Word, Kana / Width Sensitive, the five Include switches) - the value in
-	    IBoolData, the tab in IID_IFINDCHANGEMODEDATA. Whether it was stated. */
+	/** A switch of one tab (Case Sensitive, Whole Word, Kana / Width Sensitive, the five Include switches, the search
+	    direction) - the value in IBoolData, the tab in IID_IFINDCHANGEMODEDATA. Whether it was stated. */
 	bool CommitFindChangeBool(const ClassID& cmdBoss, bool16 value, int32 mode);
 
 	/** Find what / Change to of one tab (kFindStringCmdBoss / kReplaceStringCmdBoss). Whether it was stated. */

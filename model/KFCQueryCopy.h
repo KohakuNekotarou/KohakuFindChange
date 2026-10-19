@@ -96,9 +96,6 @@ namespace KFCQueryCopier
 	    write, so it fails closed. */
 	bool Matches(const KFCQueryCopy& copy, PMString& outWhat);
 
-	/** The controlled shutdown: nothing static is held here (the copies live with the lists - KFCTierStore). */
-	void ShutdownCleanup();
-
 #ifdef KFC_DIAG
 	/** TEST BUILDS ONLY - the tier switch's spike (docs/superpowers/plans/2026-10-14-kfc-tier-switch.md Task 3). While one of
 	    the fault switches is on, the panel's Find does this instead of searching (one-shot - the switch is taken away):
