@@ -112,10 +112,10 @@ private:
 //    snapshot, while a fill-colour search whose last find was on page 2 ended with nothing selected (obj-list-basic passed
 //    by that, not by the snapshot). So the UI half is asked first, and clears the selection after the snapshot when
 //    nothing was selected;
-//  - THE WINDOWS BEHIND THE FRONT VIEW, given back too (IKFCUIServices::SnapshotBackgroundSelections - measured
-//    2026-10-18: the walks select what they find in every document with a window, and an All Documents search with
-//    nothing selected anywhere left the last item it found selected in the document behind - in a minimised window and
-//    a document's second window as well, so every layout window is read; the snapshot is the front view's alone);
+//  - THE WINDOWS BEHIND THE FRONT VIEW, given back too (IKFCUIServices::SnapshotBackgroundSelections - measured: the
+//    walks select what they find in every document with a window, and an All Documents search with nothing selected
+//    anywhere left the last item it found selected in the document behind - in a minimised window and a document's
+//    second window as well, so every layout window is read; the snapshot is the front view's alone);
 //  - the shared walker, aimed at the front document again (O7).
 // Made before the walks' bar (whose events can come in while it stands) and after the page items Search: = Selection
 // names are read.
@@ -159,12 +159,12 @@ enum WalkEnd
 // One document's slice of the bar, in steps. The bar runs 0 .. targets x this.
 const int32 kDocSpan = 1000;
 
-// THE BAR INSIDE ONE DOCUMENT (the author's call: a Cancel is heard inside a document, not only between documents, where
-// the 300 items of one could not be stopped). The walk does not know how many items a document holds until it has found
-// them all, but it knows where it stands - the spread of the item it is on - as the text search knows the story
-// (KFCSearchEngine.cpp, its slice cut by stories). So: one step per item listed, and on to a later spread's share of the
-// slice when the walk gets there; a parent page's spread (not in the spread list) only crawls. Never backwards, never past
-// the slice.
+// THE BAR INSIDE ONE DOCUMENT (the author's call: a Cancel is heard inside a document, not only between documents,
+// where the many items of one - up to the object lists' limit - could not be stopped). The walk does not know how many
+// items a document holds until it has found them all, but it knows where it stands - the spread of the item it is on -
+// as the text search knows the story (KFCSearchEngine.cpp, its slice cut by stories). So: one step per item listed, and
+// on to a later spread's share of the slice when the walk gets there; a parent page's spread (not in the spread list)
+// only crawls. Never backwards, never past the slice.
 // Moved at every item, and asked at every item (WalkDoc): which call on the bar lets a click on Cancel in is not
 // measured (KFCSearchEngine.cpp's KFCAdvanceProgress), so the walk makes both, as KIDMCP's working cancel does. Each item
 // already costs a fingerprint, so the two calls were judged to add little - against the snippet print of the time (20-75
@@ -211,13 +211,13 @@ private:
 
 // THE SPREAD AN ITEM STANDS ON, ASKED OF THE ITEM (IPasteboardUtils::QuerySpread - IsOnSpread asks it too): what the
 // bar inside a document moves by (DocProgress). kInvalidUID for an item on no spread - an inline in overset text.
-// NOT THE SHARED WALKER'S IObjectWalker::GetCurrentSpread - IT BROUGHT InDesign DOWN (the author's Find Objects on Active
-// Layer, 2026-10-18 02:03; reproduced the same day): a walker initialized for Search: = Selection walks the items it was given
-// and puts no document in its document list, while GetCurrentSpread reads that list's first entry whatever the scope (TEXT
-// WALKER.RPLN - Initialize +0xb9cd0, GetCurrentSpread +0xb9110, read in the disassembly). The list keeps the storage a
-// document walk gave it, so a selection walk read a stale entry - until the session's FIRST object walk was a selection's,
-// with no storage yet: a read of address 0 (+0xb9151), at the first item it listed. The header promises "the spread being
-// walked" and says nothing of the scope.
+// NOT THE SHARED WALKER'S IObjectWalker::GetCurrentSpread - IT BROUGHT InDesign DOWN (the author's
+// Find Objects on Active Layer; reproduced): a walker initialized for Search: = Selection walks the items it was given
+// and puts no document in its document list, while GetCurrentSpread reads that list's first entry whatever the scope
+// (TEXT WALKER.RPLN - Initialize +0xb9cd0, GetCurrentSpread +0xb9110, read in the disassembly). The list keeps the
+// storage a document walk gave it, so a selection walk read a stale entry - until the session's FIRST object walk was a
+// selection's, with no storage yet: a read of address 0 (+0xb9151), at the first item it listed. The header promises
+// "the spread being walked" and says nothing of the scope.
 UID SpreadOf(const UIDRef& item)
 {
 	InterfacePtr<IHierarchy> hier(item, UseDefaultIID());
@@ -235,7 +235,7 @@ UID SpreadOf(const UIDRef& item)
 // InDesign to initialise it from Search: itself (kTrue), which takes the caret's frame (measured: the plan's Task 1 M6),
 // and the steps after it go on "as is". Only for the front document, whose selection that is.
 // bar / barBase: the run's bar and this document's slice of it - moved and asked at every item listed (DocProgress).
-// narrow (Narrow Down - the spec's N3): a narrowed list's conditions - an item that does not meet them is passed over
+// narrow (Narrow Down - KFCNarrow.h): a narrowed list's conditions - an item that does not meet them is passed over
 // before the list's limit counts it; nil = every match. The matching stays InDesign's own: the walk is the same, and
 // only what it lists is narrowed.
 WalkEnd WalkDoc(IFindChangeService* svc, IObjectWalker* shared, const UIDRef& docRef, const UIDList* items, size_t limit,
@@ -927,11 +927,12 @@ void KFCObjectSearch::CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targ
 		const std::vector<int32> shares(KFCBookScope::ProgressBases(KFCBookScope::TargetSizes(targets), barEnd));
 		KFCProgressBar bar(title, 0, barEnd, kTrue, kTrue);
 		bar.DisableChildProgressBars(kTrue);
-		int32 objectLimit = KFCResultModel::kKFCCollectObjectLimit;	// the object lists' own (N7)
+		int32 objectLimit = KFCResultModel::kKFCCollectObjectLimit;	// the object lists' own (KFCResultModel.h)
 #ifdef KFC_DIAG
-		// (Test builds only) Fault value object-limit (%TEMP%\kbs-diag-fault-object-limit holding a number): the list's limit
-		// for this walk set to it - the narrow-down plan's M6, the object lists' new limit measured (300 / 500 / 1000 objects:
-		// the search and the special operations timed) before it is chosen.
+		// (Test builds only) Fault value object-limit (%TEMP%\kbs-diag-fault-object-limit holding a number): the list's
+		// limit for this walk set to it - how the object lists' limit was measured before it was chosen (300 / 500 /
+		// 1000 objects: the search and the special operations timed - KFCResultModel.h's kKFCCollectObjectLimit says
+		// what came of it).
 		const int diagLimit = KFCDiagFaultValue("object-limit", 0, 0);
 		if (diagLimit > 0)
 			objectLimit = diagLimit;

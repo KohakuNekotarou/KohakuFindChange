@@ -101,12 +101,12 @@ KFCQueryScope::KFCQueryScope()
 	// <ms> <InDesign's counters>", KFCDiag.h).
 	KFC_DIAG_PHASE(scopePhase, "query-scope");
 
-	// (4) THE LIST'S QUERY STATED, INSIDE AN ABORTABLE SEQUENCE, AND CHECKED THREE TIMES (the v1 switch's checks, moved here
-	// whole): field by field (Matches - every field the copy's tab uses); by the walk signature the list was searched with
-	// (what the walk itself goes by - the switches included); and in the words the person reads - the list's name, asked
-	// of the UI half, which named it after its query when the search was made. Any check that fails refuses - aborted, so
-	// InDesign rolls every tab's settings back (the spike, 10-14) - and the standing error is asked before the sequence
-	// ends, as the abort's own error is cleared before any command after it.
+	// (4) THE LIST'S QUERY STATED, INSIDE AN ABORTABLE SEQUENCE, AND CHECKED THREE TIMES: field by field (Matches -
+	// every field the copy's tab uses); by the walk signature the list was searched with (what the walk itself goes
+	// by - the switches included); and in the words the person reads - the list's name, asked of the UI half, which
+	// named it after its query when the search was made. Any check that fails refuses - aborted, so InDesign rolls
+	// every tab's settings back (measured - the tier switch's spike, qcopy-abort: KFCQueryCopy.h) - and the standing
+	// error is asked before the sequence ends, as the abort's own error is cleared before any command after it.
 	PMString what;
 	what.SetTranslatable(kFalse);
 	IAbortableCmdSeq* seq = CmdUtils::BeginAbortableCmdSeq("KFC tier query");

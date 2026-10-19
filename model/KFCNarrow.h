@@ -4,12 +4,13 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  A TIER'S NARROW DOWN - THE CONDITIONS (docs/superpowers/specs/2026-10-18-kfc-narrow-down-design.md N3, N5 - the author,
-//  2026-10-18): what a narrowed list's walks ask of each match or item before they list it, so the list's limit counts the
-//  rows that pass (the author's call: "the latter" - the tier searched again, the rest dropped on the way). The steps are
-//  the list's (KFCResultModel::ListHeader::narrow); the search engines hand each row they build to a Filter made of them.
-//  And the fact a text row carries for them that only they ask, read as the row is built: where its match's text stands (a
-//  table cell, a footnote, an endnote). (Its frame out on the pasteboard is read with its page - KFCSearchEngine's FrameFacts.)
+//  A TIER'S NARROW DOWN - THE CONDITIONS (docs/superpowers/specs/2026-10-18-kfc-narrow-down-design.md N3, N5): what a
+//  narrowed list's walks ask of each match or item before they list it, so the list's limit counts the rows that pass
+//  (the author's call: "the latter" - the tier searched again, the rest dropped on the way). The steps are the list's
+//  (KFCResultModel::ListHeader::narrow); the search engines hand each row they build to a Filter made of them. And the
+//  fact a text row carries for them that only they ask, read as the row is built: where its match's text stands (a
+//  table cell, a footnote, an endnote). (Its frame out on the pasteboard is read with its page - KFCSearchEngine's
+//  FrameFacts.)
 //
 //========================================================================================
 
@@ -89,7 +90,7 @@ namespace KFCNarrow
 		/** Step k's layer in document db - its layer of the step's name, looked up once a document; kInvalidUID when it has none
 		    (its rows are not kept, and its name is noted - NoLayerDocs). */
 		UID LayerOf(size_t k, IDataBase* db) const;
-		// THE CACHES ARE KEYED BY A DOCUMENT'S IDENTITY, NOT ITS IDataBase* (2026-10-18): a book's run opens its chapters one at
+		// THE CACHES ARE KEYED BY A DOCUMENT'S IDENTITY, NOT ITS IDataBase*: a book's run opens its chapters one at
 		//  a time and closes each before the next with kProcess (KFCBookScope::HandBackHeldDocNow), so a chapter opened after
 		//  another was closed can be given the closed one's address - and chapters made alike share page and frame UIDs (three
 		//  of them measured: page 243, frame 272 in each). Identity is the document's file (memory uidref-reuse-after-close);

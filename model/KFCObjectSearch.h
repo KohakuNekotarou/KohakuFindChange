@@ -11,12 +11,13 @@
 //  document first (spec O2 - measured in KT: a windowless chapter is searched that way, nothing primed).
 //  What it finds is read off the shared walker (GetCurrentItem): the service's own OUT argument stays empty (O5).
 //
-//  WHAT THE SEARCH COSTS THE USER, AND WHAT IS GIVEN BACK. The service SELECTS what it finds - in the front document even
-//  when it searched a windowless one, where it selects the item of the same number (measured). So a listing takes the
-//  text walker's selection snapshot first and gives it back at the end (O6) - NEVER around a replace: given back after
-//  ReplaceObject, the snapshot brought InDesign down (KT). And the shared walker is aimed at the front document
-//  again when a run of ours is over (O7): it would go on naming a chapter the run has closed, for Edit > Find/Change's
-//  next search.
+//  WHAT THE SEARCH COSTS THE USER, AND WHAT IS GIVEN BACK. The service SELECTS what it finds - in the front document
+//  even when it searched a windowless one, where it selects the item of the same number (measured). So a listing takes
+//  the text walker's selection snapshot first and gives it back at the end (O6) - the selections in the windows behind
+//  the front view, and an empty selection, too (WalkAftercare, in the .cpp) - NEVER around a replace: given back after
+//  ReplaceObject, the snapshot brought InDesign down (KT). And the shared walker is aimed at the front document again
+//  when a run of ours is over (O7): it would go on naming a chapter the run has closed, for Edit > Find/Change's next
+//  search.
 //
 //========================================================================================
 
@@ -85,7 +86,7 @@ namespace KFCObjectSearch
 
 	/** AN OBJECT ROW FOR AN ITEM (its text, its place, its fingerprint): the row the object search lists for each item
 	    it finds, and what Frames of These Matches makes of the frame holding a match (KFCSearchEngine's walk - the
-	    narrow-down spec's N5). */
+	    frame KFCNarrow::FrameOwner names). */
 	void BuildRow(const UIDRef& docRef, UID item, KFCResultModel::Hit& out);
 
 	/** An item's FINGERPRINT (O12): its own persistent data as the database writes it (IPMPersist::SaveAll into memory),

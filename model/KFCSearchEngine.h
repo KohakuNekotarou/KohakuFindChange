@@ -4,19 +4,18 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  The search engine: walks the user's CURRENT Find/Change query across the scope the Book Scope
-//  toggle selects - every chapter of the TARGET book when it is ON (the book the Book panel is
-//  showing, or the active book when no panel can be reached: KFCBookScope::ResolveTargetBook), what
-//  Edit > Find/Change's Search: names when it is OFF, never a silent fallback between
-//  them - and collects the matches into KFCResultModel, grouped by chapter. Unlike KESCL - which
-//  supplied its own literal text and pinned the mode to plain text - the walk takes the query as the
-//  user set it on the Find/Change panel, MODE INCLUDED (Text or GREP). What KFC writes to the panel
-//  is a value restated at what it already is (CommitSearchMode, CommitReplaceSide), the direction
-//  turned forward and back (KFCForwardSearchScope - and backward for the Replace's write of a GREP query
-//  holding ^, KFCBackwardSearchScope), or what a feature asks for: a query of its own
-//  (SetQuery - the Application Bar's field; KFCSavedQueries::LoadIntoFindChange - the query run) or
-//  Search: put back after a click (RestoreSearchScope). The walk is read-only (a
-//  SaveRestoreModifiedState dirty guard per document).
+//  The search engine: walks the user's CURRENT Find/Change query across the scope the Book Scope toggle selects - every
+//  chapter of the TARGET book when it is ON (the book the Book panel is showing, or the active book when no panel can
+//  be reached: KFCBookScope::ResolveTargetBook), what Edit > Find/Change's Search: names when it is OFF, never a silent
+//  fallback between them - and collects the matches into KFCResultModel, grouped by chapter; and walks a list again
+//  with its own query (Search ... Again, Narrow Down). Unlike KESCL - which supplied its own literal text and pinned
+//  the mode to plain text - the walk takes the query as the user set it on the Find/Change panel, MODE INCLUDED (Text
+//  or GREP). What KFC writes to the panel is a value restated at what it already is (CommitSearchMode,
+//  CommitReplaceSide), the direction turned forward and back (KFCForwardSearchScope - and backward for the Replace's
+//  write of a GREP query holding ^, KFCBackwardSearchScope), or what a feature asks for: a query of its own (SetQuery -
+//  the Application Bar's field; KFCSavedQueries::LoadIntoFindChange - the query run), a list's own query, stated for an
+//  operation on its rows and put back after it (KFCQueryScope - KFCQueryCopy), or Search: put back after a click
+//  (RestoreSearchScope). The walk is read-only (a SaveRestoreModifiedState dirty guard per document).
 //
 //  Each collected hit carries the line's text pre-split into the three segments the colour cell
 //  paints (before / matched / after) and the jump anchors (story UID + text range).
@@ -127,12 +126,13 @@ namespace KFCSearchEngine
 		CollectTally() : total(0), chaptersWithHits(0), truncated(false), cancelled(false) {}
 	};
 
-	/** ONE TARGET'S ROWS INTO THE MODEL AS A CHAPTER, AND INTO THE TALLY - the one way both tabs' walks file a target
-	    (CollectTargets in the .cpp, and KFCObjectSearch::CollectTargets): the rows put in page order, each with its
-	    "P<page>(<n>)" locator (KFCResultModel::OrderHitsByPage), handed to the model as the target's chapter
-	    (KFCResultModel::AppendChapter), and counted. The rows - and the stories' versions and searched parts, where
-	    given - are TAKEN, not copied. For a target that holds at least one row. searchedStory: a Search: Story search's
-	    story (KFCResultModel::Chapter::searchedStory). */
+	/** ONE TARGET'S ROWS INTO THE MODEL AS A CHAPTER, AND INTO THE TALLY - the one way a walk's rows are filed (both
+	    tabs' walks - CollectTargets in the .cpp and KFCObjectSearch::CollectTargets - and a Narrow Down's over part of
+	    a document, SearchPartsAgain): the rows put in page order, each with its "P<page>(<n>)" locator
+	    (KFCResultModel::OrderHitsByPage), handed to the model as the target's chapter (KFCResultModel::AppendChapter),
+	    and counted. The rows - and the stories' versions and searched parts, where given - are TAKEN, not copied. For a
+	    target that holds at least one row. searchedStory: a Search: Story search's story
+	    (KFCResultModel::Chapter::searchedStory). */
 	void FileChapter(const KFCBookScope::ChapterDoc& target, std::vector<KFCResultModel::Hit>& hits, CollectTally& tally,
 		std::map<UID, uint32>* storyVersions = nil, std::map<UID, KFCResultModel::SearchedRange>* searchedRanges = nil,
 		UID searchedStory = kInvalidUID);
@@ -250,13 +250,12 @@ namespace KFCSearchEngine
 	    so this header needs no text includes. */
 	int32 CurrentSearchMode();
 
-	/** THE Search: OF THAT TAB (KFC follows it - the author's call). Edit >
-	    Find/Change's Search: - Document / All Documents / Story / To End of Story / Selection - as an
-	    IWalkerScopeFactoryUtils::WalkScopeType value (IFindChangeOptions::GetFindChangeScope of the current
-	    tab); -1 when the settings cannot be read. Each tab keeps a Search: of its own.
-	    kEmptyScope is answered as kDocumentScope: it is what a session reads before anything has set
-	    Search: (measured, straight after a launch), and a user who never opened the dialog has asked
-	    for nothing but the document. */
+	/** THE Search: OF THAT TAB (KFC follows it - the author's call). Edit > Find/Change's Search: - Document /
+	    All Documents / Story / To End of Story / Selection - as an IWalkerScopeFactoryUtils::WalkScopeType value
+	    (IFindChangeOptions::GetFindChangeScope of the current tab); -1 when the settings cannot be read. Each tab keeps
+	    a Search: of its own. kEmptyScope is answered as kDocumentScope: it is what a session reads before anything has
+	    set Search: (measured, straight after a launch), and a user who never opened the dialog has asked for nothing
+	    but the document. */
 	int32 CurrentSearchScope();
 
 	/** Put Search: of tab 'mode' back to 'scope' (a WalkScopeType value, as CurrentSearchScope gives it) - the
@@ -284,11 +283,11 @@ namespace KFCSearchEngine
 	    line say it: "Document", "All Documents", "Story", "To End of Story", "Selection"; empty otherwise. */
 	const char* SearchScopeName(int32 scope);
 
-	/** The Find command's name for the scope it would search NOW: "Find in Book" while Book
-	    Scope is on - "Find in Selected Documents" when the run would take only the Book panel's selected documents
-	    (Find/Change Selected Documents (Book) - KFCBookScope::DescribeTargetBook); with it off, Search:'s -
-	    "Find in Document", "Find in All Documents", "Find in Story",
-	    "Find to End of Story", "Find in Selection" ("Find in Document" for a Search: this panel refuses). */
+	/** The Find command's name for the scope it would search NOW: "Find in Book" while Book Scope is on - "Find in
+	    Selected Documents" when the run would take only the Book panel's selected documents (Find/Change Selected
+	    Documents (Book) - KFCBookScope::DescribeTargetBook); with it off, Search:'s - "Find in Document", "Find in
+	    All Documents", "Find in Story", "Find to End of Story", "Find in Selection" ("Find in Document" for a Search:
+	    this panel refuses). */
 	const char* FindCommandName(bool bookScopeOn);
 
 	/** Can Find in ... run on this tab? No on Colour alone (the Object tab lists page items - KFCObjectSearch). Asked by
@@ -348,11 +347,12 @@ namespace KFCSearchEngine
 	            walk signature follows). */
 	bool FindFormatHasChanged();
 
-	/** Keep THIS LIST's Find Format as the one the rows were searched with - read off its query copy (KFCQueryCopy:
-	    the list and its database), not off Find/Change. For the tier switch (KFCTierStore::SwitchTo), which leaves
-	    Find/Change alone (v2 R1): a kept list made the live one takes the format it was searched with back with it, so the
-	    replace's door (FindFormatHasChanged) compares against that list's, not the one before. nil, an invalid copy or
-	    one with no list = nothing remembered (the door then cannot tell, and does not refuse - RememberFindFormat's rule). */
+	/** Keep THIS LIST's Find Format as the one the rows were searched with - read off its query copy (KFCQueryCopy: the
+	    list and its database), not off Find/Change. For the tier switch (KFCTierStore::SwitchTo), which leaves
+	    Find/Change alone (docs/superpowers/specs/2026-10-14-kfc-tier-switch-v2-design.md R1): a kept list made the live
+	    one takes the format it was searched with back with it, so the replace's door (FindFormatHasChanged) compares
+	    against that list's, not the one before. nil, an invalid copy or one with no list = nothing remembered (the door
+	    then cannot tell, and does not refuse - RememberFindFormat's rule). */
 	void RememberFindFormatOf(const KFCQueryCopy* copy);
 
 	/** Drop the Find Format the search kept. It goes with EVERY KFCResultModel::Clear(), exactly as
@@ -376,7 +376,7 @@ namespace KFCSearchEngine
 	    rather than keeping the three in step by hand. Worth having no exceptions to even where a
 	    part has nothing to do - the search's own commit point remembers the format again a moment
 	    later. (One place still pairs two of them by hand and keeps the book: a query run's end -
-	    KFCQuerySequence::Run, whose list is left empty, F7.) */
+	    KFCQuerySequence::Run, whose list is left empty - the no-track-change-all spec's F7.) */
 	void DropResults();
 
 	/** The walker scope options EVERY KFC walk uses: the five switches read straight off the
@@ -429,7 +429,7 @@ namespace KFCSearchEngine
 	    will be returned" by GetParcelContaining. That walk - position to parcel to frame - is
 	    already this file's FrameUIDForPosition, which every hit is built through, so asking it here
 	    is what keeps "the row was overset when we found it" and "the jump treats it as overset"
-	    the same statement. Asked by the jump - KFCJump's JumpToHit - through IKFCRuns.
+	    the same statement. Asked by the jump (KFCJump's JumpToHit, through IKFCRuns) and by Create Outlines.
 
 	    @note NOT the same question as ITextParcelList::GetIsOverset, which is about a whole
 	          THREAD (and is the only test that answers for a table cell overflowing on its own).
@@ -514,8 +514,8 @@ namespace KFCSearchEngine
 	    of KFC's own IS followed now, and the rows stand where their text is; the example stands for an
 	    edit that is not followed.)
 
-	    False when the row, its story or its place cannot be read. Asked by the verify walk and
-	    RowStillStands (KFCReplaceEngine); the jump reads a row the same way at each place LocateRow tries
+	    False when the row, its story or its place cannot be read. Asked by the writes' doors (KFCReplaceEngine - the
+	    verify walk, RowStillStands, Create Outlines); the jump reads a row the same way at each place LocateRow tries
 	    (RowReadsAsFoundAt). */
 	bool RowReadsAsFound(int32 chapterIdx, int32 hitIdx, IDataBase* db);
 
@@ -533,40 +533,47 @@ namespace KFCSearchEngine
 	/** What FollowStoryFoci did. */
 	enum FollowResult { kFollowNone, kFollowed, kFollowBroken };
 
-	/** The rows of `story` in that chapter take their text foci's places (docs/superpowers/plans/
-	    2026-10-14-kfc-row-focus-undo.md D5 - the .cpp says how). kFollowed = they did, or stood there already, and the
-	    story is recorded at its version as it stands; kFollowNone = no row of the story here has a focus (the version
-	    rule decides, as before); kFollowBroken = a focus that could not follow (lost), or a row without one among rows
-	    with one - nothing is moved. outMoved = rows were moved or read again (the list is to be repainted). Asked
-	    before a Replace, a preview and a jump (KFCReplaceEngine, LocateRow). */
+	/** The rows of `story` in that chapter take their text foci's places
+	    (docs/superpowers/plans/2026-10-14-kfc-row-focus-undo.md D5 - the .cpp says how). kFollowed = they did, or stood
+	    there already, and the story is recorded at its version as it stands; kFollowNone = no row of the story here has
+	    a focus (the version rule decides, as before); kFollowBroken = a focus that could not follow (lost), or a row
+	    without one among rows with one - nothing is moved. outMoved = rows were moved or read again (the list is to be
+	    repainted). Asked before KFC writes in a text row's story (KFCReplaceEngine - a Replace, Restore from Copy,
+	    Create Outlines - and a preview), before a jump (LocateRow), and before a search again walks (SearchStoryAgain;
+	    FollowChapterFoci for a document or a list). */
 	FollowResult FollowStoryFoci(int32 chapterIdx, IDataBase* db, UID story, bool* outMoved = nil);
 
 	/** FollowStoryFoci for every story of a chapter whose document is open - a list shown again (a tier switched to -
-	    KFCTierStore::SwitchTo), so its rows and story rows show the text as it is now. */
+	    KFCTierStore::SwitchTo), or about to be searched again (Search This Document Again, Search These Results Again),
+	    so its rows and story rows show the text as it is now. */
 	void FollowChapterFoci(int32 chapterIdx);
 
 	/** Search This Story Again (a story row's right-click menu): that story alone walked again with the search's query,
 	    its rows put back as the walk finds them and its version recorded (KFCResultModel::ReplaceStoryRows). False =
-	    refused or failed, the list unchanged; outStatus says what happened either way. */
+	    refused or failed: no row put back - though once the story is reached its rows have followed their foci
+	    (FollowStoryFoci), which the panel repaints either way; outStatus says what happened either way. */
 	bool SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMString& outStatus);
 
-	/** Search This Document Again (a document row's right-click menu - the author's call): that document
-	    walked again whole with the search's query - the walk the search makes of each document, the Object tab's
-	    included - under a bar with Cancel, its rows put back as the walk finds them and its stories' versions recorded
+	/** Search This Document Again (a document row's right-click menu - the author's call): that document walked again
+	    whole with the search's query - the walk the search makes of each document, the Object tab's included - under a
+	    bar with Cancel, its rows put back as the walk finds them and its stories' versions recorded
 	    (KFCResultModel::ReplaceChapterRows). A search over part of a document is refused. False = refused, failed or
-	    cancelled, the list unchanged; outStatus says what happened either way. */
+	    cancelled: no row put back - though once the document is reached its rows have followed their foci
+	    (FollowChapterFoci), which the panel repaints either way; outStatus says what happened either way. */
 	bool SearchDocumentAgain(int32 chapterIdx, PMString& outStatus);
 
-	/** SEARCH THESE RESULTS AGAIN (a tier's heading's right-click menu - the author, 2026-10-14 night): the live list's
-	    own search run once more - SearchBook's body (RunSearch, in the .cpp) - with the list's query (the door states it
-	    when Find/Change holds another one - KFCQueryScope) over what the list searched: its document (Search: Document -
-	    found OPEN, by its binding or by the file it was closed from, never reopened; none recorded - a search that found
-	    nothing - the front document, as Find), the documents open now (All Documents), or its book (open - the Book
-	    panel's selection of it, as Find takes it). Its rows replaced in place: the same result set - the tier keeps its
-	    place, its name and its query - in a new layout. Refused, the list as it was: a run up, a list no search made, a
-	    search over part of a document (Story, To End of Story, Selection - Search This Story Again's), its document or
-	    book not open. Cancelled: the list put back. True = searched again (no match too); outStatus says what happened
-	    either way. */
+	/** SEARCH THESE RESULTS AGAIN (a tier's heading's right-click menu - the author's call): the live list's own search
+	    run once more - SearchBook's body (RunSearch, in the .cpp) - with the list's query (the door states it when
+	    Find/Change holds another one - KFCQueryScope) over what the list searched: its document (Search: Document -
+	    found OPEN, by its binding or by the file it was closed from, never reopened; none recorded - a search that
+	    found nothing - the front document, as Find), the documents open now (All Documents), its book (open - the
+	    Book panel's selection of it, as Find takes it), or the part of a document a Search: Story, To End of Story or
+	    Selection searched - its story, or each story's part found again where it stands, walked as
+	    Search This Story Again walks it (SearchPartsAgain, in the .cpp). Its rows replaced in place: the same result
+	    set - the tier keeps its place, its name and its query - in a new layout. Refused, the list as it was: a run up,
+	    a list no search made, an Object tab's Selection list (the objects selected then are not kept), its document or
+	    book not open, a searched part that cannot be walked on its own or whose edge cannot be told. Cancelled: the
+	    list put back. True = searched again (no match too); outStatus says what happened either way. */
 	bool SearchListAgain(PMString& outStatus);
 
 	/** NARROW DOWN (a tier's heading's right-click menu - docs/superpowers/specs/2026-10-18-kfc-narrow-down-design.md): the live
@@ -640,8 +647,8 @@ namespace KFCSearchEngine
 	    attributes, which is database work, and doing it from a static destructor means doing it
 	    after the application has torn down.
 
-	    Called from KFCStartupShutdown::Shutdown, beside the same call on KFCHitMarker,
-	    KFCBookScope and KFCResultModel. */
+	    Called from KFCStartupShutdown::Shutdown, beside the same call on the module's other holders of static storage
+	    (the list is there). */
 	void ShutdownCleanup();
 }
 

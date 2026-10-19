@@ -71,7 +71,7 @@ void KFCNarrow::ReadTextPlace(const UIDRef& storyRef, TextIndex at, KFCResultMod
 		io.inEndnote = (endnotes->IsEndnoteStory(storyRef) != kFalse);
 	else
 		io.inEndnote = (storyClass == kEndnoteStoryBoss);
-	// (Test builds only) The facts the conditions were read from - the plan's M1 and M2.
+	// (Test builds only) The facts the conditions were read from - the spec's M1 and M2.
 	KFC_DIAG_LOG("NARROWFACT story=%u class=0x%x at=%d dict=%u dictClass=0x%x table=%d foot=%d endnote=%d",
 		storyRef.GetUID().Get(), (unsigned)storyClass.Get(), (int)at, dict.Get(), (unsigned)owner.Get(),
 		io.inTable ? 1 : 0, io.inFootnote ? 1 : 0, io.inEndnote ? 1 : 0);
@@ -92,7 +92,7 @@ ITextDataValidation::RangeError KFCNarrow::ReadPageRange(IDataBase* db, const PM
 	if (error == ITextDataValidation::kNoError)
 		for (int32 i = 0; i < uids.Length(); ++i)
 			outPages.insert(uids[i]);
-	// (Test builds only) What each document answered - the plan's M4.
+	// (Test builds only) What each document answered - the spec's M4.
 	KFC_DIAG_LOG("PAGERANGE db=%p range=%s error=%d pages=%d", (void*)db, pages.GetUTF8String().c_str(), (int)error,
 		(int)outPages.size());
 	return error;
@@ -280,7 +280,7 @@ bool KFCNarrow::Filter::Meets(size_t k, const KFCResultModel::Hit& hit, bool obj
 		// THE PAGE THE ROW NAMES, in the range as the row's document reads it (N5): an overset text row by its "+" page, an
 		// object row by its own; a row on a parent page or the pasteboard is in no such range.
 		case kKFCNarrowPages:			return hit.pageUID != kInvalidUID && PagesOf(k, db).count(hit.pageUID) > 0;
-		// THE LAYER OF THE NAME in the row's document (On Active Layer - Find Objects on Active Layer moved here, 2026-10-18): an
+		// THE LAYER OF THE NAME in the row's document (On Active Layer - Find Objects on Active Layer moved here): an
 		// object row by its item's own layer (a group's member by its group's, an item in text by its anchor frame's - as the
 		// command read it); a text row by its frame's - the frame its page is named after, the "+" frame for an overset match
 		// (Hit::frameLayer), as On Pasteboard and Pages read the place a text row stands.

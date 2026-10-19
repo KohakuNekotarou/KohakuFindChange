@@ -69,12 +69,13 @@ bool GetFramePageString(const UIDRef& docRef, UID frameUID, PMString& outPage, i
 	if (db == nil)
 		return false;
 
-	// THE PAGE THE FRAME STANDS ON, as the object rows ask it (KFCObjectSearch::ReadItemPlace): ILayoutUtils::GetOwnerPageUID -
-	// the page holding most of its area, and the SPREAD's UID when it is on no page. It climbs the hierarchy itself, so the
-	// UID IParcelList::GetParcelFrameUID gives (the item the text is composed into) answers for its frame, and grouped,
-	// inline and anchored frames read their owner page. (Until 2026-10-18 ITextUtils::GetPageUIDRef was asked first: it
-	// counts a page's BLEED as the page, so a frame standing in the bleed off page 1 - the default 3 mm - read "P1" while its
-	// object row, the DOM's parentPage and the Pages panel say pasteboard. The author's call: the text rows say "PB" too.)
+	// THE PAGE THE FRAME STANDS ON, as the object rows ask it (KFCObjectSearch::ReadItemPlace):
+	// ILayoutUtils::GetOwnerPageUID - the page holding most of its area, and the SPREAD's UID when it is on no page. It
+	// climbs the hierarchy itself, so the UID IParcelList::GetParcelFrameUID gives (the item the text is composed into)
+	// answers for its frame, and grouped, inline and anchored frames read their owner page. (NOT
+	// ITextUtils::GetPageUIDRef first: it counts a page's BLEED as the page, so a frame standing in the bleed off page
+	// 1 - the default 3 mm - would read "P1" while its object row, the DOM's parentPage and the Pages panel say
+	// pasteboard. The author's call: the text rows say "PB" too.)
 	//
 	// The spread's UID is deliberate: GetPageString takes a spread UID too and spells it "PB" (IPageList.h:131, "Given a page
 	// UID (or spread UID)"). A match out on the pasteboard should say where it is rather than drop out of the list, so this
@@ -118,9 +119,8 @@ bool GetFramePageString(const UIDRef& docRef, UID frameUID, PMString& outPage, i
 // Find/Change dialog says "Hidden Item".
 //
 // TWO independent switches, and both have to be asked:
-//   * its LAYER is hidden. The layer an item sits on is a SPREAD layer (one per spread); the
-//     visibility switch lives on the DOCUMENT layer it points at, which is the row in the Layers
-//     panel.
+//   * its LAYER is hidden. The layer an item sits on is a SPREAD layer (one per spread); the visibility switch lives on
+//     the DOCUMENT layer it points at, which is the row in the Layers panel.
 //   * the ITEM ITSELF is hidden (Object > Hide), which no layer says anything about.
 //
 // Without the second, a match inside an individually hidden frame comes up with no "hidden" mark at

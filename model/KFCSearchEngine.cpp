@@ -87,10 +87,10 @@
 #include "KFCRunGuard.h"		// is anything ELSE of ours running? (the modal bar pumps events)
 #include "KFCOversetLocator.h"	// the "+" page for an overset hit (locator + sort key)
 #include "KFCReplaceEngine.h"	// QueryUnchangedSinceSearch - a look again runs only under the search's own query
-#include "KFCDiag.h"			// the fault switch queries-run (SearchBook's head)
+#include "KFCDiag.h"			// the fault switch queries-run (RunSearch's head)
 #include "KFCDiagCommands.h"	// the test build's command count (KFC_DIAG_COMMANDS)
 #include "KFCQuerySequence.h"	// RunFromDiagSwitch - the test build's way into the query run
-#include "KFCChangeAll.h"		// CommandName - the limit's note names Change All in Book (No List) (F18)
+#include "KFCChangeAll.h"		// CommandName - the limit's note names Change All in Book (No List)
 #include "KFCObjectSearch.h"	// the Object tab's listing, its Search: and its query
 #include "KFCTextCut.h"			// KFCSafeCut - where a row's line may be cut (the rule the panel's own cuts follow)
 #include "KFCFindChangeCmds.h"	// the find/change settings' commands, one at a time
@@ -101,8 +101,10 @@
 namespace
 {
 
-// (The limit is kKFCCollectHitLimit, in KFCResultModel.h - the number the panel draws (spec F9). Read the contract
-// there; this file uses it in SearchBook.)
+// (THE LIST'S LIMIT OF ROWS is KFCResultModel.h's ListLimit: the text lists' kKFCCollectHitLimit - the rows the panel
+// draws, the no-track-change-all spec's F9, docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md -
+// and the object lists' kKFCCollectObjectLimit. Read the contract there. Every walk here takes its room from it; a list
+// whose header is not written yet, from ListLimitFor.)
 
 // THE SEARCH'S BAR (KFCProgressBar.h - the UI half's), defined below with the direction scopes. The search's alone:
 // a row's Replace has no bar, and Change All in Book and the query run move theirs directly.
@@ -111,7 +113,7 @@ namespace
 // a repaint can be swallowed; force = true where the bar must land exactly, such as a chapter boundary.
 // NOTE: this does NOT make the run cancellable, and neither does any other way of moving the bar (measured both
 // ways). WasCancelled has to be ASKED, and asking it only inside the chapter loop misses a cancel pressed during
-// the last chapter - see the ask-once-more test that follows the loop in SearchBook.
+// the last chapter - see the ask-once-more test that follows the chapter loop in CollectTargets.
 void KFCAdvanceProgress(KFCProgressBar* bar, int32& ioReported, int32 target, bool force = false);
 
 // The smallest advance worth reporting to the progress bar. Moving the bar keeps Cancel answering (which
@@ -120,18 +122,17 @@ void KFCAdvanceProgress(KFCProgressBar* bar, int32& ioReported, int32 target, bo
 // still answers promptly.
 const int32 kKFCProgressReportStep = 8;
 
-// How much of the progress bar one CHAPTER gets. Every chapter gets the same slice, because the
-// run does not know how big a chapter is before it opens it: chapters are opened one at a time
-// and closed again straight after, so there is no all-chapters-open moment in which to add up
-// their story counts.
+// How much of the progress bar one target gets ON AVERAGE: a run's bar is targets x this, dealt out among them by their
+// sizes (KFCBookScope::ProgressBases - a book's chapter by the size its book records, an open document by its pages:
+// docs/superpowers/specs/2026-10-18-kfc-copy-results-progress-share-design.md) - not by their stories: chapters are
+// opened one at a time and closed again straight after, and a chapter's stories cannot be counted before it is opened.
 //
-// Within a chapter the slice is still divided by STORIES - the search cannot know how many MATCHES
-// a chapter holds until it has found them all, but a document that IS open can be asked for its
-// story count for free, and each story is then subdivided by how far into its text the walk has
-// got (CollectHitsInDoc does the moving; see CountSearchableStories).
+// Within a target its share is divided by STORIES - the search cannot know how many MATCHES a document holds until it
+// has found them all, but a document that IS open can be asked for its story count for free, and each story is then
+// subdivided by how far into its text the walk has got (CollectHitsInDoc does the moving; see CountSearchableStories).
 //
-// Large enough that a chapter with many stories still gets whole steps per story (a 500-story
-// chapter gets 20 apiece); small enough that a 100-chapter book stays far inside int32.
+// Large enough that a target with many stories still gets whole steps per story (a 500-story chapter of the average
+// share gets 20 apiece); small enough that a 100-chapter book stays far inside int32.
 const int32 kKFCChapterProgressSpan = 10000;
 
 /** How many stories a walk of this document will visit. Counting them is free: IStoryList keeps the
@@ -226,12 +227,12 @@ bool gSearching = false;
 // attribute list, taken when the search ran and compared before a row's Replace re-walks. See
 // RememberFindFormat for why the list is COPIED rather than described.
 //
-// WHY IT LIVES HERE AND NOT ON KFCResultModel, beside the walk signature it belongs with: that
-// header states its own rule - the search mode is "held as a plain int so this header needs no text
-// includes" - and an AttributeBossList member would drag the text headers into every file that
-// includes the model. The lifetime is kept in step instead by KFCSearchEngine::DropResults, which
-// every place that throws the results away calls (KFCBookWatch.cpp, which hands its book back first
-// on its own, pairs the model's Clear() with ForgetSearchedFindFormat itself).
+// WHY IT LIVES HERE AND NOT ON KFCResultModel, beside the walk signature it belongs with: that header states its own
+// rule - the search mode is "held as a plain int so this header needs no text includes" - and an AttributeBossList
+// member would drag the text headers into every file that includes the model. The lifetime is kept in step instead by
+// KFCSearchEngine::DropResults, which every place that throws the results away calls (the one place that pairs the
+// model's Clear() with ForgetSearchedFindFormat by hand, keeping the book, is a query run's end - the header's
+// DropResults says why).
 boost::shared_ptr<AttributeBossList> gSearchedFindAttrs;
 
 // The attribute database that list's UIDs are in. Kept beside it because a UID means nothing
@@ -244,18 +245,19 @@ boost::shared_ptr<AttributeBossList> gSearchedFindAttrs;
 // seen to fire; it stays for any route that would hand this a document's database.
 IDataBase* gSearchedFindAttrDB = nil;
 
-// Raise gSearching for the length of a search, whichever way SearchBook returns.
+// Raise gSearching for the length of a search - RunSearch's, and a search again's - whichever way it returns.
 struct SearchingFlagGuard
 {
 	SearchingFlagGuard()	{ gSearching = true; }
 	~SearchingFlagGuard()	{ gSearching = false; }
 };
 
-// A NARROWED LIST'S CONDITIONS, FOR THE LENGTH OF A WALK THAT LISTS ITS ROWS (Narrow Down - KFCNarrow.h): the search's
-// (RunSearch), and its searches again (SearchStoryAgain, SearchDocumentAgain, SearchPartsAgain - a narrowed list is
-// searched again with its conditions, the spec's N4). Read by CollectHitsInDoc for a search's rows (kHitEverything) alone -
-// never by a walk that looks a row up again (CollectStoryHits - kHitPlaceAndText), which must meet every match. Set and
-// let go by WalkFilterScope, one walk at a time (the walks are not entered twice - gSearching, KFCRunGuard).
+// A NARROWED LIST'S CONDITIONS, FOR THE LENGTH OF A WALK THAT LISTS ITS ROWS (Narrow Down - KFCNarrow.h,
+// docs/superpowers/specs/2026-10-18-kfc-narrow-down-design.md): the search's (RunSearch), and its searches again
+// (SearchStoryAgain, SearchDocumentAgain, SearchPartsAgain - a narrowed list is searched again with its conditions, the
+// narrow-down spec's N4). Read by CollectHitsInDoc for a search's rows (kHitEverything) alone - never by a walk that
+// looks a row up again (CollectStoryHits - kHitPlaceAndText), which must meet every match. Set and let go by
+// WalkFilterScope, one walk at a time (the walks are not entered twice - gSearching, KFCRunGuard).
 const KFCNarrow::Filter* gWalkFilter = nil;
 
 struct WalkFilterScope
@@ -820,7 +822,7 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 	// that follows from the frame comes out of the cache.
 	const UID matchFrameUID = FrameUIDForPosition(storyRef, start);
 	const FrameFacts* facts = &LookUpFrame(docRef, storyRef, matchFrameUID, cache.frames);
-	outHit.matchFrame = matchFrameUID;		// (Frames of These Matches climbs from it - CollectHitsInDoc)
+	outHit.matchFrame = matchFrameUID;		// (the frame Frames of These Matches starts from - KFCNarrow::FrameOwner)
 
 	// No page for the match itself (it is overset - composed but placed nowhere - or its frame sits
 	// on no page). Name the page of the "+" overset indicator instead (the last placed parcel's
@@ -866,8 +868,8 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
-// THE PART OF A STORY A SEARCH OVER PART OF A STORY WALKS (Search: To End of Story / Selection) - kept for Search This
-// Story Again (the author's idea: "keep where the search started with a text focus").
+// THE PART OF A STORY A SEARCH OVER PART OF A STORY WALKS (Search: To End of Story / Selection) - kept for
+// Search This Story Again (the author's idea: "keep where the search started with a text focus").
 //
 // MEASURED FIRST (a test build's walks - docs/ai-notes/kfc-story-search-again-part-2026-10-09.md): the scope
 // InDesign builds for these holds the part as STRETCHES OF TEXT, IN THE ORDER ITS WALKER TAKES THEM - one for plain text
@@ -1157,14 +1159,15 @@ struct WalkBar
 		: bar(&onBar), base(sliceBase), span(sliceSpan), stories(CountSearchableStories(docRef)), reported(&ioReported) {}
 };
 
-// THE SHARED WALKER IS NOT LEFT HOLDING A CALLER'S SCOPE (CollectHitsInDoc's givenScope). A searched part's scope - Search
-// This Story Again over a Selection, QueryPartScope - stands on a text focus of KFC's own, which the caller removes the
-// moment the walk returns (TempFocus); the session's shared walker (AcquireWalker) outlives that, and nothing says Halt
-// lets go of the scope it was given (ITextWalker.h: QueryScope answers the scope a walker holds; Halt only "halts the
-// walking"). Not known to matter - InDesign's own Selection walks leave a scope over focuses the selection may drop - but
-// until it is measured (a test build's WALKSCOPE line), the walker is handed the part's story as the walk ends, by any
-// exit past Initialize, and stopped: the scope every story walk of KFC's leaves it with, taken while the focus still
-// stands. (A walker of KFC's own - the fault switch own-walker - goes with the walk: the question does not arise for it.)
+// THE SHARED WALKER IS NOT LEFT HOLDING A CALLER'S SCOPE (CollectHitsInDoc's givenScope). A searched part's scope -
+// Search This Story Again over a Selection, QueryPartScope - stands on a text focus of KFC's own, which the caller
+// removes the moment the walk returns (TempFocus); the session's shared walker (AcquireWalker) outlives that, and
+// nothing says Halt lets go of the scope it was given (ITextWalker.h: QueryScope answers the scope a walker holds; Halt
+// only "halts the walking"). Not known to matter - InDesign's own Selection walks leave a scope over focuses the
+// selection may drop - but until it is measured (a test build's WALKSCOPE line), the walker is handed the part's story
+// as the walk ends, by any exit past Initialize, and stopped: the scope every story walk of KFC's leaves it with, taken
+// while the focus still stands. (A walker of KFC's own - the fault switch own-walker - goes with the walk: the question
+// does not arise for it.)
 class SharedWalkerLetsGoOfGivenScope
 {
 public:
@@ -1199,10 +1202,10 @@ private:
 // chapter can be closed afterwards without wanting a save. NOTHING is set on opts - the walk uses
 // the user's Find/Change settings verbatim, so the search mode (Text or GREP) is followed.
 //
-// scopeOptions: the five switches every chapter of this run is walked with, read once by the caller
-// (see SearchBook). They are the same for every chapter by definition - the replace pass re-walks
-// with exactly these, or it meets other matches than the hits list - so reading them here would have
-// been the Find/Change settings asked once per chapter for one answer.
+// scopeOptions: the five switches every chapter of this run is walked with, read once by the caller (CollectTargets,
+// and each search again). They are the same for every chapter by definition - the replace pass re-walks with exactly
+// these, or it meets other matches than the hits list - so reading them here would have been the Find/Change settings
+// asked once per chapter for one answer.
 //
 // bar: where this walk moves the run's bar (WalkBar - none by default). The walk moves it as it goes: a story at a
 // time, each one subdivided by how far into its text the current match sits.
@@ -1221,17 +1224,17 @@ private:
 // five switches as spellpanel passes its options), so the range is the dialog's by construction rather than
 // KFC's reading of it. docRef is not used then: the hits are filed by the document each one's story is in
 // (outHitDBs, one per hit), and every open document gets the dirty guard. ! Such a walk STARTS at the
-// selection and loops back (IWalkerScopeFactoryUtils.h:169-171), so SearchBook asks it only where the
+// selection and loops back (IWalkerScopeFactoryUtils.h:169-171), so CollectTargets asks it only where the
 // selection decides the range - To End of Story, Selection, and which story a Story search is in - and walks
 // the rest from the top (a Document or All Documents search walked by such a scope would list its rows in
 // the caret's order).
 // kEmptyScope (the default) = docRef / onlyStory: a document, a book's chapter, or one story - from the top.
 // outHitDBs is filled on either path.
 //
-// outPieces (a Search: walk only): the stretches InDesign's scope holds (ListScopePieces) - what a search over part of a
-// story records (MakeSearchedRange). givenScope: walk this scope instead (a story's searched part, Search This Story
-// Again - QueryPartScope), docRef being the document it is in and onlyStory its story - which the shared walker is left
-// with in its place (SharedWalkerLetsGoOfGivenScope).
+// outPieces (a Search: walk only): the stretches InDesign's scope holds (ListScopePieces) - what a search over part of
+// a story records (MakeSearchedRange). givenScope: walk this scope instead (a story's searched part,
+// Search This Story Again - QueryPartScope), docRef being the document it is in and onlyStory its story - which the
+// shared walker is left with in its place (SharedWalkerLetsGoOfGivenScope).
 void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOptions& scopeOptions,
 	HitDetail detail, std::vector<KFCResultModel::Hit>& outHits,
 	bool& outCapped, ChapterWalkResult& outResult,
@@ -1445,10 +1448,10 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 
 	// A NARROWED LIST'S WALK (Narrow Down - gWalkFilter: its conditions asked of each row built, below), and whether
 	// its rows are the frames holding the matches (Frames of These Matches). Its ceiling is asked of a row the
-	// conditions let through (below): a match they drop takes no room, and says nothing of more rows (the spec's N3 -
-	// the order the object walk keeps, KFCObjectSearch's WalkDoc). (Fault switch narrow-ceiling-first, a test build's
-	// only - KFCDiag.h: asked of every match before its row is built, and before a new frame's row is made, the old
-	// way.)
+	// conditions let through (below): a match they drop takes no room, and says nothing of more rows (the narrow-down
+	// spec's N3 - the order the object walk keeps, KFCObjectSearch's WalkDoc). (Fault switch narrow-ceiling-first, a
+	// test build's only - KFCDiag.h: asked of every match before its row is built, and before a new frame's row is
+	// made, the old way.)
 	const bool narrowed = (gWalkFilter != nil && detail == kHitEverything);
 	const bool makesFrames = (narrowed && gWalkFilter->MakesFrames());
 	const bool ceilingFirst = !narrowed || KFC_DIAG_FAULT("narrow-ceiling-first");
@@ -1530,13 +1533,13 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 		{
 			if (story != progressStory)
 			{
-				// CANCEL IS ASKED HERE, WHEN THE WALK MOVES ON TO ANOTHER STORY (the author's call: the middle
-				// option - see the note on the critical section above): a Cancel pressed in a large document is
-				// heard when the story being walked is done, not once the whole document - or, for an All
-				// Documents walk, every open document - has been walked and the hits are thrown away. ! The walk
-				// comes back to KFC only with a MATCH, so "another story" means the next story that holds one.
-				// Whether WasCancelled itself lets events in is not measured (KFCAdvanceProgress); the "safety
-				// first" call is in the note on the critical section above. kFalse = no global error state.
+				// CANCEL IS ASKED HERE, WHEN THE WALK MOVES ON TO ANOTHER STORY (the author's call: the middle option -
+				// see the note on the critical section above): a Cancel pressed in a large document is heard when the
+				// story being walked is done, not once the whole document - or, for an All Documents walk, every open
+				// document - has been walked and the hits are thrown away. ! The walk comes back to KFC only with a
+				// MATCH, so "another story" means the next story that holds one. Whether WasCancelled itself lets
+				// events in is not measured (KFCAdvanceProgress); the "safety first" call is in the note on the
+				// critical section above. kFalse = no global error state.
 				if (progressStory.GetDataBase() != nil && bar.bar->WasCancelled(kFalse))
 				{
 					outResult = kChapterCancelled;
@@ -1599,8 +1602,8 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 		KFC_SPENT(tSearchBuild, cSearchBuild);
 		// A NARROWED LIST'S CONDITIONS (Narrow Down - gWalkFilter): a row that does not meet them goes again at once,
 		// and the ceiling is asked of a row that does (the end of this block) - the list's limit counts the rows that
-		// pass (the spec's N3, the author's call). Where the match's text stands is read for the conditions that ask it
-		// alone (ReadTextPlace); its frame out on the pasteboard came with its page (BuildHit).
+		// pass (the narrow-down spec's N3, the author's call). Where the match's text stands is read for the conditions
+		// that ask it alone (ReadTextPlace); its frame out on the pasteboard came with its page (BuildHit).
 		if (narrowed)
 		{
 			if (gWalkFilter->NeedsTextPlace())
@@ -1612,10 +1615,10 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 				outHits.pop_back();
 				continue;
 			}
-			// FRAMES OF THESE MATCHES (N5): the match makes no row - the frame the person selects holding it does, once (one row
-			// a frame, whatever its matches), an object row as the object search makes one (KFCObjectSearch::BuildRow), asked
-			// the conditions after the Frames step (KeepObject). A match with no frame placed (overset text) is counted for the
-			// status line.
+			// FRAMES OF THESE MATCHES (the narrow-down spec's N5): the match makes no row - the frame the person
+			// selects holding it does, once (one row a frame, whatever its matches), an object row as the object search
+			// makes one (KFCObjectSearch::BuildRow), asked the conditions after the Frames step (KeepObject). A match
+			// with no frame placed (overset text) is counted for the status line.
 			if (makesFrames)
 			{
 				const UID frame = hit.isOverset ? kInvalidUID : KFCNarrow::FrameOwner(storyDB, hit.matchFrame);
@@ -1677,11 +1680,12 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 }
 
 // HOW MANY MATCHES ONE STORY'S LOOK AGAIN LISTS AT MOST (CollectStoryHits) - a number of its own, not the list's
-// (kKFCCollectHitLimit, the rows the panel draws - spec F9). The row looked for can stand past its story's 300th match once
-// matches were added in front of it by an edit KFC did not follow, and a walk cut at 300 then lists every candidate but the
-// row's own: the row is called missing - or moved onto a look-alike (OneFreePlace), which a Replace then writes once an Undo
-// has brought the story's version back. 10000 is the ceiling this walk was written with, before the list's limit came down
-// to 300 and took that constant with it. Reaching it is "cannot tell", never a list.
+// (kKFCCollectHitLimit, the rows the panel draws - the no-track-change-all spec's F9). The row looked for can stand
+// past its story's 300th match once matches were added in front of it by an edit KFC did not follow, and a walk cut at
+// 300 then lists every candidate but the row's own: the row is called missing - or moved onto a look-alike
+// (OneFreePlace), which a Replace then writes once an Undo has brought the story's version back. 10000 is the ceiling
+// this walk was written with, before the list's limit came down to 300 and took that constant with it. Reaching it is
+// "cannot tell", never a list.
 const size_t kKFCLookAgainMatchCeiling = 10000;
 
 // Every match of the current query in one story of an open document, as the search's walk meets them
@@ -1775,7 +1779,7 @@ void KFCAdvanceProgress(KFCProgressBar* bar, int32& ioReported, int32 target, bo
 	//
 	// It WAS measured against DoTask, when a run had become impossible to cancel: it was not the
 	// culprit - the cancel works exactly the same through SetPosition. The fault was that nothing asked
-	// WasCancelled after the LAST chapter (see the ask-once-more test in SearchBook).
+	// WasCancelled after the LAST chapter (see the ask-once-more test at the end of CollectTargets).
 	//
 	// Both forms are in the SDK, chosen by what the caller is counting: linksui advances a
 	// TaskProgressBar with DoTask because it processes a list of files, while textexportfilter drives
@@ -1936,9 +1940,10 @@ bool KFCSearchEngine::CommitReplaceSide()
 // searches - identical but for one attribute's value - that this was checked with.
 //
 // KEEP A COPY OF THE FIND FORMAT this search ran with - the attribute list behind the dialog's format pane, and on the
-// Glyph tab the query's own font - so the replace can ask whether it is still the same one (FindFormatHasChanged).
-// SearchBook's alone, once per search, beside BuildWalkSignature; a search that cannot read the settings simply
-// remembers nothing, and FindFormatHasChanged then says "cannot tell".
+// Glyph tab the query's own font - so the replace can ask whether it is still the same one (FindFormatHasChanged). A
+// new list's header's alone (WriteListHeader - the search's, and a Narrow Down's over part of a document), once per
+// list, beside BuildWalkSignature; a search that cannot read the settings simply remembers nothing, and
+// FindFormatHasChanged then says "cannot tell".
 namespace
 {
 void RememberFindFormat()
@@ -2342,9 +2347,9 @@ bool MatchIsSameOccurrence(const UIDRef& storyRef, TextIndex start, TextIndex en
 }
 }	// anonymous namespace
 
-// THE ROW READ AT A PLACE (spec T1): the test a row's stored place has always had to pass, at any place of the row's
-// own story - the whole match by its hash (MatchIsSameOccurrence), and the line around it read the way the search
-// read it (ReadHitText). The jump asks it of the stored place and of the row's text focus (LocateRow).
+// THE ROW READ AT A PLACE (the text-focus-jump spec's T1): the test a row's stored place has always had to pass, at any
+// place of the row's own story - the whole match by its hash (MatchIsSameOccurrence), and the line around it read the
+// way the search read it (ReadHitText). The jump asks it of the stored place and of the row's text focus (LocateRow).
 static bool RowReadsAsFoundAt(int32 chapterIdx, int32 hitIdx, IDataBase* db, UID story, TextIndex start, TextIndex end)
 {
 	UID rowStory = kInvalidUID;
@@ -2559,11 +2564,10 @@ int32 CarryKeptRowsByDocument(const KFCResultModel::ModelSnapshot& before,
 }
 
 // EVERY STORY'S VERSION, WHILE ITS DOCUMENT IS STILL OPEN.
-// ITextModel::GetChangeCount of each story holding a hit (ReadStoryVersion) - what the replace compares
-// before it writes, so a story moved since without KFC (typing, Ctrl+Z of anything but a write of KFC's
-// own - which the panel follows, KFCUndoFollow) is not written to. A book's chapter has
-// it read in front of the release that closes a chapter this search opened (CollectTargets, and Search This
-// Document Again - KFCSearchEngine::SearchDocumentAgain).
+// ITextModel::GetChangeCount of each story holding a hit (ReadStoryVersion) - what the replace compares before it
+// writes, so a story moved since without KFC (typing, Ctrl+Z of anything but a write of KFC's own - which the panel
+// follows, KFCUndoFollow) is not written to. A book's chapter has it read in front of the release that closes a chapter
+// this search opened (CollectTargets, and Search This Document Again - KFCSearchEngine::SearchDocumentAgain).
 void ReadStoryVersions(const UIDRef& docRef, const std::vector<KFCResultModel::Hit>& hits,
 	std::map<UID, uint32>& outVersions)
 {
@@ -2588,14 +2592,14 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 	out = KFCSearchEngine::CollectTally();
 
 	// THE FIVE SCOPE SWITCHES, read ONCE for the whole run. They come off the same dialog as the query the
-	// caller stated (SearchBook), they are the same for every chapter by definition (the replace pass has to
+	// caller stated (RunSearch), they are the same for every chapter by definition (the replace pass has to
 	// re-walk with exactly these), and nothing can change them while the run is on: the progress bar
 	// below is modal - so not inside CollectHitsInDoc, once per chapter, for an answer that cannot differ.
 	WalkerScopeOptions scopeOptions;
 	KFCSearchEngine::GetKFCWalkerScopeOptions(scopeOptions);
 
 	// Walk every target; only chapters that hold a hit go into the model (no empty branches). The
-	// caller cleared the model at its commit point (SearchBook - DropResults); each chapter is APPENDED as it
+	// caller cleared the model at its commit point (RunSearch - DropResults); each chapter is APPENDED as it
 	// finishes, and the caller draws the tree once the search returns (KFCSearchEngine::FileChapter).
 	// The progress bar, shown for EVERY scope (the user's request) - not for a book only: a one-document
 	// search is a single CHAPTER with nothing to cancel between, but the bar is sized in stories, and a
@@ -2605,11 +2609,10 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 	// That covers the windowless chapter opens as well: chapters are opened inside the loop below, not
 	// before this bar exists.
 	//
-	// EQUAL SLICES PER CHAPTER, subdivided by stories inside each one. The slices have to be equal
-	// because a chapter's size cannot be asked for before it is opened, and chapters are opened one
-	// at a time. Within a chapter the story count comes from IStoryList and costs nothing, and
-	// each story is subdivided by how far into its text the walk has got (CollectHitsInDoc does the
-	// moving) - which is what keeps the bar alive through a chapter of a hundred stories.
+	// SHARES BY THE TARGETS' SIZES (shares, below), subdivided by stories inside each one: a chapter's stories cannot
+	// be counted before it is opened, and chapters are opened one at a time. Within a target the story count comes from
+	// IStoryList and costs nothing, and each story is subdivided by how far into its text the walk has got
+	// (CollectHitsInDoc does the moving) - which is what keeps the bar alive through a chapter of a hundred stories.
 	//
 	// Why not simply ask the walker how far it is: ITextWalkerProgressMonitor is only a place to PARK
 	// a bar - the CLIENT's own OnNextPosition is what has to call SetPosition on it, and the stock
@@ -2640,12 +2643,12 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 	int32 progressBase = 0;
 	int32 progressReported = 0;
 
-	// WHAT A WALK THAT DID NOT END CLEANLY OWES THE SUMMARY, named for what was walked - in both loops below, the Book
-	// Scope OFF walks' and a book's chapters' (the tally's lists, KFCSearchEngine.h). One that broke off keeps its hits:
-	// they are real and are filed like any other, and what the summary owes is the other half - the rest was never
-	// looked at. One that never ran is named with its reason, since a skipped document is otherwise indistinguishable
-	// from one with no matches; the colon goes with the reason, so an ending with none of its own (ChapterWalkResultText)
-	// leaves the name standing alone. A cancelled walk says nothing: the run is thrown away.
+	// WHAT A WALK THAT DID NOT END CLEANLY OWES THE SUMMARY, named for what was walked - in both loops below, the
+	// Book Scope OFF walks' and a book's chapters' (the tally's lists, KFCSearchEngine.h). One that broke off keeps its
+	// hits: they are real and are filed like any other, and what the summary owes is the other half - the rest was
+	// never looked at. One that never ran is named with its reason, since a skipped document is otherwise
+	// indistinguishable from one with no matches; the colon goes with the reason, so an ending with none of its own
+	// (ChapterWalkResultText) leaves the name standing alone. A cancelled walk says nothing: the run is thrown away.
 	auto noteWalk = [&](const PMString& walkName, ChapterWalkResult walkResult)
 	{
 		PMString name(walkName);
@@ -2919,7 +2922,7 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 			out.unclosed.push_back(targets[i].shortName);
 
 		// Cancel heard inside the walk, at a story's end: the chapter is handed back above, and the
-		// caller throws the run away (SearchBook's "Search cancelled.").
+		// caller throws the run away (RunSearch's "Search cancelled.").
 		if (walkResult == kChapterCancelled)
 		{
 			out.cancelled = true;
@@ -2945,9 +2948,9 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 		out.cancelled = true;
 }
 
-// The run's target sentences: its front doors' (KFCSearchEngine::ResolveRunTarget) and SearchBook's safety nets past its
-// commit point, which say the same words. (The empty book's, kBookHasNoChapters, is the header's: Change All in Book and
-// the query run say it too.)
+// The run's target sentences: its front doors' (KFCSearchEngine::ResolveRunTarget) and RunSearch's safety nets past its
+// commit point, which say the same words. (The empty book's, kBookHasNoChapters, is the header's: Change All in Book
+// and the query run say it too.)
 const char* const kNoBookOpen = "Book Scope is on, but no book is open.";
 const char* const kNoDocumentToSearch = "No open document to search.";
 
@@ -2958,8 +2961,8 @@ const char* const kNoDocumentToSearch = "No open document to search.";
 //    from here rather than from the toggle keeps an existing result set's display stable if the user flips Book Scope
 //    afterwards. The Search: beside it, for the same reason: All Documents draws its document rows closed and says
 //    which has no window; a Search: changed afterwards changes nothing on screen.
-//  - A narrowed list's conditions (Narrow Down - the spec's N4: its searches again search with them, its tier's heading
-//    names them) - empty for every other search.
+//  - A narrowed list's conditions (Narrow Down - the narrow-down spec's N4: its searches again search with them, its
+//    tier's heading names them) - empty for every other search.
 //  - That a search HAPPENED, which the panel's illustration follows: it survives finding nothing - a search that
 //    returned no hits has still been run.
 //  - WHICH book, for the tree's book row - empty for a document search, which has no book row at all. This is the
@@ -3006,9 +3009,9 @@ const char* RowWords(bool frames)
 }
 
 // WHAT A NARROWED LIST'S WALKS OWE ITS SUMMARY (Narrow Down - nothing for any other list), said by the same two: the
-// matches no frame holds - overset text - counted for a Frames of These Matches list (N5: "3 match(es) in overset text
-// have no frame."), and the documents that had rows to ask and no layer of an On Active Layer step's name, named - as
-// Find Objects on Active Layer named them (OBJ-21).
+// matches no frame holds - overset text - counted for a Frames of These Matches list (the narrow-down spec's N5: "3
+// match(es) in overset text have no frame."), and the documents that had rows to ask and no layer of an On Active Layer
+// step's name, named - as Find Objects on Active Layer named them (OBJ-21).
 void AppendNarrowNotes(PMString& io, const KFCNarrow::Filter& narrow)
 {
 	if (narrow.MakesFrames() && narrow.NoFrameCount() > 0)
@@ -3190,7 +3193,7 @@ namespace KFCSearchEngine
 		uint32					set;			// the list's result set: kept, so the tier stays where it stands (v2 R4)
 		std::vector<KFCNarrowStep>	narrow;	// the list's conditions (Narrow Down) - and a Narrow Down's new one after them
 		bool					newTier;	// NARROW DOWN: into a new list, the live one parked as a tier first, as Find parks it
-										// (the spec's N4); false = Search These Results Again, the list searched in place
+										// (the narrow-down spec's N4); false = Search These Results Again, in place
 		AgainTarget() : fromBook(false), allDocuments(false), hasDoc(false), set(0), newTier(false) {}
 	};
 
@@ -3386,9 +3389,10 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	// SEARCH THESE RESULTS AGAIN KEEPS THE LIST WHERE IT IS (SearchListAgain): not parked - it is the same tier, searched
 	// anew - and copied whole first, its rows on their foci as they stand, to be put back if the search does not go
 	// through (putBack, below).
-	// NARROW DOWN (again->newTier) MAKES A NEW LIST, AS FIND DOES (the spec's N4): the list it narrows is parked as a tier, as
-	// Find parks it - and its own query copy taken first, to go on the new list (N3: the list's query, which the door
-	// states into Find/Change, searched with its conditions). Search These Results Again searches the list in place.
+	// NARROW DOWN (again->newTier) MAKES A NEW LIST, AS FIND DOES (the narrow-down spec's N4): the list it narrows is
+	// parked as a tier, as Find parks it - and its own query copy taken first, to go on the new list (N3: the list's
+	// query, which the door states into Find/Change, searched with its conditions). Search These Results Again searches
+	// the list in place.
 	const bool inPlace = (again != nil && !again->newTier);
 	const std::shared_ptr<const KFCQueryCopy> againCopy((again != nil) ? KFCResultModel::GetQueryCopy() : nullptr);
 	KFCResultModel::ModelSnapshot before;
@@ -3500,9 +3504,9 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 		targets.push_back(KFCBookScope::DocAsChapter(doc));
 	}
 
-	// THE LIST'S HEADER (WriteListHeader): its scope, its conditions, its book, its tab, its walk's key, its Find
-	// Format - and its query, copied in memory now, beside the signature and the format, for their reason (on this side
-	// of CommitSearchMode). SEARCH THESE RESULTS AGAIN keeps the list's own copy: the tier keeps its name, and its
+	// THE LIST'S HEADER (WriteListHeader): its scope, its conditions, its book, its tab, its walk's key, its
+	// Find Format - and its query, copied in memory now, beside the signature and the format, for their reason (on this
+	// side of CommitSearchMode). SEARCH THESE RESULTS AGAIN keeps the list's own copy: the tier keeps its name, and its
 	// query - whatever Change to the dialog holds. A NARROW DOWN's new list takes the copy of the list it narrows, for
 	// the same reason.
 	std::shared_ptr<const KFCQueryCopy> listCopy(againCopy);
@@ -3549,7 +3553,8 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 			return 0;
 		}
 		KFCSearchEngine::DropResults();		// the rows, the book (its chapters closed) and the format
-		// (A NARROW DOWN cancelled as Find is - the spec's N8: the list it narrowed is a tier, to be switched back to.)
+		// (A NARROW DOWN cancelled as Find is - the narrow-down spec's N8: the list it narrowed is a tier, to be
+		// switched back to.)
 		outSummary.Append((again != nil) ? "Narrow Down: cancelled." : "Search cancelled.");
 		return 0;
 	}
@@ -3557,16 +3562,18 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	// THE ROW EYE (docs/superpowers/specs/2026-10-17-kfc-row-eye-keep-design.md 2-2): Search These Results Again carries
 	// the rows of the list as it was whose eye is on into the new one, each to its own document (CarryKeptRowsByDocument)
 	// - ahead of the foci, which attach to them with the rest.
-	// (Not a Narrow Down's - the spec's N9: a new search; the rows with their eye on stay with the list it narrowed.)
+	// (Not a Narrow Down's - the narrow-down spec's N9: a new search; the rows with their eye on stay with the list it
+	// narrowed.)
 	int32 keptStay = 0;
 	if (inPlace)
 		keptStay = CarryKeptRowsByDocument(before, targets);
 
-	// THE ROWS' FOCI (spec T6 a): every chapter whose document is still open - the documents of a document-scope search,
-	// a book's chapters the user has open. The chapters a book search opened itself were handed back in the loop.
+	// THE ROWS' FOCI (the text-focus-jump spec's T6 a): every chapter whose document is still open - the documents of a
+	// document-scope search, a book's chapters the user has open. The chapters a book search opened itself were handed
+	// back in the loop.
 	KFCRowFoci::AttachOpenChapters();
-	// (SEARCH THESE RESULTS AGAIN says so ahead of the search's own words - and a NARROW DOWN its conditions, the spec's N10:
-	// "Narrowed down (In Tables): 12 hit(s) in 3 of 5 chapter(s).")
+	// (SEARCH THESE RESULTS AGAIN says so ahead of the search's own words - and a NARROW DOWN its conditions, the
+	// narrow-down spec's N10: "Narrowed down (In Tables): 12 hit(s) in 3 of 5 chapter(s).")
 	if (inPlace)
 		outSummary.Append("Searched these results again: ");
 	else if (again != nil)
@@ -3680,12 +3687,13 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 		outSummary.Append(fellBackNote);	// a Search: the selection did not offer (empty otherwise)
 	}
 
-	// One limit (F9): collected = drawn.
+	// One limit (the no-track-change-all spec's F9): collected = drawn.
 	if (tally.truncated)
 	{
-		// THE LIMIT (F9): the rows are a list to walk and replace one at a time - more than this is a Change All's
-		// work: KFC's own for a book, InDesign's Find/Change dialog's for anything else (F18).
-		// A list of object rows has the object lists' limit, and Narrow Down > Pages... to take it in parts (N7).
+		// THE LIMIT (the no-track-change-all spec's F9): the rows are a list to walk and replace one at a time - more
+		// than this is a Change All's work: KFC's own for a book, InDesign's Find/Change dialog's for anything else
+		// (F18). A list of object rows has the object lists' limit, and Narrow Down > Pages... to take it in parts (the
+		// narrow-down spec's N7).
 		const bool objects = KFCResultModel::ListHoldsObjects();
 		outSummary.Append(" Stopped at the ");
 		outSummary.AppendNumber(KFCResultModel::ListLimit());
@@ -3700,9 +3708,9 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	AppendKeptStay(outSummary, keptStay);	// the row eye: what stayed of the list as it was
 	outSummary.Append(chapterNotes);
 
-	// How to replace (spec F19): a hit row's Replace - its right-click menu, or Return on a selected row (F17).
-	// Nothing else on screen says how (the user's request).
-	// Shift+Return - replace, then on to the next row - is said too (the author's call).
+	// How to replace (the no-track-change-all spec's F19): a hit row's Replace - its right-click menu, or Return on a
+	// selected row (F17). Nothing else on screen says how (the user's request). Shift+Return - replace, then on to the
+	// next row - is said too (the author's call).
 	//
 	// Last, after the warnings: it is an offer, not something that went wrong, and the status field
 	// truncates its tail when it has to.
@@ -3944,11 +3952,12 @@ bool PlaceTakenByAnotherRow(int32 chapterIdx, int32 hitIdx, UID storyUID, TextIn
 	return false;
 }
 
-// WHAT "READS AS THE ROW" MEANS WHEN A ROW IS LOOKED FOR AGAIN (spec T1, T14): the whole match the same - its hash and
-// its length - and the line around it the same, the text before it and after it. The places a row could stand at now
-// (StaleRowPlaces, ReplacedRowPlaces) and the rows that look like it (LookAlikeRows) are told by this one test: the
-// order rule (PickByOrder) compares how many of each there are, so the two counts must never be made by different
-// tests. (A place the row is read AT - RowReadsAsFoundAt - reads the story there instead, MatchIsSameOccurrence's way.)
+// WHAT "READS AS THE ROW" MEANS WHEN A ROW IS LOOKED FOR AGAIN (the text-focus-jump spec's T1, T14): the whole match
+// the same - its hash and its length - and the line around it the same, the text before it and after it. The places a
+// row could stand at now (StaleRowPlaces, ReplacedRowPlaces) and the rows that look like it (LookAlikeRows) are told by
+// this one test: the order rule (PickByOrder) compares how many of each there are, so the two counts must never be made
+// by different tests. (A place the row is read AT - RowReadsAsFoundAt - reads the story there instead,
+// MatchIsSameOccurrence's way.)
 bool ReadsAlike(uint64 hash, int32 length, const PMString& pre, const PMString& post, uint64 rowHash, int32 rowLength,
 	const KFCResultModel::RowDisplay& row)
 {
@@ -4053,7 +4062,7 @@ bool LookAlikePlacesNow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, UI
 
 // THE RULE FOR MOVING A ROW (JMP-14): exactly one candidate that no other row stands on - a guess between two
 // look-alikes would be worse than saying so. The one rule that writes a found place into the row (MoveRowTo); a
-// look-alike chosen by order is the jump's only (PickByOrder, spec T3).
+// look-alike chosen by order is the jump's only (PickByOrder - the text-focus-jump spec's T3).
 bool OneFreePlace(int32 chapterIdx, int32 hitIdx, UID story, const Places& places, TextIndex& outStart, TextIndex& outEnd)
 {
 	int32 count = 0;
@@ -4070,7 +4079,7 @@ bool OneFreePlace(int32 chapterIdx, int32 hitIdx, UID story, const Places& place
 
 // The row moved to [start, end): its place, its line read again there (so it draws what stands there), a Missing word
 // taken off (found after all - SetHitOutcome turns a replaced row away, which never had one), and its focus with it
-// (spec T4).
+// (the text-focus-jump spec's T4).
 void MoveRowTo(int32 chapterIdx, int32 hitIdx, const UIDRef& storyRef, TextIndex start, TextIndex end)
 {
 	KFCResultModel::Hit found;
@@ -4082,9 +4091,10 @@ void MoveRowTo(int32 chapterIdx, int32 hitIdx, const UIDRef& storyRef, TextIndex
 	KFCRowFoci::Reanchor(chapterIdx, hitIdx);
 }
 
-// A ROW'S LOOK-ALIKE ROWS (spec T14): the rows of its chapter and story that read the same - the whole match (its hash
-// and length), the line around it - and are replaced, or not, as it is; itself included, in the order the search found
-// them in the story (Hit::storyOrdinal). outRank = this row's place among them; -1 = not resolvable.
+// A ROW'S LOOK-ALIKE ROWS (the text-focus-jump spec's T14): the rows of its chapter and story that read the same - the
+// whole match (its hash and length), the line around it - and are replaced, or not, as it is; itself included, in the
+// order the search found them in the story (Hit::storyOrdinal). outRank = this row's place among them; -1 = not
+// resolvable.
 void LookAlikeRows(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outRows, int32& outRank)
 {
 	outRows.clear();
@@ -4118,12 +4128,12 @@ void LookAlikeRows(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outRows, 
 	}
 }
 
-// ONE OF SEVERAL LOOK-ALIKES, BY ORDER (spec T14 - the author's call). `places` = every place in the row's
-// story that reads as the row now, in position order. When there are as many as the row has look-alike rows, the
-// row's place is the one at its rank among them (Hit::storyOrdinal - the order the search found them in, which no
-// insert or delete changes); when the counts differ, a look-alike came or went and which one cannot be told - none.
-// No "another row stands there" test: the other rows' stored places are the search's, stale after the very edit this
-// answers (spec T2, 3rd edition), and the ranks are distinct, so two rows are never sent to one place.
+// ONE OF SEVERAL LOOK-ALIKES, BY ORDER (the text-focus-jump spec's T14 - the author's call). `places` = every place in
+// the row's story that reads as the row now, in position order. When there are as many as the row has look-alike rows,
+// the row's place is the one at its rank among them (Hit::storyOrdinal - the order the search found them in, which no
+// insert or delete changes); when the counts differ, a look-alike came or went and which one cannot be told - none. No
+// "another row stands there" test: the other rows' stored places are the search's, stale after the very edit this
+// answers (the same spec's T2, 3rd edition), and the ranks are distinct, so two rows are never sent to one place.
 bool PickByOrder(int32 chapterIdx, int32 hitIdx, const Places& places, TextIndex& outStart, TextIndex& outEnd)
 {
 	std::vector<int32> rows;
@@ -4137,12 +4147,13 @@ bool PickByOrder(int32 chapterIdx, int32 hitIdx, const Places& places, TextIndex
 }
 }	// anonymous namespace
 
-// ROWS FOLLOW THEIR FOCI (docs/superpowers/plans/2026-10-14-kfc-row-focus-undo.md D5 - the author's call of 2026-10-14
-// night). A row's focus is of KFC's own class (KFCRowFocus.h): it has followed every edit of its story and every Undo
-// and Redo since it was made, so while it is not lost it stands where the row's text is - more surely than the row's
-// stored place, which follows KFC's own writes only, and more surely than the story's version, which an Undo takes back
-// to a number a different later edit can reach again (the experiment of 10-14: an Undo, then typing elsewhere). So the
-// rows of the story in this chapter take their foci's places:
+// ROWS FOLLOW THEIR FOCI (docs/superpowers/plans/2026-10-14-kfc-row-focus-undo.md D5 - the author's call). A row's
+// focus is of KFC's own class (KFCRowFocus.h): it has followed every edit of its story and every Undo and Redo since it
+// was made, so while it is not lost it stands where the row's text is - more surely than the row's stored place, which
+// follows KFC's own writes only, and more surely than the story's version, which an Undo takes back to a number a
+// different later edit can reach again (measured: an Undo, then typing elsewhere -
+// docs/ai-notes/text-focus-undo-spike-2026-10-14.md). So the rows of the story in this chapter take their foci's
+// places:
 //   - a row not replaced whose focus reads its match (hash and length): moved there, its line read again (MoveRowTo -
 //     a Missing word taken off);
 //   - a row not replaced whose focus reads another text - its own match was edited: Missing put on it, and its
@@ -4150,14 +4161,14 @@ bool PickByOrder(int32 chapterIdx, int32 hitIdx, const Places& places, TextIndex
 //     moved onto the edited text kept that length, and the row stayed Missing after the edit was undone). An Undo of
 //     the edit brings the focus back over the match, and the next follow moves the row there and takes Missing off;
 //   - a replaced row: moved where its focus reads what its replace wrote (Hit::replacedText); left where it is
-//     otherwise (its jump then looks for what it wrote - LocateRow's old way);
-// and the story row's words are read again (RereadStoryLead - the author, 10-14 night: "the Story part's text is
-// getting different"), and the story is recorded at its version as it stands. QUICK: at the version on record with
-// every focus on its row's
-// place, nothing is done. kFollowNone = no row of this story here has a focus (a chapter whose story KFC did not know
-// when it opened): the version rule decides, as it always has. kFollowBroken = a row without a usable focus among rows
-// that have one, a lost focus, or a version that cannot be read: nothing is moved - a write is refused, a jump takes
-// the old way.
+//     otherwise - its jump goes by that place then (LocateRow: a story that followed is where its rows say - the plan's
+//     D6);
+// and the story row's words are read again (RereadStoryLead - the author: "the Story part's text is getting
+// different"), and the story is recorded at its version as it stands. QUICK: at the version on record with every focus
+// on its row's place, nothing is done. kFollowNone = no row of this story here has a focus (a chapter whose story KFC
+// did not know when it opened): the version rule decides, as it always has. kFollowBroken = a row without a usable
+// focus among rows that have one, a lost focus, or a version that cannot be read: nothing is moved - a write is
+// refused, a jump takes the old way.
 KFCSearchEngine::FollowResult KFCSearchEngine::FollowStoryFoci(int32 chapterIdx, IDataBase* db, UID story, bool* outMoved)
 {
 	if (outMoved != nil)
@@ -4267,34 +4278,34 @@ void KFCSearchEngine::FollowChapterFoci(int32 chapterIdx)
 		(void)FollowStoryFoci(chapterIdx, db, *s);
 }
 
-// FIRST, THE ROWS FOLLOW THEIR FOCI (FollowStoryFoci, above - the author's call of 2026-10-14 night): a story whose
-// foci all followed every edit and every Undo is where they say, and nothing below is asked. What follows is the
-// way for a story with no foci, or with one that met an Undo it could not follow - the focus a hint only.
+// FIRST, THE ROWS FOLLOW THEIR FOCI (FollowStoryFoci, above - the author's call): a story whose foci all followed every
+// edit and every Undo is where they say, and nothing below is asked. What follows is the way for a story with no foci,
+// or with one that met an Undo it could not follow - the focus a hint only.
 //
-// WHERE IS THIS ROW NOW? (spec T2) One question for the jump and the selection a click makes - HERE, NOT IN THE JUMP
-// (KFCJump.cpp): walking a story and putting a row right is the model half's work; the jump asks it through IKFCRuns.
-// The row's stored place and its text focus's place are both read against the row (RowReadsAsFoundAt). One of them:
-// that one. Both, at different places (look-alikes - one reached by a focus an Undo left behind, or a stored place
-// another look-alike slid under): the look-alikes now are counted against the rows - the same count, by order (an
-// Undo left the focus behind); not the same, the focus (one came or went before the row, and the focus followed that
-// edit). Neither: the story looked through again - the one free candidate moves the row there (OneFreePlace), else
-// the order rule.
+// WHERE IS THIS ROW NOW? (the text-focus-jump spec's T2) One question for the jump and the selection a click makes -
+// HERE, NOT IN THE JUMP (KFCJump.cpp): walking a story and putting a row right is the model half's work; the jump asks
+// it through IKFCRuns. The row's stored place and its text focus's place are both read against the row
+// (RowReadsAsFoundAt). One of them: that one. Both, at different places (look-alikes - one reached by a focus an Undo
+// left behind, or a stored place another look-alike slid under): the look-alikes now are counted against the rows - the
+// same count, by order (an Undo left the focus behind); not the same, the focus (one came or went before the row, and
+// the focus followed that edit). Neither: the story looked through again - the one free candidate moves the row there
+// (OneFreePlace), else the order rule.
 //
 // A ROW WHOSE PLACE HAS MOVED UNDER IT IS LOOKED FOR AGAIN (the author's call). The rows keep their places themselves,
 // and follow every change KFC makes - and an Edit > Undo / Redo of a write of KFC's own (KFCUndoFollow). Not the edits
 // that are not followed: typing, an Undo of anything else, the Track Changes panel, a script - which move the text
 // without telling them, so a row's stored place can be off although its text has not been touched. (Measured before
-// Undo was followed: an edit before the second of two matches, taken back by Ctrl+Z - the row's place was one
-// character off, and the jump called it "missing".) So before the jump gives up on a row, the story is walked again
-// under the same query, and the row moves to the ONE match that is the same text with the same line around it (the
-// three segments the row drew) and that no other row stands on - OneFreePlace; MoveRowTo moves its focus with it.
-// None, or more than one, and it is not moved: more than one is decided by order (spec T14), for that jump only. A
+// Undo was followed: an edit before the second of two matches, taken back by Ctrl+Z - the row's place was one character
+// off, and the jump called it "missing".) So before the jump gives up on a row, the story is walked again under the
+// same query, and the row moves to the ONE match that is the same text with the same line around it (the three segments
+// the row drew) and that no other row stands on - OneFreePlace; MoveRowTo moves its focus with it. None, or more than
+// one, and it is not moved: more than one is decided by order (the text-focus-jump spec's T14), for that jump only. A
 // replaced row is looked for by what it wrote (ReplacedRowPlaces): the query no longer finds it.
 //
-// A PLACE FOUND THROUGH THE FOCUS OR BY ORDER IS THE JUMP'S ONLY (spec T3, 3rd edition): the row's stored place stays.
-// The Replace trusts that place whenever the story is at the version KFC recorded, and an Undo of the user's edit
-// brings the version back - a stored place moved onto a look-alike in between would be written there (case
-// tf-undo-replace-right-dup). Whatever decides, the row's focus goes to the place found (T4).
+// A PLACE FOUND THROUGH THE FOCUS OR BY ORDER IS THE JUMP'S ONLY (the text-focus-jump spec's T3, 3rd edition): the
+// row's stored place stays. The Replace trusts that place whenever the story is at the version KFC recorded, and an
+// Undo of the user's edit brings the version back - a stored place moved onto a look-alike in between would be written
+// there (case tf-undo-replace-right-dup). Whatever decides, the row's focus goes to the place found (T4).
 KFCResultModel::RowLocation KFCSearchEngine::LocateRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef,
 	TextIndex& ioStart, TextIndex& ioEnd)
 {
@@ -4304,9 +4315,9 @@ KFCResultModel::RowLocation KFCSearchEngine::LocateRow(int32 chapterIdx, int32 h
 	uint64 hash = 0;
 	if (db == nil || !KFCResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, story, a, b, hash))
 		return KFCResultModel::kRowNotFound;
-	// THE ROWS FOLLOW THEIR FOCI FIRST (FollowStoryFoci - the author's call of 2026-10-14 night). A story whose foci
-	// are all kept is where they say: the row reads as found at its place, or its own text was edited there (Missing,
-	// and the view goes there). Only a story with no foci, or with one that could not follow, takes the old way below.
+	// THE ROWS FOLLOW THEIR FOCI FIRST (FollowStoryFoci - the author's call). A story whose foci are all kept is where
+	// they say: the row reads as found at its place, or its own text was edited there (Missing, and the view goes
+	// there). Only a story with no foci, or with one that could not follow, takes the old way below.
 	bool moved = false;
 	if (FollowStoryFoci(chapterIdx, db, story, &moved) == kFollowed)
 	{
@@ -4379,7 +4390,8 @@ KFCResultModel::RowLocation KFCSearchEngine::LocateRow(int32 chapterIdx, int32 h
 		if (!PickByOrder(chapterIdx, hitIdx, places, toStart, toEnd))
 			return KFCResultModel::kRowNotFound;
 	}
-	// Found elsewhere - for this jump only (T3): the stored place stays, the focus goes there, a Missing word goes.
+	// Found elsewhere - for this jump only (the text-focus-jump spec's T3): the stored place stays, the focus goes
+	// there, a Missing word goes.
 	if (KFCResultModel::GetHitOutcome(chapterIdx, hitIdx) == KFCResultModel::kOutcomeMissing)
 		KFCResultModel::SetHitOutcome(chapterIdx, hitIdx, KFCResultModel::kOutcomeNone);	// found after all
 	KFCRowFoci::MoveTo(chapterIdx, hitIdx, toStart, toEnd);
@@ -4434,23 +4446,24 @@ void SayFoundAgain(PMString& outStatus, const char* what, int32 now, bool capped
 		outStatus.Append(kListLimitReached);
 }
 
-// A SEARCH OVER PART OF A DOCUMENT, SEARCHED AGAIN AS IT WAS SEARCHED - the tier heading's Search These Results Again over a
-// list Search: Story, To End of Story or Selection made (the author, 2026-10-17 evening: "the same conditions as the first
-// search; a Story search, that story alone"; the document row's is greyed over such a list). In each of the list's
-// chapters: the story a Story search searched (Chapter::searchedStory - the stories of its rows for a chapter with none
-// recorded), walked whole by the story form, as the story row walks it; the part of each story a To End of Story or
-// Selection search walked (Chapter::searchedRanges), found again where it stands (FindSearchedPartAgain) and walked by its
-// own scope (QueryPartScope) - Search This Story Again's walk, story by story - and recorded again where it was walked.
-// Then each chapter's rows are replaced by what its walks found (ReplaceChapterRows - the rows with their eye on stay, a
-// chapter with nothing found is shown empty, (0/0), to be searched again). EVERY DOOR IS ASKED BEFORE ANYTHING IS WALKED,
-// so a refusal leaves the list as it was: a changed query, a part that cannot be walked on its own or whose edge cannot be
-// told (Search This Story Again's refusals), a document not open (KFC does not open again what the person closed -
-// LIFE-01; a document closed since has forgotten what was searched in it - KFCResultModel::EmptyChapter). Under a bar with
-// Cancel, counted as a search for every other door, as Search This Document Again.
-// AND NARROW DOWN over such a list (again.newTier - the spec's N3, N4): the same walks with the list's conditions and the new
-// one (again.narrow - a narrowed list's own conditions searched again in place too), then not put back in place but filed
-// as a NEW list - the list narrowed parked as a tier, as Find parks it; after a Frames of These Matches step, a list of
-// frames, with a list of frames' limit and words (N7, N10), as the search files one.
+// A SEARCH OVER PART OF A DOCUMENT, SEARCHED AGAIN AS IT WAS SEARCHED - the tier heading's Search These Results Again
+// over a list Search: Story, To End of Story or Selection made (the author: "the same conditions as the first search; a
+// Story search, that story alone"; the document row's is greyed over such a list). In each of the list's chapters: the
+// story a Story search searched (Chapter::searchedStory - the stories of its rows for a chapter with none recorded),
+// walked whole by the story form, as the story row walks it; the part of each story a To End of Story or Selection
+// search walked (Chapter::searchedRanges), found again where it stands (FindSearchedPartAgain) and walked by its own
+// scope (QueryPartScope) - Search This Story Again's walk, story by story - and recorded again where it was walked.
+// Then each chapter's rows are replaced by what its walks found (ReplaceChapterRows - the rows with their eye on stay,
+// a chapter with nothing found is shown empty, (0/0), to be searched again). EVERY DOOR IS ASKED BEFORE ANYTHING IS
+// WALKED, so a refusal puts no row back - the rows of a chapter reached have only followed their foci
+// (FollowChapterFoci, which the panel repaints): a changed query, a part that cannot be walked on its own or whose edge
+// cannot be told (Search This Story Again's refusals), a document not open (KFC does not open again what the person
+// closed - LIFE-01; a document closed since has forgotten what was searched in it - KFCResultModel::EmptyChapter).
+// Under a bar with Cancel, counted as a search for every other door, as Search This Document Again. AND NARROW DOWN
+// over such a list (again.newTier - the narrow-down spec's N3, N4): the same walks with the list's conditions and the
+// new one (again.narrow - a narrowed list's own conditions searched again in place too), then not put back in place but
+// filed as a NEW list - the list narrowed parked as a tier, as Find parks it; after a Frames of These Matches step, a
+// list of frames, with a list of frames' limit and words (N7, N10), as the search files one.
 bool SearchPartsAgain(const PMString& lead, PMString& outStatus, const KFCSearchEngine::AgainTarget& again)
 {
 	outStatus.Clear();
@@ -4569,8 +4582,9 @@ bool SearchPartsAgain(const PMString& lead, PMString& outStatus, const KFCSearch
 	const KFCNarrow::Filter narrowFilter(again.narrow);
 	const bool asText = KFC_DIAG_FAULT("part-narrow-as-text");
 	const bool frames = narrowFilter.MakesFrames() && !asText;
-	// The room the list leaves: its limit less the rows of the chapters not searched again, and the rows with their eye on.
-	// A Narrow Down's new list has the whole limit of its own rows (nothing of the list it narrows comes along - N9).
+	// The room the list leaves: its limit less the rows of the chapters not searched again, and the rows with their eye
+	// on. A Narrow Down's new list has the whole limit of its own rows (nothing of the list it narrows comes along -
+	// the narrow-down spec's N9).
 	int32 room = KFCResultModel::ListLimit() - KFCResultModel::GetTotalHitCount();
 	for (size_t k = 0; k < chapters.size(); ++k)
 		room += KFCResultModel::GetDisplayHitCount(chapters[k].chapter)
@@ -4689,7 +4703,8 @@ bool SearchPartsAgain(const PMString& lead, PMString& outStatus, const KFCSearch
 	// at), its scope, its query copy; then the list parked as Find parks it (KFCTierStore::ParkCurrent - its rows' foci
 	// go with it), its documents handed back, the list dropped (a new result set), and the new list's header written as
 	// the search writes it (WriteListHeader) - its mode, its walk's key and its Find Format read under the door that
-	// stated its query, as the search reads them - its conditions with them. No row with its eye on comes along (N9).
+	// stated its query, as the search reads them - its conditions with them. No row with its eye on comes along (the
+	// narrow-down spec's N9).
 	if (again.newTier)
 	{
 		struct NewChapter
@@ -4722,8 +4737,8 @@ bool SearchPartsAgain(const PMString& lead, PMString& outStatus, const KFCSearch
 				KFCSearchEngine::FileChapter(made[k].target, chapters[k].hits, tally, &chapters[k].versions, &made[k].ranges,
 					made[k].story);
 		KFCRowFoci::AttachOpenChapters();
-		// "Narrowed down (In Tables): 4 hit(s) in the story." - the search's own words (N10), and what its walks owe
-		// them.
+		// "Narrowed down (In Tables): 4 hit(s) in the story." - the search's own words (the narrow-down spec's N10),
+		// and what its walks owe them.
 		outStatus.Append("Narrowed down (");
 		outStatus.Append(KFCResultModel::NarrowWords());
 		outStatus.Append("): ");
@@ -4768,14 +4783,14 @@ bool SearchPartsAgain(const PMString& lead, PMString& outStatus, const KFCSearch
 // replaced in it go (the query no longer finds what they wrote - the author's call); the other stories' rows and
 // their state stay.
 // REFUSED when the query changed since the search (the story's rows would be another query's beside the others').
-// A SEARCH OVER PART OF A STORY (Search: To End of Story / Selection - the author's idea: "keep where the
-// search started with a text focus") walks that part again, not the whole story - the part the search recorded
+// A SEARCH OVER PART OF A STORY (Search: To End of Story / Selection - the author's idea: "keep where the search
+// started with a text focus") walks that part again, not the whole story - the part the search recorded
 // (KFCResultModel::SearchedRange), found again where the story stands now (FindSearchedPartAgain) and walked the way
 // InDesign walks its own (QueryPartScope); then recorded again where it was found. Refused when the part cannot be
 // walked on its own (InDesign walked it as separate stretches - MakeSearchedRange) or its edges cannot be told (the
-// text just outside one was rewritten). A chapter the search handed back is reopened windowless for the walk and
-// handed back after it, before the rows are put in (its foci then wait for its next open). The list keeps its limit
-// (F9): the story gets the room the other rows leave it.
+// text just outside one was rewritten). A chapter the search handed back is reopened windowless for the walk and handed
+// back after it, before the rows are put in (its foci then wait for its next open). The list keeps its limit (the
+// no-track-change-all spec's F9): the story gets the room the other rows leave it.
 bool KFCSearchEngine::SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMString& outStatus)
 {
 	outStatus.Clear();
@@ -4859,8 +4874,8 @@ bool KFCSearchEngine::SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMStrin
 		KFCForwardSearchScope forward;
 		WalkerScopeOptions scopeOptions;
 		KFCSearchEngine::GetKFCWalkerScopeOptions(scopeOptions);
-		// A NARROWED LIST'S CONDITIONS, searched again with it (Narrow Down - the spec's N4: the list's rows are its search's,
-		// conditions and all - a story walked again lists what the list would).
+		// A NARROWED LIST'S CONDITIONS, searched again with it (Narrow Down - the narrow-down spec's N4: the list's
+		// rows are its search's, conditions and all - a story walked again lists what the list would).
 		const KFCNarrow::Filter narrowFilter(KFCResultModel::GetNarrowSteps());
 		const WalkFilterScope walkFilter(narrowFilter);
 		// A searched part's own scope - nil for a whole story, which CollectHitsInDoc walks by the story form.
@@ -4907,12 +4922,13 @@ bool KFCSearchEngine::SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMStrin
 // replaced by what that walk finds (KFCResultModel::ReplaceChapterRows), its stories' versions recorded, so they can be
 // replaced. Its replaced rows go (the query no longer finds what they wrote); the other documents' rows and their state
 // stay. Nothing found: the document's row stays, empty, to be searched again (the author's call).
-// REFUSED - the list as it was - while a run is up; for a search over part of a document (Search: Story, To End of Story,
-// Selection - the author's call: whole-document searches only; a story's part is Search This Story Again's); when the
-// query changed since the search; when the document cannot be opened; when the walk breaks off or is cancelled.
-// A chapter the search handed back is reopened windowless for the walk and handed back after it, before the rows go in.
-// The list keeps its limit (F9): the document gets the room the other rows leave it. Under a bar of its own, with Cancel -
-// a document can take as long as a search - so it counts as a search for every other door (gSearching).
+// REFUSED - no row put back (once the document is reached its rows have followed their foci - FollowChapterFoci) -
+// while a run is up; for a search over part of a document (Search: Story, To End of Story, Selection - the author's
+// call: whole-document searches only; a story's part is Search This Story Again's); when the query changed since the
+// search; when the document cannot be opened; when the walk breaks off or is cancelled. A chapter the search handed
+// back is reopened windowless for the walk and handed back after it, before the rows go in. The list keeps its limit
+// (the no-track-change-all spec's F9): the document gets the room the other rows leave it. Under a bar of its own, with
+// Cancel - a document can take as long as a search - so it counts as a search for every other door (gSearching).
 bool KFCSearchEngine::SearchDocumentAgain(int32 chapterIdx, PMString& outStatus)
 {
 	outStatus.Clear();
@@ -5012,10 +5028,11 @@ bool KFCSearchEngine::SearchDocumentAgain(int32 chapterIdx, PMString& outStatus)
 	return true;
 }
 
-// SEARCH THESE RESULTS AGAIN (a tier's heading's right-click menu - the author, 2026-10-14 night, to the idea of searching a
-// tier again from its heading: "let's try it"). The live list's own search run once more - RunSearch, the search's
-// one body - over what the list searched, with its own query (the door states it when Find/Change holds another one -
-// KFCQueryScope): its document, its book, or the documents open now; its rows replaced in place. See the header.
+// SEARCH THESE RESULTS AGAIN (a tier's heading's right-click menu - the author's call, to the idea of searching a tier
+// again from its heading: "let's try it"). The live list's own search run once more - RunSearch, the search's one
+// body - over what the list searched, with its own query (the door states it when Find/Change holds another one -
+// KFCQueryScope): its document, its book, the documents open now, or the part of a document it searched
+// (SearchPartsAgain); its rows replaced in place. See the header.
 namespace
 {
 // A NARROW DOWN'S CHECK BEFORE ANYTHING IS WALKED, put to the list's documents open now (a book's chapter has what another
@@ -5049,10 +5066,11 @@ bool AskListDocuments(const std::function<bool(const UIDRef&)>& ask, bool& outAs
 	return false;
 }
 
-// SEARCH THESE RESULTS AGAIN AND NARROW DOWN, ONE BODY (KFCSearchEngine::SearchListAgain / NarrowList): the live list's own
-// search run once more over what it searched, with its query and its conditions (a narrowed list's - KFCNarrow) - and, for a
-// Narrow Down (`step`), the new condition after them and the result put into a new list (AgainTarget::newTier - the spec's
-// N3, N4); nil = the list searched in place. The same doors and the same refusals for both (N8), each said after its lead.
+// SEARCH THESE RESULTS AGAIN AND NARROW DOWN, ONE BODY (KFCSearchEngine::SearchListAgain / NarrowList): the live list's
+// own search run once more over what it searched, with its query and its conditions (a narrowed list's - KFCNarrow) -
+// and, for a Narrow Down (`step`), the new condition after them and the result put into a new list
+// (AgainTarget::newTier - the narrow-down spec's N3, N4); nil = the list searched in place. The same doors and the same
+// refusals for both (N8), each said after its lead.
 bool SearchListOnceMore(const KFCNarrowStep* step, PMString& outStatus)
 {
 	outStatus.Clear();
@@ -5064,8 +5082,9 @@ bool SearchListOnceMore(const KFCNarrowStep* step, PMString& outStatus)
 	}
 	PMString lead((step != nil) ? "Narrow Down: " : "Search These Results Again: ");
 	lead.SetTranslatable(kFalse);
-	// A NARROW DOWN'S CONDITION: one this build knows; one only a text row can meet, refused over a list of object rows (the
-	// menu greys it - this stays for a caller that never opened the menu, as Find's refusals do - N8).
+	// A NARROW DOWN'S CONDITION: one this build knows; one only a text row can meet, refused over a list of object rows
+	// (the menu greys it - this stays for a caller that never opened the menu, as Find's refusals do - the narrow-down
+	// spec's N8).
 	if (step != nil)
 	{
 		if (step->kind <= kKFCNarrowNone || step->kind >= kKFCNarrowKindCount)
@@ -5083,10 +5102,11 @@ bool SearchListOnceMore(const KFCNarrowStep* step, PMString& outStatus)
 		}
 		// FRAMES OF THESE MATCHES: once - a list of frames has no matches to turn into frames (its rows are object rows: the
 		// text-only refusal above answers it).
-		// PAGES...: A RANGE NO DOCUMENT CAN READ IS REFUSED BEFORE ANYTHING IS WALKED (N5) - read in the list's documents open
-		// now (one that reads it is enough: a book's chapter has pages another has not), else in the front document (a list
-		// that found nothing searches it). A list whose documents are all closed (a book's chapters, handed back) is walked,
-		// each chapter reading it for itself (KFCNarrow::Filter - a chapter that cannot lists nothing).
+		// PAGES...: A RANGE NO DOCUMENT CAN READ IS REFUSED BEFORE ANYTHING IS WALKED (the narrow-down spec's N5) -
+		// read in the list's documents open now (one that reads it is enough: a book's chapter has pages another has
+		// not), else in the front document (a list that found nothing searches it). A list whose documents are all
+		// closed (a book's chapters, handed back) is walked, each chapter reading it for itself (KFCNarrow::Filter - a
+		// chapter that cannot lists nothing).
 		if (step->kind == kKFCNarrowPages)
 		{
 			PMString pages(step->pages);
@@ -5110,10 +5130,11 @@ bool SearchListOnceMore(const KFCNarrowStep* step, PMString& outStatus)
 				return false;
 			}
 		}
-		// ON ACTIVE LAYER (Find Objects on Active Layer moved into Narrow Down - the author, 2026-10-18): the layer the front
-		// document's Layers panel had active, by its name. NO DOCUMENT WITH A LAYER OF THE NAME IS REFUSED BEFORE ANYTHING IS
-		// WALKED, as an unreadable page range is - asked of the same documents (AskListDocuments); a chapter with none lists
-		// nothing and is named after the walk (KFCNarrow::Filter::NoLayerDocs - as the command named it, OBJ-21).
+		// ON ACTIVE LAYER (Find Objects on Active Layer moved into Narrow Down - the author's call): the layer the
+		// front document's Layers panel had active, by its name. NO DOCUMENT WITH A LAYER OF THE NAME IS REFUSED BEFORE
+		// ANYTHING IS WALKED, as an unreadable page range is - asked of the same documents (AskListDocuments); a
+		// chapter with none lists nothing and is named after the walk (KFCNarrow::Filter::NoLayerDocs - as the command
+		// named it, OBJ-21).
 		if (step->kind == kKFCNarrowOnLayer)
 		{
 			PMString layer(step->layer);
@@ -5149,7 +5170,7 @@ bool SearchListOnceMore(const KFCNarrowStep* step, PMString& outStatus)
 	}
 	KFCSearchEngine::AgainTarget again;
 	again.set = KFCResultModel::GetResultSetId();
-	again.narrow = KFCResultModel::GetNarrowSteps();	// a narrowed list's conditions - searched with again (N4)
+	again.narrow = KFCResultModel::GetNarrowSteps();	// a narrowed list's conditions - searched with again
 	if (step != nil)
 	{
 		again.narrow.push_back(*step);		// ...and a Narrow Down's new one after them, into a new list
@@ -5158,10 +5179,10 @@ bool SearchListOnceMore(const KFCNarrowStep* step, PMString& outStatus)
 	const KFCResultModel::SearchScopeKind listScope = KFCResultModel::GetSearchScope();
 	again.fromBook = (listScope == KFCResultModel::kScopeBook);
 	again.allDocuments = (listScope == KFCResultModel::kScopeAllDocuments);
-	// A SEARCH OVER PART OF A DOCUMENT (Search: Story, To End of Story, Selection): searched again as it was searched - its
-	// story alone, its parts alone (SearchPartsAgain - the author, 2026-10-17 evening: "the same conditions as the first
-	// search; a Story search, that story alone"). The Object tab's Selection was the objects selected then, which the list
-	// does not keep: refused.
+	// A SEARCH OVER PART OF A DOCUMENT (Search: Story, To End of Story, Selection): searched again as it was searched -
+	// its story alone, its parts alone (SearchPartsAgain - the author: "the same conditions as the first search; a
+	// Story search, that story alone"). The Object tab's Selection was the objects selected then, which the list does
+	// not keep: refused.
 	if (PartOfDocumentName(listScope) != nil)
 	{
 		if (KFCResultModel::GetSearchMode() == IFindChangeOptions::kObjectSearch)
