@@ -197,13 +197,14 @@
 
 - **GEN-33** 1度に走るのは**検索・行の Replace・Change All in Book（・クエリ連続実行）のうち1つだけ**。
   走っている間（進捗バーが出ている間）は KFC の灰色にできるメニュー項目がすべて灰色になり（SET-04）、それでも割り込んできた操作（検索・置換・行の Replace・Return・Save Panel Settings〈2026-10-13〉）はメッセージ欄に理由を出して断る。
-  Search This Document Again（REP-37）もバーを出し、その間は検索として数える。Search This Story Again（REP-35）はバーを出さず、走っている実行があれば断る。（1.4.0）
+  Search This Document Again（REP-37）と Search This Story Again（REP-35）も、扉から章を返すまで検索として数える（Document はバーを出す・Story は出さない＝理由は GEN-33b・2026-10-19 から＝それまで Story は数えず、Document は歩く間だけだった）。（1.4.0）
   - 訂正:
 
 - **GEN-33b** ★**行の Replace も、走っている間は「実行中」に数える**（2026-10-12・全コードの致命的な部分の再検査の N-1）――
   バーは出ないが、閉じた章を開き直す・書いた章に窓を付けるときに InDesign がメッセージループを回すので、その間に届いたものは割り込める。
   行の Replace が終わるまで、行のクリックは着地せず（JMP-05b）、2つ目の Return・検索・Change All・クエリの実行は GEN-33 のとおり断る。ブックを閉じたときの片付けは終わるのを待ち（LIFE の見張りが待ち直す）、Undo の追従と、文書を閉じたときの結果の片付けは、その間は動かない（ほかの実行の間と同じ）。
   逆向き＝**行のクリックの着地の最中**は、パネルから書く・歩く・走らせる操作を始めない（JMP-05b）。
+  ★**一覧から書くほかの操作も、扉から最後に章を返すまで同じく数える**＝Restore from Copy・文字の行の Create Outlines（2026-10-17〜18 の初めから）と、物の行の Create Outlines・Special Operations（2026-10-19 から＝ブロック11 の不具合の回の D11-1・それまで数えられていなかった）。章を開き直す Search This Story／Document Again も同じ（GEN-33）。
   - 訂正:
 
 - **GEN-34** ★件数の上限は**文字の一覧 300 行・物の一覧 1000 行**（2026-10-06・F9＝作者「最大を３００にする／３００でStop」。2026-10-18 から物の一覧〈Object タブの検索・Frames of These Matches の一覧＝OBJ-22〉は 1000＝300／500／1000 で検索と特殊操作の時間を測って決めた・作者が承認＝設計書 `docs/superpowers/specs/2026-10-18-kfc-narrow-down-design.md` §3-1 の M6）。検索は上限まで集め、**パネルは全部描く**。
@@ -275,3 +276,4 @@
   ⬜「前の文書の行がちょうど 300 の後ろの `(0/0)` の文書の行が残る」（2026-10-13 の直し）は実機で測っていない＝All Documents で2つの文書を検索（前の文書は 300 未満）→ 後ろの文書を一致0にして Search This Document Again → 前の文書を 300 以上の一致にして Search This Document Again → 後ろの文書の行が `(0/0)` で残るか。回帰のケースは無い。
 - 公開版 1.0.0 と手元の版（1.2.0 以降）で**振る舞いが違う項目を、この章では区別していない**。
 - About が本体のどのメニューの下に出るか（日本語 UI での見え方）を実機で見ていない。
+- ⬜**GEN-33／33b の 2026-10-19 の数え（D11-1）は実機で測っていない**＝回帰 `guard-*` 6本（`work/kbs-regress/tier-cases.tsv`）を、直す前のテスト用ビルド（KFC `209e8ba`＝開き直しと窓の記録 `REOPEN`／`WINDOW running=… landing=…` だけ）で回して RED（4つの扉の開き直しが running=0）、直したビルド（`5cf1256`）で GREEN（対照の2本＝行の Replace は running=1・着地は running=0 landing=1 をどちらのビルドでも）。作者が InDesign を使っていた間なので回していない。
