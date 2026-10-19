@@ -332,9 +332,8 @@ void DoNarrow(IActiveContext* ac, int32 kind, IPMUnknown* widget)
 	// and Move to Active Layer's reading), taken now - each document of the tier is searched on its layer of that name.
 	if (kind == kKFCNarrowOnLayer && !ActiveLayerName(ac, step.layer))
 	{
-		PMString why("Narrow Down: no layer is active - bring a document forward and pick its layer in the Layers panel.");
-		why.SetTranslatable(kFalse);
-		KFCResultTree::ShowStatus(why);
+		KFCResultTree::ShowStatus("Narrow Down: no layer is active"
+			" - bring a document forward and pick its layer in the Layers panel.");
 		return;
 	}
 	// PAGES...: the range asked FIRST (KFCSpecialDialogs - the narrow-down spec's N5) - Cancel changes nothing, a grey
@@ -393,9 +392,8 @@ void DoSpecial(IActiveContext* ac, int32 op, IPMUnknown* widget)
 	KFCSpecialParams params;
 	if (op == kKFCSpecialMoveToLayer && !ActiveLayerName(ac, params.text))
 	{
-		PMString why("Move to Active Layer: no layer is active - bring a document forward and pick its layer in the Layers panel.");
-		why.SetTranslatable(kFalse);
-		KFCResultTree::ShowStatus(why);
+		KFCResultTree::ShowStatus("Move to Active Layer: no layer is active"
+			" - bring a document forward and pick its layer in the Layers panel.");
 		return;
 	}
 	if (op == kKFCSpecialMove || op == kKFCSpecialScale || op == kKFCSpecialRotate || op == kKFCSpecialShear)

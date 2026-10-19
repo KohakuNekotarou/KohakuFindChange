@@ -87,13 +87,14 @@ struct RowRef
 	bool IsValid() const { return chapter >= 0 && hit >= 0; }
 };
 
-// Is the row (chapter, hit) one of these rows?
-bool RowsHold(const KFCRowsByChapter& rows, int32 chapter, int32 hit)
+// A ROW PUT IN ITS DOCUMENT'S GROUP, the rows coming in the order drawn: a document's rows are drawn together, under
+// its row, so a new chapter starts a new group. The one rule of the lists of rows this file hands out
+// (GetSelectedHitRows, RowsUnder).
+void AddToRows(KFCRowsByChapter& rows, int32 chapter, int32 hit)
 {
-	for (size_t k = 0; k < rows.size(); ++k)
-		if (rows[k].chapter == chapter && std::find(rows[k].hits.begin(), rows[k].hits.end(), hit) != rows[k].hits.end())
-			return true;
-	return false;
+	if (rows.empty() || rows.back().chapter != chapter)
+		rows.push_back(KFCChapterRows(chapter));
+	rows.back().hits.push_back(hit);
 }
 
 // THE MOVING END OF A RUN: the row the last click or Shift+arrow left the run at - Shift+Up / Shift+Down move it, while
@@ -224,7 +225,7 @@ void KFCResultTreeController::ProcessSelectionRules(IEvent* event, UID nodeWidge
 	// away for a row that Select then turns away (below) - its click switches to its tier (KFCResultNodeEH). The live tier's
 	// own row is selected as a story row is - alone (Joins, below).
 	TreeNodePtr<KFCResultNodeID> pressed(node);
-	if (pressed != nil && pressed->IsInert() && !pressed->IsLiveTierRow())
+	if (pressed != nil && pressed->IsGrey())
 		return;
 	const bool modified = (event->GetType() == IEvent::kLButtonDn) && (event->ShiftKeyDown() || event->CmdKeyDown());
 	if (modified && !IsSelected(node) && !fSelectedNodes.empty())
@@ -251,7 +252,7 @@ ITreeViewController::SelectCode KFCResultTreeController::Select(const NodeID& no
 	// and the arrows stay out of a grey tier (the tier switch v2's R8). THE LIVE TIER'S OWN ROW CAN BE (the author's call,
 	// 10-14 night) - alone, as a story row is: it joins no other row (Joins), and acts on nothing.
 	TreeNodePtr<KFCResultNodeID> nodeID(node);
-	if (nodeID != nil && nodeID->IsInert() && !nodeID->IsLiveTierRow())
+	if (nodeID != nil && nodeID->IsGrey())
 		return eNoSelectionAllowed;
 	// NOT WITH THESE ROWS: a row that cannot join the selection is turned away whoever asks - a click, a run of
 	// rows, a key. The stock answer for "not with the selection" (eSingleParentOnly) - nothing of KFC's reads it.
@@ -263,6 +264,15 @@ ITreeViewController::SelectCode KFCResultTreeController::Select(const NodeID& no
 //========================================================================================
 // What the clicks and keys ask (KFCResultTree.h)
 //========================================================================================
+bool KFCResultTree::RowsHold(const KFCRowsByChapter& rows, int32 chapter, int32 hit)
+{
+	for (size_t k = 0; k < rows.size(); ++k)
+		if (rows[k].chapter == chapter
+			&& std::find(rows[k].hits.begin(), rows[k].hits.end(), hit) != rows[k].hits.end())
+			return true;
+	return false;
+}
+
 bool KFCResultTree::GetSelectedHitRows(KFCRowsByChapter& outRows, bool* outObjects)
 {
 	outRows.clear();
@@ -290,10 +300,7 @@ bool KFCResultTree::GetSelectedHitRows(KFCRowsByChapter& outRows, bool* outObjec
 			outRows.clear();
 			return false;		// (never - the rules keep one kind; asked anyway)
 		}
-		// A document's rows are drawn together, under its row: a new chapter starts a new group.
-		if (outRows.empty() || outRows.back().chapter != nodeID->GetChapter())
-			outRows.push_back(KFCChapterRows(nodeID->GetChapter()));
-		outRows.back().hits.push_back(nodeID->GetHit());
+		AddToRows(outRows, nodeID->GetChapter(), nodeID->GetHit());
 	}
 	if (outObjects != nil)
 		*outObjects = objects;
@@ -537,10 +544,7 @@ bool KFCResultTree::RowsUnder(const NodeID& row, KFCRowsByChapter& out)
 		TreeNodePtr<KFCResultNodeID> nodeID(rows[k]);
 		if (nodeID == nil)
 			continue;
-		// A document's rows are drawn together, under its row: a new chapter starts a new group (GetSelectedHitRows' rule).
-		if (out.empty() || out.back().chapter != nodeID->GetChapter())
-			out.push_back(KFCChapterRows(nodeID->GetChapter()));
-		out.back().hits.push_back(nodeID->GetHit());
+		AddToRows(out, nodeID->GetChapter(), nodeID->GetHit());
 	}
 	return !out.empty();
 }
@@ -673,6 +677,33 @@ void KFCResultTree::FollowModifiedClick(const NodeID& clicked)
 	KFCRowsByChapter rows;
 	if (GetSelectedHitRows(rows) && RowsHold(rows, nodeID->GetChapter(), nodeID->GetHit()))
 		KFCJump::ActivateNode(nodeID->GetChapter(), nodeID->GetHit());
+}
+
+int32 KFCResultTree::SelectAloneInView(ITreeViewController* controller, const ITreeViewHierarchyAdapter* adapter,
+	ITreeViewMgr* treeMgr, const NodeID& row)
+{
+	// Every row above it open, top down, so the tree draws it. (ExpandNode on an open row is a harmless no-op -
+	// KFCResultTreeEH's StockMoveThenLand leans on the same.)
+	std::vector<NodeID> above;
+	for (NodeID up(adapter->GetParentNode(row)); up.IsValid(); up = NodeID(adapter->GetParentNode(up)))
+	{
+		TreeNodePtr<KFCResultNodeID> upID(up);
+		if (upID == nil || upID->IsRoot())
+			break;		// the hidden root is never drawn
+		above.push_back(up);
+	}
+	for (auto it = above.rbegin(); it != above.rend(); ++it)
+		treeMgr->ExpandNode(*it, kFalse /*expandAllDescendants*/);
+	// THE SELECTION BEFORE IT OFF FIRST. Select does not move a selection: in a one-row list it refuses while a row
+	// is selected (ITreeViewController::SelectCode eSingleItemAlreadySelected; measured: the next row was jumped to
+	// while the written one stayed selected), and in this list, which selects rows together, it would add to them.
+	// The official re-selection (docs/ai-notes/api-official-examples.md, "select a tree row again"): the deselect tells
+	// nobody - only the row that ends selected is announced - and both repaint.
+	controller->DeselectAll(kFalse /*notifyOfChange*/, kTrue /*changeHilite*/);
+	const ITreeViewController::SelectCode selected =
+		controller->Select(row, kTrue /*notifyOfChange*/, kTrue /*changeHilite*/);
+	treeMgr->ScrollToNode(row, ITreeViewMgr::eScrollIntoView);
+	return static_cast<int32>(selected);
 }
 
 bool KFCResultTree::ExtendSelection(ITreeViewController* controller, bool down)

@@ -26,6 +26,8 @@
 
 class IControlView;
 class ITreeViewController;
+class ITreeViewHierarchyAdapter;
+class ITreeViewMgr;
 class NodeID;
 class NodeID_rv;
 
@@ -112,6 +114,10 @@ namespace KFCResultTree
 	    the panel exactly the way Rebuild does. */
 	void ShowStatus(const PMString& message);
 
+	/** ...a sentence written in code ("That book is no longer open."): the same, its words marked not to be translated
+	    on the way - a message is a sentence, never a key of the string table. */
+	void ShowStatus(const char* message);
+
 	/** A selected GREP row's AFTER-TEXT on the message area: "Preview Text:", the row's context faded and
 	    what its Replace would write at full colour (KFCReplaceEngine::PreviewHit - written in a step thrown away).
 	    false = no preview for this row (not a GREP search, replaced, the query or the story changed, its document
@@ -151,6 +157,11 @@ namespace KFCResultTree
 	    rather than text rows. false when nothing is selected, or a story, document or book row is
 	    (KFCResultTreeController.cpp). */
 	bool GetSelectedHitRows(KFCRowsByChapter& outRows, bool* outObjects = nil);
+
+	/** Is the row (chapter, hit) one of these rows? The one question the selection's doors (RowsOfRightClick,
+	    LastSelectedHit, FollowModifiedClick) and Copy Rows (KFCCopyResults) ask of a list of rows
+	    (KFCResultTreeController.cpp). */
+	bool RowsHold(const KFCRowsByChapter& rows, int32 chapter, int32 hit);
 
 	/** THE ROWS A RIGHT-CLICK'S REPLACE WRITES: every row selected together, by document in the order drawn, when
 	    the hit row right-clicked is one of several selected; else that row alone. Asked by the menu's grey state and by
@@ -206,6 +217,14 @@ namespace KFCResultTree
 	    rows: the key is not this function's. */
 	bool ExtendSelection(ITreeViewController* controller, bool down);
 
+	/** A ROW SELECTED ALONE AND IN VIEW: every row above it opened, top down, so the tree draws it (a book search
+	    brings its chapters up closed); the selection taken off and put on it - the official re-selection; brought
+	    into view. What a landing that skips rows does first - Shift+Return's and Ctrl+Return's (KFCResultTreeEH) and
+	    a tier switch's (KFCResultHistory) - before its jump. Returns the Select's answer (an
+	    ITreeViewController::SelectCode) (KFCResultTreeController.cpp). */
+	int32 SelectAloneInView(ITreeViewController* controller, const ITreeViewHierarchyAdapter* adapter,
+		ITreeViewMgr* treeMgr, const NodeID& row);
+
 	/** SEARCH THIS STORY AGAIN (a story row's right-click menu - the author's call): nothing while a run of
 	    ours is up (RefusedWhileRunning); then the story walked again (KFCRuns()->SearchStoryAgain), the tree rebuilt
 	    when its rows were put back (their places in the list moved) and the status line set either way. True = done. */
@@ -260,6 +279,10 @@ namespace KFCResultTree
 	    the keyboard's questions, the Return filter. (RedrawKeyboardFrame wants the panel's view as well, and asks the
 	    panel for both.) */
 	IControlView* ResultListView();
+
+	/** ...and its tree's manager, counted (an InterfacePtr takes it) - nil while the panel is closed. The one reach
+	    of the drawing (Rebuild, RefreshRows, BeforeChapterRowGoes) and of the tiers' copies (KFCResultHistory). */
+	ITreeViewMgr* QueryResultTreeMgr();
 
 	/** THE LIST TAKES THE KEYBOARD, THE PANEL MADE ACTIVE: IPanelMgr::ShowPanelByWidgetID with giveKeyFocus,
 	    then the panel's IPanelControlData::SetKeyboardFocus on the list - and IKeyBoard::AcquireKeyFocus if those did not

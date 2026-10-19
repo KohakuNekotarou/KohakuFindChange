@@ -696,9 +696,8 @@ void RememberAndWrite(const Placement& p, bool sayFailure)
 		// A broken settings file was repaired to keep the placement - said once, when it
 		// happens: a setting the file had lost comes up at its default from the next start (this
 		// session still holds it).
-		PMString msg("Book panel placement saved - the settings file was damaged and has been rewritten with what could be read.");
-		msg.SetTranslatable(kFalse);
-		KFCResultTree::ShowStatus(msg);
+		KFCResultTree::ShowStatus("Book panel placement saved"
+			" - the settings file was damaged and has been rewritten with what could be read.");
 	}
 }
 

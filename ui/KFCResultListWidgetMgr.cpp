@@ -59,8 +59,6 @@
 #include "TextChar.h"		// kTextChar_Ellipse - the mark on a cut "Preview Text:"
 #include "Utils.h"
 #include "widgetid.h"		// kTreeNodeExpanderWidgetID
-#include "IconRsrcDefs.h"	// kEyeballIcon, kNoIcon - the row eye
-#include "SysControlIds.h"	// kApplicationRsrcPluginID - the eyeball is the application's
 
 // Project includes:
 #include "KFCUIID.h"
@@ -69,6 +67,7 @@
 #include "KFCResultTree.h"
 #include "KFCResultHistory.h"	// the tiers kept above the live list - their rows' copies, and whether there are any
 #include "KFCJump.h"			// ReplaceObjectRows - object rows' Replace
+#include "KFCResultEye.h"		// Draw - the row eye, drawn as its click and its trace draw it
 #include "KFCColorTextView.h"	// IKFCRowData (the hit cell)
 #include "IKFCStatusTextData.h"	// the message area's pieces
 #include "KFCTextCut.h"			// KFCSafeCut - where the box's text may be cut (the rows' own rule, model/)
@@ -297,7 +296,7 @@ public:
 		// for a kept tier's - and HOW FAR RIGHT: a kept row one tier level in, the live list's rows one tier level in while the
 		// results are kept in tiers (TierShift), a tier's own row at the left edge.
 		KFCResultTree::RowLook look;
-		const bool kept = nodeID->IsInert() && nodeID->GetTier() >= 0;
+		const bool kept = nodeID->IsGrey();
 		bool known = false;
 		PMReal levelIn(0.0);
 		if (kept)
@@ -429,13 +428,11 @@ private:
 			eyeFrame.Left(xStart - kExpanderZone);
 			eyeFrame.Right(xStart);
 			eye->SetFrame(eyeFrame);
-			eye->SetRsrcID(look.kept ? kEyeballIcon : kNoIcon);
-			eye->SetRsrcPluginID(kApplicationRsrcPluginID);
 			if (kept)
 				eye->Disable();
 			else
 				eye->Enable();
-			eye->Invalidate();
+			KFCResultEye::Draw(eye, look.kept, false /*invalidated: the tree draws the row right after*/);
 		}
 
 		IControlView* cell = rowData->FindWidget(kKFCResultTextWidgetID);
@@ -477,12 +474,10 @@ bool KFCResultTree::GetRowLook(const NodeID& node, RowLook& out)
 {
 	out = RowLook();
 	TreeNodePtr<KFCResultNodeID> nodeID(node);
-	if (nodeID == nil || nodeID->IsRoot() || nodeID->IsKeptRow())
-		return false;
+	if (nodeID == nil || nodeID->IsRoot() || nodeID->IsGrey())
+		return false;		// a grey row - a kept tier's own row or a row of its copy: KFCResultHistory::GetKeptLook
 	if (nodeID->IsTierRow())
 	{
-		if (nodeID->GetTier() >= 0)
-			return false;		// a kept tier's own row: KFCResultHistory::GetKeptLook
 		// THE LIVE TIER'S ROW (the stacked results' spec, section 2-2): the search that made the list, and the list's
 		// counts as the book row reads them. At the left edge.
 		out.label = KFCResultHistory::LiveTierLabel();
@@ -598,15 +593,11 @@ IControlView* KFCResultTree::ResultListView()
 	return (panelData != nil) ? panelData->FindWidget(kKFCResultListWidgetID) : nil;
 }
 
-namespace
+ITreeViewMgr* KFCResultTree::QueryResultTreeMgr()
 {
-// The panel's result tree, reached through the panel - nil when the panel is closed, which is an ordinary
-// state: Rebuild, RefreshRows and BeforeChapterRowGoes then do nothing.
-ITreeViewMgr* QueryResultTreeMgr()
-{
-	IControlView* const listView = KFCResultTree::ResultListView();
+	// Nil when the panel is closed, an ordinary state: Rebuild, RefreshRows and BeforeChapterRowGoes then do nothing.
+	IControlView* const listView = ResultListView();
 	return (listView != nil) ? InterfacePtr<ITreeViewMgr>(listView, UseDefaultIID()).forget() : nil;
-}
 }
 
 //----------------------------------------------------------------------------------------
@@ -947,6 +938,13 @@ void KFCResultTree::ShowStatus(const PMString& message)
 	WriteMessage(message, kTrue /*force the redraw*/);
 }
 
+void KFCResultTree::ShowStatus(const char* message)
+{
+	PMString sentence(message);
+	sentence.SetTranslatable(kFalse);
+	ShowStatus(sentence);
+}
+
 //----------------------------------------------------------------------------------------
 // KFCResultTree::ShowRowPreview - a GREP row's after-text on the message area
 //----------------------------------------------------------------------------------------
@@ -1113,13 +1111,24 @@ bool KFCResultTree::TakeKeyboard()
 	return keyBoard->GetKeyFocus() == listEH;
 }
 
-bool KFCResultTree::CanReplaceAny(const KFCRowsByChapter& rows)
+namespace
+{
+// IS ANY OF THESE ROWS ONE `can` SAYS YES FOR - the one walk of the questions the row menus grey their items by
+// (CanReplaceAny, CanRestoreAny, CanOutlineAny, CanSpecialAny): the first yes is enough.
+template <typename Can>
+bool AnyRowCan(const KFCRowsByChapter& rows, Can can)
 {
 	for (size_t c = 0; c < rows.size(); ++c)
 		for (size_t k = 0; k < rows[c].hits.size(); ++k)
-			if (KFCRuns()->CanReplaceHit(rows[c].chapter, rows[c].hits[k]))
+			if (can(rows[c].chapter, rows[c].hits[k]))
 				return true;
 	return false;
+}
+}	// anonymous namespace
+
+bool KFCResultTree::CanReplaceAny(const KFCRowsByChapter& rows)
+{
+	return AnyRowCan(rows, [](int32 chapter, int32 hit) { return KFCRuns()->CanReplaceHit(chapter, hit); });
 }
 
 bool KFCResultTree::ReplaceRows(const KFCRowsByChapter& rows, PMString* outStatus)
@@ -1206,6 +1215,26 @@ bool SearchAgain(Walk walk)
 	KFCResultTree::ShowStatus(status);
 	return done;
 }
+
+// A WRITE FROM THE LIST WITH NO LANDING, THE STEPS AROUND IT - one place for Create Outlines, Restore from Copy and
+// the other Special Operations: not under a landing or a run (KFCJump::IsLanding, RefusedWhileRunning), nothing for
+// no rows; then the write; the rows drawn again - repainted in place, or the tree rebuilt when the write threw the
+// results away (ReplaceRows says when) - and the status line, when the write has words for it. True = written.
+template <typename Write>
+bool WriteRowsInPlace(const KFCRowsByChapter& rows, Write write)
+{
+	if (KFCJump::IsLanding() || KFCResultTree::RefusedWhileRunning() || KFCRowCount(rows) == 0)
+		return false;
+	PMString status;
+	const bool wrote = write(status);
+	if (KFCResults()->HasRun())
+		KFCResultTree::RefreshRows();
+	else
+		KFCResultTree::Rebuild();
+	if (!status.IsEmpty())
+		KFCResultTree::ShowStatus(status);
+	return wrote;
+}
 }	// anonymous namespace
 
 bool KFCResultTree::SearchStoryAgain(int32 chapterIdx, int32 groupIdx)
@@ -1225,80 +1254,38 @@ bool KFCResultTree::SearchListAgain()
 
 bool KFCResultTree::OutlineRows(const KFCRowsByChapter& rows)
 {
-	if (KFCJump::IsLanding() || RefusedWhileRunning() || KFCRowCount(rows) == 0)
-		return false;
-	PMString status;
-	const bool wrote = KFCRuns()->OutlineRows(rows, status);
-	// The rows drawn again - each written one reads Outlined and names its outlines (RefreshRows keeps what the person had
-	// opened and closed) - and the status line either way.
-	if (KFCResults()->HasRun())
-		RefreshRows();
-	else
-		Rebuild();
-	if (!status.IsEmpty())
-		ShowStatus(status);
-	return wrote;
+	// Drawn again after it (WriteRowsInPlace): each written row reads Outlined and names its outlines, RefreshRows
+	// keeping what the person had opened and closed.
+	return WriteRowsInPlace(rows, [&](PMString& status) { return KFCRuns()->OutlineRows(rows, status); });
 }
 
 bool KFCResultTree::RestoreRows(const KFCRowsByChapter& rows)
 {
-	if (KFCJump::IsLanding() || RefusedWhileRunning() || KFCRowCount(rows) == 0)
-		return false;
-	PMString status;
-	const bool wrote = KFCRuns()->RestoreRows(rows, status);
-	// The rows drawn again - each one put back reads as before its Replace (RefreshRows keeps what the person had opened
-	// and closed) - and the status line either way.
-	if (KFCResults()->HasRun())
-		RefreshRows();
-	else
-		Rebuild();
-	if (!status.IsEmpty())
-		ShowStatus(status);
-	return wrote;
+	// Drawn again after it (WriteRowsInPlace): each row put back reads as before its Replace, RefreshRows keeping
+	// what the person had opened and closed.
+	return WriteRowsInPlace(rows, [&](PMString& status) { return KFCRuns()->RestoreRows(rows, status); });
 }
 
 bool KFCResultTree::CanRestoreAny(const KFCRowsByChapter& rows)
 {
-	for (size_t c = 0; c < rows.size(); ++c)
-		for (size_t k = 0; k < rows[c].hits.size(); ++k)
-			if (KFCRuns()->CanRestoreHit(rows[c].chapter, rows[c].hits[k]))
-				return true;
-	return false;
+	return AnyRowCan(rows, [](int32 chapter, int32 hit) { return KFCRuns()->CanRestoreHit(chapter, hit); });
 }
 
 bool KFCResultTree::CanOutlineAny(const KFCRowsByChapter& rows)
 {
-	for (size_t c = 0; c < rows.size(); ++c)
-		for (size_t k = 0; k < rows[c].hits.size(); ++k)
-			if (KFCRuns()->CanOutlineHit(rows[c].chapter, rows[c].hits[k]))
-				return true;
-	return false;
+	return AnyRowCan(rows, [](int32 chapter, int32 hit) { return KFCRuns()->CanOutlineHit(chapter, hit); });
 }
 
 bool KFCResultTree::SpecialRows(int32 op, const KFCRowsByChapter& rows, const KFCSpecialParams& params)
 {
-	if (KFCJump::IsLanding() || RefusedWhileRunning() || KFCRowCount(rows) == 0)
-		return false;
-	PMString status;
-	const bool wrote = KFCRuns()->SpecialRows(op, rows, params, status);
-	// The rows drawn again - each written one reads the operation's word, its place read again (RefreshRows keeps what the
-	// person had opened and closed) - and the status line either way.
-	if (KFCResults()->HasRun())
-		RefreshRows();
-	else
-		Rebuild();
-	if (!status.IsEmpty())
-		ShowStatus(status);
-	return wrote;
+	// Drawn again after it (WriteRowsInPlace): each written row reads the operation's word, its place read again,
+	// RefreshRows keeping what the person had opened and closed.
+	return WriteRowsInPlace(rows, [&](PMString& status) { return KFCRuns()->SpecialRows(op, rows, params, status); });
 }
 
 bool KFCResultTree::CanSpecialAny(int32 op, const KFCRowsByChapter& rows)
 {
-	for (size_t c = 0; c < rows.size(); ++c)
-		for (size_t k = 0; k < rows[c].hits.size(); ++k)
-			if (KFCRuns()->CanSpecialHit(op, rows[c].chapter, rows[c].hits[k]))
-				return true;
-	return false;
+	return AnyRowCan(rows, [op](int32 chapter, int32 hit) { return KFCRuns()->CanSpecialHit(op, chapter, hit); });
 }
 
 const char* KFCResultTree::SpecialRowWord(int32 op)

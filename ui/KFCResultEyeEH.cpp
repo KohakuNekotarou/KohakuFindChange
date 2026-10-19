@@ -102,6 +102,14 @@ bool KFCResultEye::WrittenRow(const IPMUnknown* eye, int32& outChapter, int32& o
 		&& IsWritten(outRow);
 }
 
+void KFCResultEye::SayKept(const PMString& what, bool kept)
+{
+	PMString words(what);
+	words.SetTranslatable(kFalse);
+	words.Append(kept ? "  kept when searching again" : "  not kept when searching again");
+	KFCResultTree::ShowStatus(words);
+}
+
 void KFCResultEye::Draw(IControlView* eye, bool kept, bool now)
 {
 	if (eye == nil)
@@ -130,10 +138,7 @@ bool16 KFCResultEyeEH::Turn()
 	InterfacePtr<IControlView> view(this, UseDefaultIID());
 	KFCResultEye::Draw(view, kept, false);
 	// "P1(2)  kept when searching again" - the row named by its locator, as the list reads it.
-	PMString words(row.locator);
-	words.SetTranslatable(kFalse);
-	words.Append(kept ? "  kept when searching again" : "  not kept when searching again");
-	KFCResultTree::ShowStatus(words);
+	KFCResultEye::SayKept(row.locator, kept);
 	// The keyboard to the list, as after every click on it (KFCResultNodeEH) - Return and the arrows go on from here.
 	(void)KFCResultTree::TakeKeyboard();
 	return kTrue;

@@ -80,7 +80,6 @@
 #include <chrono>					// a Return's hold on the keyboard - how long at most (gHolding)
 #include <set>						// the rows Ctrl+Return takes off the list - passed over by the row it lands on
 #include <utility>					// std::pair - a row as its chapter and hit
-#include <vector>					// the rows above the one Shift+Return goes on to, opened top down
 
 // Project includes:
 #include "KFCUIID.h"
@@ -210,29 +209,11 @@ NodeID RowBeforeInTreeOrder(const ITreeViewHierarchyAdapter* adapter, const Node
 void LandOnRow(ITreeViewController* controller, const ITreeViewHierarchyAdapter* adapter, ITreeViewMgr* treeMgr,
 	const NodeID& next, int32 chapterIdx, int32 hitIdx)
 {
-	// Every row above it open, top down, so the tree draws it. (ExpandNode on an open row is a harmless no-op -
-	// StockMoveThenLand leans on the same.)
-	std::vector<NodeID> above;
-	for (NodeID up(adapter->GetParentNode(next)); up.IsValid(); up = NodeID(adapter->GetParentNode(up)))
-	{
-		TreeNodePtr<KFCResultNodeID> upID(up);
-		if (upID == nil || upID->IsRoot())
-			break;		// the hidden root is never drawn
-		above.push_back(up);
-	}
-	for (auto it = above.rbegin(); it != above.rend(); ++it)
-		treeMgr->ExpandNode(*it, kFalse /*expandAllDescendants*/);
-	// THE WRITTEN ROWS' SELECTION OFF FIRST. Select does not move a selection: in a one-row list it refuses while a row
-	// is selected (ITreeViewController::SelectCode eSingleItemAlreadySelected; measured: the next row was jumped to while
-	// the written one stayed selected), and in this list, which selects rows together (KFCResultTreeController), it would
-	// add to them.
-	// The official re-selection (docs/ai-notes/api-official-examples.md, "select a tree row again"): the deselect tells
-	// nobody - only the row that ends selected is announced - and both repaint.
-	controller->DeselectAll(kFalse /*notifyOfChange*/, kTrue /*changeHilite*/);
-	const ITreeViewController::SelectCode selected = controller->Select(next, kTrue /*notifyOfChange*/, kTrue /*changeHilite*/);
+	// Every row above it open, the written rows' selection taken off and this one selected, brought into view
+	// (KFCResultTree::SelectAloneInView - the official re-selection, and why).
+	const int32 selected = KFCResultTree::SelectAloneInView(controller, adapter, treeMgr, next);
 	KFC_DIAG_LOG("GOON select code=%d chapter=%d hit=%d", static_cast<int>(selected), static_cast<int>(chapterIdx), static_cast<int>(hitIdx));
 	(void)selected;
-	treeMgr->ScrollToNode(next, ITreeViewMgr::eScrollIntoView);
 	{
 		// One walk at a time, as for the arrows (gWalking): the landing may open a chapter, and that runs the message loop.
 		WalkGuard walkGuard;
@@ -764,7 +745,7 @@ bool16 KFCResultTreeEH::StockMoveThenLand(IEvent* e, const VirtualKey& key)
 			}
 			if (edge.IsValid() && !(selected.size() == 1 && selected[0] == edge))
 			{
-				// The official re-selection (LandOnRow): Select alone does not move a selection.
+				// The official re-selection (KFCResultTree::SelectAloneInView): Select alone does not move a selection.
 				controller->DeselectAll(kFalse /*notifyOfChange*/, kTrue /*changeHilite*/);
 				(void)controller->Select(edge, kTrue /*notifyOfChange*/, kTrue /*changeHilite*/);
 				treeMgr->ScrollToNode(edge, ITreeViewMgr::eScrollIntoView);

@@ -543,9 +543,7 @@ bool KFCPanelStateFilePath(PMString& outPath)
 // One place for the failure messages, so every exit says something rather than failing silently.
 static void KFCPanelStateSayFailed(const char* what)
 {
-	PMString err(what);
-	err.SetTranslatable(kFalse);
-	KFCResultTree::ShowStatus(err);
+	KFCResultTree::ShowStatus(what);
 }
 
 //----------------------------------------------------------------------------------------

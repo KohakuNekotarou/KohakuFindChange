@@ -141,16 +141,12 @@ bool16 KFCResultNodeEH::LButtonUp(IEvent* e)
 	// A GREY ROW - A ROW OF A KEPT TIER - SWITCHES TO ITS TIER (docs/superpowers/specs/2026-10-14-kfc-tier-switch-design.md
 	// section 2-1, the author's call): booked, not made here - the switch draws the list anew, and this row's widget goes with
 	// the old tree (KFCResultHistory::SwitchToKeptRowLater says when it runs, and why). Nothing of this row is read after.
-	if (nodeID != nil && nodeID->IsKeptRow())
+	// A GREY TIER'S OWN ROW SWITCHES TO IT TOO (v2 R5 - the author's call), booked the same way with no row to land on
+	// (GetKeptRow -1): a tier's row is never selected. (Its arrow opens and closes it, as every tier's does - the
+	// arrow's own widget.)
+	if (nodeID != nil && nodeID->IsGrey())
 	{
 		KFCResultHistory::SwitchToKeptRowLater(nodeID->GetTier(), nodeID->GetKeptRow());
-		return result;
-	}
-	// A GREY TIER'S OWN ROW SWITCHES TO IT TOO (v2 R5 - the author's call), booked the same way with no row to land on: a
-	// tier's row is never selected. (Its arrow opens and closes it, as every tier's does - the arrow's own widget.)
-	if (nodeID != nil && nodeID->IsTierRow() && nodeID->GetTier() >= 0)
-	{
-		KFCResultHistory::SwitchToKeptRowLater(nodeID->GetTier(), -1);
 		return result;
 	}
 	// THE LIVE TIER'S OWN ROW (the author's call, 10-14 night: a heading row can be selected): the press selected it - alone,

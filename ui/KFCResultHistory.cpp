@@ -16,7 +16,7 @@
 #include "IPanelControlData.h"			// the tree's row widgets - the row at the top of the view (ShownTop)
 #include "ITreeNodeIDData.h"			// ...each row widget's NodeID
 #include "ITreeViewController.h"		// DeselectAll / Select - the row switched to, selected
-#include "ITreeViewHierarchyAdapter.h"	// GetParentNode - the rows above it opened, so the tree draws it
+#include "ITreeViewHierarchyAdapter.h"	// the rows above the row switched to, opened (SelectAloneInView)
 #include "ITreeViewMgr.h"				// IsNodeExpanded / ExpandNode - the kept tiers opened as they were
 
 // General includes:
@@ -145,11 +145,15 @@ namespace
 		return (row < static_cast<int32>(kept.rows.size())) ? &kept.rows[static_cast<size_t>(row)] : nil;
 	}
 
-	// The result list's tree - nil while the panel is closed (KFCResultTree::ResultListView).
-	ITreeViewMgr* QueryListTreeMgr()
+	// The copy of list `set` (a result set): its place among the kept tiers, -1 when no copy has it - a tier gone
+	// since (the cap, a switch, Clear These Results). Each list has one copy at most: the copies follow the model's
+	// tiers, each of them taken once (FollowModelTiers).
+	int32 TierOfSet(uint32 set)
 	{
-		IControlView* const listView = KFCResultTree::ResultListView();
-		return (listView != nil) ? InterfacePtr<ITreeViewMgr>(listView, UseDefaultIID()).forget() : nil;
+		for (size_t k = 0; k < gKept.size(); ++k)
+			if (gKept[k].set == set)
+				return static_cast<int32>(k);
+		return -1;
 	}
 
 	// THE ROWS UNDER `from`, COPIED into `kept` under its row `parent` (-1 = the tier's own row): each row, then the rows under
@@ -201,7 +205,7 @@ namespace
 		out.label = head.label;
 		out.head = KFCResultHistory::LiveTierLabel();	// the name GetRowLook wrote it with, before the counts
 		out.head.SetTranslatable(kFalse);
-		InterfacePtr<ITreeViewMgr> treeMgr(QueryListTreeMgr());
+		InterfacePtr<ITreeViewMgr> treeMgr(KFCResultTree::QueryResultTreeMgr());
 		// The tier's own row open or closed as the person left it (v2 R6) - open when the tree does not show it as a tier (a
 		// list drawn with no tiers shows all its rows) or the panel is closed.
 		out.open = (treeMgr != nil && KFCResultHistory::IsStacking())
@@ -345,12 +349,9 @@ namespace
 		if (!at.heading)
 		{
 			at.keptRow = id->GetKeptRow();
-			for (size_t k = 0; k < gKept.size(); ++k)
-				if (gKept[k].set == at.set && at.keptRow >= 0 && at.keptRow < static_cast<int32>(gKept[k].rows.size()))
-				{
-					at.live = gKept[k].rows[static_cast<size_t>(at.keptRow)].live;
-					break;
-				}
+			const KeptRow* const row = RowOf(TierOfSet(at.set), at.keptRow);
+			if (row != nil)
+				at.live = row->live;
 		}
 		return at;
 	}
@@ -367,22 +368,59 @@ namespace
 				return NodeID(KFCResultNodeID::CreateLiveTier());
 			return at.live;
 		}
-		for (size_t k = 0; k < gKept.size(); ++k)
-		{
-			if (gKept[k].set != at.set)
-				continue;
-			const int32 t = static_cast<int32>(k);
-			if (at.heading)
-				return NodeID(KFCResultNodeID::CreateTier(t));
-			if (at.keptRow >= 0 && at.keptRow < static_cast<int32>(gKept[k].rows.size()))
-				return NodeID(KFCResultNodeID::CreateKept(t, at.keptRow));
-			// A row of the list that was live: the copy's row made from it.
-			for (size_t r = 0; r < gKept[k].rows.size(); ++r)
-				if (at.live.IsValid() && gKept[k].rows[r].live == at.live)
-					return NodeID(KFCResultNodeID::CreateKept(t, static_cast<int32>(r)));
+		const int32 t = TierOfSet(at.set);
+		if (t < 0)
+			return NodeID();
+		const KeptTier& kept = gKept[static_cast<size_t>(t)];
+		if (at.heading)
 			return NodeID(KFCResultNodeID::CreateTier(t));
+		if (at.keptRow >= 0 && at.keptRow < static_cast<int32>(kept.rows.size()))
+			return NodeID(KFCResultNodeID::CreateKept(t, at.keptRow));
+		// A row of the list that was live: the copy's row made from it.
+		for (size_t r = 0; r < kept.rows.size(); ++r)
+			if (at.live.IsValid() && kept.rows[r].live == at.live)
+				return NodeID(KFCResultNodeID::CreateKept(t, static_cast<int32>(r)));
+		return NodeID(KFCResultNodeID::CreateTier(t));
+	}
+
+	// A LIST MADE ANEW BY A SEARCH INTO THE PANEL (Find, Narrow - `committed`: it went through), what follows it, in
+	// one place: the copy of the list it replaced offered as a tier; THE COPIES FOLLOW THE MODEL'S TIERS - after
+	// every search, whether it went through or not (the plan's Review Focus 5: the copies and the model's tiers must
+	// not drift apart): the list replaced is kept or not as the model kept it (KFCTierStore::ParkCurrent - one
+	// answer, in one place), and past the cap the model let the oldest go; and the new list named `label`. outKept =
+	// the copy offered was kept. Returns how many copies the cap let go: the copies that went are the oldest - all of
+	// them but the one offered, when the model did not keep it.
+	int32 FollowNewList(bool committed, bool havePending, KeptTier& pending, uint32 setBefore, const PMString& label,
+		bool& outKept)
+	{
+		if (committed && havePending)
+			gKept.push_back(std::move(pending));
+		const int32 went = FollowModelTiers();
+		outKept = committed && havePending && !gKept.empty() && gKept.back().set == setBefore;
+		const int32 letGo = went - ((committed && havePending && !outKept) ? 1 : 0);
+		if (committed)
+		{
+			gLive.label = label;
+			gLive.label.SetTranslatable(kFalse);
+			gLive.set = KFCResults()->GetResultSetId();
+			gLive.stacked = true;
 		}
-		return NodeID();
+		return letGo;
+	}
+
+	// The status line after a search into the panel: the search's words - and, when the cap let a tier go, a word on it
+	// after them.
+	void SayFound(const PMString& summary, int32 letGo)
+	{
+		PMString status(summary);
+		status.SetTranslatable(kFalse);
+		if (letGo > 0)
+		{
+			status.Append(" The oldest kept results were let go - ");
+			status.AppendNumber(KFCResultModel::kMaxKeptTiers);
+			status.Append(" are kept at most.");
+		}
+		KFCResultTree::ShowStatus(status);
 	}
 }	// anonymous namespace
 
@@ -414,37 +452,14 @@ int32 KFCResultHistory::Find(const PMString& label, PMString& outSummary, bool* 
 	// WENT THROUGH = A NEW LIST: past its commit point the search drops the results (KFCSearchEngine::DropResults - a new
 	// result set), and every refusal comes before it and touches nothing (SearchBook's own rule).
 	const bool committed = KFCResults()->GetResultSetId() != setBefore;
-	if (committed && havePending)
-		gKept.push_back(std::move(pending));
-	// THE COPIES FOLLOW THE MODEL'S TIERS - after every search, whether it went through or not (the plan's Review Focus 5:
-	// the copies and the model's tiers must not drift apart): the list replaced is kept or not as the model kept it
-	// (KFCTierStore::ParkCurrent - one answer, in one place), and past the cap the model let the oldest go.
-	const int32 went = FollowModelTiers();
-	const bool keptPending = committed && havePending && !gKept.empty() && gKept.back().set == setBefore;
-	// The copies that went are the oldest, let go by the cap - all of them but the one offered, when the model did not keep
-	// it.
-	const int32 letGo = went - ((committed && havePending && !keptPending) ? 1 : 0);
-	if (committed)
-	{
-		gLive.label = label;
-		gLive.label.SetTranslatable(kFalse);
-		gLive.set = KFCResults()->GetResultSetId();
-		gLive.stacked = true;
-	}
+	bool keptPending = false;
+	const int32 letGo = FollowNewList(committed, havePending, pending, setBefore, label, keptPending);
 	KFC_DIAG_LOG("STACK find went=%d kept=%d letgo=%d tiers=%d", committed ? 1 : 0, keptPending ? 1 : 0,
 		static_cast<int>(letGo), static_cast<int>(gKept.size()));
 	KFCResultTree::Rebuild();
-	// The status line: the search's words - and, when the cap let a tier go, a word on it after them (the panel's line
-	// only: outSummary goes back to the caller as the search's own words, which the query dialog quotes).
-	PMString status(outSummary);
-	status.SetTranslatable(kFalse);
-	if (letGo > 0)
-	{
-		status.Append(" The oldest kept results were let go - ");
-		status.AppendNumber(KFCResultModel::kMaxKeptTiers);
-		status.Append(" are kept at most.");
-	}
-	KFCResultTree::ShowStatus(status);
+	// The status line is the panel's alone: outSummary goes back to the caller as the search's own words, which the
+	// query dialog quotes.
+	SayFound(outSummary, letGo);
 	if (outCommitted != nil)
 		*outCommitted = committed;
 	return found;
@@ -466,31 +481,13 @@ bool KFCResultHistory::Narrow(const KFCNarrowStep& step, PMString& outSummary)
 	(void)KFCRuns()->NarrowList(step, outSummary);
 	// A NEW LIST = narrowed (a new result set - the model's commit point, as a search's); refused, nothing has changed.
 	const bool committed = KFCResults()->GetResultSetId() != setBefore;
-	if (committed && havePending)
-		gKept.push_back(std::move(pending));
-	const int32 went = FollowModelTiers();
-	const bool keptPending = committed && havePending && !gKept.empty() && gKept.back().set == setBefore;
-	const int32 letGo = went - ((committed && havePending && !keptPending) ? 1 : 0);
-	if (committed)
-	{
-		gLive.label = label;
-		gLive.label.SetTranslatable(kFalse);
-		gLive.set = KFCResults()->GetResultSetId();
-		gLive.stacked = true;
-	}
+	bool keptPending = false;
+	const int32 letGo = FollowNewList(committed, havePending, pending, setBefore, label, keptPending);
 	KFC_DIAG_LOG("STACK narrow kind=%d went=%d kept=%d letgo=%d tiers=%d", static_cast<int>(step.kind), committed ? 1 : 0,
 		keptPending ? 1 : 0, static_cast<int>(letGo), static_cast<int>(gKept.size()));
 	if (committed)
 		KFCResultTree::Rebuild();
-	PMString status(outSummary);
-	status.SetTranslatable(kFalse);
-	if (letGo > 0)
-	{
-		status.Append(" The oldest kept results were let go - ");
-		status.AppendNumber(KFCResultModel::kMaxKeptTiers);
-		status.Append(" are kept at most.");
-	}
-	KFCResultTree::ShowStatus(status);
+	SayFound(outSummary, letGo);
 	return committed;
 }
 
@@ -718,19 +715,19 @@ void KFCResultHistory::NoteOpenTiers(ITreeViewMgr* treeMgr)
 	// stands now: the cap lets tiers go from the front, and a switch takes one out from anywhere. A tier gone since is
 	// passed over.
 	for (size_t t = 0; t < gDrawnSets.size(); ++t)
-		for (size_t k = 0; k < gKept.size(); ++k)
-			if (gKept[k].set == gDrawnSets[t])
-			{
-				KeptTier& kept = gKept[k];
-				kept.open = (treeMgr->IsNodeExpanded(KFCResultNodeID::CreateTier(static_cast<int32>(t))) != kFalse);
-				// Its rows too (v2 R6 - a row the person opened or closed in a grey tier stays so): the branch rows, a hit row
-				// being a leaf.
-				for (size_t r = 0; r < kept.rows.size(); ++r)
-					if (!kept.rows[r].look.hit)
-						kept.rows[r].open = (treeMgr->IsNodeExpanded(KFCResultNodeID::CreateKept(static_cast<int32>(t),
-							static_cast<int32>(r))) != kFalse);
-				break;
-			}
+	{
+		const int32 k = TierOfSet(gDrawnSets[t]);
+		if (k < 0)
+			continue;
+		KeptTier& kept = gKept[static_cast<size_t>(k)];
+		kept.open = (treeMgr->IsNodeExpanded(KFCResultNodeID::CreateTier(static_cast<int32>(t))) != kFalse);
+		// Its rows too (v2 R6 - a row the person opened or closed in a grey tier stays so): the branch rows, a hit row
+		// being a leaf.
+		for (size_t r = 0; r < kept.rows.size(); ++r)
+			if (!kept.rows[r].look.hit)
+				kept.rows[r].open = (treeMgr->IsNodeExpanded(KFCResultNodeID::CreateKept(static_cast<int32>(t),
+					static_cast<int32>(r))) != kFalse);
+	}
 	// The live tier's own row, while the list drawn last is the live one still - a switch notes what it opens itself.
 	if (gLiveOpen.set == 0 && gDrawnLive != 0 && gDrawnLive == KFCResults()->GetResultSetId())
 	{
@@ -829,18 +826,17 @@ bool KFCResultHistory::QueryReadsAsTier(uint32 set, PMString& outName)
 			return false;
 		return (WithoutQueryPlace(gLive.label) == QueryLabel()) != kFalse;
 	}
-	for (size_t k = 0; k < gKept.size(); ++k)
-		if (gKept[k].set == set)
-		{
-			outName = gKept[k].head.IsEmpty() ? gKept[k].name : gKept[k].head;
-			outName.SetTranslatable(kFalse);
-			if (gKept[k].name.IsEmpty())
-				return false;		// no search here named that list: nothing to read the query against
-			// Word for word - PMString's == compares the buffers -: the name as the search made it, the dialog's place in the
-			// run order taken off, against the name made again from the query Find/Change holds now.
-			return (WithoutQueryPlace(gKept[k].name) == QueryLabel()) != kFalse;
-		}
-	return false;
+	const int32 tier = TierOfSet(set);
+	if (tier < 0)
+		return false;
+	const KeptTier& kept = gKept[static_cast<size_t>(tier)];
+	outName = kept.head.IsEmpty() ? kept.name : kept.head;
+	outName.SetTranslatable(kFalse);
+	if (kept.name.IsEmpty())
+		return false;		// no search here named that list: nothing to read the query against
+	// Word for word - PMString's == compares the buffers -: the name as the search made it, the dialog's place in the
+	// run order taken off, against the name made again from the query Find/Change holds now.
+	return (WithoutQueryPlace(kept.name) == QueryLabel()) != kFalse;
 }
 
 bool KFCResultHistory::ClearTier(int32 tier)
@@ -886,20 +882,14 @@ bool KFCResultHistory::ClearTier(int32 tier)
 
 void KFCResultHistory::KeptChapterGone(uint32 set, int32 chapterIdx, int32 replaced, int32 hits)
 {
-	int32 tier = -1;
-	for (size_t k = 0; k < gKept.size(); ++k)
-		if (gKept[k].set == set)
-		{
-			tier = static_cast<int32>(k);
-			break;
-		}
+	const int32 tier = TierOfSet(set);
 	if (tier < 0)
 		return;
 	KeptTier& kept = gKept[static_cast<size_t>(tier)];
 	// THE TREE IS TOLD ONLY WHERE THE LAST REBUILD DREW THIS TIER, AT THIS PLACE (gDrawnSets - the tree numbers the tiers
 	// as it drew them): a copy drawn elsewhere or not at all - the panel closed - is drawn from the copy at the next
 	// rebuild.
-	InterfacePtr<ITreeViewMgr> treeMgr(QueryListTreeMgr());
+	InterfacePtr<ITreeViewMgr> treeMgr(KFCResultTree::QueryResultTreeMgr());
 	const bool drawn = treeMgr != nil && tier < static_cast<int32>(gDrawnSets.size())
 		&& gDrawnSets[static_cast<size_t>(tier)] == set;
 	// THE DOCUMENT ROW: a row under the tier's own row, copied from that chapter's row (a book's tier keeps its chapters -
@@ -975,7 +965,7 @@ bool KFCResultHistory::SwitchToKeptRow(int32 tier, int32 row, NodeID& outLiveRow
 
 	// AS IT STANDS, BEFORE ANYTHING MOVES: which rows are open - the grey tiers' as the person left them, the tier switched
 	// to's among them (v2 R6) - and the row at the top of the view (the view stays where it is).
-	InterfacePtr<ITreeViewMgr> treeMgr(QueryListTreeMgr());
+	InterfacePtr<ITreeViewMgr> treeMgr(KFCResultTree::QueryResultTreeMgr());
 	NoteOpenTiers(treeMgr);
 	const ViewTop top(NoteViewTop());
 
@@ -1062,20 +1052,14 @@ namespace
 			KFC_DIAG_LOG("STACK switch booking let go set=%u", tierSet);
 			return IIdleTask::kEndOfTime;
 		}
-		int32 tier = -1;
-		for (size_t k = 0; k < gKept.size(); ++k)
-			if (gKept[k].set == tierSet)
-			{
-				tier = static_cast<int32>(k);
-				break;
-			}
+		const int32 tier = TierOfSet(tierSet);
 		NodeID liveRow;
 		if (tier < 0 || !KFCResultHistory::SwitchToKeptRow(tier, row, liveRow))
 			return IIdleTask::kEndOfTime;
 
 		// THE ROW SWITCHED TO, SELECTED AND LANDED ON - the arrows' landing (KFCResultTreeEH's GoOnToNextReplaceableRow): every
 		// row above it opened, top down, so the tree draws it; the selection taken off and put on it (the official
-		// re-selection, docs/ai-notes/api-official-examples.md - Select alone does not move a selection); brought into view;
+		// re-selection - Select alone does not move a selection); brought into view (KFCResultTree::SelectAloneInView);
 		// then the jump, and the keyboard to the list - a click on a live row's two (KFCResultNodeEH).
 		IControlView* const listView = KFCResultTree::ResultListView();
 		InterfacePtr<ITreeViewController> controller(listView, UseDefaultIID());
@@ -1094,19 +1078,7 @@ namespace
 			(void)KFCResultTree::TakeKeyboard();
 			return IIdleTask::kEndOfTime;
 		}
-		std::vector<NodeID> above;
-		for (NodeID up(adapter->GetParentNode(liveRow)); up.IsValid(); up = NodeID(adapter->GetParentNode(up)))
-		{
-			TreeNodePtr<KFCResultNodeID> upID(up);
-			if (upID == nil || upID->IsRoot())
-				break;		// the hidden root is never drawn
-			above.push_back(up);
-		}
-		for (auto it = above.rbegin(); it != above.rend(); ++it)
-			treeMgr->ExpandNode(*it, kFalse /*expandAllDescendants*/);
-		controller->DeselectAll(kFalse /*notifyOfChange*/, kTrue /*changeHilite*/);
-		(void)controller->Select(liveRow, kTrue /*notifyOfChange*/, kTrue /*changeHilite*/);
-		treeMgr->ScrollToNode(liveRow, ITreeViewMgr::eScrollIntoView);
+		(void)KFCResultTree::SelectAloneInView(controller, adapter, treeMgr, liveRow);
 		TreeNodePtr<KFCResultNodeID> rowID(liveRow);
 		if (rowID != nil)
 			KFCJump::ActivateNode(rowID->GetChapter(), rowID->GetHit());

@@ -112,9 +112,8 @@ public:
 		// THE ROOT WHILE THE RESULTS ARE IN TIERS: the kept tiers, then the live one - while there is a live list.
 		if (nodeID->IsRoot() && KFCResultHistory::IsStacking())
 			return KFCResultHistory::KeptTierCount() + (KFCResultHistory::HasLiveList() ? 1 : 0);
-		if (nodeID->IsTierRow() && nodeID->GetTier() >= 0)
-			return KFCResultHistory::KeptChildCount(nodeID->GetTier(), -1);
-		if (nodeID->IsKeptRow())
+		// A GREY ROW - a kept tier's own row (GetKeptRow -1) or a row of its copy: what its copy hangs under it.
+		if (nodeID->IsGrey())
 			return KFCResultHistory::KeptChildCount(nodeID->GetTier(), nodeID->GetKeptRow());
 		return KFCResultTree::LiveRowCount(node);
 	}
@@ -142,14 +141,7 @@ public:
 				return KFCResultNodeID::CreateTier(tier);
 			return kInvalidNodeID;
 		}
-		if (nodeID->IsTierRow() && nodeID->GetTier() >= 0)
-		{
-			const int32 row = KFCResultHistory::KeptChild(nodeID->GetTier(), -1, nth);
-			if (row < 0)
-				return kInvalidNodeID;
-			return KFCResultNodeID::CreateKept(nodeID->GetTier(), row);
-		}
-		if (nodeID->IsKeptRow())
+		if (nodeID->IsGrey())
 		{
 			const int32 row = KFCResultHistory::KeptChild(nodeID->GetTier(), nodeID->GetKeptRow(), nth);
 			if (row < 0)
@@ -203,8 +195,8 @@ CREATE_PMINTERFACE(KFCResultListAdapter, kKFCResultListAdapterImpl)
 int32 KFCResultTree::LiveRowCount(const NodeID& node)
 {
 	TreeNodePtr<KFCResultNodeID> nodeID(node);
-	// Hit rows are the leaves; a kept tier's rows are KFCResultHistory's.
-	if (nodeID == nil || nodeID->IsHitRow() || nodeID->IsKeptRow() || (nodeID->IsTierRow() && nodeID->GetTier() >= 0))
+	// Hit rows are the leaves; a grey row's rows are its tier's copy's (KFCResultHistory).
+	if (nodeID == nil || nodeID->IsHitRow() || nodeID->IsGrey())
 		return 0;
 	// The list's top - the root, or the live tier's row: the book row alone while the results came from a book, the
 	// documents shown otherwise.
@@ -226,7 +218,7 @@ int32 KFCResultTree::LiveRowCount(const NodeID& node)
 NodeID_rv KFCResultTree::LiveRow(const NodeID& node, int32 nth)
 {
 	TreeNodePtr<KFCResultNodeID> nodeID(node);
-	if (nodeID == nil || nodeID->IsHitRow() || nodeID->IsKeptRow() || (nodeID->IsTierRow() && nodeID->GetTier() >= 0))
+	if (nodeID == nil || nodeID->IsHitRow() || nodeID->IsGrey())
 		return kInvalidNodeID;
 	if (nodeID->IsRoot() || nodeID->IsTierRow())
 	{

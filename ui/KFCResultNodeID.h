@@ -187,6 +187,11 @@ public:
 	    nothing for it (KFCResultTree::GetSelectedHitRows takes no row that is not a hit). */
 	bool16 IsLiveTierRow() const { return IsTierRow() && fFont < 0; }
 
+	/** A GREY ROW - a kept tier's own row or a row of its copy: every inert row but the live tier's own
+	    (IsLiveTierRow). Never selected (KFCResultTreeController::Select), drawn and hung from its tier's copy
+	    (KFCResultHistory), and a click on one switches to its tier (KFCResultNodeEH) - the one question they ask. */
+	bool16 IsGrey() const { return IsInert() && fFont >= 0; }
+
 	/** The tier of a tier's row or a kept row: 0 = the oldest kept tier, -1 = the live one (a tier's row only). -1 for every
 	    other row. */
 	int32 GetTier() const { return IsInert() ? fFont : -1; }

@@ -376,9 +376,8 @@ static uint32 RunPendingSearch(void* /*refPtr*/)
 	{
 		if (panelMgr != nil && panelMgr->IsPanelWithWidgetIDShown(kKFCPanelWidgetID))
 		{
-			PMString msg("Application Bar link: Return searches on the Text and GREP tabs only - nothing was searched.");
-			msg.SetTranslatable(kFalse);
-			KFCResultTree::ShowStatus(msg);
+			KFCResultTree::ShowStatus("Application Bar link: Return searches on the Text and GREP tabs only"
+				" - nothing was searched.");
 		}
 		return IIdleTask::kEndOfTime;
 	}
@@ -395,9 +394,8 @@ static uint32 RunPendingSearch(void* /*refPtr*/)
 		query.SetTranslatable(kFalse);
 		if (!KFCRuns()->SetQuery(query, mode))
 		{
-			PMString msg("The Application Bar's text could not be put into Find/Change - nothing was searched.");
-			msg.SetTranslatable(kFalse);
-			KFCResultTree::ShowStatus(msg);
+			KFCResultTree::ShowStatus("The Application Bar's text could not be put into Find/Change"
+				" - nothing was searched.");
 			return IIdleTask::kEndOfTime;
 		}
 	}

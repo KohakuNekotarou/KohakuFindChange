@@ -55,7 +55,7 @@
 #include "KFCModelAccess.h"			// KFCResults() - the rows' state
 #include "KFCResultEye.h"
 #include "KFCResultNodeID.h"
-#include "KFCResultTree.h"			// ShowStatus, TakeKeyboard
+#include "KFCResultTree.h"			// TakeKeyboard
 
 namespace
 {
@@ -167,9 +167,7 @@ void SayTurned()
 		words.AppendNumber(gTrace.fTurned);
 		words.Append(" rows:");
 	}
-	words.SetTranslatable(kFalse);
-	words.Append(gTrace.fWasKept ? "  not kept when searching again" : "  kept when searching again");
-	KFCResultTree::ShowStatus(words);
+	KFCResultEye::SayKept(words, !gTrace.fWasKept);
 }
 
 }	// anonymous namespace

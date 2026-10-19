@@ -609,9 +609,7 @@ namespace
 		// Nothing can be reached, so nothing moves - and that has to be SAID. A row that does
 		// nothing at all when clicked reads as a broken panel: the file has been moved, deleted,
 		// renamed, or is open in another application.
-		PMString message("Cannot open that chapter - moved, deleted, or in use?");
-		message.SetTranslatable(kFalse);
-		KFCResultTree::ShowStatus(message);
+		KFCResultTree::ShowStatus("Cannot open that chapter - moved, deleted, or in use?");
 		return false;
 	}
 
@@ -767,9 +765,7 @@ bool RowHasPlace(TextIndex start, TextIndex end)
 
 void SayRowHasNoPlace()
 {
-	PMString message("This row has no place in its story to go to. Search again.");
-	message.SetTranslatable(kFalse);
-	KFCResultTree::ShowStatus(message);
+	KFCResultTree::ShowStatus("This row has no place in its story to go to. Search again.");
 }
 
 // Is the text at this position still the text this row describes - and if not, where is the row now? The stored
@@ -832,9 +828,7 @@ bool FrontChapter(const UIDRef& docRef, bool hidePreviousChapters = true)
 {
 	if (!EnsureDocFrontmost(docRef))
 	{
-		PMString message("Cannot bring that chapter's window to the front.");
-		message.SetTranslatable(kFalse);
-		KFCResultTree::ShowStatus(message);
+		KFCResultTree::ShowStatus("Cannot bring that chapter's window to the front.");
 		return false;
 	}
 	if (hidePreviousChapters && ShouldHidePreviousChapter())
@@ -1313,9 +1307,7 @@ void ShowBook()
 	// is not a request to open a file. Saying so beats a row that appears to do nothing.
 	if (!KFCChapters()->MakeBookActive(bookPath))
 	{
-		PMString message("That book is no longer open.");
-		message.SetTranslatable(kFalse);
-		KFCResultTree::ShowStatus(message);
+		KFCResultTree::ShowStatus("That book is no longer open.");
 		return;
 	}
 	// ...and its tab to the front of the book panel: the active book and the front tab are separate states,
@@ -1476,9 +1468,7 @@ bool JumpToObject(int32 chapterIdx, int32 hitIdx, UID item)
 			KFCResults()->SetHitOutcome(chapterIdx, hitIdx, KFCResultModel::kOutcomeMissing);
 			KFCResultTree::RefreshRows();
 		}
-		PMString message("Not found - the object is no longer in the document. Search again.");
-		message.SetTranslatable(kFalse);
-		KFCResultTree::ShowStatus(message);
+		KFCResultTree::ShowStatus("Not found - the object is no longer in the document. Search again.");
 		return false;
 	}
 	KFCHitMarkerView::Hide();						// a text row's marker, if one is still up

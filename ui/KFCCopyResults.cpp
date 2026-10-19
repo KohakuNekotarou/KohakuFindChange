@@ -14,7 +14,6 @@
 #include "IClipboardController.h"
 #include "ICommand.h"
 #include "IDataExchangeHandler.h"
-#include "ITextModel.h"
 #include "ITextModelCmds.h"
 #include "ITextScrapData.h"
 
@@ -27,7 +26,6 @@
 
 // Project includes:
 #include "KFCCopyResults.h"
-#include "KFCModelAccess.h"
 #include "KFCResultHistory.h"
 #include "KFCResultNodeID.h"
 #include "KFCResultTree.h"
@@ -166,16 +164,6 @@ namespace
 		++out.rows;
 	}
 
-	bool Holds(const KFCRowsByChapter& rows, int32 chapter, int32 hit)
-	{
-		for (size_t i = 0; i < rows.size(); ++i)
-			if (rows[i].chapter == chapter)
-				for (size_t k = 0; k < rows[i].hits.size(); ++k)
-					if (rows[i].hits[k] == hit)
-						return true;
-		return false;
-	}
-
 	// THE LIVE LIST WALKED AS THE TREE DRAWS IT (KFCResultTree::LiveRowCount / LiveRow - the adapter's own walk): the book
 	// row, its documents, their stories, the rows - a row taken off the list is not among them. `only`: the rows to copy
 	// (nil = all). `limit`: stop after that many rows (0 = all) - the menus' question asks for one.
@@ -191,7 +179,8 @@ namespace
 			KFCResultTree::RowLook look;
 			if (row->IsHitRow())
 			{
-				if ((only == nil || Holds(*only, row->GetChapter(), row->GetHit())) && KFCResultTree::GetRowLook(child, look))
+				if ((only == nil || KFCResultTree::RowsHold(*only, row->GetChapter(), row->GetHit()))
+					&& KFCResultTree::GetRowLook(child, look))
 					AppendRow(out, document, look);
 				continue;
 			}

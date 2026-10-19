@@ -28,11 +28,10 @@
 // Interface includes:
 #include "ISubject.h"
 #include "ITreeNodeIDData.h"
-#include "ITreeViewMgr.h"		// IID_ITREEVIEWMGR - the protocol the tree manager tells a row's opening and closing on
 
 // General includes:
 #include "CObserver.h"
-#include "widgetid.h"			// kTreeNodeCollapsedMsg
+#include "widgetid.h"			// kTreeNodeCollapsedMsg; IID_ITREEVIEWMGR - the protocol the tree manager tells it on
 
 // Project includes:
 #include "KFCUIID.h"

@@ -7,7 +7,8 @@
 //  THE ROW EYE'S ROW, ASKED IN ONE PLACE (memory one-question-one-place): by the click that turns one eye
 //  (KFCResultEyeEH.cpp) and by the drag that turns the eyes it passes over (KFCResultEyeDrag.cpp - the author's ask of
 //  2026-10-17: "like the Layers panel, by tracing"). Every eye asks the same question - is this a live hit row KFC has
-//  written, and is it kept - and draws the answer the same way.
+//  written, and is it kept - and draws the answer the same way (Draw - the list's rows too, KFCResultListWidgetMgr),
+//  with the same words on the status line (SayKept).
 //
 //========================================================================================
 
@@ -37,6 +38,10 @@ namespace KFCResultEye
 	/** An eye drawn as its row is: InDesign's own eyeball while kept, nothing while not. now = drawn at once - while a drag
 		holds the button nothing else draws it in time (the Layers panel's ForceRedraw); else invalidated, as a click's. */
 	void Draw(IControlView* eye, bool kept, bool now);
+
+	/** The status line after eyes are turned: `what` - the row's locator as the list reads it, or "<n> rows:" - and
+		what the eyes mean now (kept = on). */
+	void SayKept(const PMString& what, bool kept);
 
 	/** The drag the eye `eye` started is over (IDragDropController::StartDrag has returned): what it turned is said on the
 		status line, and the keyboard goes to the list as after a click. A drag that crossed no eye - or never began - is a
