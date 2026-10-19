@@ -33,6 +33,7 @@
 #include "TextDrawPriority.h"		// kTAPassPriForeground
 
 #include <boost/thread/recursive_mutex.hpp>
+#include <atomic>					// gHasMark - read off the main thread without the lock
 
 // Project includes:
 #include "KFCID.h"
@@ -40,7 +41,6 @@
 #include "KFCDiag.h"		// KFC_DIAG_LOG - test builds only
 
 #ifdef KFC_DIAG
-#include <atomic>
 #include "IDThreadingPrimitives.h"	// IDThreading::IsMainThreadDomain - a test build counts the asks from another thread
 #endif
 
@@ -59,14 +59,23 @@ namespace
 boost::recursive_mutex gLock;
 typedef boost::recursive_mutex::scoped_lock Lock;
 
-volatile bool16 gHasMark  = kFalse;	// set kTrue only after the rest is filled in; kFalse before it is emptied
-IDataBase*      gDB       = nil;	// an ADDRESS, never read through: see KFCHitMarkerSameDoc
-IDFile          gDocFile;			// the file gDB's document lived in when the marker went up...
-bool16          gDocHasFile = kFalse;	// ...if it had one (kFalse = never saved)
-UID             gStory    = kInvalidUID;
-TextIndex       gStart    = 0;
-TextIndex       gEnd      = 0;
-bool16          gShutdown = kFalse;
+// Where the marker is, as ONE value - put up and emptied whole under gLock, so neither can leave a field behind.
+struct Mark
+{
+	IDataBase*	db;			// an ADDRESS, never read through: see KFCHitMarkerSameDoc
+	IDFile		docFile;	// the file db's document lived in when the marker went up...
+	bool		docHasFile;	// ...if it had one (false = never saved)
+	UID			story;
+	TextIndex	start;
+	TextIndex	end;
+	Mark() : db(nil), docHasFile(false), story(kInvalidUID), start(0), end(0) {}
+};
+Mark gMark;
+
+// Set true only after gMark is filled in; false before it is emptied. Read first and alone, without the lock (above) -
+// std::atomic, so that read is the language's and not the compiler's reading of volatile.
+std::atomic<bool> gHasMark(false);
+bool gShutdown = false;
 
 #ifdef KFC_DIAG
 // A TEST BUILD SAYS WHEN THE ADORNMENT IS ASKED OFF THE MAIN THREAD (the thread test - an export's background thread draws
@@ -94,29 +103,26 @@ const double kCaretWidthFraction = 0.25;
 
 // SAME ADDRESS IS NOT SAME DOCUMENT. A closed document's address can be handed to the next document
 // opened, so the address is confirmed by the file (memory uidref-reuse-after-close). Neither ever
-// saved: the address stands alone. gDB is compared, never read; drawnDB is a wax run's, being drawn,
+// saved: the address stands alone. The mark's db is compared, never read; drawnDB is a wax run's, being drawn,
 // so it is certainly alive.
 // THE FILES ARE COMPARED, NOT THEIR PATH STRINGS. FileUtils::IsEqual, the rule KFCBookScope's
 // KFCDocumentLivesInFile keeps (and KCM's KCMIsSameDoc). Caller holds gLock.
 bool KFCHitMarkerSameDoc(IDataBase* drawnDB)
 {
-	if (drawnDB == nil || drawnDB != gDB)
+	if (drawnDB == nil || drawnDB != gMark.db)
 		return false;
 	const IDFile* drawnFile = drawnDB->GetSysFile();
-	if (drawnFile == nil || !gDocHasFile)
-		return drawnFile == nil && !gDocHasFile;
-	return FileUtils::IsEqual(*drawnFile, gDocFile) != kFalse;
+	if (drawnFile == nil || !gMark.docHasFile)
+		return drawnFile == nil && !gMark.docHasFile;
+	return FileUtils::IsEqual(*drawnFile, gMark.docFile) != kFalse;
 }
 
 // Forget where the marker is - gHasMark first, the flag every unlocked reader tests. The one place
 // ClearMarker, ForgetDoc and ShutdownCleanup empty the state. Caller holds gLock.
 void KFCHitMarkerForget()
 {
-	gHasMark = kFalse;
-	gDB = nil;
-	gDocFile = IDFile();
-	gDocHasFile = kFalse;
-	gStory = kInvalidUID;
+	gHasMark = false;
+	gMark = Mark();
 }
 
 // (Repainting a document so the marker appears or disappears now is the UI half's:
@@ -135,13 +141,14 @@ bool KFCHitMarkerRunPart(const IWaxRun* waxRun, int32& outCharStart, int32& outC
 	const TextIndex runEnd = runStart + runCount;
 
 	// Cheapest first: does the run touch the marked characters at all? A zero-width marker sits at
-	// gStart, which belongs to the run that holds that character.
-	if (gEnd > gStart)
+	// its start, which belongs to the run that holds that character.
+	const TextIndex markStart = gMark.start, markEnd = gMark.end;
+	if (markEnd > markStart)
 	{
-		if (runEnd <= gStart || runStart >= gEnd)
+		if (runEnd <= markStart || runStart >= markEnd)
 			return false;
 	}
-	else if (gStart < runStart || gStart >= runEnd)
+	else if (markStart < runStart || markStart >= runEnd)
 		return false;
 
 	// Then which story and which document - the Query this costs is only paid by runs that passed.
@@ -152,11 +159,11 @@ bool KFCHitMarkerRunPart(const IWaxRun* waxRun, int32& outCharStart, int32& outC
 	if (model == nil)
 		return false;
 	const UIDRef modelRef = ::GetUIDRef(model);
-	if (modelRef.GetUID() != gStory || !KFCHitMarkerSameDoc(modelRef.GetDataBase()))
+	if (modelRef.GetUID() != gMark.story || !KFCHitMarkerSameDoc(modelRef.GetDataBase()))
 		return false;
 
-	const TextIndex from = (gStart > runStart) ? gStart : runStart;
-	const TextIndex to = (gEnd < runEnd) ? gEnd : runEnd;
+	const TextIndex from = (markStart > runStart) ? markStart : runStart;
+	const TextIndex to = (markEnd < runEnd) ? markEnd : runEnd;
 	outCharStart = static_cast<int32>(from - runStart);
 	outCharCount = (to > from) ? static_cast<int32>(to - from) : 0;
 	return true;
@@ -321,22 +328,24 @@ bool KFCHitMarker::SetMarker(IDataBase* db, UID storyUID, TextIndex start, TextI
 	outPreviousDB = nil;
 	if (gShutdown || db == nil || storyUID == kInvalidUID)
 		return false;
-	if (end < start)
-		end = start;
+
+	Mark mark;
+	mark.db = db;
+	const IDFile* const sysFile = db->GetSysFile();	// read now, while the document is certainly alive
+	mark.docHasFile = (sysFile != nil);
+	if (sysFile != nil)
+		mark.docFile = *sysFile;
+	mark.story = storyUID;
+	mark.start = start;
+	mark.end = (end < start) ? start : end;
 
 	IDataBase* previousDB = nil;
-	const IDFile* const sysFile = db->GetSysFile();	// read now, while the document is certainly alive
 	{
 		Lock lock(gLock);
-		previousDB = gHasMark ? gDB : nil;
-		gHasMark = kFalse;
-		gDB = db;
-		gDocHasFile = (sysFile != nil) ? kTrue : kFalse;
-		gDocFile = (sysFile != nil) ? *sysFile : IDFile();
-		gStory = storyUID;
-		gStart = start;
-		gEnd = end;
-		gHasMark = kTrue;
+		previousDB = gHasMark ? gMark.db : nil;
+		gHasMark = false;
+		gMark = mark;
+		gHasMark = true;
 	}
 	if (previousDB != nil && previousDB != db)
 		outPreviousDB = previousDB;
@@ -354,7 +363,7 @@ bool KFCHitMarker::ClearMarker(IDataBase*& outDB)
 	IDataBase* db = nil;
 	{
 		Lock lock(gLock);
-		db = gHasMark ? gDB : nil;
+		db = gHasMark ? gMark.db : nil;
 		KFCHitMarkerForget();
 	}
 	outDB = db;		// repainted by the caller
@@ -366,16 +375,16 @@ void KFCHitMarker::ForgetDoc(IDataBase* db)
 	if (db == nil)
 		return;
 	Lock lock(gLock);
-	if (gDB != db)
+	if (gMark.db != db)
 		return;			// compared, never read
 	KFCHitMarkerForget();
 }
 
 void KFCHitMarker::ShutdownCleanup()
 {
-	gShutdown = kTrue;
+	gShutdown = true;
 	Lock lock(gLock);
-	KFCHitMarkerForget();	// gDocFile too: a static path must not outlive the DLL's teardown
+	KFCHitMarkerForget();	// the mark's file too: a static path must not outlive the DLL's teardown
 }
 
 // End, KFCHitMarker.cpp.

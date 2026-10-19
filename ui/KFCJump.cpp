@@ -1032,6 +1032,31 @@ NotSelected SelectMatchOnClick(int32 chapterIdx, int32 hitIdx, const UIDRef& sto
 	return hidden ? kSelectedHidden : kSelected;
 }
 
+// THE MARKER GOES AT EVERY EXIT OF A LANDING BUT THE ONE THAT RAISES IT (JumpToHit's; JumpToObject raises none): a
+// landing that goes nowhere, or lands where the selection points, must not leave the previous row's marker standing
+// over what the panel says - and an exit added later cannot forget to take it down (the block 12 audit's B-3 once found
+// the exits uneven). Declared after the landing's HandBackChapterOnExit: the marker goes before its chapter can be
+// handed back.
+class MarkerUnlessRaised
+{
+public:
+	MarkerUnlessRaised() : fRaised(false) {}
+	~MarkerUnlessRaised()
+	{
+		if (!fRaised)
+			KFCHitMarkerView::Hide();
+	}
+	void Raise(IDataBase* db, UID storyUID, TextIndex start, TextIndex end)
+	{
+		KFCHitMarkerView::Show(db, storyUID, start, end);
+		fRaised = true;
+	}
+private:
+	bool fRaised;
+	MarkerUnlessRaised(const MarkerUnlessRaised&);
+	MarkerUnlessRaised& operator=(const MarkerUnlessRaised&);
+};
+
 /** Jump to hit 'hitIdx' of chapter 'chapterIdx': front its document, scroll to the match, and select
     it - or raise the marker on one that cannot be selected (SelectMatchOnClick). An unreachable
     chapter (missing / locked file) reports through the status line. An overset match has no on-page
@@ -1052,25 +1077,22 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx, NotSelected& outWhy)
 {
 	outWhy = kNotSelectedQuietly;
 	const HandBackChapterOnExit handBack(chapterIdx);		// before the dirty guard below - see the class
+	// A JUMP THAT GOES NOWHERE TAKES THE OLD MARKER WITH IT - at every exit but the one that raises a new marker
+	// (MarkerUnlessRaised): the previous hit's marker would otherwise stand over a row that had just refused to go
+	// anywhere. It expires by itself within the second either way; what is being made consistent is what the panel is
+	// SAYING.
+	MarkerUnlessRaised marker;
 	UIDRef docRef;
 	IDFile file;
 	UID storyUID = kInvalidUID;
 	TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
-	// A JUMP THAT GOES NOWHERE TAKES THE OLD MARKER WITH IT. Every exit below that does not move the
-	// view clears it, these two included - or the previous hit's marker would stand over a row that
-	// had just refused to go anywhere. It expires by itself within the second either way; what is
-	// being made consistent is what the panel is SAYING.
 	if (!KFCResults()->GetHitLocation(chapterIdx, hitIdx, docRef, file, storyUID, start, end))
-	{
-		KFCHitMarkerView::Hide();
 		return false;
-	}
 
 	// A ROW WITH NO PLACE GOES NOWHERE, AND SAYS WHY (RowHasPlace). Nothing below asks about that: the
 	// overset test, the spread and the wax rectangle would all be handed -1.
 	if (!RowHasPlace(start, end))
 	{
-		KFCHitMarkerView::Hide();
 		SayRowHasNoPlace();
 		return false;
 	}
@@ -1078,17 +1100,11 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx, NotSelected& outWhy)
 	// The chapter may have been closed since the search (the user can close a held window). Bring
 	// it back windowless by file - see EnsureChapterReachable, which ShowChapter shares.
 	if (!EnsureChapterReachable(chapterIdx, docRef, file))
-	{
-		KFCHitMarkerView::Hide();	// it has already said why through the status line
-		return false;
-	}
+		return false;	// it has already said why through the status line
 
 	IDataBase* db = docRef.GetDataBase();
 	if (db == nil)
-	{
-		KFCHitMarkerView::Hide();
 		return false;
-	}
 	const UIDRef storyRef(db, storyUID);
 
 	// Everything from here on happens inside the dirty guard. Recomposing text dirties a document,
@@ -1127,10 +1143,7 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx, NotSelected& outWhy)
 	// window can be produced, the panel has said so and the view is left where it was. (With "Hide
 	// Previous Chapter" ON the tour has moved, and every other displayed clean chapter of the book is closed.)
 	if (!FrontChapter(docRef))
-	{
-		KFCHitMarkerView::Hide();
 		return false;
-	}
 #ifdef KFC_DIAG
 	// (Fault switch landing-return, a test build's only - KFCDiag.h: the Return a landing's message loop can dispatch, made
 	// here - the window in front, the dirty guard standing. The panel's door must turn it away: KFCJump::IsLanding.)
@@ -1170,7 +1183,6 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx, NotSelected& outWhy)
 		const KFCOversetLoc loc = KFCRuns()->FindOversetLocator(storyRef, start);
 		if (loc.found)
 			ScrollViewToPoint(frontView, loc.outportPb);	// scroll only - no marker on the "+" locator
-		KFCHitMarkerView::Hide();
 		// SELECTED WHERE NOTHING OF IT SHOWS (2026-10-17, the author: "select it, and the jump as it is") - Find Next's own
 		// way with an overset match, said as its dialog says it ("(Overset Text)"). A locked one stays unselected and says
 		// so; a row whose text has gone says only the "Not found" below.
@@ -1198,14 +1210,8 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx, NotSelected& outWhy)
 			// inversion cannot be read (JMP-17's reason). Every other row is marked as above, and the answer says
 			// why it was not selected (ActivateNode says it).
 			outWhy = SelectMatchOnClick(chapterIdx, hitIdx, storyRef, start, end, sameOccurrence);
-			if (LandedSelected(outWhy))
-				KFCHitMarkerView::Hide();
-			else
-				KFCHitMarkerView::Show(db, storyUID, start, end);
-		}
-		else
-		{
-			KFCHitMarkerView::Hide();
+			if (!LandedSelected(outWhy))
+				marker.Raise(db, storyUID, start, end);
 		}
 	}
 
@@ -1413,33 +1419,24 @@ void LeaveRowItemSelected(int32 chapterIdx, int32 hitIdx, const UIDRef& itemRef)
 bool JumpToObject(int32 chapterIdx, int32 hitIdx, UID item)
 {
 	const HandBackChapterOnExit handBack(chapterIdx);		// before the dirty guard below - see the class
+	const MarkerUnlessRaised marker;	// an object row raises none: a text row's marker still up goes at every exit
 	UIDRef docRef;
 	IDFile file;
 	UID story = kInvalidUID;
 	TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
 	if (!KFCResults()->GetHitLocation(chapterIdx, hitIdx, docRef, file, story, start, end)
 		|| !EnsureChapterReachable(chapterIdx, docRef, file))
-	{
-		KFCHitMarkerView::Hide();
 		return false;
-	}
 	IDataBase* const db = docRef.GetDataBase();
 	if (db == nil)
-	{
-		KFCHitMarkerView::Hide();
 		return false;
-	}
 	IDataBase::SaveRestoreModifiedState dirtyGuard(db);
 	const UIDRef itemRef(db, item);
 	const bool there = ItemIsThere(itemRef);
 	if (!FrontChapter(docRef))
-	{
-		KFCHitMarkerView::Hide();
 		return false;
-	}
 	if (!there)
 	{
-		KFCHitMarkerView::Hide();
 		bool replaced = false, locked = false;
 		KFCResults()->GetHitFlags(chapterIdx, hitIdx, replaced, locked);
 		if (!replaced)
@@ -1450,7 +1447,6 @@ bool JumpToObject(int32 chapterIdx, int32 hitIdx, UID item)
 		KFCResultTree::ShowStatus("Not found - the object is no longer in the document. Search again.");
 		return false;
 	}
-	KFCHitMarkerView::Hide();						// a text row's marker, if one is still up
 	// AN ITEM IN OVERSET TEXT - no spread holds it (the model's KFCObjectSearch::IsOnSpread): nothing of
 	// it is laid out to scroll to or select. The view goes to the "+" its text overflows at, as a text row's overset match
 	// does; nothing is selected, and the row's note says why, as a locked one's does (SelectItemOnClick).
@@ -1634,10 +1630,10 @@ bool KFCJump::ReplaceObjectRows(const KFCRowsByChapter& rows, int32 shownChapter
 	const HandBackChapterOnExit handBack(rows);
 	if (!KFCRuns()->CheckObjectReplaceRows(rows, outStatus))
 		return false;
-	const int32 chapterIdx = shownChapter;
 	UIDRef docRef;
 	IDFile file;
-	if (!KFCResults()->GetChapterLocation(chapterIdx, docRef, file) || !EnsureChapterReachable(chapterIdx, docRef, file))
+	if (!KFCResults()->GetChapterLocation(shownChapter, docRef, file)
+		|| !EnsureChapterReachable(shownChapter, docRef, file))
 		return false;
 	IDataBase* const db = docRef.GetDataBase();
 	if (db == nil)
@@ -1659,7 +1655,7 @@ bool KFCJump::ReplaceObjectRows(const KFCRowsByChapter& rows, int32 shownChapter
 		IDataBase::SaveRestoreModifiedState dirtyGuard(db);
 		if (!FrontChapter(docRef, sweep /*hidePreviousChapters*/))
 			return false;		// it has said why
-		const UIDRef shown(db, KFCResults()->GetHitItem(chapterIdx, shownHit));
+		const UIDRef shown(db, KFCResults()->GetHitItem(shownChapter, shownHit));
 		if (ItemIsThere(shown) && SpreadOfItem(shown) != kInvalidUID)
 			ShowItemInView(shown);
 	}
@@ -1675,7 +1671,7 @@ bool KFCJump::ReplaceObjectRows(const KFCRowsByChapter& rows, int32 shownChapter
 			(void)EnsureDocFrontmost(docRef, false /*carryZoom*/);
 		// 9. THE ITEM OF THE ROW SELECTED LAST LEFT SELECTED (LeaveRowItemSelected). Quietly: the status says what was written.
 		if (LayoutOfDocIsFrontmost(docRef))
-			LeaveRowItemSelected(chapterIdx, shownHit, UIDRef(db, KFCResults()->GetHitItem(chapterIdx, shownHit)));
+			LeaveRowItemSelected(shownChapter, shownHit, UIDRef(db, KFCResults()->GetHitItem(shownChapter, shownHit)));
 	}
 	return wrote;
 }
