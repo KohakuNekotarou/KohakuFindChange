@@ -173,6 +173,23 @@ void KFCTierStore::ForgetDocument(IDataBase* db)
 	}
 }
 
+void KFCTierStore::RenameDocument(const UIDRef& docRef, const PMString& newName)
+{
+	for (size_t t = 0; t < gTiers.size(); ++t)
+	{
+		if (gTiers[t].list.header.fromBook)
+			continue;
+		std::vector<KFCResultModel::Chapter>& chapters = gTiers[t].list.chapters;
+		for (size_t c = 0; c < chapters.size(); ++c)
+		{
+			if (chapters[c].docRef != docRef)
+				continue;
+			chapters[c].name = newName;
+			chapters[c].name.SetTranslatable(kFalse);
+		}
+	}
+}
+
 void KFCTierStore::ChaptersOfDoc(uint32 set, IDataBase* db, std::vector<int32>& out)
 {
 	const TierRecord* const tier = TierOf(set);

@@ -10,6 +10,8 @@
 //  the name the search read: with B.indd saved as C.indd and B.indd's file opened again, the row "B.indd" wrote into
 //  C.indd, the right document under the wrong name (measured before this responder - case ad-saveas-reopen-replace).
 //  A book's list keeps its names: its rows stand for the book's chapters (KFCResultModel::RenameDocumentChapters).
+//  The kept tiers' lists take the name as well (KFCTierStore::RenameDocument), and the lists kept for a query run's
+//  Undo (KFCUndoFollow::RenameDocument) - a switch back or an Undo does not bring the old name back.
 //  The name is read the way the SDK's docwatch reads it (DocWchUtils::DwAlert: IDocumentSignalData::GetDocument, then
 //  IDocument::GetName).
 //
@@ -32,6 +34,7 @@
 #include "KFCModelNotify.h"		// KFCNotifyRefreshRows - the rows repaint in place
 #include "KFCResultModel.h"
 #include "KFCRunGuard.h"		// not while a run of ours is going
+#include "KFCTierStore.h"		// RenameDocument - the kept tiers' lists
 #include "KFCUndoFollow.h"		// RenameDocument - the lists kept for a query run's Undo
 
 /** Gives a document-scope list's rows the new name of their document after a Save As. One signal, so no
@@ -76,6 +79,7 @@ void KFCSaveAsDocResponder::Respond(ISignalMgr* signalMgr)
 	doc->GetName(name);
 	const int32 renamed = KFCResultModel::RenameDocumentChapters(savedRef, name);
 	KFCUndoFollow::RenameDocument(savedRef, name);
+	KFCTierStore::RenameDocument(savedRef, name);
 	KFC_DIAG_LOG("SAVEAS doc=%p uid=%u renamed=%d", (void*)savedRef.GetDataBase(), savedRef.GetUID().Get(), renamed);
 	if (renamed > 0)
 		KFCNotifyRefreshRows();
