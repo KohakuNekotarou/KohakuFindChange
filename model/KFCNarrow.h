@@ -30,10 +30,11 @@
 
 namespace KFCNarrow
 {
-	/** WHERE A MATCH'S TEXT STANDS (In Tables / In Footnotes / In Endnotes): read off the story thread holding `at` - the
-	    owner of its thread dictionary (ITextStoryThread::GetDictUID: a table's cells are threads of kTableModelBoss, a footnote's
-	    text one of kFootnoteReferenceBoss - the iid-boss dictionary's owners of IID_ITEXTSTORYTHREADDICT) - and the story's own
-	    class (an endnote's text is a story of kEndnoteStoryBoss). Written onto the row; nothing for a position it cannot read. */
+	/** WHERE A MATCH'S TEXT STANDS (In Tables / In Footnotes / In Endnotes): read off the story thread holding `at` -
+	    the owner of its thread dictionary (ITextStoryThread::GetDictUID: a table's cells are threads of
+	    kTableModelBoss, a footnote's text one of kFootnoteReferenceBoss - the iid-boss dictionary's owners of
+	    IID_ITEXTSTORYTHREADDICT) - and whether the story is an endnote's (Facade::IEndnoteFacade::IsEndnoteStory - a
+	    story of kEndnoteStoryBoss). Written onto the row; nothing for a position it cannot read. */
 	void ReadTextPlace(const UIDRef& storyRef, TextIndex at, KFCResultModel::Hit& io);
 
 	/** PAGES... - A PAGE RANGE READ IN ONE DOCUMENT (the spec's N5): as the Print dialog reads its Range - "1-5, 8", a section's
@@ -43,8 +44,9 @@ namespace KFCNarrow
 	ITextDataValidation::RangeError ReadPageRange(IDataBase* db, const PMString& pages, std::set<UID>& outPages);
 
 	/** FRAMES OF THESE MATCHES - THE FRAME THE PERSON SELECTS for a match's own frame (the parcel's frame - a text frame's
-	    column, a frame on a path): the nearest page item from it up its hierarchy that is a graphic frame (IGraphicFrameData -
-	    a text frame's spline, an inline's frame, a path's spline). kInvalidUID for none. */
+	    column, a frame on a path), by the official two steps: the path itself for text on a path
+	    (ITOPFrameData::GetMainSplineItemUID), else the spline of the column's multi-column item
+	    (ITextUtils::QuerySplineFromTextFrame - a text frame's spline, an inline's frame). kInvalidUID for none. */
 	UID FrameOwner(IDataBase* db, UID matchFrame);
 
 	/** THE CONDITIONS OF ONE NARROWED LIST, asked of each row a walk builds. Made of the list's steps; an empty Filter keeps

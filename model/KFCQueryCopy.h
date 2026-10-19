@@ -13,8 +13,11 @@
 //  frightening"). A replace made with Find/Change as it is takes the copy again (v2 R3).
 //  NO FILE IS WRITTEN (the author's call): not a saved query, not a temporary one.
 //  Left out on purpose: Search: (KFC never states it - kScopeCmdBoss) and the direction (KFC walks forward only).
-//  What no command states (the XML tag, the case option and the conditions mode of the change side, the CJK font groups)
-//  is copied to be COMPARED: a switch is refused when one of them differs.
+//  What the copy does not state back (the XML tag, the case option and the conditions mode of the change side, the CJK
+//  font groups) is copied to be COMPARED: a switch is refused when one of them differs. Commands for them exist -
+//  kFindChangeFormatCmdBoss's IFindChangeFormatCmdData carries the first three (SetChangeXMLTag, SetChangeCaseOption,
+//  SetChangeConditionsMode), kFindROSFontGroupCmdBoss / kUseROSFontGroupCmdBoss the font groups - but none is measured
+//  yet, so none is used.
 //  The main thread only.
 //
 //========================================================================================
@@ -60,7 +63,7 @@ struct KFCQueryCopy
 	UID			objectChangeStyle;
 	IDataBase*	attrDB;					// the database the lists' and styles' UIDs are in (GetUIDAttrDB - the session's); a raw
 										// address, compared only - never handed to a command unless Find/Change's is the same (Apply)
-	// Compared only - no command states them:
+	// Compared only - not stated back (the head of this file):
 	PMString	changeXMLTag;
 	PMString	changeCaseOption;
 	int32		changeConditionsMode;	// IFindChangeOptions::ChangeConditionsMode

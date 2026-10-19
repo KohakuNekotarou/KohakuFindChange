@@ -13,17 +13,23 @@
 // Interface includes:
 #include "IDataBase.h"
 #include "IDocument.h"				// GetName - a document with no layer of the name, said by name (LayerOf)
-#include "IGraphicFrameData.h"		// the frame the person selects - FrameOwner
+#include "IEndnoteFacade.h"			// IsEndnoteStory - an endnote's text (ReadTextPlace)
+#include "IGraphicFrameData.h"		// the test build's old climb (FrameOwner)
 #include "IHierarchy.h"
 #include "IPageList.h"				// PageRangeStringToUIDList - Pages...' range, read in a document
+#include "ITextFrameColumn.h"		// the match's frame - a text column (FrameOwner)
 #include "ITextModel.h"				// QueryStoryThread - the thread a match stands in
 #include "ITextStoryThread.h"		// GetDictUID - the thread's owner
+#include "ITextUtils.h"				// QuerySplineFromTextFrame - the frame the person selects (FrameOwner)
+#include "ITOPFrameData.h"			// GetMainSplineItemUID - text on a path's path (FrameOwner)
 
 // General includes:
 #include "FileUtils.h"				// SysFileToPMString - a document's identity (DocKey)
+#include "PersistUtils.h"			// ::GetUID
 #include "TablesID.h"				// kTableModelBoss - a table's cells are its threads
 #include "TextID.h"					// kFootnoteReferenceBoss, kEndnoteStoryBoss
 #include "UIDList.h"
+#include "Utils.h"
 
 #include <cstdio>
 
@@ -55,10 +61,16 @@ void KFCNarrow::ReadTextPlace(const UIDRef& storyRef, TextIndex at, KFCResultMod
 	}
 	io.inTable = (owner == kTableModelBoss);
 	io.inFootnote = (owner == kFootnoteReferenceBoss);
-	// AN ENDNOTE'S TEXT: a story of the endnote story's class, or a thread of one - which of the two is the plan's M1, read off
-	// the trace below (NARROWFACT).
+	// AN ENDNOTE'S TEXT: a story of its own (the narrow-down spec's M1 - of kEndnoteStoryBoss, its threads' owner the
+	// story itself), asked as the product asks it - Facade::IEndnoteFacade::IsEndnoteStory (InCopyDocUtils.cpp,
+	// InCopyImportProvider.cpp; measured to agree with the class, KT's KTRedlineProbe endnote); by the class itself
+	// when the facade is not there (SnpManipulateTextEndnotes' IsEndnoteStory).
 	const ClassID storyClass = db->GetClass(storyRef.GetUID());
-	io.inEndnote = (storyClass == kEndnoteStoryBoss || owner == kEndnoteStoryBoss);
+	Utils<Facade::IEndnoteFacade> endnotes;
+	if (endnotes)
+		io.inEndnote = (endnotes->IsEndnoteStory(storyRef) != kFalse);
+	else
+		io.inEndnote = (storyClass == kEndnoteStoryBoss);
 	// (Test builds only) The facts the conditions were read from - the plan's M1 and M2.
 	KFC_DIAG_LOG("NARROWFACT story=%u class=0x%x at=%d dict=%u dictClass=0x%x table=%d foot=%d endnote=%d",
 		storyRef.GetUID().Get(), (unsigned)storyClass.Get(), (int)at, dict.Get(), (unsigned)owner.Get(),
@@ -90,19 +102,39 @@ UID KFCNarrow::FrameOwner(IDataBase* db, UID matchFrame)
 {
 	if (db == nil || matchFrame == kInvalidUID || !db->IsValidUID(matchFrame))
 		return kInvalidUID;
-	// Up from the match's own frame: a text frame's column (kFrameItemBoss) under its multi-column item under the spline the
-	// person selects (SnpManipulateTextFrame.cpp calls that spline "the text frame's kSplineItemBoss"); a frame on a path
-	// under the path's spline. Ten levels at most - a page item is never that deep below its frame.
-	UID at = matchFrame;
-	for (int32 depth = 0; depth < 10 && at != kInvalidUID; ++depth)
+#ifdef KFC_DIAG
+	// (Test builds only) Fault switch frame-owner-climb - KFCDiag.h: up the hierarchy to the first item with
+	// IGraphicFrameData, the old way. Text on a path then reaches its kTOPSplineItemBoss, not the path.
+	if (KFC_DIAG_FAULT("frame-owner-climb"))
 	{
-		InterfacePtr<IGraphicFrameData> frame(db, at, UseDefaultIID());
-		if (frame != nil)
-			return at;
-		InterfacePtr<IHierarchy> hier(db, at, UseDefaultIID());
-		at = (hier != nil) ? hier->GetParentUID() : kInvalidUID;
+		UID at = matchFrame;
+		for (int32 depth = 0; depth < 10 && at != kInvalidUID; ++depth)
+		{
+			InterfacePtr<IGraphicFrameData> frame(db, at, UseDefaultIID());
+			if (frame != nil)
+				return at;
+			InterfacePtr<IHierarchy> hier(db, at, UseDefaultIID());
+			at = (hier != nil) ? hier->GetParentUID() : kInvalidUID;
+		}
+		return kInvalidUID;
 	}
-	return kInvalidUID;
+#endif
+	// THE OFFICIAL TWO STEPS FROM A TEXT COLUMN TO THE ITEM SHOWING IT (sdksamples/common/SDKLayoutHelper.cpp's
+	// GetGraphicFrameRef; basicpersistinterface/BPIHelper.cpp the same). Text on a path: the column's ITOPFrameData
+	// names the path (GetMainSplineItemUID). Its three bosses (kTOPSplineItemBoss -> kMultiColumnItemBoss ->
+	// kTOPFrameItemBoss) hang from the path through IMainItemTOPData / ITOPSplineData, not through its hierarchy - up
+	// the hierarchy stands kTOPSplineItemBoss, which carries IGraphicFrameData (the live object-model dump) and is not
+	// what the person selects. Any other column: the spline of its multi-column item
+	// (ITextUtils::QuerySplineFromTextFrame) - a text frame's, an inline's frame, the frame a table cell or a footnote
+	// stands in.
+	InterfacePtr<ITOPFrameData> onPath(db, matchFrame, UseDefaultIID());
+	if (onPath != nil)
+		return onPath->GetMainSplineItemUID();
+	InterfacePtr<ITextFrameColumn> column(db, matchFrame, UseDefaultIID());
+	if (column == nil)
+		return kInvalidUID;
+	InterfacePtr<IHierarchy> spline(Utils<ITextUtils>()->QuerySplineFromTextFrame(column));
+	return (spline != nil) ? ::GetUID(spline) : kInvalidUID;
 }
 
 bool KFCNarrow::IsTextOnly(int32 kind)
