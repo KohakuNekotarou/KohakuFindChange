@@ -1443,6 +1443,16 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 	UIDRef progressStory;		// with its database: an All Documents walk crosses documents
 	int32 progressStoryLength = 0;
 
+	// A NARROWED LIST'S WALK (Narrow Down - gWalkFilter: its conditions asked of each row built, below), and whether
+	// its rows are the frames holding the matches (Frames of These Matches). Its ceiling is asked of a row the
+	// conditions let through (below): a match they drop takes no room, and says nothing of more rows (the spec's N3 -
+	// the order the object walk keeps, KFCObjectSearch's WalkDoc). (Fault switch narrow-ceiling-first, a test build's
+	// only - KFCDiag.h: asked of every match before its row is built, and before a new frame's row is made, the old
+	// way.)
+	const bool narrowed = (gWalkFilter != nil && detail == kHitEverything);
+	const bool makesFrames = (narrowed && gWalkFilter->MakesFrames());
+	const bool ceilingFirst = !narrowed || KFC_DIAG_FAULT("narrow-ceiling-first");
+
 	while (true)
 	{
 		// A COMMAND THAT COULD NOT BE BUILT IS A FAILED WALK, NOT A FINISHED ONE - kChapterWalked here
@@ -1567,10 +1577,9 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 
 		// Whole-search safety ceiling reached: stop collecting. More matches may exist, but the
 		// result set is capped so a match-everywhere query cannot grow it without bound.
-		// (A FRAMES OF THESE MATCHES list counts its frames, not its matches: its ceiling is asked when a new frame's row
-		// would go in - below.)
-		const bool makesFrames = (gWalkFilter != nil && detail == kHitEverything && gWalkFilter->MakesFrames());
-		if (!makesFrames && outHits.size() >= maxHits)
+		// (A NARROWED LIST'S WALK asks it of the rows its conditions let through, at the end of the conditions' block
+		// below - a Frames of These Matches list counts its frames, not its matches.)
+		if (ceilingFirst && !makesFrames && outHits.size() >= maxHits)
 		{
 			outCapped = true;
 			break;
@@ -1588,11 +1597,11 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 		KFC_CLOCK(cSearchBuild);
 		BuildHit(hitDocRef, story, start, end, detail, walkCaches[storyDB], hit);
 		KFC_SPENT(tSearchBuild, cSearchBuild);
-		// A NARROWED LIST'S CONDITIONS (Narrow Down - gWalkFilter): a row that does not meet them goes again at once, before the
-		// ceiling above counts it - the list's limit counts the rows that pass (the spec's N3, the author's call). Where the
-		// match's text stands is read for the conditions that ask it alone (ReadTextPlace); its frame out on the pasteboard
-		// came with its page (BuildHit).
-		if (gWalkFilter != nil && detail == kHitEverything)
+		// A NARROWED LIST'S CONDITIONS (Narrow Down - gWalkFilter): a row that does not meet them goes again at once,
+		// and the ceiling is asked of a row that does (the end of this block) - the list's limit counts the rows that
+		// pass (the spec's N3, the author's call). Where the match's text stands is read for the conditions that ask it
+		// alone (ReadTextPlace); its frame out on the pasteboard came with its page (BuildHit).
+		if (narrowed)
 		{
 			if (gWalkFilter->NeedsTextPlace())
 				KFCNarrow::ReadTextPlace(story, start, hit);
@@ -1610,9 +1619,9 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 			if (makesFrames)
 			{
 				const UID frame = hit.isOverset ? kInvalidUID : KFCNarrow::FrameOwner(storyDB, hit.matchFrame);
-				outHits.pop_back();
 				KFC_DIAG_LOG("NARROWFRAME story=%u at=%d matchFrame=%u frame=%u overset=%d", story.GetUID().Get(), (int)start,
 					hit.matchFrame.Get(), frame.Get(), hit.isOverset ? 1 : 0);
+				outHits.pop_back();		// (`hit` is the row it takes away - read above, never after)
 				if (frame == kInvalidUID)
 				{
 					gWalkFilter->NoteNoFrame();
@@ -1620,7 +1629,7 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 				}
 				if (!gWalkFilter->FirstFrame(storyDB, frame))
 					continue;
-				if (outHits.size() >= maxHits)
+				if (ceilingFirst && outHits.size() >= maxHits)
 				{
 					outCapped = true;
 					break;
@@ -1632,9 +1641,14 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 					outHits.pop_back();
 					continue;
 				}
-				if (outHitDBs != nil)
-					outHitDBs->push_back(storyDB);
-				continue;
+			}
+			// THE CEILING, ASKED OF A ROW THE CONDITIONS LET THROUGH: one past the list goes again, and the list is
+			// full.
+			if (outHits.size() > maxHits)
+			{
+				outHits.pop_back();
+				outCapped = true;
+				break;
 			}
 		}
 		if (outHitDBs != nil)
@@ -2983,6 +2997,41 @@ void WriteListHeader(bool fromBook, KFCResultModel::SearchScopeKind scope, const
 	KFCResultModel::SetQueryCopy(copy);
 }
 
+// A LIST'S ROWS IN ITS SUMMARY'S WORDS (the narrow-down spec's N10): " frame(s)" for a Frames of These Matches list's -
+// its rows are frames - " hit(s)" for any other's. Said by the search's summary (RunSearch) and by a Narrow Down's over
+// part of a document (SearchPartsAgain).
+const char* RowWords(bool frames)
+{
+	return frames ? " frame(s)" : " hit(s)";
+}
+
+// WHAT A NARROWED LIST'S WALKS OWE ITS SUMMARY (Narrow Down - nothing for any other list), said by the same two: the
+// matches no frame holds - overset text - counted for a Frames of These Matches list (N5: "3 match(es) in overset text
+// have no frame."), and the documents that had rows to ask and no layer of an On Active Layer step's name, named - as
+// Find Objects on Active Layer named them (OBJ-21).
+void AppendNarrowNotes(PMString& io, const KFCNarrow::Filter& narrow)
+{
+	if (narrow.MakesFrames() && narrow.NoFrameCount() > 0)
+	{
+		io.Append(" ");
+		io.AppendNumber(narrow.NoFrameCount());
+		io.Append(" match(es) in overset text have no frame.");
+	}
+	if (!narrow.NoLayerDocs().empty())
+	{
+		io.Append(" No layer named \"");
+		io.Append(narrow.LayerName());
+		io.Append("\" in: ");
+		for (size_t d = 0; d < narrow.NoLayerDocs().size(); ++d)
+		{
+			if (d > 0)
+				io.Append(", ");
+			io.Append(narrow.NoLayerDocs()[d]);
+		}
+		io.Append(".");
+	}
+}
+
 }	// anonymous namespace
 
 bool KFCSearchEngine::ResolveRunScope(RunScope& out, PMString& outRefusal)
@@ -3537,28 +3586,7 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	// ends - "No matches" is a lie too if a chapter was skipped, or a walk broke off before its end.
 	PMString chapterNotes;
 	chapterNotes.SetTranslatable(kFalse);
-	// (A FRAMES OF THESE MATCHES list: the matches no frame holds - overset text - counted, N5.)
-	if (narrowFilter.MakesFrames() && narrowFilter.NoFrameCount() > 0)
-	{
-		chapterNotes.Append(" ");
-		chapterNotes.AppendNumber(narrowFilter.NoFrameCount());
-		chapterNotes.Append(" match(es) in overset text have no frame.");
-	}
-	// (AN ON ACTIVE LAYER list: the documents that had rows to ask and no layer of the name - named, as Find Objects on Active
-	//  Layer named them, OBJ-21.)
-	if (!narrowFilter.NoLayerDocs().empty())
-	{
-		chapterNotes.Append(" No layer named \"");
-		chapterNotes.Append(narrowFilter.LayerName());
-		chapterNotes.Append("\" in: ");
-		for (size_t d = 0; d < narrowFilter.NoLayerDocs().size(); ++d)
-		{
-			if (d > 0)
-				chapterNotes.Append(", ");
-			chapterNotes.Append(narrowFilter.NoLayerDocs()[d]);
-		}
-		chapterNotes.Append(".");
-	}
+	AppendNarrowNotes(chapterNotes, narrowFilter);		// a narrowed list's (Narrow Down)
 	AppendUnsearchableNote(chapterNotes, tally.unsearchable);
 	AppendSearchErrorNote(chapterNotes, tally.brokeOff);
 	KFCBookScope::AppendUnopenableNote(chapterNotes, unopenable);
@@ -3612,7 +3640,7 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	// has not already got (the author's call). The "no matches" wording DOES
 	// still name what was searched - there is no tree under it to read.
 	outSummary.AppendNumber(tally.total);
-	outSummary.Append(narrowFilter.MakesFrames() ? " frame(s)" : " hit(s)");	// (a Frames of These Matches list's rows are frames)
+	outSummary.Append(RowWords(narrowFilter.MakesFrames()));	// (a Frames of These Matches list's rows are frames)
 	if (fromBook && selection.selected > 0)
 	{
 		// "in M of S selected document(s) (T in the book)" (the query dialog's spec, section 4-4): M held a hit, S were
@@ -4421,7 +4449,8 @@ void SayFoundAgain(PMString& outStatus, const char* what, int32 now, bool capped
 // Cancel, counted as a search for every other door, as Search This Document Again.
 // AND NARROW DOWN over such a list (again.newTier - the spec's N3, N4): the same walks with the list's conditions and the new
 // one (again.narrow - a narrowed list's own conditions searched again in place too), then not put back in place but filed
-// as a NEW list - the list narrowed parked as a tier, as Find parks it.
+// as a NEW list - the list narrowed parked as a tier, as Find parks it; after a Frames of These Matches step, a list of
+// frames, with a list of frames' limit and words (N7, N10), as the search files one.
 bool SearchPartsAgain(const PMString& lead, PMString& outStatus, const KFCSearchEngine::AgainTarget& again)
 {
 	outStatus.Clear();
@@ -4533,19 +4562,24 @@ bool SearchPartsAgain(const PMString& lead, PMString& outStatus, const KFCSearch
 		outStatus.Append("what these results searched is no longer known (its document was closed) - search again with Find.");
 		return false;
 	}
+	// The list's conditions - and a Narrow Down's new one - asked of every row the walks build (gWalkFilter, below).
+	// After a Frames of These Matches step its rows are frames (the narrow-down spec's N5): it has a list of frames'
+	// limit (N7) and words (N10), as the search's has (RunSearch). (Fault switch part-narrow-as-text, a test build's
+	// only - KFCDiag.h: a text list's limit and words, and nothing said of the matches no frame holds, the old way.)
+	const KFCNarrow::Filter narrowFilter(again.narrow);
+	const bool asText = KFC_DIAG_FAULT("part-narrow-as-text");
+	const bool frames = narrowFilter.MakesFrames() && !asText;
 	// The room the list leaves: its limit less the rows of the chapters not searched again, and the rows with their eye on.
-	// A Narrow Down's new list has the whole limit (nothing of the list it narrows comes along - N9).
+	// A Narrow Down's new list has the whole limit of its own rows (nothing of the list it narrows comes along - N9).
 	int32 room = KFCResultModel::ListLimit() - KFCResultModel::GetTotalHitCount();
 	for (size_t k = 0; k < chapters.size(); ++k)
 		room += KFCResultModel::GetDisplayHitCount(chapters[k].chapter)
 			- KFCResultModel::CountKeptRows(chapters[k].chapter, kInvalidUID);
 	if (again.newTier)
-		room = KFCResultModel::kKFCCollectHitLimit;		// (a list over part of a document is a text list - no Frames step yet)
+		room = KFCResultModel::ListLimitFor(frames);
 	bool capped = false, cancelled = false, walked = true;
 	{
 		const SearchingFlagGuard searchingGuard;
-		// The list's conditions - and a Narrow Down's new one - asked of every row the walks build (gWalkFilter).
-		const KFCNarrow::Filter narrowFilter(again.narrow);
 		const WalkFilterScope walkFilter(narrowFilter);
 		KFCForwardSearchScope forward;		// forward, as the search was
 		WalkerScopeOptions scopeOptions;
@@ -4634,7 +4668,8 @@ bool SearchPartsAgain(const PMString& lead, PMString& outStatus, const KFCSearch
 		part.record.version = v->second;
 		return true;
 	};
-	// ...and how many rows they found, in the words of the search's own summary: "4 hit(s) in the story."
+	// ...and how many rows they found, in the words of the search's own summary: "4 hit(s) in the story." ("4 frame(s)"
+	// for a list of frames - RowWords.)
 	const auto sayFound = [&](int32 found)
 	{
 		if (found == 0)
@@ -4642,7 +4677,7 @@ bool SearchPartsAgain(const PMString& lead, PMString& outStatus, const KFCSearch
 		else
 		{
 			outStatus.AppendNumber(found);
-			outStatus.Append(" hit(s)");
+			outStatus.Append(RowWords(frames));
 		}
 		outStatus.Append(SelectionScopeWords(storyForm ? IWalkerScopeFactoryUtils::kStoryScope
 			: (scope == KFCResultModel::kScopeToEndOfStory) ? IWalkerScopeFactoryUtils::kToEndOfStoryScope
@@ -4687,13 +4722,16 @@ bool SearchPartsAgain(const PMString& lead, PMString& outStatus, const KFCSearch
 				KFCSearchEngine::FileChapter(made[k].target, chapters[k].hits, tally, &chapters[k].versions, &made[k].ranges,
 					made[k].story);
 		KFCRowFoci::AttachOpenChapters();
-		// "Narrowed down (In Tables): 4 hit(s) in the story." - the search's own words (N10).
+		// "Narrowed down (In Tables): 4 hit(s) in the story." - the search's own words (N10), and what its walks owe
+		// them.
 		outStatus.Append("Narrowed down (");
 		outStatus.Append(KFCResultModel::NarrowWords());
 		outStatus.Append("): ");
 		sayFound(tally.total);
 		if (capped)
 			outStatus.Append(kListLimitReached);
+		if (!asText)
+			AppendNarrowNotes(outStatus, narrowFilter);
 		return true;
 	}
 	// Each part recorded again where it was walked, at the version it was walked at - before the rows go in, whose foci
@@ -4716,6 +4754,8 @@ bool SearchPartsAgain(const PMString& lead, PMString& outStatus, const KFCSearch
 	AppendKeptStay(outStatus, stayed);
 	if (capped)
 		outStatus.Append(kListLimitReached);
+	if (!asText)
+		AppendNarrowNotes(outStatus, narrowFilter);
 	return true;
 }
 }	// anonymous namespace

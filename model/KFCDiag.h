@@ -201,6 +201,12 @@
 //    frame-owner-climb  Frames of These Matches climbs a match's frame's hierarchy to the first item with
 //                IGraphicFrameData, the old way (KFCNarrow::FrameOwner): text on a path reaches its
 //                kTOPSplineItemBoss - which carries IGraphicFrameData - and not the path (nd-frames-path-armed)
+//    narrow-ceiling-first  a narrowed list's text walk (KFCSearchEngine.cpp's CollectHitsInDoc) asks the list's ceiling
+//                ahead of its conditions, of every match it meets, the old way: a full list met by one more match the
+//                conditions drop is called cut short - "Stopped at the 300 limit" (nd-limit-dropped-armed)
+//    part-narrow-as-text  a Narrow Down over part of a document (KFCSearchEngine.cpp's SearchPartsAgain) files a Frames
+//                of These Matches list with a text list's limit and words, and says nothing of the matches no frame
+//                holds, the old way (nd-frames-part-armed)
 //
 //  AND TIMERS: KFC_CLOCK / KFC_SPENT add up the milliseconds a stretch of code takes, and KFCDiagPhase
 //  writes "PHASE <name> begin" and "PHASE <name> end <ms>" around a scope - all of it nothing without KFC_DIAG.

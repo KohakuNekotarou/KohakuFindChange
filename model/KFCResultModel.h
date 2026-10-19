@@ -389,6 +389,10 @@ namespace KFCResultModel
 	/** The list's limit of rows: kKFCCollectObjectLimit for a list of object rows (ListHoldsObjects), kKFCCollectHitLimit for
 	    any other - what a search's walks and its searches again take the room from. */
 	int32 ListLimit();
+	/** ...the same rule for a list whose header is not written yet: a Narrow Down's over part of a document, filed
+	    after its walks (KFCSearchEngine.cpp's SearchPartsAgain). objectRows = its rows are object rows (a Frames
+	    step's). */
+	int32 ListLimitFor(bool objectRows);
 
 	/** A DOCUMENT OF THE LIST WAS CLOSED (the author's calls: only its rows go - an All Documents list's, and every
 	    list's, its heading staying while it is a tier - KFCCloseDocResponder). Its chapter is emptied - rows, groups,

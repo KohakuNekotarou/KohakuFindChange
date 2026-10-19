@@ -407,7 +407,12 @@ bool KFCResultModel::ListIsFrames()
 
 int32 KFCResultModel::ListLimit()
 {
-	return ListHoldsObjects() ? kKFCCollectObjectLimit : kKFCCollectHitLimit;
+	return ListLimitFor(ListHoldsObjects());
+}
+
+int32 KFCResultModel::ListLimitFor(bool objectRows)
+{
+	return objectRows ? kKFCCollectObjectLimit : kKFCCollectHitLimit;
 }
 
 bool KFCResultModel::ListHoldsObjects()
