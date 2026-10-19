@@ -268,7 +268,7 @@
   （記録も色も InDesign 自身の形のデータなので、そのまま見えるはず、という推論だけ）。
 - ✅（2026-10-11 全件の点検で確かめた）**置換形式（Change Format）は書かれる**＝回帰 `hd-cf-char`・`hd-cf-formatonly`・`hd-cf-formatonly-undo`（期待は本体の「すべてを置換」で測った）が全件で合格している。→ 第6章 REP-01
 - **model だけを入れた状態が実機で本当に壊れないか**を測っていない（設計上の宣言としてはそうなっている）。
-- **GEN-42 は実機で測っていない**（2026-10-12 はコンパイルとリソースの通しだけ）。テスト用ビルドの故障スイッチ `boundary-mismatch`（InDesign を起動する前に置く）で、次の全件の回に測る＝灰色にできる項目がすべて灰色・メッセージ欄の一文・本を閉じても落ちない・Save Panel Settings を押しても設定ファイルの `selectedDocuments` が変わらない（2026-10-13 に足した）。
+- ✅**GEN-42 は 2026-10-19 に実機で測った**（テスト用ビルド `c41faf1`・故障スイッチ `boundary-mismatch` を起動の前に置いて）＝押せるのはパネルの窓の2つと灰色にできない4つ（Open Find/Change・Save Panel Settings・How to Use・About）だけ・メッセージ欄は `Kohaku Find/Change cannot run: its two plug-in files are not from the same build (KohakuFindChange.pln 1.4.0/19, KohakuFindChangeUI.pln 1.4.0/19). …`・Save Panel Settings を押すとメッセージ欄は同じ一文のままで設定ファイルは書かれない（時刻が変わらない）・本を作って閉じても落ちない。記録＝`docs/ai-notes/kfc-live-partial-2026-10-19.md`。（それまで＝実機で測っていない＝2026-10-12 はコンパイルとリソースの通しだけ・測る手は 2026-10-13 に足した。）
 - **頼みごとの口が無い状態（GEN-14）で検索や置換が走る経路**は、今の製品には無い（走らせるのはメニューだけ）。
   「UI なしとして動く」はコードの約束で、その状態で実際に走らせた記録は見つけていない。
 - GEN-34：300 の上限は `cap-300`（文書）・`cap-300-book`（ブック）で踏んだ（2026-10-06）。一覧の最後の 300 行目を置換する `cap-300-last`（`click:1;key:END;replace:last`）も全件に入っていて合格している（2026-10-11 全件の点検で確かめた）。
