@@ -180,6 +180,10 @@
 //                Original says no copy could be kept (docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md C3, R16)
 //    copy-links  TakeRowCopy's cross-reference door stands open: a row whose copy touches a cross-reference source keeps
 //                its copy all the same (its hyperlink sources are kept and put back as one link - the same spec's C15)
+//    restore-link-in-way  Restore from Copy pastes over a hyperlink source whose whole text lies on the paste, the old
+//                way: a kept link the Replace left on what it wrote is not moved out of the paste's way, and one made
+//                there since does not leave the row - the paste leaves the source with no text (KFCReplaceEngine.cpp,
+//                MoveLinksOutOfPaste - tier-cases.tsv, restore-link-inside-named-armed, restore-link-made-after-armed)
 //    qcopy-roundtrip / qcopy-armed / qcopy-abort  the panel's Find copies Find/Change's query in memory, states it
 //                back and says what came back, searching nothing (KFCQueryCopier::DiagProbe - KFCQueryCopy.h says what
 //                each does; work\note-scripts\2026-10-14-kfc-tier-switch\spike.ps1). One-shot.

@@ -24,6 +24,7 @@
 #include "IWalkerScopeFactoryUtils.h"
 #include "IAttrReport.h"			// IsParagraphAttribute - a Change side that sets paragraph formatting (TakeRowCopy)
 #include "IAttributeStrand.h"		// a paragraph's style and own overrides, kept and put back (TakeRowCopy, PutParagraphBack)
+#include "IStyleInfo.h"				// a kept paragraph style still one of the document's (ParagraphStyleStands)
 #include "IComposeScanner.h"		// FindSurroundingParagraph - the paragraph of a copy (ParagraphOf)
 #include "ICreateOutlinesUtils.h"		// CreateCOTextCmd - a text row's Create Outlines (OutlineHits)
 #include "ITextModelCmds.h"			// ApplyStyleCmd / ApplyCmd - a paragraph's formatting put back (PutParagraphBack)
@@ -1704,13 +1705,16 @@ bool ParagraphOf(ITextModel* model, TextIndex at, TextIndex& outStart, int32& ou
 // attributes of the paragraph it is pasted into. (A copy of the whole paragraph, head to return, would carry them, and
 // would collide with every other row replaced in it - each copy holding the others' text from before them.)
 // A HYPERLINK SOURCE THE COPY TOUCHES - strictly inside the match, around it, across its edge - is kept with where it
-// stood (HitCopy::links), for RestoreInChapter to put the ONE link back (PutLinksBack - the spec's C15, the author's call
-// of 2026-10-17 evening: "delete one of the duplicated links, perhaps"). Measured live the same day with the doors open
-// (switch copy-links, H1-H5): one the match crossed is cut back to its part outside the match (set back where it stood);
-// one around the match, and one strictly inside it (the replace deletes that link outright and the paste brings it back
-// under its own name), come back as they were. One the paste would replace WHOLE - the match itself (InDesign's replace
-// keeps it on what it writes), one in the run-on rest, one at the match's edge - keeps no copy: the paste brings a second
-// link over it and leaves it with no story, and setting it again crashed InDesign (16:34 the same day).
+// stood (HitCopy::links), for RestoreInChapter to put the ONE link back (PutLinksBack - the spec's C15, the author's
+// call of 2026-10-17 evening: "delete one of the duplicated links, perhaps"). Measured live the same day with the doors
+// open (switch copy-links, H1-H5): one the match crossed is cut back to its part outside the match (set back where it
+// stood); one around the match comes back as it was, and so does one strictly inside it - in the part of the match the
+// Replace deletes, the link goes with it and the paste brings it back under its own name (H4); on what the Replace
+// writes over, the Replace keeps it on what it wrote, and the Restore moves it out of the paste's way and sets it back
+// (MoveLinksOutOfPaste - measured, case restore-link-inside-named). One the paste would replace WHOLE - the match
+// itself (InDesign's replace keeps it on what it writes), one in the run-on rest, one at the match's edge - keeps no
+// copy: the paste brings a second link over it and leaves it with no story, and setting it again crashed InDesign
+// (16:34 the same day).
 // NONE is taken - the row says why - for a match outside the story's primary thread (a table cell's, a footnote's or a
 // note's: a copy run across threads crashed InDesign), one that touches a CROSS-REFERENCE source (its text is made by
 // InDesign - unmeasured), and a run-on rest holding an object or a marker (pasted again over itself, such a thing is made
@@ -1812,12 +1816,14 @@ KFCResultModel::HitCopy TakeRowCopy(const UIDRef& storyRef, TextIndex start, Tex
 				copy.whyNot = KFCResultModel::kCopyTouchesHyperlink;
 				return copy;
 			}
-			// A SOURCE THE PASTE WOULD REPLACE WHOLE keeps no copy (the crash of 2026-10-17 16:34): one inside what the copy
-			// covers that is not strictly inside the match - the match itself (the Replace keeps it on what it writes, H1),
-			// one in the run-on rest (H5), one at the match's edge - is left with no story once the copy is pasted over its
-			// text, and setting it again took InDesign down (HYPERLINKS.RPLN, under IHyperlinkFacade::ChangeTextSource).
-			// Strictly inside the match the Replace deletes it and the paste brings it back (H4); around the match or across
-			// its edge, its part outside stays and it is set back where it stood (H2, H3).
+			// A SOURCE THE PASTE WOULD REPLACE WHOLE keeps no copy (the crash of 2026-10-17 16:34): one inside what the
+			// copy covers that is not strictly inside the match - the match itself (the Replace keeps it on what it
+			// writes, H1), one in the run-on rest (H5), one at the match's edge - is left with no story once the copy
+			// is pasted over its text, and setting it again took InDesign down (HYPERLINKS.RPLN, under
+			// IHyperlinkFacade::ChangeTextSource). Strictly inside the match the Replace deletes it and the paste
+			// brings it back (H4), or keeps it on what it wrote and the Restore moves it out of the paste's way first
+			// (MoveLinksOutOfPaste); around the match or across its edge, its part outside stays and it is set back
+			// where it stood (H2, H3).
 			if (touching[i].start >= start && touching[i].start + touching[i].length <= copyEnd
 				&& !(touching[i].start > start && touching[i].start + touching[i].length < end))
 			{
@@ -2246,6 +2252,8 @@ enum RestoreRefusal
 	kRestoreEdited,			// what its Replace wrote has been edited since
 	kRestoreRestChanged,	// the rest of its paragraph has changed since the Replace
 	kRestoreLocked,			// locked now
+	kRestoreLinkInTheWay,	// a hyperlink the paste would break (MoveLinksOutOfPaste)
+	kRestoreStyleGone,		// the paragraph style it puts back has been deleted since (ParagraphStyleStands)
 	kRestoreRefusalCount
 };
 
@@ -2263,6 +2271,8 @@ const char* RestoreWords(RestoreRefusal why)
 		case kRestoreEdited:		return "edited since";
 		case kRestoreRestChanged:	return "rest of paragraph changed";
 		case kRestoreLocked:		return "locked";
+		case kRestoreLinkInTheWay:	return "hyperlink in the way";
+		case kRestoreStyleGone:		return "paragraph style deleted";
 		default:					return "";
 	}
 }
@@ -2296,6 +2306,10 @@ const char* RestoreSentence(RestoreRefusal why, int32 whyNoCopy)
 		case kRestoreEdited:		return "the text its Replace wrote has been edited since - left as it is.";
 		case kRestoreRestChanged:	return "the rest of its paragraph has changed since the replace - left as it is.";
 		case kRestoreLocked:		return "the text is locked now (a locked layer or story) - left as it is.";
+		case kRestoreLinkInTheWay:
+			return "a hyperlink stands on the text its Replace wrote, and a copy put back over it would break "
+				"the link - left as it is.";
+		case kRestoreStyleGone:		return "the paragraph style it puts back has been deleted since - left as it is.";
 		default:					return "";
 	}
 }
@@ -2422,14 +2436,91 @@ void DestinationsOf(IDataBase* db, std::set<UID>& out)
 		out.insert(d->second);
 }
 
+// THE LINKS THE PASTE WOULD REPLACE WHOLE - MOVED OUT OF ITS WAY FIRST, OR THE ROW IS LEFT. A source whose whole text
+// lies on [at, pasteEnd) is left by the paste with no text beside the paste's own copy of it (measured: "L1 1" on the
+// text put back, "L1" on none - cases restore-link-inside*), and giving such a source its story back took InDesign down
+// (PutLinksBack). One of the row's kept links can be one: InDesign's replace writes the Change To over the match where
+// it can, so a link strictly inside the match but on what it wrote over stays on what it wrote ("at sa" of "cat sat"
+// stood on "og" of "dog"; H4 was a link in the part it deletes, which goes with it). Such a kept source is moved onto a
+// character beside the paste that no source stands on - right after it, else right before it; not the story's last
+// return, not a character an object or a marker stands on, not a table's - so the paste leaves it whole, and
+// PutLinksBack sets it back where it stood: the one link, its name and destination as they were (REP-38), the paste's
+// copy of it deleted. Any other source the paste would replace whole - one made on what the Replace wrote since (case
+// restore-link-made-after) - leaves the row as it is (outInTheWay), as does a kept one with no character beside the
+// paste to stand on. `before` = the sources on [at, pasteEnd) now (LinksOn). False = a range could not be read, or
+// InDesign would not move a source: the caller takes the step back.
+bool MoveLinksOutOfPaste(ITextModel* model, const UIDRef& storyRef, TextIndex at, TextIndex pasteEnd,
+	const std::vector<KFCResultModel::HitLink>& kept, const std::vector<LinkAt>& before, bool& outInTheWay)
+{
+	outInTheWay = false;
+	// The characters beside the paste, in the order they are offered - each to one source at most.
+	const int32 primary = model->GetPrimaryStoryThreadSpan() - 1;
+	std::vector<TextIndex> beside;
+	if (pasteEnd < primary)
+		beside.push_back(pasteEnd);
+	if (at > 0)
+		beside.push_back(at - 1);
+	size_t offered = 0;
+	// Each kept source to move, and the character it stands on while the paste goes in.
+	std::vector<std::pair<UID, TextIndex> > moves;
+	for (size_t b = 0; b < before.size(); ++b)
+	{
+		// Part of it outside the paste stays, and it is set back from there (H2, H3); one of no text loses nothing.
+		if (before[b].length <= 0 || before[b].start < at || before[b].start + before[b].length > pasteEnd)
+			continue;
+		bool ours = false;
+		for (size_t k = 0; k < kept.size() && !ours; ++k)
+			ours = (kept[k].source == before[b].source);
+		TextIndex spot = kInvalidTextIndex;
+		while (ours && spot == kInvalidTextIndex && offered < beside.size())
+		{
+			const TextIndex c = beside[offered++];
+			TextIterator it(model, c);
+			if (it.IsNull())
+				continue;
+			const UTF32TextChar ch = *it;
+			if (KFCResultModel::IsMarkerNotShown(ch) || ch.GetValue() == kTextChar_Table
+				|| ch.GetValue() == kTextChar_NonRomanSpecialGlyph)
+				continue;
+			std::vector<LinkAt> onIt;
+			if (!LinksOn(model, storyRef, c, c + 1, onIt))
+				return false;
+			if (onIt.empty())
+				spot = c;
+		}
+		KFC_DIAG_LOG("LINK in the paste's way: source=%u [%d,%d) ours=%d -> %d", (unsigned)before[b].source.Get(),
+			(int)before[b].start, (int)(before[b].start + before[b].length), ours ? 1 : 0, (int)spot);
+		if (spot == kInvalidTextIndex)
+		{
+			outInTheWay = true;
+			return true;
+		}
+		moves.push_back(std::make_pair(before[b].source, spot));
+	}
+	if (moves.empty())
+		return true;
+	Utils<Facade::IHyperlinkFacade> facade;
+	if (!facade)
+		return false;
+	IDataBase* const db = storyRef.GetDataBase();
+	for (size_t m = 0; m < moves.size(); ++m)
+	{
+		const UIDRef source(db, moves[m].first);
+		if (facade->ChangeTextSource(source, kFalse, storyRef, kTrue, moves[m].second, 1) != kSuccess)
+			return false;
+	}
+	return true;
+}
+
 // ONE LINK PUT BACK WHERE IT STOOD, once the copy is pasted over [at, at + copied) (the spec's C15 - measured live
-// 2026-10-17, H1-H5). (1) A source the paste made there - one not on the range before the paste (`before`) and not a kept
-// one - over which a kept source still in the document is to stand is deleted with its link: the Replace had kept the
-// original on what it wrote, and the copy brought a second (H1, H5). A source the paste made where the Replace had deleted
-// the original stays - it IS the link put back (H4). (2) Every kept source still in the document is set where it stood:
-// its part in the copy at the same place from `at`, a part outside the copy where it stands now (H3: one the match crossed
-// had lost what the paste replaced; H2: one around the match stands as it was). (3) The destinations the paste made that no
-// link names now are let go (the facade lets a hidden one go with its link; a shared one stays).
+// 2026-10-17, H1-H5). (1) A source the paste made there - one not on the range before the paste (`before`) and not a
+// kept one - over which a kept source still in the document is to stand is deleted with its link: the Replace had kept
+// the original on what it wrote, and the copy brought a second (one the paste would have replaced whole was moved out
+// of its way first - MoveLinksOutOfPaste). A source the paste made where the Replace had deleted the original stays -
+// it IS the link put back (H4). (2) Every kept source still in the document is set where it stood: its part in the copy
+// at the same place from `at`, a part outside the copy where it stands now (H3: one the match crossed had lost what the
+// paste replaced; H2: one around the match stands as it was). (3) The destinations the paste made that no link names
+// now are let go (the facade lets a hidden one go with its link; a shared one stays).
 bool PutLinksBack(ITextModel* model, const UIDRef& storyRef, TextIndex at, int32 copied,
 				  const std::vector<KFCResultModel::HitLink>& kept, const std::vector<LinkAt>& before,
 				  const std::set<UID>& destinationsBefore)
@@ -2439,10 +2530,11 @@ bool PutLinksBack(ITextModel* model, const UIDRef& storyRef, TextIndex at, int32
 	InterfacePtr<IHyperlinkTable> table(db, db->GetRootUID(), IID_IHYPERLINKTABLE);
 	if (!facade || table == nil)
 		return false;
-	// Where each kept source still in this story is to stand. ONE WITH NO STORY IS NEVER TOUCHED: a source whose text the
-	// paste replaced whole reads no owning story (measured live 2026-10-17, H1 and H5 - the DOM's sourceText an error), and
-	// IHyperlinkFacade::ChangeTextSource giving it the story back took InDesign down (HYPERLINKS.RPLN, 16:34) - TakeRowCopy
-	// keeps no copy where that can happen; this is the backstop.
+	// Where each kept source still in this story is to stand. ONE WITH NO STORY IS NEVER TOUCHED: a source whose text
+	// the paste replaced whole reads no owning story (measured live 2026-10-17, H1 and H5 - the DOM's sourceText an
+	// error), and IHyperlinkFacade::ChangeTextSource giving it the story back took InDesign down (HYPERLINKS.RPLN,
+	// 16:34) - TakeRowCopy keeps no copy where that can happen, and MoveLinksOutOfPaste moves a kept one out of the
+	// paste's way; this is the backstop.
 	struct Wanted
 	{
 		UID			source;
@@ -2559,12 +2651,24 @@ bool PutParagraphBack(ITextModel* model, TextIndex at, const KFCResultModel::Hit
 	return true;
 }
 
-// THE PASTES OF ONE DOCUMENT, inside the write's step: every row of the chapter that stands taken as "this far into this
-// thread" (RowNow - a Replace's way), the rows to put back pasted in text order, each checked again just before its paste
-// - what its Replace wrote, and its run-on rest (by its hash, ending at a paragraph's return or the story's) - in rounds
-// until a round puts none back. Then every row where its text stands: the ones put back as before their Replace
-// (MarkHitRestored), the rest of the list carried. The rows not put back are counted by why. False = an error stands, or
-// InDesign would not paste a copy: the caller takes the step back.
+// IS THE PARAGRAPH STYLE A COPY PUTS BACK (the spec's C16 - PutParagraphBack) STILL ONE OF THE DOCUMENT'S? A style
+// deleted since the Replace would be given to InDesign by a UID nothing holds - what ApplyStyleCmd does with one is not
+// known, and is not tried: the row is left as it is (RestoreHits' doors).
+bool ParagraphStyleStands(IDataBase* db, UID style)
+{
+	if (db == nil || style == kInvalidUID || !db->IsValidUID(style))
+		return false;
+	InterfacePtr<IStyleInfo> info(db, style, UseDefaultIID());
+	return info != nil && info->GetStyleType() == IStyleInfo::kParagraphStyle;
+}
+
+// THE PASTES OF ONE DOCUMENT, inside the write's step: every row of the chapter that stands taken as "this far into
+// this thread" (RowNow - a Replace's way), the rows to put back pasted in text order, each checked again just before
+// its paste - what its Replace wrote, its run-on rest (by its hash, ending at a paragraph's return or the story's) and
+// the hyperlinks the paste would replace whole (MoveLinksOutOfPaste) - in rounds until a round puts none back. Then
+// every row where its text stands: the ones put back as before their Replace (MarkHitRestored), the rest of the list
+// carried. The rows not put back are counted by why. False = an error stands, or InDesign would not paste a copy: the
+// caller takes the step back.
 bool RestoreInChapter(RestoreChapter& chapter, int32 (&counts)[kRestoreRefusalCount])
 {
 	IDataBase* const db = chapter.docRef.GetDataBase();
@@ -2650,16 +2754,26 @@ bool RestoreInChapter(RestoreChapter& chapter, int32 (&counts)[kRestoreRefusalCo
 			}
 			const KFCCopyStore::CopyRef ref(RefOf(row.copy));
 			const int32 copied = KFCCopyStore::Length(ref);
-			// The links the copy touched (the spec's C15): what stands on the range, and the document's destinations,
-			// before the paste - so that what the paste makes is told from what was there.
+			// The links on the range before the paste (the spec's C15) and, when the copy touched some, the document's
+			// destinations - so that what the paste makes is told from what was there. A link the paste would replace
+			// whole is moved out of its way first, or the row is left (MoveLinksOutOfPaste). (Fault switch
+			// restore-link-in-way, a test build's only - KFCDiag.h: neither, the old way - the paste leaves such a
+			// source with no text.)
 			std::vector<LinkAt> linksBefore;
 			std::set<UID> destinationsBefore;
-			if (!row.copy.links.empty())
+			if ((pasteEnd > at || !row.copy.links.empty()) && !LinksOn(model, storyRef, at, pasteEnd, linksBefore))
+				return false;
+			bool inTheWay = false;
+			if (!KFC_DIAG_FAULT("restore-link-in-way")
+				&& !MoveLinksOutOfPaste(model, storyRef, at, pasteEnd, row.copy.links, linksBefore, inTheWay))
+				return false;
+			if (inTheWay)
 			{
-				if (!LinksOn(model, storyRef, at, pasteEnd, linksBefore))
-					return false;
-				DestinationsOf(db, destinationsBefore);
+				row.why = kRestoreLinkInTheWay;
+				continue;
 			}
+			if (!row.copy.links.empty())
+				DestinationsOf(db, destinationsBefore);
 			if (copied < row.copy.rest || !KFCCopyStore::PasteOver(ref, storyRef, at, pasteEnd))
 				return false;
 			// A Replace that set paragraph formatting: the starting paragraph's own put back (the spec's C16) - no length
@@ -2819,6 +2933,9 @@ bool KFCReplaceEngine::RestoreHits(const KFCRowsByChapter& rowsByChapter, PMStri
 				if (!KFCSearchEngine::IsFrameEditable(storyRef, KFCSearchEngine::EditableFrameForMatch(storyRef, row.start)))
 					why = kRestoreLocked;
 			}
+			// The paragraph style it puts back, when it puts one back, still in the document (ParagraphStyleStands).
+			if (why == kRestoreOk && row.copy.paraStyle != kInvalidUID && !ParagraphStyleStands(db, row.copy.paraStyle))
+				why = kRestoreStyleGone;
 			if (why != kRestoreOk)
 			{
 				++counts[why];

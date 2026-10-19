@@ -126,13 +126,14 @@ namespace KFCReplaceEngine
 	    (KFCUndoFollow). The doors, row by row (C8): a replaced text row with its copy kept; its document reached (a
 	    closed chapter reopened windowless, as a Replace reaches it); its story followed (its rows take their foci's
 	    places - KFCSearchEngine::FollowStoryFoci - and its own focus stands exactly on its place; a story with no foci
-	    as KFC left it); what its Replace wrote still there; not locked. The rows that pass are pasted in text order,
-	    each checked again just before (its run-on rest too); one that cannot be yet waits for another round. Each row
-	    put back reads as before its Replace - not replaced, its eye as it was (KFCResultModel::MarkHitRestored); every
-	    other row is carried to where its text stands. outStatus: "Restored ID:262 #3." - "Restored 2 of 3 rows: ID:262
-	    #1, ID:262 #3. Left as they were: 1 edited since." - "Restored 3 rows in 2 documents: a.indd ID:262 #1; b.indd
-	    ID:270 #1."; a refusal ("Restore from Copy: ...") when none could be put back. True when something was written.
-	    Refused while a run of ours is up. */
+	    as KFC left it); what its Replace wrote still there; not locked; the paragraph style it puts back, when it puts
+	    one back, still in the document. The rows that pass are pasted in text order, each checked again just before
+	    (its run-on rest too, and a hyperlink the paste would replace whole); one that cannot be yet waits for another
+	    round. Each row put back reads as before its Replace - not replaced, its eye as it was
+	    (KFCResultModel::MarkHitRestored); every other row is carried to where its text stands. outStatus:
+	    "Restored ID:262 #3." - "Restored 2 of 3 rows: ID:262 #1, ID:262 #3. Left as they were: 1 edited since." -
+	    "Restored 3 rows in 2 documents: a.indd ID:262 #1; b.indd ID:270 #1."; a refusal ("Restore from Copy: ...") when
+	    none could be put back. True when something was written. Refused while a run of ours is up. */
 	bool RestoreHits(const KFCRowsByChapter& rows, PMString& outStatus);
 
 	/** A TEXT ROW'S SPECIAL OPERATIONS > CREATE OUTLINES (docs/superpowers/specs/2026-10-18-kfc-text-outlines-design.md X1-X9):
