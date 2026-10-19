@@ -48,6 +48,9 @@
 #include "KFCDiag.h"			// KFC_DIAG_FAULT / KFC_DIAG_LOG - a test build's fault switch (compiled out of a shipping one)
 #include "KFCDiagWrittenDocs.h"	// KFC_DIAG_NOTE_CLOSE_ASKED - a test build's written-document check (nothing in a shipping one)
 #include "IKFCUIServices.h"		// the windows and the Book panel are the UI half's
+#ifdef KFC_DIAG
+#include "KFCRunGuard.h"		// REOPEN / WINDOW: is an open or a window counted by a run of ours (test builds only)
+#endif
 
 namespace
 {
@@ -777,6 +780,13 @@ bool KFCBookScope::ReopenChapterDoc(const IDFile& file, UIDRef& outDocRef)
 	{
 		GlobalErrorStatePreserver openErrorState;
 		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+#ifdef KFC_DIAG
+		// (Test builds only) A WINDOWLESS OPEN RUNS THE MESSAGE LOOP, so whatever opens one here must be counted while
+		// it does (KFCRunGuard.h): running = KFCRunGuard::IsAnyRunning (a run, or a write from the list), landing = a
+		// row's landing in the panel (its own guard - IsLandingUnderWay). The regression's guard-* cases read it.
+		KFC_DIAG_LOG("REOPEN running=%d landing=%d", KFCRunGuard::IsAnyRunning() ? 1 : 0,
+			KFCRunGuard::IsLandingUnderWay() ? 1 : 0);
+#endif
 		err = Utils<IDocumentCommands>()->Open(&docRef, file, kSuppressUI,
 			IOpenFileCmdData::kOpenDefault, IOpenFileCmdData::kUseLockFile, kFalse /*showInWindow*/);
 	}
@@ -864,6 +874,9 @@ bool KFCBookScope::ShowChapterWindow(const UIDRef& docRef)
 	// a written chapter that stays windowless.)
 	if (KFC_DIAG_FAULT("no-window"))
 		return false;
+	// (A window opening runs the message loop as a windowless open does - the same question as REOPEN's.)
+	KFC_DIAG_LOG("WINDOW running=%d landing=%d", KFCRunGuard::IsAnyRunning() ? 1 : 0,
+		KFCRunGuard::IsLandingUnderWay() ? 1 : 0);
 #endif
 	InterfacePtr<IKFCUIServices> ui(KFCQueryUIServices());
 	if (ui == nil || !ui->OpenLayoutWindow(docRef))
