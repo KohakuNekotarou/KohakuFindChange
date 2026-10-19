@@ -101,6 +101,7 @@ namespace
 		virtual bool ListHoldsObjects() { return false; }
 		virtual int32 ClearRows(const KFCRowsByChapter&) { return 0; }
 		virtual int32 GetObjectRowHit(int32, int32) { return -1; }
+		virtual bool IsHitItemGone(int32, int32) { return false; }
 	};
 
 	class KFCRunsStandInImpl : public IKFCRuns

@@ -14,7 +14,6 @@
 #include "ICommand.h"
 #include "ICreateOutlinesUtils.h"	// CreateCOFrameCmd, FilterUIDList - InDesign's own Type > Create Outlines, over frames
 #include "IDataBase.h"
-#include "IHierarchy.h"
 
 // General includes:
 #include "CmdUtils.h"
@@ -32,7 +31,7 @@
 #include "KFCID.h"				// kKFCCreateOutlinesStepKey - the Edit menu's name of the step
 #include "KFCObjectOutline.h"
 #include "KFCObjectSearch.h"	// IsOnSpread, Fingerprint
-#include "KFCPageItemFacts.h"	// IsPageItemLockedForEdit, IsFrameOnLockedLayer, ItemIsThere
+#include "KFCPageItemFacts.h"	// IsPageItemLockedForEdit, IsFrameOnLockedLayer
 #include "KFCReplaceEngine.h"	// the write's undo step (WriteStep) and what its documents are left as (DocsAfterWrite)
 #include "KFCResultModel.h"
 #include "KFCRunGuard.h"
@@ -135,13 +134,7 @@ Refusal CheckItem(int32 chapterIdx, int32 hitIdx, UIDRef& outDoc, UID& outItem)
 		return kRefusedNotOpened;
 	KFCResultModel::RebindChapterDoc(chapterIdx, outDoc);
 	IDataBase* const db = outDoc.GetDataBase();
-	bool there = false;
-	if (db != nil && db->IsValidUID(outItem))
-	{
-		InterfacePtr<IHierarchy> hier(db, outItem, UseDefaultIID());
-		there = (hier != nil);
-	}
-	if (!there)
+	if (!KFCResultModel::RowItemIsThere(chapterIdx, hitIdx, db))
 	{
 		KFCResultModel::SetHitOutcome(chapterIdx, hitIdx, KFCResultModel::kOutcomeMissing);
 		return kRefusedMissing;
@@ -197,7 +190,7 @@ bool KFCObjectOutline::CanOutlineHit(int32 chapterIdx, int32 hitIdx)
 	if (!KFCBookScope::FindOpenChapterDoc(file, docRef))
 		return true;		// not open now: pressing reaches it, and its doors say why when it cannot be outlined
 	IDataBase* const db = docRef.GetDataBase();
-	if (!KFCPageItemFacts::ItemIsThere(db, item) || !KFCObjectSearch::IsOnSpread(UIDRef(db, item)))
+	if (!KFCResultModel::RowItemIsThere(chapterIdx, hitIdx, db) || !KFCObjectSearch::IsOnSpread(UIDRef(db, item)))
 		return false;
 	if (KFCPageItemFacts::IsPageItemLockedForEdit(db, item) || KFCPageItemFacts::IsFrameOnLockedLayer(db, item))
 		return false;

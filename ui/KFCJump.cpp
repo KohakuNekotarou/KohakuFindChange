@@ -1311,11 +1311,14 @@ void ShowBook()
 	KFCBookPanelLookup::BringBookTabForward(bookPath);
 }
 
-// AN OBJECT ROW'S ITEM IS STILL THERE: its UID valid in the database, and a page item (it has a hierarchy).
-bool ItemIsThere(const UIDRef& itemRef)
+// AN OBJECT ROW'S ITEM IS STILL THERE: its UID valid in the database, and a page item (it has a hierarchy) - and not
+// gone with its document's session (IKFCResults::IsHitItemGone: the document came back without it, so its UID may
+// name another object by now).
+bool RowItemIsThere(int32 chapterIdx, int32 hitIdx, const UIDRef& itemRef)
 {
 	IDataBase* const db = itemRef.GetDataBase();
-	if (db == nil || itemRef.GetUID() == kInvalidUID || !db->IsValidUID(itemRef.GetUID()))
+	if (db == nil || itemRef.GetUID() == kInvalidUID || !db->IsValidUID(itemRef.GetUID())
+		|| KFCResults()->IsHitItemGone(chapterIdx, hitIdx))
 		return false;
 	InterfacePtr<IHierarchy> hier(itemRef, UseDefaultIID());
 	return hier != nil;
@@ -1406,7 +1409,7 @@ void SelectItemOnClick(int32 chapterIdx, int32 hitIdx, const UIDRef& itemRef)
 // overset text, leaves nothing selected. InDesign's walk and replace selected what they met, which this puts right.
 void LeaveRowItemSelected(int32 chapterIdx, int32 hitIdx, const UIDRef& itemRef)
 {
-	if (ItemIsThere(itemRef) && SpreadOfItem(itemRef) != kInvalidUID)
+	if (RowItemIsThere(chapterIdx, hitIdx, itemRef) && SpreadOfItem(itemRef) != kInvalidUID)
 		SelectItemOnClick(chapterIdx, hitIdx, itemRef);
 	else
 		ClearSelection();
@@ -1432,7 +1435,7 @@ bool JumpToObject(int32 chapterIdx, int32 hitIdx, UID item)
 		return false;
 	IDataBase::SaveRestoreModifiedState dirtyGuard(db);
 	const UIDRef itemRef(db, item);
-	const bool there = ItemIsThere(itemRef);
+	const bool there = RowItemIsThere(chapterIdx, hitIdx, itemRef);
 	if (!FrontChapter(docRef))
 		return false;
 	if (!there)
@@ -1656,7 +1659,7 @@ bool KFCJump::ReplaceObjectRows(const KFCRowsByChapter& rows, int32 shownChapter
 		if (!FrontChapter(docRef, sweep /*hidePreviousChapters*/))
 			return false;		// it has said why
 		const UIDRef shown(db, KFCResults()->GetHitItem(shownChapter, shownHit));
-		if (ItemIsThere(shown) && SpreadOfItem(shown) != kInvalidUID)
+		if (RowItemIsThere(shownChapter, shownHit, shown) && SpreadOfItem(shown) != kInvalidUID)
 			ShowItemInView(shown);
 	}
 	const bool wrote = KFCRuns()->ReplaceRows(rows, outStatus);

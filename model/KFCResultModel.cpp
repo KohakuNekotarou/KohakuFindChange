@@ -25,6 +25,7 @@
 // Project includes:
 #include "KFCDiag.h"	// KFC_DIAG_LOG / KFC_DIAG_FAULT - a row's outcome as it is set, and the fault switches, in a test
 						// build (compiled out of a shipping one)
+#include "KFCPageItemFacts.h"	// ItemIsThere - asked of an object row's item where a chapter is bound again
 #include "KFCResultModel.h"
 #include "KFCRowFoci.h"	// the rows' text foci - attached where a chapter is bound, let go with the rows
 
@@ -908,10 +909,37 @@ void KFCResultModel::RebindChapterDoc(int32 chapterIdx, const UIDRef& newDocRef)
 	if (Chapter* c = ChapterAt(chapterIdx))
 	{
 		c->docRef = newDocRef;
+		// A NEW SESSION OF THE CHAPTER'S FILE (its document closed since the last bind - ChapterDocumentClosing): an
+		// object row's item it came back without is gone for good, and its UID free for the next item made
+		// (Hit::itemGone). Read here, as the document comes - before anyone can make one in it: every road that binds
+		// comes here.
+		IDataBase* const db = newDocRef.GetDataBase();
+		if (c->closedSinceBound && db != nil)
+		{
+			c->closedSinceBound = false;
+			for (size_t i = 0; i < c->hits.size(); ++i)
+			{
+				Hit& h = c->hits[i];
+				if (h.itemUID == kInvalidUID || h.itemGone || KFCPageItemFacts::ItemIsThere(db, h.itemUID))
+					continue;
+				h.itemGone = true;
+				KFC_DIAG_LOG("ITEMGONE chapter=%d hit=%d item=%u - its document came back without it", chapterIdx,
+					static_cast<int>(i), static_cast<unsigned>(h.itemUID.Get()));
+			}
+		}
 		// THE ONE PLACE A CHAPTER'S ROWS GET THEIR FOCI AFTER A (RE)OPEN (the text-focus spec's T6): every road that
 		// binds a chapter to an open document comes here - a jump's or a replace's reopen, and the user's own open
 		// (KFCOpenDocResponder).
 		KFCRowFoci::AttachChapter(chapterIdx);
+	}
+}
+
+void KFCResultModel::ChapterDocumentClosing(const UIDRef& closingDocRef)
+{
+	for (size_t i = 0; i < gChapters.size(); ++i)
+	{
+		if (gChapters[i].docRef == closingDocRef)
+			gChapters[i].closedSinceBound = true;
 	}
 }
 
@@ -1741,6 +1769,18 @@ UID KFCResultModel::GetHitItem(int32 chapterIdx, int32 hitIdx)
 {
 	const Hit* h = HitAt(chapterIdx, hitIdx);
 	return (h != nil) ? h->itemUID : kInvalidUID;
+}
+
+bool KFCResultModel::IsHitItemGone(int32 chapterIdx, int32 hitIdx)
+{
+	const Hit* h = HitAt(chapterIdx, hitIdx);
+	return h != nil && h->itemUID != kInvalidUID && h->itemGone;
+}
+
+bool KFCResultModel::RowItemIsThere(int32 chapterIdx, int32 hitIdx, IDataBase* db)
+{
+	const Hit* h = HitAt(chapterIdx, hitIdx);
+	return h != nil && h->itemUID != kInvalidUID && !h->itemGone && KFCPageItemFacts::ItemIsThere(db, h->itemUID);
 }
 
 bool KFCResultModel::GetHitItemPrint(int32 chapterIdx, int32 hitIdx, uint64& outPrint, uint32& outLength)

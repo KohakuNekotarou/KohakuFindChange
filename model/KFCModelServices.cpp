@@ -80,6 +80,10 @@ public:
 	virtual bool ListHoldsObjects() { return KFCResultModel::ListHoldsObjects(); }
 	virtual int32 ClearRows(const KFCRowsByChapter& rows) { return KFCResultModel::ClearRows(rows); }
 	virtual int32 GetObjectRowHit(int32 chapterIdx, int32 nth) { return KFCResultModel::GetObjectRowHit(chapterIdx, nth); }
+	virtual bool IsHitItemGone(int32 chapterIdx, int32 hitIdx)
+	{
+		return KFCResultModel::IsHitItemGone(chapterIdx, hitIdx);
+	}
 };
 
 CREATE_PMINTERFACE(KFCResultsSession, kKFCResultsImpl)

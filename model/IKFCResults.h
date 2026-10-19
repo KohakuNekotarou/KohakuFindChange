@@ -121,6 +121,9 @@ public:
 	virtual int32 ClearRows(const KFCRowsByChapter& rows) = 0;
 	/** = KFCResultModel::GetObjectRowHit (appended) - an object list's chapter: its nth row shown, as a hit index. */
 	virtual int32 GetObjectRowHit(int32 chapterIdx, int32 nth) = 0;
+	/** = KFCResultModel::IsHitItemGone (appended) - an object row whose item its document came back without: its UID
+	    may name another object by now, so the row's click and its Replace's selection take it for gone. */
+	virtual bool IsHitItemGone(int32 chapterIdx, int32 hitIdx) = 0;
 };
 
 #endif // __IKFCResults_h__

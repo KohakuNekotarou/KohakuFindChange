@@ -437,13 +437,7 @@ Refusal CheckItem(const OpInfo& info, const KFCSpecialParams& params, int32 chap
 	else if (!KFCBookScope::FindOpenChapterDoc(file, outDoc))
 		return kRefusedNone;
 	IDataBase* const db = outDoc.GetDataBase();
-	bool there = false;
-	if (db != nil && db->IsValidUID(outItem))
-	{
-		InterfacePtr<IHierarchy> hier(db, outItem, UseDefaultIID());
-		there = (hier != nil);
-	}
-	if (!there)
+	if (!KFCResultModel::RowItemIsThere(chapterIdx, hitIdx, db))
 	{
 		if (reach)
 			KFCResultModel::SetHitOutcome(chapterIdx, hitIdx, KFCResultModel::kOutcomeMissing);

@@ -13,7 +13,6 @@
 // Interface includes:
 #include "IDataBase.h"
 #include "IFindChangeOptions.h"		// kObjectSearch, kAllFrames - a Frames list's Replace states the Object tab's find side
-#include "IHierarchy.h"
 #include "IObjectWalker.h"
 
 // General includes:
@@ -182,13 +181,7 @@ Refusal CheckItem(int32 chapterIdx, int32 hitIdx, UIDRef& outDoc, UID& outItem)
 		return kRefusedNotOpened;
 	KFCResultModel::RebindChapterDoc(chapterIdx, outDoc);
 	IDataBase* const db = outDoc.GetDataBase();
-	bool there = false;
-	if (db != nil && db->IsValidUID(outItem))
-	{
-		InterfacePtr<IHierarchy> hier(db, outItem, UseDefaultIID());
-		there = (hier != nil);
-	}
-	if (!there)
+	if (!KFCResultModel::RowItemIsThere(chapterIdx, hitIdx, db))
 	{
 		KFCResultModel::SetHitOutcome(chapterIdx, hitIdx, KFCResultModel::kOutcomeMissing);
 		return kRefusedMissing;

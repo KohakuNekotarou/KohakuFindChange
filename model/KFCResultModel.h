@@ -248,6 +248,12 @@ namespace KFCResultModel
 		// no longer reads this way.
 		uint64		itemPrint;
 		uint32		itemPrintLength;
+		// GONE WITH ITS DOCUMENT'S SESSION: the chapter's document was closed and opened again without the item - one
+		// never saved. Its UID can then name only ANOTHER object: InDesign hands a never-saved item's UID to the next
+		// item made after the reopen (measured 2026-10-20 - a book's chapter closed unsaved and opened again, a new
+		// rectangle took the gone one's UID, and the old row's click selected it). Set where the chapter is bound again
+		// (RebindChapterDoc), asked by every door that takes the row's item (RowItemIsThere, IsHitItemGone).
+		bool		itemGone;
 
 		Hit() : pageIndex(-1), isOverset(false), isLocked(false), isHidden(false),
 				fontGroup(-1), fontGroupPos(-1), storyUID(kInvalidUID),
@@ -257,7 +263,7 @@ namespace KFCResultModel
 				frameLayer(kInvalidUID), outcome(kOutcomeNone),
 				pageOrdinal(0), storyOrdinal(-1),
 				itemUID(kInvalidUID), onPasteboard(false), isMaster(false), isGrouped(false), isInline(false),
-				isAnchored(false), itemPrint(0), itemPrintLength(0) {}
+				isAnchored(false), itemPrint(0), itemPrintLength(0), itemGone(false) {}
 	};
 
 	/** One STORY of a chapter's hits - one story row in the tree. The struct keeps the name it had when
@@ -322,11 +328,16 @@ namespace KFCResultModel
 		// chapter with no rows is otherwise not shown - a search
 		// lists only documents that hold a match, and CloseChapter empties a closed one in place (ChapterShown).
 		bool					shownEmpty;
+		// ITS DOCUMENT CLOSED SINCE IT WAS LAST BOUND (ChapterDocumentClosing): the next document bound to it
+		// (RebindChapterDoc) is a new session of its file - the one bind that can find an object row's item gone for
+		// good (Hit::itemGone). A bind with no close before it (every object write's check binds again) finds an item
+		// missing in this session, deleted - which an Undo can bring back.
+		bool					closedSinceBound;
 
 		// (No "not reached" mark per chapter: rows of several documents replaced together are written in one
 		// sequence, which a chapter not written whole takes back entire - every chapter is written or none is.)
 
-		Chapter() : searchedStory(kInvalidUID), shownEmpty(false) {}
+		Chapter() : searchedStory(kInvalidUID), shownEmpty(false), closedSinceBound(false) {}
 	};
 
 
@@ -610,8 +621,14 @@ namespace KFCResultModel
 		UIDRef& outDocRef, IDFile& outFile, UID& outStoryUID, TextIndex& outStart, TextIndex& outEnd);
 
 	/** Rebind a chapter's document reference: after a closed chapter is reopened - by a jump or a
-	    replace - later calls must use the live database, not the dead one from search time. */
+	    replace - later calls must use the live database, not the dead one from search time. The first bind after its
+	    document closed (Chapter::closedSinceBound) marks the object rows whose items the document came back without as
+	    gone for good (Hit::itemGone). */
 	void RebindChapterDoc(int32 chapterIdx, const UIDRef& newDocRef);
+
+	/** A DOCUMENT CLOSING (KFCCloseDocResponder, kBeforeCloseDoc - every close): the chapters bound to it take note
+	    (Chapter::closedSinceBound). The UIDRef is compared, never dereferenced. */
+	void ChapterDocumentClosing(const UIDRef& closingDocRef);
 
 	/** A DOCUMENT SAVED AS ANOTHER FILE (KFCSaveAsDocResponder - the author's call, the spec map's LIFE-14):
 	    the chapter of a document-scope list bound to it takes its new name - the row's, and a status line's that names it
@@ -654,6 +671,15 @@ namespace KFCResultModel
 
 	/** The page item an OBJECT row stands for (Hit::itemUID); kInvalidUID for a text row or an index out of range. */
 	UID GetHitItem(int32 chapterIdx, int32 hitIdx);
+
+	/** An object row whose item its document came back without (Hit::itemGone) - false for any other row or an
+	    index out of range. */
+	bool IsHitItemGone(int32 chapterIdx, int32 hitIdx);
+
+	/** AN OBJECT ROW'S ITEM, STILL IN ITS DOCUMENT `db`: a page item there (KFCPageItemFacts::ItemIsThere) and not
+	    gone with its document's session (Hit::itemGone - by then its UID may name another object). The one question
+	    the doors that take a row's item ask: the object Replace's, Create Outlines' and Special Operations' checks. */
+	bool RowItemIsThere(int32 chapterIdx, int32 hitIdx, IDataBase* db);
 
 	/** An object row's fingerprint (Hit::itemPrint / itemPrintLength). false for a text row or an index out of range. */
 	bool GetHitItemPrint(int32 chapterIdx, int32 hitIdx, uint64& outPrint, uint32& outLength);

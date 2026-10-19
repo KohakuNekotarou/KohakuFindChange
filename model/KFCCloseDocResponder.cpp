@@ -120,6 +120,11 @@ static void LetGoOfClosingDocument(const UIDRef& closingDocRef)
 	// (KFCRowFoci::DetachDocument).
 	KFCRowFoci::DetachDocument(closingDocRef.GetDataBase());
 
+	// A chapter of the results bound to it - a book's keeps its rows: the next document bound to it is a new session of
+	// its file, where an object row's item never saved is gone and its UID free for another
+	// (KFCResultModel::ChapterDocumentClosing - Hit::itemGone).
+	KFCResultModel::ChapterDocumentClosing(closingDocRef);
+
 	// The Undo follow takes its observer off the closing document (KFCUndoFollow::DocumentClosing): what was attached is
 	// detached.
 	KFCUndoFollow::DocumentClosing(closingDocRef);
