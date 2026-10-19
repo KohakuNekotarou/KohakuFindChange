@@ -21,7 +21,7 @@
 //     as it was: both tabs when the list's is not the one on screen (PutBack). A query that does not read back is refused
 //     before the operation: the sequence aborted, Find/Change put back, nothing done.
 //  Find/Change is not left on the list's query: what could not be put back is said - in the operation's words, or on the
-//  panel's line where it has none (IKFCUIServices::ShowNotice). No file is written. The main thread only.
+//  panel's line where it has none (KFCNotifyStatus). No file is written. The main thread only.
 //
 //========================================================================================
 
@@ -85,6 +85,12 @@ bool KFCUnderListQuery(PMString& ioStatus, bool writes, Operation operation)
 	scope.Finish(writes && done, ioStatus);
 	return done;
 }
+
+/** FIND/CHANGE NOT PUT BACK, IN ONE SENTENCE: "Find/Change could not be put back as you left it (<what>) - check
+    Edit > Find/Change before replacing." Every put-back of Find/Change that fails after a row operation says it so -
+    this scope's (in the operation's words, or on the panel's line: KFCNotifyStatus) and a Frames list's write
+    (KFCObjectReplace). */
+PMString KFCFindChangeNotPutBack(const PMString& what);
 
 #endif // __KFCQueryScope_h__
 

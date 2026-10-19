@@ -30,8 +30,9 @@
 #include "KFCObjectReplace.h"
 #include "KFCObjectSearch.h"
 #include "KFCPageItemFacts.h"
-#include "IKFCUIServices.h"	// ShowNotice - Find/Change not put back after a Frames list's write
+#include "KFCModelNotify.h"	// KFCNotifyStatus - Find/Change not put back after a Frames list's write
 #include "KFCQueryCopy.h"		// a Frames list's Replace: the Object tab read, stated for the write, put back
+#include "KFCQueryScope.h"		// KFCFindChangeNotPutBack - the sentence every failed put-back says
 #include "KFCReplaceEngine.h"	// RefuseChangedQuery, CanReplaceHit, WhyGreyed; the write's undo step (WriteStep) and
 								// what its documents are left as (DocsAfterWrite)
 #include "KFCResultModel.h"
@@ -444,15 +445,7 @@ public:
 			back = KFCQueryCopier::Apply(fBeforeNow, what) && KFCQueryCopier::Matches(fBeforeNow, what);
 		KFC_DIAG_LOG("FRAMESREPLACE put back=%d (%s)", back ? 1 : 0, what.GetUTF8String().c_str());
 		if (!back)
-		{
-			PMString notice("Find/Change could not be put back as you left it (");
-			notice.SetTranslatable(kFalse);
-			notice.Append(what);
-			notice.Append(") - check Edit > Find/Change.");
-			InterfacePtr<IKFCUIServices> ui(KFCQueryUIServices());
-			if (ui != nil)
-				ui->ShowNotice(notice);
-		}
+			KFCNotifyStatus(KFCFindChangeNotPutBack(what));
 	}
 	bool Ready(PMString& outWhy) const
 	{

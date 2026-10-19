@@ -21,8 +21,9 @@
 
 // Project includes:
 #include "KFCQueryScope.h"
-#include "IKFCUIServices.h"			// QueryReadsAsTier, LiveQueryRecopied, ShowNotice - the lists' names are the UI half's
+#include "IKFCUIServices.h"			// QueryReadsAsTier, LiveQueryRecopied - the lists' names are the UI half's
 #include "KFCDiag.h"				// the QSCOPE lines, and the fault switch query-scope-refuse - test builds only
+#include "KFCModelNotify.h"			// KFCNotifyStatus - a put-back that failed, said on the panel's line
 #include "KFCReplaceEngine.h"		// QueryUnchangedSinceSearch - the replace's own question; CanReplaceHit, PreviewHit
 #include "KFCResultModel.h"			// the live list's query copy, walk signature, result set and tab
 #include "KFCRunGuard.h"			// nothing is stated while a run of ours is under way
@@ -37,25 +38,18 @@ namespace
 		out.SetTranslatable(kFalse);
 	}
 
-	// The panel's line, for what an operation with no words of its own cannot carry (IKFCUIServices::ShowNotice).
-	void Notice(const PMString& words)
-	{
-		InterfacePtr<IKFCUIServices> ui(KFCQueryUIServices());
-		if (ui != nil)
-			ui->ShowNotice(words);
-	}
-
-	// "Find/Change could not be put back as it was (<what>) - check Edit > Find/Change." - the loud form, said wherever
-	// the put-back fails (the v1 switch's words: the person has to look before replacing again).
-	PMString NotPutBack(const PMString& what)
-	{
-		PMString say("Find/Change could not be put back as it was (");
-		say.SetTranslatable(kFalse);
-		say.Append(what);
-		say.Append(") - check Edit > Find/Change before replacing.");
-		return say;
-	}
 }	// anonymous namespace
+
+// THE LOUD FORM, said wherever a put-back of Find/Change fails - the person has to look before replacing again (the
+// header says who says it).
+PMString KFCFindChangeNotPutBack(const PMString& what)
+{
+	PMString say("Find/Change could not be put back as you left it (");
+	say.SetTranslatable(kFalse);
+	say.Append(what);
+	say.Append(") - check Edit > Find/Change before replacing.");
+	return say;
+}
 
 KFCQueryScope::KFCQueryScope()
 	: fStated(false), fRefused(false), fUnchanged(false), fFinished(false)
@@ -198,9 +192,9 @@ KFCQueryScope::KFCQueryScope()
 	else
 	{
 		fWhy.Append("). ");
-		fWhy.Append(NotPutBack(whatBack));
+		fWhy.Append(KFCFindChangeNotPutBack(whatBack));
 		// Said on the panel's line too: an operation with no words of its own (a GREP row's after-text) drops Ready's.
-		Notice(fWhy);
+		KFCNotifyStatus(fWhy);
 	}
 	fWhy.SetTranslatable(kFalse);
 	KFC_DIAG_LOG("QSCOPE refused set=%u what=%s back=%d", KFCResultModel::GetResultSetId(), what.GetUTF8String().c_str(),
@@ -218,7 +212,7 @@ KFCQueryScope::~KFCQueryScope()
 	if (PutBack(what))
 		return;
 	KFC_DIAG_LOG("QSCOPE not put back (left early) what=%s", what.GetUTF8String().c_str());
-	Notice(NotPutBack(what));
+	KFCNotifyStatus(KFCFindChangeNotPutBack(what));
 }
 
 bool KFCQueryScope::Ready(PMString& outWhy) const
@@ -249,7 +243,7 @@ void KFCQueryScope::Finish(bool wrote, PMString& ioStatus)
 			ioStatus.Append(" - Find/Change is as you left it.");
 		}
 		else
-			ioStatus.Append(NotPutBack(what));
+			ioStatus.Append(KFCFindChangeNotPutBack(what));
 		ioStatus.SetTranslatable(kFalse);
 		KFC_DIAG_LOG("QSCOPE put back=%d wrote=%d", back ? 1 : 0, wrote ? 1 : 0);
 		return;

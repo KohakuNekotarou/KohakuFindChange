@@ -138,10 +138,6 @@ public:
 	    query dialog's run order kept), so its heading says what a later replace under it would write - and the third check
 	    above reads that name. Nothing for a set that is not the live list's. */
 	virtual void				LiveQueryRecopied(uint32 resultSet) = 0;
-	/** A NOTICE ON THE PANEL'S MESSAGE LINE where the operation has no words of its own to carry it - Find/Change could not
-	    be put back as it was after a list's query was stated for a GREP row's after-text, or for an operation that left
-	    early (KFCQueryScope). Said at once (KFCResultTree::ShowStatus), so the person checks Edit > Find/Change. */
-	virtual void				ShowNotice(const PMString& words) = 0;
 	/** THE SELECTIONS OF THE WINDOWS BEHIND THE FRONT VIEW, AROUND AN OBJECT SEARCH (the selection, given back -
 	    O6 of docs/superpowers/specs/2026-10-09-kfc-object-search-design.md): its walks select what they find in every
 	    document with a window they walk (IFindChangeService::SearchObject - measured: an All Documents search with

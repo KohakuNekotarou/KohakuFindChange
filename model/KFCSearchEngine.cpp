@@ -3549,7 +3549,7 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 		if (inPlace)
 		{
 			putBack();		// SEARCH THESE RESULTS AGAIN: the list as it was
-			outSummary.Append("Search These Results Again: cancelled - the rows are left as they were.");
+			outSummary.Append("Search These Results Again: cancelled - the rows stay as they are.");
 			return 0;
 		}
 		KFCSearchEngine::DropResults();		// the rows, the book (its chapters closed) and the format
@@ -4430,20 +4430,30 @@ const char* PartOfDocumentName(KFCResultModel::SearchScopeKind scope)
 // A search again's walks cut short by the list's limit (SayFoundAgain, SearchPartsAgain), said last.
 const char* const kListLimitReached = " The list's limit of rows was reached - its other matches are not listed.";
 
-// WHAT BOTH SEARCHES AGAIN SAY ONCE THE ROWS ARE BACK: what was searched again ("story", "document"), how many matches
-// it holds now, how many rows with their eye on stayed beside them (the row eye - AppendKeptStay), and whether the list's
-// limit cut it short.
-void SayFoundAgain(PMString& outStatus, const char* what, int32 now, bool capped, int32 stayed)
+// WHAT BOTH SEARCHES AGAIN SAY ONCE THE ROWS ARE BACK, in the words of the search's own summary - Search These Results
+// Again's (SearchPartsAgain): what was searched again ("story", "document"); how many rows it holds now, in the list's
+// words (RowWords - frame(s) for a list of frames, hit(s) for any other), or No matches; how many rows with their eye
+// on stayed beside them (the row eye - AppendKeptStay); whether the list's limit cut it short; and a narrowed list's
+// notes (AppendNarrowNotes - the matches no frame holds, the documents with no layer of the name).
+void SayFoundAgain(PMString& outStatus, const char* what, int32 now, bool capped, int32 stayed,
+	const KFCNarrow::Filter& narrow)
 {
 	outStatus.Clear();
 	outStatus.Append("Searched this ");
 	outStatus.Append(what);
 	outStatus.Append(" again: ");
-	outStatus.AppendNumber(now > 0 ? now : 0);
-	outStatus.Append(" match(es).");
+	if (now > 0)
+	{
+		outStatus.AppendNumber(now);
+		outStatus.Append(RowWords(narrow.MakesFrames()));
+		outStatus.Append(".");
+	}
+	else
+		outStatus.Append("No matches.");
 	AppendKeptStay(outStatus, stayed);
 	if (capped)
 		outStatus.Append(kListLimitReached);
+	AppendNarrowNotes(outStatus, narrow);
 }
 
 // A SEARCH OVER PART OF A DOCUMENT, SEARCHED AGAIN AS IT WAS SEARCHED - the tier heading's Search These Results Again
@@ -4661,13 +4671,13 @@ bool SearchPartsAgain(const PMString& lead, PMString& outStatus, const KFCSearch
 	if (cancelled)
 	{
 		outStatus.Append(lead);
-		outStatus.Append("cancelled - the rows are left as they were.");
+		outStatus.Append("cancelled - the rows stay as they are.");
 		return false;
 	}
 	if (!walked)
 	{
 		outStatus.Append(lead);
-		outStatus.Append("InDesign's search stopped with an error - the rows are left as they were.");
+		outStatus.Append("InDesign's search stopped with an error - the rows stay as they are.");
 		return false;
 	}
 	// What both endings below take from the walks: a part recorded again where it was walked, at the version it was
@@ -4872,14 +4882,15 @@ bool KFCSearchEngine::SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMStrin
 	std::vector<KFCResultModel::Hit> hits;
 	bool capped = false;
 	ChapterWalkResult walked = kChapterWalked;
+	// A NARROWED LIST'S CONDITIONS, searched again with it (Narrow Down - the narrow-down spec's N4: the list's rows
+	// are its search's, conditions and all - a story walked again lists what the list would) and said with its rows
+	// (SayFoundAgain).
+	const KFCNarrow::Filter narrowFilter(KFCResultModel::GetNarrowSteps());
 	{
 		// forward, as the search was
 		KFCForwardSearchScope forward;
 		WalkerScopeOptions scopeOptions;
 		KFCSearchEngine::GetKFCWalkerScopeOptions(scopeOptions);
-		// A NARROWED LIST'S CONDITIONS, searched again with it (Narrow Down - the narrow-down spec's N4: the list's
-		// rows are its search's, conditions and all - a story walked again lists what the list would).
-		const KFCNarrow::Filter narrowFilter(KFCResultModel::GetNarrowSteps());
 		const WalkFilterScope walkFilter(narrowFilter);
 		// A searched part's own scope - nil for a whole story, which CollectHitsInDoc walks by the story form.
 		TempFocus partFocus;
@@ -4900,7 +4911,7 @@ bool KFCSearchEngine::SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMStrin
 		(void)KFCBookScope::HandBackHeldDocNow(docRef);
 	if (walked != kChapterWalked || !versionRead)
 	{
-		outStatus.Append("InDesign's search stopped with an error - the story's rows are left as they were.");
+		outStatus.Append("InDesign's search stopped with an error - the story's rows stay as they are.");
 		return false;
 	}
 	// The part recorded where it was found, at the version it was walked at - before the rows go in, whose foci come
@@ -4914,7 +4925,7 @@ bool KFCSearchEngine::SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMStrin
 	}
 	int32 stayed = 0;
 	const int32 rows = KFCResultModel::ReplaceStoryRows(chapterIdx, story, hits, version, &stayed);
-	SayFoundAgain(outStatus, "story", rows - stayed, capped, stayed);
+	SayFoundAgain(outStatus, "story", rows - stayed, capped, stayed, narrowFilter);
 	return true;
 }
 
@@ -4984,10 +4995,10 @@ bool KFCSearchEngine::SearchDocumentAgain(int32 chapterIdx, PMString& outStatus)
 	std::vector<KFCResultModel::Hit> hits;
 	std::map<UID, uint32> storyVersions;
 	bool capped = false, cancelled = false, walked = false;
+	// A NARROWED LIST'S CONDITIONS, searched again with it and said with its rows (Search This Story Again's rule).
+	const KFCNarrow::Filter narrowFilter(KFCResultModel::GetNarrowSteps());
 	{
 		KFCForwardSearchScope forward;		// forward, as the search was
-		// A NARROWED LIST'S CONDITIONS, searched again with it (Narrow Down - Search This Story Again's rule).
-		const KFCNarrow::Filter narrowFilter(KFCResultModel::GetNarrowSteps());
 		const WalkFilterScope walkFilter(narrowFilter);
 		if (KFCResultModel::GetSearchMode() == IFindChangeOptions::kObjectSearch)
 			walked = KFCObjectSearch::WalkOneDocument(docRef, name, limit, hits, capped, cancelled,
@@ -5019,17 +5030,17 @@ bool KFCSearchEngine::SearchDocumentAgain(int32 chapterIdx, PMString& outStatus)
 		(void)KFCBookScope::HandBackHeldDocNow(docRef);
 	if (cancelled)
 	{
-		outStatus.Append("cancelled - the document's rows are left as they were.");
+		outStatus.Append("cancelled - the document's rows stay as they are.");
 		return false;
 	}
 	if (!walked)
 	{
-		outStatus.Append("InDesign's search stopped with an error - the document's rows are left as they were.");
+		outStatus.Append("InDesign's search stopped with an error - the document's rows stay as they are.");
 		return false;
 	}
 	int32 stayed = 0;
 	const int32 rows = KFCResultModel::ReplaceChapterRows(chapterIdx, hits, storyVersions, &stayed);
-	SayFoundAgain(outStatus, "document", rows - stayed, capped, stayed);
+	SayFoundAgain(outStatus, "document", rows - stayed, capped, stayed, narrowFilter);
 	return true;
 }
 

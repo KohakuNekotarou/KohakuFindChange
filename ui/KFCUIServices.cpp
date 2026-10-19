@@ -53,7 +53,6 @@
 #include "KFCBookPanelLookup.h"
 #include "KFCJump.h"				// ClearFrontSelection - ClearSelection's door; IsLanding - IsLanding's
 #include "KFCResultHistory.h"		// QueryReadsAsTier, RenameLiveFromQuery - the lists' names are this half's
-#include "KFCResultTree.h"			// ShowStatus - ShowNotice's line
 #include "KFCDiag.h"				// KFC_DIAG_FAULT - test builds only (bg-first-view)
 #ifdef KFC_DIAG
 #include "ILayoutViewUtils.h"		// GetAllLayoutViews - bg-first-view's old way, a test build's only
@@ -391,13 +390,6 @@ public:
 	virtual void LiveQueryRecopied(uint32 resultSet)
 	{
 		KFCResultHistory::RenameLiveFromQuery(resultSet);
-	}
-
-	virtual void ShowNotice(const PMString& words)
-	{
-		PMString say(words);
-		say.SetTranslatable(kFalse);
-		KFCResultTree::ShowStatus(say);
 	}
 
 	virtual void SnapshotBackgroundSelections()
