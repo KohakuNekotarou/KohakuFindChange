@@ -24,6 +24,7 @@
 #include "IWalkerScopeFactoryUtils.h"
 #include "IAttrReport.h"			// IsParagraphAttribute - a Change side that sets paragraph formatting (TakeRowCopy)
 #include "IAttributeStrand.h"		// a paragraph's style and own overrides, kept and put back (TakeRowCopy, PutParagraphBack)
+#include "IComposeScanner.h"		// FindSurroundingParagraph - the paragraph of a copy (ParagraphOf)
 #include "ICreateOutlinesUtils.h"		// CreateCOTextCmd - a text row's Create Outlines (OutlineHits)
 #include "ITextModelCmds.h"			// ApplyStyleCmd / ApplyCmd - a paragraph's formatting put back (PutParagraphBack)
 #include "IHyperlinkUtils.h"		// hyperlink sources a copy would cut or carry (TakeRowCopy) - source/open/interfaces/layout
@@ -1634,9 +1635,11 @@ struct LinkAt
 
 // THE HYPERLINK TEXT SOURCES ON [from, to) OF A STORY (the spec's C15): those the range tree names there - inside the range
 // or across its edge (IHyperlinkUtils::GetRangeContainedHyperlinks) and one around it (IsRangeContainedByAHyperlink) - each
-// found by its range reference in the document's hyperlink table (IHyperlinkTextSourceData; the table reached as
-// SnpCreateCrossReference.cpp reaches it), with where its range stands (its ITextRangeNode) and whether its link is a
-// cross-reference. False when the range tree or the table cannot be asked, or a source named cannot be read.
+// read off its range's node: the source is the text object the range is of (ITextRangeNode::GetBaseUIDRef - the source
+// the document's hyperlink table names for that range, measured in KT), where its range stands is the node's, and the
+// table (reached as SnpCreateCrossReference.cpp reaches it) gives its link and whether that is a cross-reference. A
+// source both questions name (the range is its whole text) is listed once. False when the range tree or the table
+// cannot be asked, or a range named cannot be read.
 bool LinksOn(ITextModel* model, const UIDRef& storyRef, TextIndex from, TextIndex to, std::vector<LinkAt>& out)
 {
 	Utils<IHyperlinkUtils> utils;
@@ -1650,34 +1653,41 @@ bool LinksOn(ITextModel* model, const UIDRef& storyRef, TextIndex from, TextInde
 	const TextRangeReference around = utils->IsRangeContainedByAHyperlink(model, from, to);
 	if (around.GetLogicalID() != kInvalidSBOSID)
 		refs.push_back(around);
-	if (refs.empty())
-		return true;
-	for (int32 i = 0; i < table->GetHyperlinkSourceCount(); ++i)
+	std::set<UID> listed;
+	for (size_t r = 0; r < refs.size(); ++r)
 	{
-		const UID source = table->GetNthHyperlinkSource(i);
-		InterfacePtr<IHyperlinkTextSourceData> data(db, source, UseDefaultIID());
-		if (data == nil || data->GetOwningStoryUID() != storyRef.GetUID())
-			continue;
-		const TextRangeReference ref = data->GetHyperlinkRangeReference();
-		bool named = false;
-		for (size_t r = 0; r < refs.size() && !named; ++r)
-			named = (refs[r].GetLogicalID() == ref.GetLogicalID() && refs[r].GetUIDRef() == ref.GetUIDRef());
-		if (!named)
-			continue;
-		InterfacePtr<ITextRangeNode> node(ref.Instantiate());
+		InterfacePtr<ITextRangeNode> node(refs[r].Instantiate());
 		if (node == nil)
 			return false;
+		const UIDRef sourceRef = node->GetBaseUIDRef();
+		const UID source = sourceRef.GetUID();
+		InterfacePtr<IHyperlinkTextSourceData> data(sourceRef, UseDefaultIID());
+		if (data == nil || data->GetOwningStoryUID() != storyRef.GetUID() || !listed.insert(source).second)
+			continue;
 		LinkAt at;
 		at.source = source;
 		at.start = node->GetStartIndex();
 		at.length = node->GetRangeLength();
-		at.hyperlink = table->GetHyperlinkOfSource(UIDRef(db, source));
+		at.hyperlink = table->GetHyperlinkOfSource(sourceRef);
 		at.xref = (at.hyperlink != kInvalidUID) && utils->IsXRef(UIDRef(db, at.hyperlink));
 		KFC_DIAG_LOG("LINK on story=%u [%d,%d): source=%u at=%d len=%d link=%u xref=%d", (unsigned)storyRef.GetUID().Get(),
 			(int)from, (int)to, (unsigned)source.Get(), (int)at.start, (int)at.length, (unsigned)at.hyperlink.Get(), at.xref ? 1 : 0);
 		out.push_back(at);
 	}
 	return true;
+}
+
+// THE PARAGRAPH THAT HOLDS `at`, WITH ITS RETURN - the last paragraph's with the story's own (IComposeScanner::
+// FindSurroundingParagraph, the end of the story counted - kFalse, SnpCreateCrossReference.cpp's call; it answered as
+// the walk for the returns it replaced at every position of a story in KT - an empty paragraph, a forced line break, a
+// table's anchor, the last paragraph). The copy of a match holding a return runs on to it (TakeRowCopy), and the
+// formatting of the paragraph a match starts in is put back over it (PutParagraphBack). False when it cannot be read.
+bool ParagraphOf(ITextModel* model, TextIndex at, TextIndex& outStart, int32& outLength)
+{
+	InterfacePtr<IComposeScanner> scanner(model, UseDefaultIID());
+	outLength = 0;
+	outStart = (scanner != nil) ? scanner->FindSurroundingParagraph(at, &outLength, kFalse) : kInvalidTextIndex;
+	return outStart >= 0 && outLength > 0;
 }
 
 // THE COPY ONE ROW'S REPLACE TAKES - of [start, end) of its story, as the doors before the write have just found it. Run on
@@ -1750,7 +1760,7 @@ KFCResultModel::HitCopy TakeRowCopy(const UIDRef& storyRef, TextIndex start, Tex
 		const DataWrapper<AttributeBossList> overrides = paraStrand->GetLocalOverrides(start, &count);
 		const AttributeBossList* const own = overrides.get();		// (DataWrapper has no ->: its get())
 		if (own != nil && own->CountBosses() > 0)
-			copy.paraOverrides.reset(new AttributeBossList(*own));
+			copy.paraOverrides.reset(own->Duplicate());		// shared - a later paragraph change puts in new ones
 		if (copy.paraStyle == kInvalidUID)
 		{
 			copy.whyNot = KFCResultModel::kCopyFailed;
@@ -1760,19 +1770,21 @@ KFCResultModel::HitCopy TakeRowCopy(const UIDRef& storyRef, TextIndex start, Tex
 	TextIndex copyEnd = end;
 	if (holdsReturn)
 	{
-		// The run-on rest, read once: up to the return of the paragraph the match ends in (the last paragraph's: the
-		// story's own), with no character an object or a marker stands on (KFCResultModel::IsMarkerNotShown - the ones
-		// a row does not show - and a table's two).
-		copyEnd = primary;
+		// The run-on rest: up to the return of the paragraph the match ends in (ParagraphOf - the last paragraph's is
+		// the story's own), with no character an object or a marker stands on (KFCResultModel::IsMarkerNotShown - the
+		// ones a row does not show - and a table's two).
+		TextIndex paraStart = kInvalidTextIndex;
+		int32 paraLength = 0;
+		if (!ParagraphOf(model, end, paraStart, paraLength))
+		{
+			copy.whyNot = KFCResultModel::kCopyFailed;
+			return copy;
+		}
+		copyEnd = paraStart + paraLength - 1;		// its return
 		TextIterator it(model, end);
-		for (TextIndex i = end; i < primary && !it.IsNull(); ++i, ++it)
+		for (TextIndex i = end; i < copyEnd && !it.IsNull(); ++i, ++it)
 		{
 			const UTF32TextChar c = *it;
-			if (c.GetValue() == kTextChar_CR)
-			{
-				copyEnd = i;
-				break;
-			}
 			if (KFCResultModel::IsMarkerNotShown(c) || c.GetValue() == kTextChar_Table
 				|| c.GetValue() == kTextChar_TableContinued)
 			{
@@ -2526,36 +2538,14 @@ bool PutLinksBack(ITextModel* model, const UIDRef& storyRef, TextIndex at, int32
 // THE FORMATTING OF THE PARAGRAPH A MATCH STARTS IN, PUT BACK once its copy is pasted (the spec's C16): the style it had,
 // with what the Replace left on it cleared, then its own overrides as they read before the write (TakeRowCopy). The
 // paste cannot - its first paragraph takes the attributes of the paragraph it is pasted into (measured live, R13b). The
-// paragraph is found by its returns, as the run-on rest is: from just after the return before `at` to its own return.
+// paragraph is the one that holds `at`, with its return (ParagraphOf - the paragraph the copy's run-on rest ends at).
 bool PutParagraphBack(ITextModel* model, TextIndex at, const KFCResultModel::HitCopy& copy)
 {
 	InterfacePtr<ITextModelCmds> cmds(model, UseDefaultIID());
-	if (cmds == nil || at < 0)
+	TextIndex paraStart = kInvalidTextIndex;
+	int32 length = 0;		// the paragraph with its return
+	if (cmds == nil || at < 0 || !ParagraphOf(model, at, paraStart, length))
 		return false;
-	const int32 primary = model->GetPrimaryStoryThreadSpan() - 1;
-	TextIndex paraStart = 0;
-	for (TextIndex i = at - 1; i >= 0; --i)
-	{
-		TextIterator it(model, i);
-		if (!it.IsNull() && (*it).GetValue() == kTextChar_CR)
-		{
-			paraStart = i + 1;
-			break;
-		}
-	}
-	TextIndex paraEnd = primary;		// the last paragraph's: up to and with the story's own return
-	{
-		TextIterator it(model, at);
-		for (TextIndex i = at; i < primary && !it.IsNull(); ++i, ++it)
-		{
-			if ((*it).GetValue() == kTextChar_CR)
-			{
-				paraEnd = i;
-				break;
-			}
-		}
-	}
-	const int32 length = paraEnd - paraStart + 1;		// the paragraph with its return
 	InterfacePtr<ICommand> style(cmds->ApplyStyleCmd(paraStart, length, copy.paraStyle, kParaAttrStrandBoss,
 		kTrue /*replaceOverrides*/, kFalse /*autoNextStyle*/, kFalse /*keepOldStyleAsOverrides*/));
 	if (style == nil || CmdUtils::ProcessCommand(style) != kSuccess)
