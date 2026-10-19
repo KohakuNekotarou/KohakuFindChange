@@ -54,6 +54,7 @@
 #include "KFCSpecialDialogs.h"	// Move... / Scale... / Rotate... / Shear... - their values asked first
 #include "KFCCopyResults.h"		// Copy Results / Copy Rows / Copy These Results - the rows as text on the clipboard
 #include "KFCDiagHiddenDocs.h"		// the hidden-document check after an action - test builds only
+#include "KFCDiag.h"				// KFC_DIAG_LOG - test builds only (the menu states asked for inside a landing)
 
 /** Implements IActionComponent; performs the actions that are executed when the plug-in's
 	menu items are selected.
@@ -842,6 +843,10 @@ void KFCActionComponent::DoAbout()
 */
 void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList* listToUpdate, GSysPoint /*mousePoint*/, IPMUnknown* widget)
 {
+	// (Test builds: whether a menu's states were asked for inside a landing - the log's LAND begin / LAND end around it
+	// says if a right-click's menu can be built while one is under way.)
+	KFC_DIAG_LOG("MENUSTATES items=%d landing=%d", static_cast<int>(listToUpdate->Length()),
+		KFCJump::IsLanding() ? 1 : 0);
 	// A run of ours is standing - which ones count is KFCRunGuard::IsAnyRunning's to say (a row's Replace among them,
 	// with no bar of its own). Each runs the message loop - a modal progress bar pumps events, a chapter being opened
 	// does too - so this list can be asked for its states from inside the run: lock everything until it returns. A

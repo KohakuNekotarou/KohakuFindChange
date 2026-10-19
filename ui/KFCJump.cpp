@@ -653,8 +653,10 @@ bool gActivating = false;
 class ActivationGuard
 {
 public:
-	ActivationGuard() { gActivating = true; }
-	~ActivationGuard() { gActivating = false; }
+	// (Test builds: the landing's begin and end go to the log - what a menu or a key asked for inside one is told
+	// by it.)
+	ActivationGuard() { gActivating = true; KFC_DIAG_LOG("LAND begin"); }
+	~ActivationGuard() { gActivating = false; KFC_DIAG_LOG("LAND end"); }
 };
 
 // A CHAPTER THE LANDING REOPENED IS HANDED BACK UNLESS IT GOT ITS WINDOW (the author: "a hidden document left behind
