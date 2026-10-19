@@ -4,10 +4,9 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  Event handler for the result list ITSELF (the tree-view boss, not a row). It adds two things
-//  to the stock keys that move the selection - the up / down arrows, Home / End and PageUp /
-//  PageDown - a Shift+Up / Shift+Down of its own and one key of its own - Return on a hit row - and
-//  leaves everything else alone:
+//  Event handler for the result list ITSELF (the tree-view boss, not a row). It adds two things to the stock keys that
+//  move the selection - the up / down arrows, Home / End and PageUp / PageDown - a Shift+Up / Shift+Down of its own and
+//  keys of its own - Return on a hit row, Ctrl+C on hit rows - and leaves everything else alone:
 //
 //    1. A row that is CLOSED opens when the arrows land on it. The stock keys walk the VISIBLE
 //       rows only, and a book search deliberately comes up with every chapter closed
@@ -18,7 +17,7 @@
 //       row would do: a hit row jumps, a chapter row shows its document, a STORY ("font") row
 //       shows the document it sits in (it names no hit, so it takes the chapter's arm), the book
 //       row activates its book.
-//    3. RETURN / ENTER ON A HIT ROW REPLACES IT (spec F17) - see KeyDown. With the arrows,
+//    3. RETURN / ENTER ON A HIT ROW REPLACES IT (the no-track-change-all spec's F17) - see KeyDown. With the arrows,
 //       the keyboard alone walks the rows and replaces where the match is right. SHIFT+RETURN
 //       replaces it and goes on to the next row below that can be replaced (the author's call -
 //       InDesign's own Change/Find for the list) - see GoOnToNextReplaceableRow.
@@ -26,6 +25,8 @@
 //       (Clear from Results) and lands on the row below - see ClearThenLand.
 //    4. SHIFT+DOWN / SHIFT+UP GROW OR SHRINK A RUN OF HIT ROWS selected together, the page
 //       following - see HandleUpDownKey and KFCResultTreeController.cpp.
+//    5. CTRL+C ON THE HIT ROWS SELECTED COPIES THEM as text, as their Copy Rows does (KFCCopyResults) - the key taken
+//       whole, so InDesign's own Copy does not run as well - see TakeCopy.
 //
 //  WHY THE STOCK HANDLER MOVES, NOT A WALK OF OUR OWN
 //
@@ -36,20 +37,20 @@
 //  its place in the model and is not shown) - and was sent after a node that does not exist.
 //
 //  TreeViewEventHandler is the stock base (source/open/includes/widgets; on the CPP.rsp path) and
-//  HandleUpDownKey, HandleHomeKey, HandleEndKey and HandlePageUpDownKey are virtual precisely for
-//  this: each lets the stock move, then lands (StockMoveThenLand). Home / End / PageUp / PageDown
-//  moved the selection alone until the author's call of 2026-10-13 (the page stayed on the row
-//  before, and the next Return wrote a row it did not show). The left / right expand / collapse
-//  keys stay stock.
+//  HandleUpDownKey, HandleHomeKey, HandleEndKey and HandlePageUpDownKey are virtual precisely for this: each lets the
+//  stock move, then lands (StockMoveThenLand) - Home / End / PageUp / PageDown too (the author's call: moving the
+//  selection alone left the page on the row before, and the next Return wrote a row it did not show). The left / right
+//  expand / collapse keys stay stock.
 //
 //  Shift+Return and Ctrl+Return have no stock move to lean on - they skip rows - so they walk, but through
 //  the tree's OWN hierarchy adapter (KFCResultListAdapter, what the tree view builds its rows from), never
 //  the model's counts: they can only reach a row the tree has.
 //
-//  NOTE: THIS CLASS ONLY EXISTS IF SOMETHING ASKS FOR IT. Interface implementations are created on
-//  first QueryInterface, so naming it in KFCUI.fr is not enough - a row click's key-focus hand-off
-//  (KFCResultNodeEH, through KFCResultTree::TakeKeyboard) is what brings it into being (and what puts
-//  the arrows here at all). See the long comment in KFCResultNodeEH before removing that call.
+//  NOTE: THIS CLASS ONLY EXISTS IF SOMETHING ASKS FOR IT. Interface implementations are created on first
+//  QueryInterface, so naming it in KFCUI.fr is not enough - what asks for the list's IID_IEVENTHANDLER brings it into
+//  being (and puts the arrows here at all): the keyboard frame the panel draws (KFCResultTree::ListHoldsKeyboard) and
+//  every hand-off of the keyboard to the list (KFCResultTree::TakeKeyboard). See the long comment in KFCResultNodeEH's
+//  LButtonUp before removing either.
 //
 //========================================================================================
 
@@ -309,11 +310,11 @@ bool IsReturnKey(const VirtualKey& key)
 	return key == kVirtualReturnKey || key == kVirtualEnterKey;
 }
 
-// RETURN ON THE SELECTED HIT ROW (spec F17), one place for the two that take it: the list's own KeyDown and the Return
-// filter below. Return or the keypad's Enter, no modifier, HIT rows selected (one, or several together): they are
-// replaced through the right-click Replace's own door (KFCResultTree::ReplaceRows - nothing happens when none can be
-// replaced), the list keeps the keyboard, and the key is taken whole. kFalse = not a Return this list acts on: the caller
-// passes it on.
+// RETURN ON THE SELECTED HIT ROW (the no-track-change-all spec's F17), one place for the two that take it: the list's
+// own KeyDown and the Return filter below. Return or the keypad's Enter, no modifier, HIT rows selected (one, or
+// several together): they are replaced through the right-click Replace's own door (KFCResultTree::ReplaceRows - nothing
+// happens when none can be replaced), the list keeps the keyboard, and the key is taken whole. kFalse = not a Return
+// this list acts on: the caller passes it on.
 // WITH SHIFT, the same, and then - only when the row was written - on to the next row below that can be
 // replaced (GoOnToNextReplaceableRow); with none below, the status line says so after its own sentence.
 // WITH CTRL, the rows are taken off the list instead - Clear from Results - and the row below landed on (ClearThenLand -
@@ -648,10 +649,10 @@ bool16 KFCResultTreeEH::HandleUpDownKey(IEvent* e, const VirtualKey& key)
 	return StockMoveThenLand(e, key);
 }
 
-// HOME / END / PAGEUP / PAGEDOWN LAND AS THE ARROWS DO (the author's call, 2026-10-13 - Home and End moved the selection
-// alone, the page left on the row before). The stock moves - Home to the first row, End to the last - and the row it reached
-// is opened and landed on (StockMoveThenLand), only when the selection moved: PageUp / PageDown scroll the list and leave the
-// selection where it is (measured 2026-10-13: forty rows, row 1 clicked, two PageDowns - row 1 still selected), and a
+// HOME / END / PAGEUP / PAGEDOWN LAND AS THE ARROWS DO (the author's call - Home and End moving the selection alone
+// left the page on the row before). The stock moves - Home to the first row, End to the last - and the row it reached
+// is opened and landed on (StockMoveThenLand), only when the selection moved: PageUp / PageDown scroll the list and
+// leave the selection where it is (measured: forty rows, row 1 clicked, two PageDowns - row 1 still selected), and a
 // landing on the row left selected would open it, were it a closed row, and run its action again - for a scroll. With a
 // modifier the stock's own move is left as it is, and a single row it moves the selection to is landed on.
 bool16 KFCResultTreeEH::HandleHomeKey(IEvent* e)
@@ -724,11 +725,11 @@ bool16 KFCResultTreeEH::StockMoveThenLand(IEvent* e, const VirtualKey& key)
 	NodeIDList selected;
 	controller->GetSelectedItems(selected);
 
-	// HOME AND END KEEP TO THE LIVE TIER (the author's call, 2026-10-18). While the results are in tiers the stock Home
-	// reached the list's first row - the live tier's own row, or a grey tier's, which is never selected - and stopped there,
-	// the page left on the row before; End reached a grey tier's row whenever the live tier is not the last (the tiers do not
-	// move - ROW-42). Home goes on to the first row under the live tier's own row, End to the last row drawn under it, and
-	// the landing below runs there as on any row. A closed live tier keeps its own row (nothing under it is drawn).
+	// HOME AND END KEEP TO THE LIVE TIER (the author's call). While the results are in tiers the stock Home reaches the
+	// list's first row - the live tier's own row, or a grey tier's, which is never selected - and stops there, the page
+	// left on the row before; End reaches a grey tier's row whenever the live tier is not the last (the tiers do not
+	// move - ROW-42). Home goes on to the first row under the live tier's own row, End to the last row drawn under it,
+	// and the landing below runs there as on any row. A closed live tier keeps its own row (nothing under it is drawn).
 	if ((key == kVirtualHomeKey || key == kVirtualEndKey) && !e->ShiftKeyDown() && !e->CmdKeyDown() && !e->OptionAltKeyDown()
 		&& KFCResultHistory::IsStacking() && KFCResultHistory::HasLiveList())
 	{
@@ -772,7 +773,7 @@ bool16 KFCResultTreeEH::StockMoveThenLand(IEvent* e, const VirtualKey& key)
 		return handled;		// the selection did not move (a PageUp / PageDown's scroll, Home on the first row)
 
 	TreeNodePtr<KFCResultNodeID> node(selected[0]);
-	// THE LIVE TIER'S OWN ROW, reached by an arrow (it can be selected - the author's call, 10-14 night): nothing to land on
+	// THE LIVE TIER'S OWN ROW, reached by an arrow (it can be selected - the author's call): nothing to land on
 	// (it names no document), and the after-text the row before left on the message line taken off.
 	if (node != nil && node->IsLiveTierRow())
 	{

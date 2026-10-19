@@ -47,16 +47,16 @@
 const bool16 kKFCDontConvertAmpersand = kFalse;
 const bool16 kKFCNoUnderline = kFalse;
 
-/** DRAWN BY DROVER, AS INDESIGN'S OWN ROWS ARE (2026-10-17 - the author, on the Bright theme: the panel's message "looks
-    blurred, hard to read", and after a first fix "still crushed, not sharp" beside the document row). Both widgets used to
-    draw in Draw, with an AGM graphics context - and Draw is handed an OFFSCREEN AGM port that DVAbstractControlView blits
-    back onto the panel (DVAbstractControlView.h): text drawn there came out in black and white (photographed on the
-    Bright theme: one grey at the draws' default Med, solid and swollen; still one at High, thinner), while the stock rows
-    beside them - drawn by drover straight onto the panel - came out in ClearType (1594 of their 2287 inked pixels
-    coloured; KFC's 0). So both draw in DV_Draw now, with DrawStringUtils.h's drawbot overloads - the shipping code's way
-    (open/components/dynamicdocumentsui/TimingPanelTreeDDTarget.cpp: a row's name drawn with
+/** DRAWN BY DROVER, AS INDESIGN'S OWN ROWS ARE (the author, on the Bright theme: the panel's message "looks blurred,
+    hard to read", and after a first fix "still crushed, not sharp" beside the document row). NOT IN Draw, WITH AN AGM
+    GRAPHICS CONTEXT: Draw is handed an OFFSCREEN AGM port that DVAbstractControlView blits back onto the panel
+    (DVAbstractControlView.h), and text drawn there comes out in black and white (photographed on the Bright theme: one
+    grey at the draws' default Med, solid and swollen; still one at High, thinner), while the stock rows beside it -
+    drawn by drover straight onto the panel - come out in ClearType (1594 of their 2287 inked pixels coloured; KFC's 0
+    when it drew so). So both widgets draw in DV_Draw, with DrawStringUtils.h's drawbot overloads - the shipping code's
+    way (open/components/dynamicdocumentsui/TimingPanelTreeDDTarget.cpp: a row's name drawn with
     StringUtils::PMDrawStringRGB(drawbotP, ...)). (The raster port's text bit, IRasterPort::setantialiaspolicy - the AGM
-    samples' way - was tried first and changed nothing.) This is the policy the drawbot draws are handed. */
+    samples' way - changes nothing: tried.) This is the policy the drawbot draws are handed. */
 const dv_utils::AntiAliasPolicy kKFCTextSmoothing = dv_utils::kAntiAliasPolicy_Med;
 
 /** How wide `s` comes out as drawn here - drover's measure (the draws are drover's), with the flag the draws pass

@@ -16,10 +16,10 @@
 //  together in one undo step, KFCResultTree::ReplaceRows).
 //  THE PAGE SHOWS THE ROW SELECTED LAST, as a click does - its match, or its item, selected alone (FollowModifiedClick,
 //  ExtendSelection): the rows selected together are the list's, not the page's.
-//  A story, document or book row is always selected alone, and so is the live tier's own row (the author's call, 10-14
-//  night); a grey tier's row and a kept row - the results kept in tiers, KFCResultHistory - never are (a click on one
-//  switches to its tier, and the arrows stay out of them). A row closed over selected rows takes them out of the
-//  selection - a selected row is a drawn row (DeselectRowsUnder, asked by the row's observer, KFCResultNodeObserver.cpp).
+//  A story, document or book row is always selected alone, and so is the live tier's own row (the author's call); a
+//  grey tier's row and a kept row - the results kept in tiers, KFCResultHistory - never are (a click on one switches to
+//  its tier, and the arrows stay out of them). A row closed over selected rows takes them out of the selection - a
+//  selected row is a drawn row (DeselectRowsUnder, asked by the row's observer, KFCResultNodeObserver.cpp).
 //  The shape is Adobe's: the Layers panel's controller runs the stock rules and then takes rows of the other kind out
 //  (open/components/layerpanel/LayersPanelTreeViewController.cpp), and the Multi-State Object panel's changes the stock
 //  rules where its panel needs it (open/components/buttonui/msopanel/MSOPanelTreeViewController.cpp).
@@ -247,10 +247,11 @@ void KFCResultTreeController::ProcessSelectionRules(IEvent* event, UID nodeWidge
 ITreeViewController::SelectCode KFCResultTreeController::Select(const NodeID& node, bool16 notifyOfChange,
 	bool16 changeHilite)
 {
-	// A GREY TIER'S ROW OR A KEPT ROW IS NEVER SELECTED (docs/superpowers/specs/2026-10-14-kfc-stacked-results-design.md
-	// section 3-5) - whoever asks: a click, a run of rows, a key. A kept row is a record (a click on it switches to its tier),
-	// and the arrows stay out of a grey tier (the tier switch v2's R8). THE LIVE TIER'S OWN ROW CAN BE (the author's call,
-	// 10-14 night) - alone, as a story row is: it joins no other row (Joins), and acts on nothing.
+	// A GREY TIER'S ROW OR A KEPT ROW IS NEVER SELECTED
+	// (docs/superpowers/specs/2026-10-14-kfc-stacked-results-design.md section 3-5) - whoever asks: a click, a run of
+	// rows, a key. A kept row is a record (a click on it switches to its tier), and the arrows stay out of a grey tier
+	// (the tier-switch v2 spec's R8). THE LIVE TIER'S OWN ROW CAN BE (the author's call) - alone, as a story row is: it
+	// joins no other row (Joins), and acts on nothing.
 	TreeNodePtr<KFCResultNodeID> nodeID(node);
 	if (nodeID != nil && nodeID->IsGrey())
 		return eNoSelectionAllowed;
@@ -337,10 +338,10 @@ void CollectHitRows(ITreeViewHierarchyAdapter* adapter, const NodeID& node, Node
 
 // EVERY BRANCH ROW FROM `node` DOWN OPENED, each before the rows under it - the way KIDMCP opens a tree, which found
 // ITreeViewMgr::ExpandNode with expandAllDescendants leaving a book result's chapters closed when called on the tree's
-// hidden root (memory paneltreeview-tree-panel). On a book row on screen, open with its chapters closed (the shape a book
-// search comes up in - KFCResultTree::Rebuild), the one call does open them: measured 2026-10-13 night
-// (sel-book-closed-return-armed, the fault switch select-all-expand-once - both rows drawn and written). Row by row stays:
-// the same rows opened, whichever row the walk starts at. A row that is open is left as it is.
+// hidden root (memory paneltreeview-tree-panel). On a book row on screen, open with its chapters closed (the shape a
+// book search comes up in - KFCResultTree::Rebuild), the one call does open them: measured
+// (sel-book-closed-return-armed, the fault switch select-all-expand-once - both rows drawn and written). Row by row
+// stays: the same rows opened, whichever row the walk starts at. A row that is open is left as it is.
 void OpenBranchRows(ITreeViewHierarchyAdapter* adapter, ITreeViewMgr* treeMgr, const NodeID& node)
 {
 	treeMgr->ExpandNode(node, kFalse /*expandAllDescendants*/);

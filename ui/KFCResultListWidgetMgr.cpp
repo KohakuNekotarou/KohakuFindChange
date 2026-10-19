@@ -72,7 +72,7 @@
 #include "IKFCStatusTextData.h"	// the message area's pieces
 #include "KFCTextCut.h"			// KFCSafeCut - where the box's text may be cut (the rows' own rule, model/)
 #include "KFCPanelIcon.h"		// the illustration follows the status line
-#include "KFCDiag.h"			// TREETIME and the tree-expand fault switch - test builds only
+#include "KFCDiag.h"			// TREETIME, RETFOCUS and the fault switches - test builds only
 #include "KFCBookPanelLookup.h"	// QueryPanelManager - the panel made active (TakeKeyboard)
 #include "IApplication.h"
 #include "IEventHandler.h"		// the list's handler - the keyboard's holder (TakeKeyboard)
@@ -414,13 +414,13 @@ private:
 		const PMReal rowRight = widget->GetFrame().Width() - kRowInset;
 		const PMReal xStart = kRowInset + kExpanderZone + kHitExtraIndent + shift;
 
-		// THE ROW EYE (docs/superpowers/specs/2026-10-17-kfc-row-eye-keep-design.md) - IN THE ROW'S EXPANDER ZONE (the author,
-		// 2026-10-18: since the eye came the rows "sit too far right when searching - put them where they were", and the eye
-		// "in line with the arrow"): a hit row has no arrow of its own, and that zone is the very one its document or story
-		// row draws its arrow in (the same shift, one level up), so the eye stands under that arrow and takes no room from the
-		// text. The eyeball while the row is kept, nothing while it is not. (10-17 to 10-18 it had a column of its own after
-		// the zone, and every row's text moved right by it - kept or not.) A kept tier's eye is disabled: drawn as it was
-		// kept, its clicks the row's (a switch to its tier - ROW-42).
+		// THE ROW EYE (docs/superpowers/specs/2026-10-17-kfc-row-eye-keep-design.md) - IN THE ROW'S EXPANDER ZONE (the
+		// author: the rows "sit too far right when searching - put them where they were", and the eye "in line with the
+		// arrow" - a column of its own after the zone moves every row's text right by it, kept or not): a hit row has
+		// no arrow of its own, and that zone is the very one its document or story row draws its arrow in (the same
+		// shift, one level up), so the eye stands under that arrow and takes no room from the text. The eyeball while
+		// the row is kept, nothing while it is not. A kept tier's eye is disabled: drawn as it was kept, its clicks the
+		// row's (a switch to its tier - ROW-42).
 		IControlView* eye = rowData->FindWidget(kKFCResultEyeWidgetID);
 		if (eye != nil)
 		{
@@ -516,8 +516,9 @@ bool KFCResultTree::GetRowLook(const NodeID& node, RowLook& out)
 		out.flag = row.accentFlag;
 		out.pre = row.preText;
 		out.match = row.matchText;
-		// A TEXT ROW WRITTEN AS OUTLINES (the text-outlines spec's X6): its match is inline outlines now, which draw nothing in
-		// a line of text - the characters it outlined are drawn in their place, so the row still says what it was.
+		// A TEXT ROW WRITTEN AS OUTLINES (docs/superpowers/specs/2026-10-18-kfc-text-outlines-design.md X6): its match
+		// is inline outlines now, which draw nothing in a line of text - the characters it outlined are drawn in their
+		// place, so the row still says what it was.
 		if (row.outlined && !row.outlinedText.IsEmpty())
 			out.match = row.outlinedText;
 		out.post = row.postText;
@@ -670,9 +671,9 @@ void KFCResultTree::Rebuild()
 	(void)keptOpened;
 #endif
 	const bool liveTier = KFCResultHistory::IsStacking() && KFCResultHistory::HasLiveList();
-	// THE LIVE TIER AS IT WAS LEFT (v2 R6 - nothing opens or closes by itself - KFCResultHistory::OpenLiveTier): its own row
-	// open or closed as noted, open when nothing was; after a switch its rows too, as the tier's copy had them - and then
-	// the rules below are not run over them.
+	// THE LIVE TIER AS IT WAS LEFT (nothing opens or closes by itself - KFCResultHistory::OpenLiveTier): its own row
+	// open or closed as noted, open when nothing was; after a switch its rows too, as the tier's copy had them - and
+	// then the rules below are not run over them.
 	int32 liveExpands = 0;
 	const bool liveRowsOpened = liveTier && KFCResultHistory::OpenLiveTier(treeMgr, liveExpands);
 #ifdef KFC_DIAG

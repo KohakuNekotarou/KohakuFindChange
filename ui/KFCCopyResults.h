@@ -4,13 +4,13 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  COPY RESULTS (docs/superpowers/specs/2026-10-18-kfc-copy-results-progress-share-design.md - the author's yes of
-//  2026-10-18 to my proposal): the result rows as text on InDesign's clipboard, to paste into a spreadsheet or a text for a
-//  proofreading report. INDESIGN'S OWN SHAPE FOR A PANEL'S ROWS AS TEXT - the Links panel's Copy Info for Selected Links
-//  (open/components/linksui/LinksUIPanelMenuComponent.cpp: GenerateLinkReport, CopyStringToScrap): a line of column names,
-//  a tab between columns, "\r" between lines, put on the clipboard through its text flavor's scrap. Here the columns are
-//  Document, Page, Status and Text - each row as the list draws it, in the order it draws them. The documents are not
-//  touched: nothing to undo.
+//  COPY RESULTS (docs/superpowers/specs/2026-10-18-kfc-copy-results-progress-share-design.md - the author's yes to my
+//  proposal): the result rows as text on InDesign's clipboard, to paste into a spreadsheet or a text for a proofreading
+//  report. INDESIGN'S OWN SHAPE FOR A PANEL'S ROWS AS TEXT - the Links panel's Copy Info for Selected Links
+//  (open/components/linksui/LinksUIPanelMenuComponent.cpp: GenerateLinkReport, CopyStringToScrap): a line of column
+//  names, a tab between columns, "\r" between lines, put on the clipboard through its text flavor's scrap. Here the
+//  columns are Document, Page, Status and Text - each row as the list draws it, in the order it draws them (the
+//  Document column the document's name alone). The documents are not touched: nothing to undo.
 //
 //========================================================================================
 

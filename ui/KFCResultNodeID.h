@@ -21,10 +21,9 @@
 //  has no book row, so its tree is one level shallower.
 //
 //  The level under a document holds STORIES - a Find/Change result is grouped by story, the way KCM's
-//  Story mode lists them. !It is named "font" / FontGroup because it once held fonts (for the Find
-//  Missing Glyphs scan, since removed); the names were kept. Each row has a right-click menu of its own
-//  (KFCResultNodeEH::RButtonDn): a hit row's holds Replace; a story row's Search This Story Again, a document row's Search
-//  This Document Again, and both of them Select All Rows - the book row's that alone.
+//  Story mode lists them. !It is named "font" / FontGroup because it once held fonts (for the Find Missing Glyphs scan,
+//  since removed); the names were kept. Each kind of row has a right-click menu of its own
+//  (KFCResultNodeEH::RButtonDn - what each holds is its MenuDef in KFCUI.fr).
 //
 //  hit stays the CHAPTER-wide index, not a position inside the font group. Everything that asks
 //  the model about a hit - the row's drawing, the jump, the replace - names it that
@@ -182,8 +181,8 @@ public:
 	    but for the live tier's own row (IsLiveTierRow). */
 	bool16 IsInert() const { return IsTierRow() || IsKeptRow(); }
 
-	/** THE LIVE TIER'S OWN ROW - the one inert row that can be selected (the author's call, 10-14 night: "a heading row can
-	    be selected"): alone, as a story row is, and acting on nothing - it names no document (no jump), and Return writes
+	/** THE LIVE TIER'S OWN ROW - the one inert row that can be selected (the author's call: "a heading row can be
+	    selected"): alone, as a story row is, and acting on nothing - it names no document (no jump), and Return writes
 	    nothing for it (KFCResultTree::GetSelectedHitRows takes no row that is not a hit). */
 	bool16 IsLiveTierRow() const { return IsTierRow() && fFont < 0; }
 

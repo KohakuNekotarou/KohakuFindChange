@@ -4,13 +4,14 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  The result list's doors for the rest of the UI half: the tree reloaded from KFCResultModel after a search or an
-//  Undo (Rebuild) or its rows repainted, the panel's message area written, the rows' Replace and Search ... Again, the
-//  rows selected together, and the keyboard the list keeps. Defined where each lives: KFCResultListWidgetMgr.cpp (the
-//  tree, its rows - what a row looks like among them -, the message area, the rows' Replace and Search ... Again, the
-//  keyboard handed to the list), KFCResultListAdapter.cpp (the live list's shape),
-//  KFCResultTreeController.cpp (the rows selected together), KFCResultTreeEH.cpp (the Return filter and the keyboard
-//  frame).
+//  The result list's doors for the rest of the UI half: the tree reloaded from KFCResultModel after a search or an Undo
+//  (Rebuild) or its rows repainted, the panel's message area written, the writes from the rows, the rows selected
+//  together, and the keyboard the list keeps. Defined where each lives: KFCResultListWidgetMgr.cpp (the tree, its
+//  rows - what a row looks like among them -, the message area, the writes from the rows - Replace, Search ... Again,
+//  Create Outlines, Restore from Copy, the Special Operations -, the keyboard handed to the list),
+//  KFCResultListAdapter.cpp (the live list's shape), KFCResultTreeController.cpp (the selection - rows selected
+//  together, Select All Rows, a row selected alone in view - and Clear from Results), KFCResultTreeEH.cpp (the Return
+//  filter and the keyboard frame).
 //
 //========================================================================================
 
@@ -126,7 +127,7 @@ namespace KFCResultTree
 	    closed...) - then DropRowPreview. Not kept as the last message: a preview is the row's, not a report.
 	    @param notSelectedWhy  a few words on how the click left the row's match, put whole in the heading's brackets:
 	           why it was not selected ("not selected - locked" - the author's call), or what cannot be seen of one it
-	           selected ("Overset Text", "hidden layer" - 2026-10-17): "Preview Text (Overset Text):". nil when there is
+	           selected ("Overset Text", "hidden layer"): "Preview Text (Overset Text):". nil when there is
 	           nothing to say. */
 	bool ShowRowPreview(int32 chapterIdx, int32 hitIdx, const char* notSelectedWhy = nil);
 
@@ -194,7 +195,7 @@ namespace KFCResultTree
 	    Not under a landing or a run. True = a row went. */
 	bool ClearRows(const KFCRowsByChapter& rows);
 
-	/** A ROW CLOSED OVER SELECTED ROWS (KFCResultNodeObserver - the author's call O7-2b): the rows selected under
+	/** A ROW CLOSED OVER SELECTED ROWS (KFCResultNodeObserver - the author's call): the rows selected under
 	    `closedRow` taken out of the selection - a selected row is a drawn row, as Select All Rows keeps it (Return and the
 	    right-click Replace write the selection in the order drawn: they left the hidden rows selected and unwritten while
 	    the message area still counted them). The message area says how many went and what is selected now. false = no
@@ -237,12 +238,12 @@ namespace KFCResultTree
 	    SearchStoryAgain, over the whole document (KFCRuns()->SearchDocumentAgain). True = done. */
 	bool SearchDocumentAgain(int32 chapterIdx);
 
-	/** SEARCH THESE RESULTS AGAIN (a tier's heading's right-click menu - the author, 2026-10-14 night): as
+	/** SEARCH THESE RESULTS AGAIN (a tier's heading's right-click menu - the author's call): as
 	    SearchStoryAgain, over the live list's whole search (KFCRuns()->SearchListAgain) - a grey tier switched to the live
 	    list first, by the caller. True = done. */
 	bool SearchListAgain();
 
-	/** AN OBJECT ROW'S SPECIAL OPERATIONS > CREATE OUTLINES (the author, 2026-10-17): the rows' objects outlined where they
+	/** AN OBJECT ROW'S SPECIAL OPERATIONS > CREATE OUTLINES (the author's call): the rows' objects outlined where they
 	    stand - across spreads and documents - by the model (KFCRuns()->OutlineRows, KFCObjectOutline), with no landing:
 	    nothing is brought forward. The rows drawn again, the status line. Not under a landing or a run. True = written. */
 	bool OutlineRows(const KFCRowsByChapter& rows);
@@ -259,7 +260,7 @@ namespace KFCResultTree
 	bool CanRestoreAny(const KFCRowsByChapter& rows);
 
 	/** Can Create Outlines be offered on these rows - can any of them be outlined (KFCRuns()->CanOutlineHit - its doors,
-	    read only)? The question the object row menu greys it by (the author, 2026-10-17). */
+	    read only)? The question the object row menu greys it by (the author's call). */
 	bool CanOutlineAny(const KFCRowsByChapter& rows);
 
 	/** AN OBJECT ROW'S OTHER SPECIAL OPERATIONS (docs/superpowers/specs/2026-10-17-kfc-object-special-operations-design.md):
@@ -273,8 +274,8 @@ namespace KFCResultTree
 	    doors, read only)? The question the object row menu greys each of its items by. */
 	bool CanSpecialAny(int32 op, const KFCRowsByChapter& rows);
 
-	/** The word a row a special operation wrote reads first (the spec's E8 - where a replaced row reads "Changed"):
-	    "Fitted", "Arranged", "Rotated", "Locked" ...; "" for no operation. */
+	/** The word a row a special operation wrote reads first (the special-operations spec's E8 - where a replaced row
+	    reads "Changed"): "Fitted", "Arranged", "Rotated", "Locked" ...; "" for no operation. */
 	const char* SpecialRowWord(int32 op);
 
 	/** The result list's view, reached through its panel - nil while the panel is closed. Not counted (the panel holds
@@ -287,11 +288,13 @@ namespace KFCResultTree
 	    of the drawing (Rebuild, RefreshRows, BeforeChapterRowGoes) and of the tiers' copies (KFCResultHistory). */
 	ITreeViewMgr* QueryResultTreeMgr();
 
-	/** THE LIST TAKES THE KEYBOARD, THE PANEL MADE ACTIVE: IPanelMgr::ShowPanelByWidgetID with giveKeyFocus,
-	    then the panel's IPanelControlData::SetKeyboardFocus on the list - and IKeyBoard::AcquireKeyFocus if those did not
-	    land it. After a row's click (KFCResultNodeEH), the arrows' walk and a Return's replace (KFCResultTreeEH) - a
-	    document window has come forward - and after Select All Rows (a right-click's menu left the keyboard where it was).
-	    Does nothing while the panel is closed. True = the list holds the keyboard. */
+	/** THE LIST TAKES THE KEYBOARD, THE PANEL MADE ACTIVE: IPanelMgr::ShowPanelByWidgetID with giveKeyFocus, then the
+	    panel's IPanelControlData::SetKeyboardFocus on the list - and IKeyBoard::AcquireKeyFocus if those did not land
+	    it. After a row's click (KFCResultNodeEH), the keys' walks and writes - the arrows, Return, Ctrl+Return
+	    (KFCResultTreeEH) - and a tier switch's landing (KFCResultHistory): a document window has come forward; and
+	    after an eye's click or trace (KFCResultEyeEH, KFCResultEyeDrag - as after every click on the list) and
+	    Select All Rows (a right-click's menu left the keyboard where it was). Does nothing while the panel is closed.
+	    True = the list holds the keyboard. */
 	bool TakeKeyboard();
 
 	/** THE KEYBOARD FRAME (the author's call: "make it plain that the list has the keyboard"):
@@ -323,9 +326,11 @@ namespace KFCResultTree
 	void ShutdownReturnFilter();
 
 	/** A RUN OF OURS IS UP - its progress bar pumps events, so a key or a menu can arrive in the middle of it: the
-	    status line says so and the caller turns it away. True = refused. The one place this is asked (ReplaceRows -
-	    the rows' Replace and Return -, SearchStoryAgain, SearchDocumentAgain, SearchListAgain, Clear Results and Save
-	    Panel Settings).
+	    status line says so and the caller turns it away. True = refused. The one place this is asked - by every door
+	    from the panel that writes, searches, takes rows off or switches: the rows' writes (ReplaceRows - the rows'
+	    Replace and Return -, Create Outlines, Restore from Copy, the Special Operations), Search ... Again,
+	    Clear from Results and Narrow Down, the tier switch, Clear Results, Clear These Results and Save Panel Settings
+	    (a description - the callers are the record).
 	    A model half of another build answers here too: its stand-in is "a run standing", its words the reason. */
 	bool RefusedWhileRunning();
 

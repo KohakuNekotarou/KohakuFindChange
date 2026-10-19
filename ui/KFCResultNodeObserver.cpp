@@ -4,8 +4,8 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  The result list's row observer: a story, document or book row CLOSED takes the rows selected under it out of the
-//  selection (the author's call, 2026-10-13 - O7-2b).
+//  The result list's row observer: a row CLOSED - a story, document or book row, or a tier's own - takes the rows
+//  selected under it out of the selection (the author's call).
 //
 //  WHY. The stock tree keeps a row selected when a row above it closes over it (measured on this list: three rows
 //  selected with Select All Rows, their first story row closed over two of them - all three still selected, and the two

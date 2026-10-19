@@ -4,7 +4,8 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  The results kept in tiers - see KFCResultHistory.h.
+//  The results kept in tiers - see KFCResultHistory.h. "v2 R<n>" below names an item of the tier switch's
+//  revised spec, docs/superpowers/specs/2026-10-14-kfc-tier-switch-v2-design.md.
 //
 //========================================================================================
 
@@ -537,7 +538,7 @@ namespace
 		return words;
 	}
 
-	// THE SCOPE IN A TIER'S HEADING (the author, 2026-10-17 evening: "[Text/Story] - easy to read"): the Search: the list was
+	// THE SCOPE IN A TIER'S HEADING (the author: "[Text/Story] - easy to read"): the Search: the list was
 	// searched with, in Find/Change's own words, after the tab inside the name's first brackets - "[Text]" drawn
 	// "[Text/Story]", the query dialog's "1  [GREP]" "1  [GREP/Book]". DRAWN, NOT KEPT IN THE NAME: the name is what a row
 	// operation reads the query against (QueryReadsAsTier - QueryLabel made again from Find/Change), and Search: is not part
@@ -578,7 +579,7 @@ PMString KFCResultHistory::QueryLabel()
 	PMString findWords, changeWords;
 	if (KFCFindChangeQueryWords(findWords))
 	{
-		// F and C, not Find and Change (the author's call, 10-14 night): the row has the panel's width to fill.
+		// F and C, not Find and Change (the author's call): the row has the panel's width to fill.
 		label.Append(" F:\"");
 		AppendQueryWords(label, findWords);
 		label.Append("\"");
@@ -1081,7 +1082,7 @@ namespace
 			return IIdleTask::kEndOfTime;
 		// SWITCHED WITH NO ROW TO LAND ON - the tier's own row was clicked (v2 R5), or the row's chapter went while it was
 		// grey: nothing of the list before stays selected (its rows' numbers name other rows of this list), and the tier's own
-		// row is - the one row of a tier that can be (the author's call, 10-14 night) - with the keyboard on the list.
+		// row is - the one row of a tier that can be (the author's call) - with the keyboard on the list.
 		if (!liveRow.IsValid())
 		{
 			controller->DeselectAll(kFalse /*notifyOfChange*/, kTrue /*changeHilite*/);

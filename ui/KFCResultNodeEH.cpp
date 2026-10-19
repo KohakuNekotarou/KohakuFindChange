@@ -4,15 +4,14 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  Tree row event handler: a click on a HIT row jumps to that occurrence. Replaces
-//  IID_IEVENTHANDLER on the result tree's node boss (kKFCResultNodeWidgetBoss). Derives from the
-//  stock TreeNodeEventHandler so ordinary tree behaviour (select, expand/collapse, drag) is kept;
-//  only the button-UP is extended. EVERY row has somewhere to go - KFCJump::ActivateNode sorts
-//  out which: a hit row jumps, a chapter row shows its document, a STORY ("font") row shows the
-//  document it sits in (it names no hit, so it falls to the same arm as its chapter), the book row
-//  activates its book. A GREY row - a row of a kept tier - switches to its tier, and that row is then selected
-//  and jumped to (KFCResultHistory::SwitchToKeptRowLater); a grey tier's own row switches to it too (v2 R5) - the
-//  live tier's own row only opens and closes.
+//  Tree row event handler: a click on a HIT row jumps to that occurrence. Replaces IID_IEVENTHANDLER on the result
+//  tree's node boss (kKFCResultNodeWidgetBoss). Derives from the stock TreeNodeEventHandler so ordinary tree behaviour
+//  (select, expand/collapse, drag) is kept; only the button-UP is extended. EVERY row has somewhere to go -
+//  KFCJump::ActivateNode sorts out which: a hit row jumps, a chapter row shows its document, a STORY ("font") row shows
+//  the document it sits in (it names no hit, so it falls to the same arm as its chapter), the book row activates its
+//  book. A GREY row - a row of a kept tier - switches to its tier, and that row is then selected and jumped to
+//  (KFCResultHistory::SwitchToKeptRowLater); a grey tier's own row switches to it too (v2 R5); the live tier's own row
+//  is selected alone and acts on nothing.
 //  Simplified from KESCL (which split fresh clicks onto a selection observer).
 //
 //  The shape of the hook is the layer panel's (LayerTreeRowPanelEH::LButtonUp): act on the button
@@ -34,9 +33,9 @@
 //  the list. THE MARKER COMES UP AT ONCE, on the button-up - the beat KCM's Story-mode jump keeps, which the user
 //  asked for.
 //
-//  RIGHT-click on a row pops that row's menu - a hit row's Replace; a story row's Search This Story Again, a document
-//  row's Search This Document Again, both with Select All Rows; the book row's Select All Rows. See RButtonDn at the foot
-//  of this file.
+//  RIGHT-click on a row pops that row's menu - each kind of row its own: a hit row's, an object row's, a story row's, a
+//  document row's, the book row's and a tier's heading's (a kept row has none); what each holds is its MenuDef in
+//  KFCUI.fr. See RButtonDn at the foot of this file.
 //
 //========================================================================================
 
@@ -77,10 +76,10 @@ void PopRowMenu(const char* menuName, IEvent* e, IPMUnknown* widget)
 	InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
 	InterfacePtr<IActionManager> actionMgr(app != nil ? app->QueryActionManager() : nil);
 	InterfacePtr<IMenuManager> menuMgr(actionMgr, UseDefaultIID());
-	// GREY ITEMS STAY ON THE MENU (the author, 2026-10-17: "when it cannot be done, grey is fine" - SET-11): a row whose
-	// Replace cannot write, a book row with no hit row under it, still open their menus, the item shown greyed out. Until
-	// then this was kTrue - every caller in source/open passes it - and a menu of grey items alone did not open at all,
-	// which the spec map had called InDesign's own way (the re-read of KFC's headers found it was this argument).
+	// GREY ITEMS STAY ON THE MENU (the author: "when it cannot be done, grey is fine" - SET-11): a row whose Replace
+	// cannot write, a book row with no hit row under it, still open their menus, the item shown greyed out. kFalse,
+	// where every caller in source/open passes kTrue: kTrue drops the grey items, and a menu of grey items alone does
+	// not open at all - which looks like InDesign's own rule, and is this argument.
 	bool16 removeDisabledItems = kFalse;
 #ifdef KFC_DIAG
 	// (Test builds only) Fault switch menu-drop-grey: the grey items dropped again (kTrue) - the old way, for a test of the
@@ -138,18 +137,19 @@ bool16 KFCResultNodeEH::LButtonUp(IEvent* e)
 		return result;
 	const NodeID& node = nodeData->Get();
 	TreeNodePtr<KFCResultNodeID> nodeID(node);
-	// A GREY ROW - A ROW OF A KEPT TIER - SWITCHES TO ITS TIER (docs/superpowers/specs/2026-10-14-kfc-tier-switch-design.md
-	// section 2-1, the author's call): booked, not made here - the switch draws the list anew, and this row's widget goes with
-	// the old tree (KFCResultHistory::SwitchToKeptRowLater says when it runs, and why). Nothing of this row is read after.
-	// A GREY TIER'S OWN ROW SWITCHES TO IT TOO (v2 R5 - the author's call), booked the same way with no row to land on
-	// (GetKeptRow -1): a tier's row is never selected. (Its arrow opens and closes it, as every tier's does - the
+	// A GREY ROW - A ROW OF A KEPT TIER - SWITCHES TO ITS TIER
+	// (docs/superpowers/specs/2026-10-14-kfc-tier-switch-v2-design.md - the switch as v2 revised it, the author's
+	// calls): booked, not made here - the switch draws the list anew, and this row's widget goes with the old tree
+	// (KFCResultHistory::SwitchToKeptRowLater says when it runs, and why). Nothing of this row is read after. A GREY
+	// TIER'S OWN ROW SWITCHES TO IT TOO (v2 R5 - the author's call), booked the same way with no row to land on
+	// (GetKeptRow -1): a grey tier's row is never selected. (Its arrow opens and closes it, as every tier's does - the
 	// arrow's own widget.)
 	if (nodeID != nil && nodeID->IsGrey())
 	{
 		KFCResultHistory::SwitchToKeptRowLater(nodeID->GetTier(), nodeID->GetKeptRow());
 		return result;
 	}
-	// THE LIVE TIER'S OWN ROW (the author's call, 10-14 night: a heading row can be selected): the press selected it - alone,
+	// THE LIVE TIER'S OWN ROW (the author's call: a heading row can be selected): the press selected it - alone,
 	// as a story row is - and it acts on nothing (it names no document; Return writes nothing for it). The keyboard to the
 	// list, so the arrows walk on from it, and the row's after-text left by the row before taken off the message line.
 	if (nodeID != nil && nodeID->IsLiveTierRow())
@@ -180,11 +180,11 @@ bool16 KFCResultNodeEH::LButtonUp(IEvent* e)
 	// Hand the keyboard focus to the LIST, so the up / down arrows walk the tree from here on
 	// (KFCResultTreeEH). Two things happen in that hand-off (KFCResultTree::TakeKeyboard), and BOTH are needed:
 	//
-	//   * The QUERY of the list's IID_IEVENTHANDLER brings it into existence. Interface implementations
-	//     are created on first use, and nothing else in this plug-in asks the tree for its event
-	//     handler that early - so without it KFCResultTreeEH is never constructed at all and the
-	//     arrows keep the stock behaviour (visible rows only). Measured: with the panel
-	//     open and a book searched, a trace in that class's constructor never fired.
+	//   * The QUERY of the list's IID_IEVENTHANDLER brings it into existence - interface implementations are created on
+	//     first use; with none, KFCResultTreeEH is never constructed and the arrows keep the stock behaviour (visible
+	//     rows only - measured: with the panel open and a book searched, a trace in that class's constructor never
+	//     fired). The hand-off asks for it, and so does the keyboard frame the panel draws
+	//     (KFCResultTree::ListHoldsKeyboard).
 	//   * The hand-off makes it the key target. ActivateNode above brings a document window -
 	//     or, on a book row, the Book panel - forward, and that takes the focus with it.
 	//
@@ -227,18 +227,15 @@ bool16 KFCResultNodeEH::LButtonDn(IEvent* e)
 }
 #endif
 
-// Right-click on a HIT row: pop its menu - Replace, about THIS row (the author's call; about all of them when it is one
-// of several rows selected together - KFCActionComponent) - at the cursor (PopRowMenu).
+// Right-click on a row: pop its menu - each kind of row its own (KFCUI.fr's MenuDefs) - at the cursor (PopRowMenu). A
+// hit row's items are about THIS row (the author's call), or about all of them when it is one of several rows selected
+// together (KFCActionComponent).
 // Same machinery as the real Links and Layers panel row menus (LinksUITreeRowPanelEH and friends) and as
 // KESCL's own report rows, which this is copied from (KESCLResultNodeEH::RButtonDn): HandlePopupMenu pops a
 // MenuDef subtree by its name (KFCUI.fr), and the item the user picks fires through the ordinary action
 // component. THIS ROW - the widget handed to HandlePopupMenu - is what the action reads to learn what the menu was
 // about: the menu hands it on to the action's widget argument (KFCActionComponent's RightClickedRow), which is how the
 // product's row menus read theirs (LayerPanelMenuComponent.cpp, ITreeNodeIDData). Nothing is stashed.
-//
-// A STORY row's right-click pops ITS menu - Search This Story Again (the author's call); a DOCUMENT row's, Search This
-// Document Again (the author's call). The story and document menus hold Select All Rows as well, and the BOOK row has a
-// menu of its own for it (the author's call).
 //
 // Deliberately NOT calling the stock handler and NOT changing the selection: the selection is what
 // the arrow keys walk from, and a right-click that is only asking for a menu should not move the
@@ -255,24 +252,23 @@ bool16 KFCResultNodeEH::RButtonDn(IEvent* e)
 	if (nodeID == nil || nodeID->IsRoot())
 		return TreeNodeEventHandler::RButtonDn(e);
 
-	// Every row's right-click is consumed - no stock handling, so the row is not selected and nothing jumps. A kept row has
-	// no menu (the stacked results' spec, section 3-5); a TIER's own row has Clear These Results (v2 R9) - a grey tier's
-	// and the live one's.
+	// Every row's right-click is consumed - no stock handling, so the row is not selected and nothing jumps. A kept row
+	// has no menu (the stacked results' spec, section 3-5); a TIER's own row - a grey tier's and the live one's - has
+	// its heading's menu.
 	if (nodeID->IsTierRow())
 		PopRowMenu(kKFCResultTierMenuName, e, this);
 	else if (nodeID->IsHitRow())
 	{
-		// An OBJECT row (the Object tab's) pops its own menu - Replace, and Special Operations > Create Outlines (the
-		// author, 2026-10-17); a text row its Replace alone.
+		// An OBJECT row (the Object tab's) pops a menu of its own - its Special Operations; a text row the hit row's.
 		const bool objectRow = KFCResults()->GetHitItem(nodeID->GetChapter(), nodeID->GetHit()) != kInvalidUID;
 		PopRowMenu(objectRow ? kKFCResultObjectMenuName : kKFCResultHitMenuName, e, this);
 	}
 	else if (nodeID->IsFontRow() && KFCResults()->IsStoryGroup(nodeID->GetChapter(), nodeID->GetFont()))
-		PopRowMenu(kKFCResultStoryMenuName, e, this);		// a STORY row: Search This Story Again; Select All Rows
+		PopRowMenu(kKFCResultStoryMenuName, e, this);		// a STORY row
 	else if (nodeID->IsDocumentRow())
-		PopRowMenu(kKFCResultDocumentMenuName, e, this);	// a DOCUMENT row: Search This Document Again; Select All Rows
+		PopRowMenu(kKFCResultDocumentMenuName, e, this);	// a DOCUMENT row
 	else if (nodeID->IsBookRow())
-		PopRowMenu(kKFCResultBookMenuName, e, this);		// the BOOK row: Select All Rows
+		PopRowMenu(kKFCResultBookMenuName, e, this);		// the BOOK row
 	return kTrue;
 }
 

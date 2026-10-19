@@ -4,18 +4,17 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  THE ROW EYE'S CLICK (docs/superpowers/specs/2026-10-17-kfc-row-eye-keep-design.md 2-1 - the author's call of
-//  2026-10-17, D-13): a hit row's eye turned on or off - the row kept, or not, when its story or document is searched
-//  again. The SDK's own shape of a tree row's icon (sdksamples/customconditionaltextui/CusCondTxtUIIconEventHandler.cpp):
-//  the press handled by the icon itself - the row found through its parent (ITreeNodeIDData), the model told, the icon
-//  drawn anew. The press, its release and a double click's second press are all taken here, so a click on the eye
-//  neither selects the row nor jumps (KFCResultNodeEH does both on the release); every click turns the eye once (a
-//  double click twice, as every click of this list is one click). A kept tier's row (grey) is not a hit row: its eye is
-//  disabled and its clicks go to the row, which switches to its tier (ROW-42). AN EYE IS A WRITTEN ROW'S - one KFC has
-//  replaced, outlined, or given a special operation (the author, 2026-10-17 evening: an eye on a row not written only kept
-//  a match since deleted as Missing): on any other row the column is empty and its clicks are the row's too (selected,
-//  jumped to).
-//  A PRESS THAT BECOMES A DRAG TRACES THE COLUMN (the author, 2026-10-17 night: "like the Layers panel"): the Layers
+//  THE ROW EYE'S CLICK (docs/superpowers/specs/2026-10-17-kfc-row-eye-keep-design.md 2-1 - the author's call): a hit
+//  row's eye turned on or off - the row kept, or not, when its story or document is searched again. The SDK's own shape
+//  of a tree row's icon (sdksamples/customconditionaltextui/CusCondTxtUIIconEventHandler.cpp): the press handled by the
+//  icon itself - the row found through its parent (ITreeNodeIDData), the model told, the icon drawn anew. The press,
+//  its release and a double click's second press are all taken here, so a click on the eye neither selects the row nor
+//  jumps (KFCResultNodeEH does both on the release); every click turns the eye once (a double click twice, as every
+//  click of this list is one click). A kept tier's row (grey) is not a hit row: its eye is disabled and its clicks go
+//  to the row, which switches to its tier (ROW-42). AN EYE IS A WRITTEN ROW'S - one KFC has replaced, outlined, or
+//  given a special operation (the author's call: an eye on a row not written only kept a match since deleted as
+//  Missing): on any other row nothing is drawn there, and its clicks are the row's too (selected, jumped to).
+//  A PRESS THAT BECOMES A DRAG TRACES THE COLUMN (the author: "like the Layers panel"): the Layers
 //  panel's own eye (open/components/layerpanel/LayerEyeDragDropSourceEH.cpp) - IsUserStartingDrag (IEventUtils) tells a
 //  press that moves from one that is let go, and the first starts a drag the eyes it passes over answer
 //  (KFCResultEyeDrag.cpp).

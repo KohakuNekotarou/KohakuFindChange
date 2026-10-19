@@ -5,10 +5,10 @@
 //  KohakuFindChange (KFC)
 //
 //  THE ROW EYE'S ROW, ASKED IN ONE PLACE (memory one-question-one-place): by the click that turns one eye
-//  (KFCResultEyeEH.cpp) and by the drag that turns the eyes it passes over (KFCResultEyeDrag.cpp - the author's ask of
-//  2026-10-17: "like the Layers panel, by tracing"). Every eye asks the same question - is this a live hit row KFC has
-//  written, and is it kept - and draws the answer the same way (Draw - the list's rows too, KFCResultListWidgetMgr),
-//  with the same words on the status line (SayKept).
+//  (KFCResultEyeEH.cpp) and by the drag that turns the eyes it passes over (KFCResultEyeDrag.cpp - the author's ask:
+//  "like the Layers panel, by tracing"). Every eye asks the same question - is this a live hit row KFC has written, and
+//  is it kept - and draws the answer the same way (Draw - the list's rows too, KFCResultListWidgetMgr), with the same
+//  words on the status line (SayKept).
 //
 //========================================================================================
 
@@ -27,8 +27,8 @@ namespace KFCResultEye
 		false for a kept tier's row (ROW-42), or none. */
 	bool LiveHitRow(const IPMUnknown* eye, int32& outChapter, int32& outHit, NodeID* outNode = nil);
 
-	/** ...one KFC has written - replaced, outlined, or given a special operation: the only rows with an eye to turn (the
-		author, 2026-10-17 evening). outRow = its display. */
+	/** ...one KFC has written - replaced, outlined, or given a special operation: the only rows with an eye to turn
+		(the author's call). outRow = its display. */
 	bool WrittenRow(const IPMUnknown* eye, int32& outChapter, int32& outHit, KFCResultModel::RowDisplay& outRow,
 					NodeID* outNode = nil);
 

@@ -4,7 +4,7 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  THE ROW EYE TRACED (the author, 2026-10-17 night: "the eye on and off - by dragging, like the Layers panel"): a press on
+//  THE ROW EYE TRACED (the author: "the eye on and off - by dragging, like the Layers panel"): a press on
 //  a written row's eye that moves becomes a drag (KFCResultEyeEH), and every eye it passes over turns as the first one
 //  does - on where the first was off, off where it was on; an eye already so is left as it is.
 //  THE LAYERS PANEL'S OWN SHAPE (open/components/layerpanel: LayerEyeDragDropSource, LayerEyeDragDropTarget,

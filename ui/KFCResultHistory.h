@@ -5,17 +5,17 @@
 //  KohakuFindChange (KFC)
 //
 //  THE RESULTS KEPT IN TIERS (docs/superpowers/specs/2026-10-14-kfc-stacked-results-design.md - the author's calls (a) to
-//  (e), and three more the same day: the tiers are always kept - no toggle -, at most 10 of them, each named after its
+//  (e), and three more: the tiers are always kept - no toggle -, at most 10 of them, each named after its
 //  query). A search into the panel - the panel's Find and the query dialog's Find - puts the list it replaces above the new
 //  one as a TIER: a copy of its rows as they were, drawn grey (never selected, no jump, no menu, not followed by Ctrl+Z).
 //  The list the model holds is the LIVE tier, under them, and works as the list always has. Clear Results, a Run of the
 //  query dialog and Change All in Book (No List) take the tiers away when they make a list anew; past 10 kept tiers the
 //  oldest goes, and the status line says so.
-//  A CLICK ON A GREY ROW - OR ON A GREY TIER'S OWN ROW - SWITCHES TO ITS TIER (docs/superpowers/specs/
-//  2026-10-14-kfc-tier-switch-v2-design.md - the author's calls): the model puts that tier's list back (KFCTierStore::
-//  SwitchTo - Find/Change is left alone), the row clicked is selected and jumped to as a click on a live row is, and
-//  nothing moves: the tiers stand in search order, the live one among them (LiveTierPosition), each row open or closed as
-//  it was, the view where it was.
+//  A CLICK ON A GREY ROW - OR ON A GREY TIER'S OWN ROW - SWITCHES TO ITS TIER
+//  (docs/superpowers/specs/2026-10-14-kfc-tier-switch-v2-design.md - the author's calls): the model puts that tier's
+//  list back (KFCTierStore::SwitchTo - Find/Change is left alone), the row clicked is selected and jumped to as a click
+//  on a live row is, and nothing moves: the tiers stand in search order, the live one among them (LiveTierPosition),
+//  each row open or closed as it was, the view where it was.
 //
 //  Kept here: the grey copies (each its tier's name, its row's text and a copy of its rows, made with the rows' own look -
 //  KFCResultTree::GetRowLook - so a kept row reads as the row it was), each under its list's result set; the live tier's
@@ -62,11 +62,11 @@ namespace KFCResultHistory
 	    asked of the model; a grey one as its copy noted it)? The heading's Narrow Down greys a text-only condition by it. */
 	bool TierHoldsObjects(int32 tier);
 
-	/** A tier's name - the query Find/Change holds now, in the author's words (10-14; F and C rather than Find and Change,
-	    the same night): "[<tab>] F:"<find>" C:"<change>"",
-	    each side as the Application Bar's field would show it (KFCFindChangeQueryWords / KFCFindChangeChangeWords) and cut
-	    at 200 characters; "[<tab>]" alone for a tab with nothing to say in words (Object). The panel's Find names its tier
-	    by it; the query dialog's Find puts the query's place in the run order in front. */
+	/** A tier's name - the query Find/Change holds now, in the author's words (F and C rather than Find and Change):
+	    "[<tab>] F:"<find>" C:"<change>"", each side as the Application Bar's field would show it
+	    (KFCFindChangeQueryWords / KFCFindChangeChangeWords) and cut at 200 characters; "[<tab>]" alone for a tab with
+	    nothing to say in words (Object). The panel's Find names its tier by it; the query dialog's Find puts the
+	    query's place in the run order in front. */
 	PMString QueryLabel();
 
 	/** A LIST MADE ANEW ELSEWHERE - a Run of the query dialog, Change All in Book (No List): the tiers go when the list the
@@ -85,7 +85,7 @@ namespace KFCResultHistory
 	/** Is there a live list to put under the kept tiers - a search's (HasRun), a book row, a document row? */
 	bool HasLiveList();
 
-	// ----- the query dialog's Find (the author's call, 10-14 night: the Run Order's selected row) -----
+	// ----- the query dialog's Find (the author's call: the Run Order's selected row) -----
 
 	/** THE SAME QUERY TWICE IN A ROW (the author's call): did the query dialog's last Find search `file` (FileUtils::IsEqual
 	    - a saved query is its file), and is the list it made the panel's live list still? True = the Find is refused - its
@@ -101,9 +101,9 @@ namespace KFCResultHistory
 	int32 KeptTierCount();
 
 	/** The live tier's name as its row draws it: the label of the search that made the list the model holds, with the
-	    Search: it was searched with after the tab ("[Text/Story] F:..." - the author, 2026-10-17 evening: "easy to read";
-	    drawn, not kept in the name, which QueryReadsAsTier reads the query against), or "Results" for a list KFC did not
-	    name (one an Undo put back, say) - and a narrowed list's conditions after it, drawn so too ("... / In Tables"). */
+	    Search: it was searched with after the tab ("[Text/Story] F:..." - the author: "easy to read"; drawn, not kept
+	    in the name, which QueryReadsAsTier reads the query against), or "Results" for a list KFC did not name (one an
+	    Undo put back, say) - and a narrowed list's conditions after it, drawn so too ("... / In Tables"). */
 	PMString LiveTierLabel();
 
 	/** WHERE THE LIVE TIER STANDS AMONG THE TIERS (v2 R4 - the tiers stay in search order, the live one in its place: the
@@ -195,11 +195,11 @@ namespace KFCResultHistory
 	    says "Cleared: <name>". False = nothing let go (a tier not there, a run of ours under way - the model refuses). */
 	bool ClearTier(int32 tier);
 
-	/** A CLOSED DOCUMENT'S ROWS OUT OF A GREY TIER (the author, 2026-10-14 night: "the title part stays - only the closed
-	    document's part goes"; the model emptied the chapter - KFCTierStore::ForgetDocument): kept tier `set`'s copy lets
-	    go of chapter `chapterIdx`'s document row and the rows under it - the tree told first, where the last rebuild drew
-	    that tier - and its heading reads `replaced` of `hits`, the kept list's counts now. The tier stays. Nothing but
-	    the counts when the copy has no such row; nothing at all when no copy has that result set. */
+	/** A CLOSED DOCUMENT'S ROWS OUT OF A GREY TIER (the author: "the title part stays - only the closed document's part
+	    goes"; the model emptied the chapter - KFCTierStore::ForgetDocument): kept tier `set`'s copy lets go of chapter
+	    `chapterIdx`'s document row and the rows under it - the tree told first, where the last rebuild drew that tier -
+	    and its heading reads `replaced` of `hits`, the kept list's counts now. The tier stays. Nothing but the counts
+	    when the copy has no such row; nothing at all when no copy has that result set. */
 	void KeptChapterGone(uint32 set, int32 chapterIdx, int32 replaced, int32 hits);
 
 	/** The controlled shutdown (KFCUIStartupShutdown): every static here holding storage emptied by a fresh value

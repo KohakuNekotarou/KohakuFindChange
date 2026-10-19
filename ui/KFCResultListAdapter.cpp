@@ -125,8 +125,8 @@ public:
 			return kInvalidNodeID;
 		if (nodeID->IsRoot() && KFCResultHistory::IsStacking())
 		{
-			// IN SEARCH ORDER (v2 R4 - the tiers do not move): the kept tiers as the model keeps them, the live tier at its
-			// place among them.
+			// IN SEARCH ORDER (docs/superpowers/specs/2026-10-14-kfc-tier-switch-v2-design.md R4 - the tiers do not
+			// move): the kept tiers as the model keeps them, the live tier at its place among them.
 			const int32 kept = KFCResultHistory::KeptTierCount();
 			int32 tier = nth;
 			if (KFCResultHistory::HasLiveList())
