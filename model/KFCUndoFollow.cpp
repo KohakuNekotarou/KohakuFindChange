@@ -39,7 +39,7 @@
 #include "KFCResultModel.h"
 #include "KFCModelNotify.h"		// the panel drawn again, and its message line - told, never called
 #include "KFCRunGuard.h"		// IsAnyRunning - nothing is followed while any run of ours (the replace among them) is up
-#include "KFCSearchEngine.h"	// ReadStoryVersion - a story's version
+#include "KFCSearchEngine.h"	// ReadStoryVersion - a story's version; ChapterDocNow - a chapter's document
 #include "KFCObjectSearch.h"	// Fingerprint - an object row's item, before and after a write
 #include "KFCPageItemFacts.h"	// StackIndex - an item's place in its stack, before and after an Arrange; ItemIsThere
 #include "KFCTierStore.h"		// the kept tiers: their writes are kept, and followed onto their copies (the tier switch)
@@ -160,13 +160,6 @@ IDataBase* DocOfFile(const IDFile& file, const UIDRef& doc)
 IDataBase* DocOf(const StoryMoved& s) { return DocOfFile(s.file, s.doc); }
 IDataBase* DocOf(const ItemMoved& m) { return DocOfFile(m.file, m.doc); }
 
-// A chapter of the list as it stands: its file, and its document if that is open - found the same way.
-bool ChapterDocNow(int32 chapterIdx, IDFile& outFile, UIDRef& outDoc)
-{
-	return KFCResultModel::GetChapterLocation(chapterIdx, outDoc, outFile)
-		&& KFCBookScope::FindOpenChapterDoc(outFile, outDoc);
-}
-
 // A story's version now, noted as its "before" - a write about to be made may move it. A story that cannot be read (gone)
 // is not noted.
 void NoteStoryBefore(const IDFile& file, const UIDRef& doc, IDataBase* db, UID story, std::vector<StoryMoved>& out)
@@ -187,11 +180,11 @@ void NoteStoryBefore(const IDFile& file, const UIDRef& doc, IDataBase* db, UID s
 // open has none to read - and no write reaches it.
 void ReadChapterStories(int32 chapterIdx, std::vector<StoryMoved>& out)
 {
-	UIDRef found;
 	IDFile file;
-	if (!ChapterDocNow(chapterIdx, file, found))
-		return;
+	const UIDRef found = KFCSearchEngine::ChapterDocNow(chapterIdx, &file);
 	IDataBase* const db = found.GetDataBase();
+	if (db == nil)
+		return;
 	std::set<UID> stories;
 	KFCResultModel::GetChapterStories(chapterIdx, stories);
 	for (std::set<UID>::const_iterator story = stories.begin(); story != stories.end(); ++story)
@@ -794,9 +787,9 @@ void KFCUndoFollow::StepRecorder::RecordItem(int32 chapterIdx, UID item, bool wi
 {
 	if (!fOpen || item == kInvalidUID)
 		return;
-	UIDRef found;
 	IDFile file;
-	if (!ChapterDocNow(chapterIdx, file, found))
+	const UIDRef found = KFCSearchEngine::ChapterDocNow(chapterIdx, &file);
+	if (found.GetDataBase() == nil)
 		return;
 	ItemMoved m;
 	m.file = file;
@@ -1145,9 +1138,7 @@ void KFCUndoFollow::ForgetBookChapter(const UIDRef& docRef)
 	std::vector<int32> closing;
 	for (int32 c = 0; c < KFCResultModel::GetChapterCount(); ++c)
 	{
-		UIDRef found;
-		IDFile file;
-		if (ChapterDocNow(c, file, found) && found.GetDataBase() == db)
+		if (KFCSearchEngine::ChapterDocNow(c).GetDataBase() == db)		// (db is not nil - above)
 			closing.push_back(c);
 	}
 	// ...and, for a write of rows kept for a list a query run put away (DropOtherResultSets), the chapter in THAT list:

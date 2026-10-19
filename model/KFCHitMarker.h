@@ -41,8 +41,7 @@
 #ifndef __KFCHitMarker_h__
 #define __KFCHitMarker_h__
 
-#include "BaseType.h"
-#include "TextID.h"		// TextIndex
+#include "BaseType.h"	// TextIndex
 #include "UIDRef.h"		// UID
 
 class IDataBase;

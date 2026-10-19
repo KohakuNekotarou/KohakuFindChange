@@ -34,6 +34,7 @@
 #include <map>
 #include <vector>
 
+class IDFile;				// ChapterDocNow
 class ITextModel;			// TextHash
 class ITextWalker;			// AcquireWalker
 class ITextWalkerScope;		// ScopeHasNothingToWalk
@@ -542,6 +543,14 @@ namespace KFCSearchEngine
 	    Create Outlines - and a preview), before a jump (LocateRow), and before a search again walks (SearchStoryAgain;
 	    FollowChapterFoci for a document or a list). */
 	FollowResult FollowStoryFoci(int32 chapterIdx, IDataBase* db, UID story, bool* outMoved = nil);
+
+	/** THE CHAPTER'S DOCUMENT NOW: the open document of a chapter of the list, found BY ITS FILE -
+	    KFCBookScope::FindOpenChapterDoc (a chapter with no file by its binding, while that is open). Never by the
+	    binding alone: a book chapter's binding outlives its document (book results stay when a chapter closes -
+	    KFCCloseDocResponder), and a closed document's address can be the next document's - a neighbour would be
+	    taken for the chapter (the address-reuse fault KFCBookScope::ReachChapterDoc records). Opens nothing.
+	    UIDRef::gNull = not open, or no such chapter. outFile, asked for = the chapter's file. */
+	UIDRef ChapterDocNow(int32 chapterIdx, IDFile* outFile = nil);
 
 	/** FollowStoryFoci for every story of a chapter whose document is open - a list shown again (a tier switched to -
 	    KFCTierStore::SwitchTo), or about to be searched again (Search This Document Again, Search These Results Again),

@@ -31,7 +31,6 @@
 
 #include "PMString.h"
 #include "KFCModelTypes.h"		// KFCRowsByChapter - the rows selected together, by document
-#include <vector>
 
 namespace KFCJump
 {

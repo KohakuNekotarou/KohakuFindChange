@@ -16,8 +16,7 @@
 #ifndef __KFCHitMarkerView_h__
 #define __KFCHitMarkerView_h__
 
-#include "BaseType.h"
-#include "TextID.h"		// TextIndex
+#include "BaseType.h"	// TextIndex
 #include "UIDRef.h"		// UID
 
 class IDataBase;

@@ -4259,17 +4259,24 @@ KFCSearchEngine::FollowResult KFCSearchEngine::FollowStoryFoci(int32 chapterIdx,
 	return kFollowed;
 }
 
-// A LIST SHOWN AGAIN (a tier switched to - KFCTierStore::SwitchTo): its rows follow their foci at once, story by story,
-// so the rows and the story rows draw the text as it is now - while the list was grey the edits moved its foci, not
-// its rows (another tier's write among them). Only a chapter whose document is open (found by its file, as the foci
-// are attached - KFCRowFoci::AttachChapter); a story that cannot be followed is left as it is (FollowStoryFoci).
-void KFCSearchEngine::FollowChapterFoci(int32 chapterIdx)
+UIDRef KFCSearchEngine::ChapterDocNow(int32 chapterIdx, IDFile* outFile)
 {
 	UIDRef docRef;
 	IDFile file;
 	if (!KFCResultModel::GetChapterLocation(chapterIdx, docRef, file) || !KFCBookScope::FindOpenChapterDoc(file, docRef))
-		return;
-	IDataBase* const db = docRef.GetDataBase();
+		return UIDRef::gNull;
+	if (outFile != nil)
+		*outFile = file;
+	return docRef;
+}
+
+// A LIST SHOWN AGAIN (a tier switched to - KFCTierStore::SwitchTo): its rows follow their foci at once, story by story,
+// so the rows and the story rows draw the text as it is now - while the list was grey the edits moved its foci, not
+// its rows (another tier's write among them). Only a chapter whose document is open (ChapterDocNow - by its file, as
+// the foci are attached); a story that cannot be followed is left as it is (FollowStoryFoci).
+void KFCSearchEngine::FollowChapterFoci(int32 chapterIdx)
+{
+	IDataBase* const db = ChapterDocNow(chapterIdx).GetDataBase();
 	if (db == nil)
 		return;
 	std::set<UID> stories;
@@ -5061,13 +5068,8 @@ bool AskListDocuments(const std::function<bool(const UIDRef&)>& ask, bool& outAs
 	outAsked = false;
 	for (int32 c = 0; c < KFCResultModel::GetChapterCount(); ++c)
 	{
-		UIDRef docRef;
-		IDFile file;
-		if (!KFCResultModel::GetChapterLocation(c, docRef, file))
-			continue;
-		UIDRef open(docRef);
-		if (!((docRef.GetDataBase() != nil || KFCBookScope::ChapterHasFile(file)) && KFCBookScope::FindOpenChapterDoc(file, open))
-			|| open.GetDataBase() == nil)
+		const UIDRef open = KFCSearchEngine::ChapterDocNow(c);
+		if (open.GetDataBase() == nil)
 			continue;
 		outAsked = true;
 		if (ask(open))
@@ -5225,21 +5227,15 @@ bool SearchListOnceMore(const KFCNarrowStep* step, PMString& outStatus)
 		// KFC does not open again what the person closed): by its binding while its rows stand; its rows gone with a close,
 		// by the file it was closed from (Chapter::closedFile). No chapter at all - a search that found nothing - searches
 		// the front document, as Find does.
-		UIDRef docRef;
-		IDFile file, closed;
+		IDFile closed;
 		PMString name;
 		int32 rows = 0;
-		(void)KFCResultModel::GetChapterLocation(0, docRef, file);
 		(void)KFCResultModel::GetChapterClosedFile(0, closed);
 		(void)KFCResultModel::GetChapterDisplay(0, name, rows);
-		UIDRef open(docRef);
-		bool found = (docRef.GetDataBase() != nil || KFCBookScope::ChapterHasFile(file))
-			&& KFCBookScope::FindOpenChapterDoc(file, open);
+		UIDRef open = KFCSearchEngine::ChapterDocNow(0);		// gNull when it is not open
+		bool found = (open.GetDataBase() != nil);
 		if (!found && KFCBookScope::ChapterHasFile(closed))
-		{
-			open = UIDRef::gNull;
 			found = KFCBookScope::FindOpenChapterDoc(closed, open);
-		}
 		if (found)
 		{
 			InterfacePtr<IDocument> doc(open, UseDefaultIID());

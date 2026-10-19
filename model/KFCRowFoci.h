@@ -23,8 +23,7 @@
 #ifndef __KFCRowFoci_h__
 #define __KFCRowFoci_h__
 
-#include "BaseType.h"
-#include "TextID.h"		// TextIndex
+#include "BaseType.h"	// TextIndex
 #include "UIDRef.h"		// UID
 
 #include <memory>		// std::shared_ptr - a tier's held foci
@@ -34,7 +33,7 @@ class IDataBase;
 namespace KFCRowFoci
 {
 	/** Every row of the chapter that has none gets a focus on its stored place - when the chapter's document is open
-	    (asked BY FILE - KFCBookScope::FindOpenChapterDoc) and the row's story is at the version KFC recorded for it. */
+	    (asked BY FILE - KFCSearchEngine::ChapterDocNow) and the row's story is at the version KFC recorded for it. */
 	void AttachChapter(int32 chapterIdx);
 
 	/** AttachChapter for every chapter of the results (after a search, after a list is put back by an Undo). */
@@ -61,8 +60,9 @@ namespace KFCRowFoci
 	    a move made outside a step reads back the range of before it (KT, S7). */
 	void MoveTo(int32 chapterIdx, int32 hitIdx, TextIndex start, TextIndex end, bool inStep = false);
 
-	/** Reanchor for every row of that chapter and story that has a focus - and the story's searched part
-	    (PlaceSearchedRange). inStep as Reanchor's. */
+	/** Reanchor for every row of that chapter and story that has a focus - and the story's searched part's focus made,
+	    or put back, on its recorded place (when the chapter's document is open and the story is at the version that
+	    place was taken at). inStep as Reanchor's. */
 	void ReanchorStory(int32 chapterIdx, UID story, bool inStep = false);
 
 	// THE SEARCHED PART'S FOCUS (a search over part of a story - KFCResultModel::SearchedRange): one per story holding a
@@ -71,10 +71,6 @@ namespace KFCRowFoci
 
 	/** The part's focus range now - false when it has none in that database, or it is not usable any more. */
 	bool CurrentSearchedRange(int32 chapterIdx, UID story, IDataBase* db, TextIndex& outStart, TextIndex& outEnd);
-
-	/** The part's focus made, or put back, on its recorded place - when the chapter's document is open and the story is
-	    at the version that place was taken at; nothing otherwise. inStep as Reanchor's. */
-	void PlaceSearchedRange(int32 chapterIdx, UID story, bool inStep = false);
 
 	/** The chapter's foci let go (target cleared, RemoveFocus, Release). */
 	void DetachChapter(int32 chapterIdx);

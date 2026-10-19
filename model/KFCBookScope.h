@@ -511,7 +511,8 @@ namespace KFCBookScope
 	    document if it is open now - by its file, the same lookup ReopenChapterDoc makes before it
 	    opens anything; a chapter with no file (a document-scope row) by IsDocStillOpen(ioDocRef).
 	    For everything that acts on an open document only - its callers: the Undo follow, the rows' text foci, the open
-	    responder, the tiers and the walks again among them.
+	    responder, the tiers and the walks again among them (a chapter of the list by its number:
+	    KFCSearchEngine::ChapterDocNow).
 	    Not IsDocStillOpen of the docRef the results hold: a chapter the user closed and opened again
 	    reads "not open" by it (a new address) - and one whose address a document opened later has
 	    taken reads as THAT document (the address-reuse fault above).

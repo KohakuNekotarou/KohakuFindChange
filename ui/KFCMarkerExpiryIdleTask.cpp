@@ -14,7 +14,6 @@
 #include "VCPlugInHeaders.h"
 
 #include "CIdleTask.h"
-#include "IIdleTaskMgr.h"
 
 #include "KFCUIID.h"
 #include "KFCMarkerExpiryIdleTask.h"

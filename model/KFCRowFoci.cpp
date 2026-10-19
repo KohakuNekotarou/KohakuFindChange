@@ -27,11 +27,11 @@
 
 // Project includes:
 #include "KFCRowFoci.h"
-#include "KFCBookScope.h"		// FindOpenChapterDoc, QueryOpenDocumentList
+#include "KFCBookScope.h"		// QueryOpenDocumentList
 #include "KFCID.h"				// kKFCRowFocusBoss
 #include "KFCRowFocus.h"		// IsLost
 #include "KFCResultModel.h"
-#include "KFCSearchEngine.h"	// ReadStoryVersion
+#include "KFCSearchEngine.h"	// ReadStoryVersion, ChapterDocNow
 
 namespace
 {
@@ -131,15 +131,10 @@ ITextFocus* Usable(std::map<RowKey, Kept>::iterator it)
 	return f;
 }
 
-// A focus's range: a caret where the part is empty (RangeData.h: a two-index range must not be empty).
-RangeData FocusRange(TextIndex start, TextIndex end)
-{
-	return (start == end) ? RangeData(start, RangeData::kLeanForward) : RangeData(start, end, RangeData::kLeanForward);
-}
-
 // A focus of KFC's own class on `range` of the manager's story, its target the document's database (KFCRowFocus.h:
 // without a target its snapshots go nowhere, and an Undo leaves it behind as InDesign's own focus is left). AddRef'd;
-// nil when none could be made.
+// nil when none could be made. (Every range here is RangeData(start, end, kLeanForward): where start == end, a caret
+// with that lean - the three-index form takes the lean for an empty range, RangeData.h.)
 ITextFocus* MakeFocus(ITextFocusManager* mgr, IDataBase* db, const RangeData& range)
 {
 	ITextFocus* f = mgr->NewFocus(range, kKFCRowFocusBoss);	// AddRef'd
@@ -151,8 +146,9 @@ ITextFocus* MakeFocus(ITextFocusManager* mgr, IDataBase* db, const RangeData& ra
 	return f;
 }
 
-// The story's searched part given its focus in db, on its recorded place (PlaceSearchedRange) - made, moved, or left
-// as it is. inStep: a move inside a write's step is marked first (KFCRowFoci::MoveTo's rule).
+// The story's searched part given its focus in db, on its recorded place - made, moved, or left as it is; nothing
+// with no db (the chapter's document is not open). inStep: a move inside a write's step is marked first
+// (KFCRowFoci::MoveTo's rule).
 void PlacePart(int32 chapterIdx, UID story, IDataBase* db, bool inStep)
 {
 	KFCResultModel::SearchedRange part;
@@ -177,14 +173,14 @@ void PlacePart(int32 chapterIdx, UID story, IDataBase* db, bool inStep)
 			{
 				if (inStep)
 					f->PreDirtyFocus();
-				f->SetRange(kFalse, FocusRange(part.start, part.end));
+				f->SetRange(kFalse, RangeData(part.start, part.end, RangeData::kLeanForward));
 			}
 			return;
 		}
 		Let(had->second);		// one from another database, or no longer usable
 		gParts.erase(had);
 	}
-	ITextFocus* f = MakeFocus(mgr, db, FocusRange(part.start, part.end));
+	ITextFocus* f = MakeFocus(mgr, db, RangeData(part.start, part.end, RangeData::kLeanForward));
 	if (f == nil)
 		return;
 	Kept k;
@@ -194,15 +190,16 @@ void PlacePart(int32 chapterIdx, UID story, IDataBase* db, bool inStep)
 	gParts[key] = k;
 }
 
-// Every part focus of that chapter let go (DetachChapter), or of that database (DetachDocument), or all (-1 / nil).
-void LetParts(int32 chapterIdx, IDataBase* db, bool all)
+// Every focus in `kept` - the rows' or the parts' (both keyed chapter first) - that `picks`, asked of its key and of
+// what is kept, let go and dropped (DetachChapter, DetachDocument, DetachAll, LetDocumentOf).
+template <class Key, class Picks> void LetWhere(std::map<Key, Kept>& kept, const Picks& picks)
 {
-	for (std::map<PartKey, Kept>::iterator it = gParts.begin(); it != gParts.end(); )
+	for (typename std::map<Key, Kept>::iterator it = kept.begin(); it != kept.end(); )
 	{
-		if (all || (db != nil && it->second.db == db) || (db == nil && it->first.first == chapterIdx))
+		if (picks(it->first, it->second))
 		{
 			Let(it->second);
-			it = gParts.erase(it);
+			it = kept.erase(it);
 		}
 		else
 			++it;
@@ -214,15 +211,9 @@ void KFCRowFoci::AttachChapter(int32 chapterIdx)
 {
 	if (!IDThreading::IsMainThreadDomain())
 		return;
-	// THE CHAPTER'S DOCUMENT, BY ITS FILE (FindOpenChapterDoc - a chapter with no file by its UIDRef). A book chapter's
-	// binding outlives its document - book results stay when a chapter closes (KFCCloseDocResponder) - and a closed
-	// document's address can be the next document's: asked by that UIDRef, a neighbour would get these rows' foci (the
-	// address-reuse fault KFCBookScope::ReachChapterDoc records).
-	UIDRef docRef;
-	IDFile file;
-	if (!KFCResultModel::GetChapterLocation(chapterIdx, docRef, file) || !KFCBookScope::FindOpenChapterDoc(file, docRef))
-		return;
-	IDataBase* const db = docRef.GetDataBase();
+	// THE CHAPTER'S DOCUMENT, BY ITS FILE (KFCSearchEngine::ChapterDocNow): asked by the binding the results hold, a
+	// neighbour that has taken a closed chapter's address would get these rows' foci.
+	IDataBase* const db = KFCSearchEngine::ChapterDocNow(chapterIdx).GetDataBase();
 	if (db == nil)
 		return;
 	std::map<UID, bool> knownStory;		// per story: is it at the version KFC recorded?
@@ -355,7 +346,8 @@ void KFCRowFoci::ReanchorStory(int32 chapterIdx, UID story, bool inStep)
 			rows.push_back(it->first.second);
 	for (size_t i = 0; i < rows.size(); ++i)
 		Reanchor(chapterIdx, rows[i], inStep);
-	PlaceSearchedRange(chapterIdx, story, inStep);
+	// ...and the story's searched part, on its recorded place.
+	PlacePart(chapterIdx, story, KFCSearchEngine::ChapterDocNow(chapterIdx).GetDataBase(), inStep);
 }
 
 bool KFCRowFoci::CurrentSearchedRange(int32 chapterIdx, UID story, IDataBase* db, TextIndex& outStart, TextIndex& outEnd)
@@ -377,59 +369,31 @@ bool KFCRowFoci::CurrentSearchedRange(int32 chapterIdx, UID story, IDataBase* db
 	return true;
 }
 
-void KFCRowFoci::PlaceSearchedRange(int32 chapterIdx, UID story, bool inStep)
-{
-	if (!IDThreading::IsMainThreadDomain())
-		return;
-	// The chapter's document by its file, as AttachChapter finds it.
-	UIDRef docRef;
-	IDFile file;
-	if (KFCResultModel::GetChapterLocation(chapterIdx, docRef, file) && KFCBookScope::FindOpenChapterDoc(file, docRef))
-		PlacePart(chapterIdx, story, docRef.GetDataBase(), inStep);
-}
-
 void KFCRowFoci::DetachChapter(int32 chapterIdx)
 {
 	if (!IDThreading::IsMainThreadDomain())
 		return;
-	for (std::map<RowKey, Kept>::iterator it = gKept.begin(); it != gKept.end(); )
-	{
-		if (it->first.first == chapterIdx)
-		{
-			Let(it->second);
-			it = gKept.erase(it);
-		}
-		else
-			++it;
-	}
-	LetParts(chapterIdx, nil, false);
+	const auto ofChapter = [&](const auto& key, const Kept&) { return key.first == chapterIdx; };
+	LetWhere(gKept, ofChapter);
+	LetWhere(gParts, ofChapter);
 }
 
 void KFCRowFoci::DetachDocument(IDataBase* db)
 {
 	if (!IDThreading::IsMainThreadDomain() || db == nil)
 		return;
-	for (std::map<RowKey, Kept>::iterator it = gKept.begin(); it != gKept.end(); )
-	{
-		if (it->second.db == db)
-		{
-			Let(it->second);
-			it = gKept.erase(it);
-		}
-		else
-			++it;
-	}
-	LetParts(-1, db, false);
+	const auto onDoc = [&](const auto&, const Kept& k) { return k.db == db; };
+	LetWhere(gKept, onDoc);
+	LetWhere(gParts, onDoc);
 }
 
 void KFCRowFoci::DetachAll()
 {
 	if (!IDThreading::IsMainThreadDomain())
 		return;
-	for (std::map<RowKey, Kept>::iterator it = gKept.begin(); it != gKept.end(); ++it)
-		Let(it->second);
-	gKept.clear();
-	LetParts(-1, nil, true);
+	const auto every = [](const auto&, const Kept&) { return true; };
+	LetWhere(gKept, every);
+	LetWhere(gParts, every);
 }
 
 // A TIER'S FOCI, HELD (KFCRowFoci.h): the two maps the live list keeps, as they were when it was put aside - keyed by its
@@ -492,26 +456,9 @@ void KFCRowFoci::LetDocumentOf(const HeldPtr& held, IDataBase* db)
 {
 	if (!IDThreading::IsMainThreadDomain() || held == nullptr || db == nil)
 		return;
-	for (std::map<RowKey, Kept>::iterator it = held->rows.begin(); it != held->rows.end(); )
-	{
-		if (it->second.db == db)
-		{
-			Let(it->second);
-			it = held->rows.erase(it);
-		}
-		else
-			++it;
-	}
-	for (std::map<PartKey, Kept>::iterator it = held->parts.begin(); it != held->parts.end(); )
-	{
-		if (it->second.db == db)
-		{
-			Let(it->second);
-			it = held->parts.erase(it);
-		}
-		else
-			++it;
-	}
+	const auto onDoc = [&](const auto&, const Kept& k) { return k.db == db; };
+	LetWhere(held->rows, onDoc);
+	LetWhere(held->parts, onDoc);
 }
 
 // End, KFCRowFoci.cpp.

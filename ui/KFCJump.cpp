@@ -52,7 +52,6 @@
 #include "RangeData.h"				// the range handed to SetTextSelection
 #include "TextEditorID.h"			// kIBeamToolBoss - the Type tool a click switches to (PutTypeToolOn)
 #include "TextID.h"					// kFrameListBoss, IID_IWAXSTRAND
-#include "widgetid.h"				// IID_IPANORAMA
 #include "LayoutUIID.h"				// kOpenLayoutCmdBoss
 #include "SpreadID.h"				// kSetSpreadCmdBoss - put a spread in the layout view
 #include "ErrorUtils.h"				// GlobalErrorStatePreserver / PMSetGlobalErrorCode - a window or a
@@ -281,21 +280,26 @@ namespace
 		return true;
 	}
 
-	// The spread a match sits on: its frame -> the spread containing that frame. kInvalidUID when the
-	// match has no frame at all (and for the query failures around it, which read the same).
+	// The spread a page item stands on now; kInvalidUID when none can be read (an inline in overset text - the model
+	// asks the same of a row's item, KFCObjectSearch::IsOnSpread).
+	UID SpreadOfItem(const UIDRef& itemRef)
+	{
+		InterfacePtr<IHierarchy> hier(itemRef, UseDefaultIID());
+		if (hier == nil)
+			return kInvalidUID;
+		InterfacePtr<ISpread> spread(Utils<IPasteboardUtils>()->QuerySpread(hier));
+		return (spread != nil) ? ::GetUID(spread) : kInvalidUID;
+	}
+
+	// The spread a match sits on: its frame's (SpreadOfItem). kInvalidUID when the match has no frame at all (and for
+	// the query failures around it, which read the same).
 	//
 	// The frame is resolved through KFCSearchEngine::EditableFrameForMatch, which is the same answer
 	// the hit's own locator was built from - an overset match names the frame carrying the "+".
 	UID SpreadForMatch(const UIDRef& storyRef, TextIndex pos)
 	{
 		const UID frameUID = KFCRuns()->EditableFrameForMatch(storyRef, pos);
-		if (frameUID == kInvalidUID)
-			return kInvalidUID;
-		InterfacePtr<IHierarchy> frameHier(storyRef.GetDataBase(), frameUID, UseDefaultIID());
-		if (frameHier == nil)
-			return kInvalidUID;
-		InterfacePtr<ISpread> spread(Utils<IPasteboardUtils>()->QuerySpread(frameHier));
-		return (spread != nil) ? ::GetUID(spread) : kInvalidUID;
+		return (frameUID != kInvalidUID) ? SpreadOfItem(UIDRef(storyRef.GetDataBase(), frameUID)) : kInvalidUID;
 	}
 
 	void EnsureSpreadUIDInView(IControlView* view, IDataBase* db, UID targetSpread);	// below EnsureSpreadInView
@@ -670,36 +674,20 @@ public:
 // DECLARED AFTER the landing's ActivationGuard (a landing dropped by that guard must not hand back what the landing in
 // progress is still opening) and BEFORE any IDataBase::SaveRestoreModifiedState on the chapter's database, so that guard
 // puts the flag back on a database still open before this can close it.
+// AND EVERY DOCUMENT OF ROWS SELECTED TOGETHER (KFCJump::ReplaceObjectRows - rows of several documents): the model's
+// check can reopen any of their chapters windowless and hold it, and a way out between that check and the write -
+// the shown row's chapter not reached, its window not forward - would leave them so. A chapter the write gave a
+// window, or one the user has open, is not held: nothing happens to it.
 class HandBackChapterOnExit
 {
 public:
-	explicit HandBackChapterOnExit(int32 chapterIdx) : fChapter(chapterIdx) {}
-	~HandBackChapterOnExit()
-	{
-		UIDRef docRef;
-		IDFile file;
-		if (KFCResults()->GetChapterLocation(fChapter, docRef, file))
-			KFCChapters()->HandBackIfHeld(docRef);
-	}
-private:
-	int32 fChapter;
-	HandBackChapterOnExit(const HandBackChapterOnExit&);
-	HandBackChapterOnExit& operator=(const HandBackChapterOnExit&);
-};
-
-// The same for EVERY document of rows selected together (KFCJump::ReplaceObjectRows - rows of several documents):
-// the model's check can reopen any of their chapters windowless and hold it, and a way out between that check and the
-// write - the shown row's chapter not reached, its window not forward - would leave them so. A chapter the write gave a
-// window, or one the user has open, is not held: nothing happens to it.
-class HandBackChaptersOnExit
-{
-public:
-	explicit HandBackChaptersOnExit(const KFCRowsByChapter& rows)
+	explicit HandBackChapterOnExit(int32 chapterIdx) : fChapters(1, chapterIdx) {}
+	explicit HandBackChapterOnExit(const KFCRowsByChapter& rows)
 	{
 		for (size_t c = 0; c < rows.size(); ++c)
 			fChapters.push_back(rows[c].chapter);
 	}
-	~HandBackChaptersOnExit()
+	~HandBackChapterOnExit()
 	{
 		for (size_t c = 0; c < fChapters.size(); ++c)
 		{
@@ -711,8 +699,8 @@ public:
 	}
 private:
 	std::vector<int32> fChapters;
-	HandBackChaptersOnExit(const HandBackChaptersOnExit&);
-	HandBackChaptersOnExit& operator=(const HandBackChaptersOnExit&);
+	HandBackChapterOnExit(const HandBackChapterOnExit&);
+	HandBackChapterOnExit& operator=(const HandBackChapterOnExit&);
 };
 
 // THE "HIDE PREVIOUS CHAPTER" SWEEP IS DECIDED WHEN THE OPERATION IS OVER, NOT IN ITS MIDDLE (the author's call, 2026-10-12 -
@@ -777,10 +765,8 @@ void SayRowHasNoPlace()
 // order, and a row found nowhere is looked for again. A row found elsewhere is gone to for this jump only (T3); when
 // a row moved or a Missing word went, the rows are repainted.
 // Asked by JumpToHit, which still moves the view when it is not found - and selects nothing (SelectMatchOnClick).
-bool RowFoundOrFoundAgain(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, UID storyUID,
-	TextIndex& start, TextIndex& end)
+bool RowFoundOrFoundAgain(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, TextIndex& start, TextIndex& end)
 {
-	(void)storyUID;		// the model reads the row's own story
 	const KFCResultModel::RowLocation found = KFCRuns()->LocateRow(chapterIdx, hitIdx, docRef, start, end);
 	if (found == KFCResultModel::kRowMoved || found == KFCResultModel::kRowElsewhere)
 		KFCResultTree::RefreshRows();
@@ -1119,7 +1105,7 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx, NotSelected& outWhy)
 
 	// Is the text at this position still the text this row describes - or can the row be found again?
 	// When neither, the view still moves (it shows where the hit used to be) and the row says so below.
-	const bool sameOccurrence = RowFoundOrFoundAgain(chapterIdx, hitIdx, docRef, storyUID, start, end);
+	const bool sameOccurrence = RowFoundOrFoundAgain(chapterIdx, hitIdx, docRef, start, end);
 	if (!sameOccurrence)
 		ClampIntoStory(storyRef, start, end);	// a place the story no longer reaches - see ClampIntoStory
 
@@ -1327,17 +1313,6 @@ bool ItemIsThere(const UIDRef& itemRef)
 		return false;
 	InterfacePtr<IHierarchy> hier(itemRef, UseDefaultIID());
 	return hier != nil;
-}
-
-// The spread a page item stands on now; kInvalidUID when none can be read (an inline in overset text - the model asks the
-// same of a row's item, KFCObjectSearch::IsOnSpread).
-UID SpreadOfItem(const UIDRef& itemRef)
-{
-	InterfacePtr<IHierarchy> hier(itemRef, UseDefaultIID());
-	if (hier == nil)
-		return kInvalidUID;
-	InterfacePtr<ISpread> spread(Utils<IPasteboardUtils>()->QuerySpread(hier));
-	return (spread != nil) ? ::GetUID(spread) : kInvalidUID;
 }
 
 // THE VIEW ON THE ITEM (spec O9): its spread first - a parent page's included, the rule EnsureSpreadInView keeps - then
@@ -1654,8 +1629,9 @@ bool KFCJump::ReplaceObjectRows(const KFCRowsByChapter& rows, int32 shownChapter
 	//  SweepAtEnd, P-C.)
 	SweepAtEnd sweepAtEnd;
 	// (As one row's: the check below can reopen a chapter windowless - every document's, the shown row's among them -
-	// HandBackChaptersOnExit. The write hands back what it reached and did not write - KFCObjectReplace::ReplaceRows.)
-	const HandBackChaptersOnExit handBack(rows);
+	// HandBackChapterOnExit, for every chapter of the rows. The write hands back what it reached and did not write -
+	// KFCObjectReplace::ReplaceRows.)
+	const HandBackChapterOnExit handBack(rows);
 	if (!KFCRuns()->CheckObjectReplaceRows(rows, outStatus))
 		return false;
 	const int32 chapterIdx = shownChapter;

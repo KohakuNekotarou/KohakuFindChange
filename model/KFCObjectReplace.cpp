@@ -354,7 +354,7 @@ bool NextItemOfWalk(IFindChangeService* svc, IObjectWalker* shared, IDataBase* d
 // landings hand back the same way). The writes are reached only through the UI half's landing (KFCJump::ReplaceObjectRow,
 // ReplaceObjectRows), which has brought the row's chapter forward first - for rows selected together, the chapter of the
 // row selected last - and which hands back on its own way out whatever an exit of the write's leaves
-// (HandBackChapterOnExit, HandBackChaptersOnExit in KFCJump.cpp). The chapter brought forward is then the user's, no
+// (HandBackChapterOnExit in KFCJump.cpp). The chapter brought forward is then the user's, no
 // longer held; what every chapter a write reaches is left as - the one brought forward included, of which only its
 // "unsaved" flag can change - is DocsAfterWrite's (both doors - WriteObjectRows).
 using KFCBookScope::HandBackIfHeld;
