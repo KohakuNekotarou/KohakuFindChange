@@ -155,11 +155,15 @@ namespace
 	    document it walks (IFindChangeService::SearchObject), and measured (block 0's O-1 / O-2) it left its last
 	    item selected in a minimised window - ILayoutViewUtils::GetAllLayoutViews lists no view of one - and in a
 	    document's second window. The windows as IDocumentUIUtils lists them (is_layout: a story editor or a galley
-	    holds no layout selection), each window's layout pane by its WidgetID - the product's way (spellpanel's
-	    PrivateSpellingUtils.cpp, KCM's KCMViewLookup.cpp, KIDMCP's KIDMCPUIWindows.cpp): kLayoutWidgetID, and
-	    kLayoutSecondaryPanelWidgetID in a split window. The manager is the pane's view's
-	    (ISelectionUtils::QueryViewSelectionManager - Adobe's trackers' way, KCM's QuerySelectionManagerFor in
-	    KCMStoryJump.cpp). */
+	    holds no layout selection), each window's panes by WidgetID - the product's way (spellpanel's
+	    PrivateSpellingUtils.cpp; KCM's KCMViewLookup.cpp the same): the window's kLayoutWidgetID, and in a split
+	    window the kLayoutWidgetID inside the kLayoutSecondaryPanelWidgetID panel, while that view is shown. The
+	    manager is the pane's view's (ISelectionUtils::QueryViewSelectionManager - Adobe's trackers' way, KCM's
+	    QuerySelectionManagerFor in KCMStoryJump.cpp). Measured with KT's panesel probe (2026-10-19): a split
+	    window's second pane has a manager of its own (what is selected there is not the window's DOM selection);
+	    the PANEL answers the first pane's manager, so handed over as it stands it never reached the second pane
+	    (1b4e6a9 did that); and every window has a hidden second pane with a manager of its own - left out, as the
+	    product leaves it. */
 	template <typename Fn>
 	void ForEachWindowSelection(IDataBase* db, const ISelectionManager* skip, Fn fn)
 	{
@@ -193,19 +197,24 @@ namespace
 		PresentationSequence windows;
 		FindPresentation_PreferCriteria noPreference;
 		(void)docUI->FindPresentationsForDocument(db, windows, &FindPresCriteria::is_layout, noPreference);
-		const WidgetID panes[2] = { kLayoutWidgetID, kLayoutSecondaryPanelWidgetID };
 		for (size_t w = 0; w < windows.size(); ++w)
 		{
 			InterfacePtr<IPanelControlData> panel(windows[w], UseDefaultIID());
+			if (panel == nil)
+				continue;
+			IControlView* panes[2] = { panel->FindWidget(kLayoutWidgetID), nil };
+			InterfacePtr<IPanelControlData> split(panel->FindWidget(kLayoutSecondaryPanelWidgetID), UseDefaultIID());
+			IControlView* const second = (split != nil) ? split->FindWidget(kLayoutWidgetID) : nil;
+			if (second != nil && second->IsVisible())
+				panes[1] = second;
 			const ISelectionManager* seen = nil;
-			for (int32 p = 0; panel != nil && p < 2; ++p)
+			for (int32 p = 0; p < 2; ++p)
 			{
-				IControlView* const view = panel->FindWidget(panes[p]);
 				InterfacePtr<ISelectionManager> manager(
-					(view != nil) ? selectionUtils->QueryViewSelectionManager(view) : nil);
+					(panes[p] != nil) ? selectionUtils->QueryViewSelectionManager(panes[p]) : nil);
 				ISelectionManager* const m = manager;
 				if (m == nil || m == skip || m == seen)
-					continue;		// (a split window's two panes can share one)
+					continue;		// (never seen shared - this only keeps a manager from being given back twice)
 				seen = m;
 				fn(windows[w], p, m);
 			}
@@ -417,6 +426,8 @@ public:
 				(void)ReadSelectedItems(manager, kept.items);
 				kept.other = kept.items.Length() == 0
 					&& manager->SelectionExists(kInvalidClass, ISelectionManager::kAnySelection) != kFalse;
+				KFC_DIAG_LOG("BGSEL keep window=%p pane=%d manager=%p items=%d other=%d", (const void*)window, pane,
+					(void*)manager, kept.items.Length(), kept.other ? 1 : 0);
 				gBackSelections.push_back(kept);
 			});
 		}
@@ -434,7 +445,10 @@ public:
 				ISelectionManager* manager)
 			{
 				if (window == kept.window && pane == kept.pane)
+				{
+					KFC_DIAG_LOG("BGSEL give window=%p pane=%d manager=%p", (const void*)window, pane, (void*)manager);
 					GiveBack(kept, manager);
+				}
 			});
 		}
 		gBackSelections = std::vector<BackSelection>();		// a fresh one: the storage goes too
