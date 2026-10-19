@@ -54,6 +54,10 @@
 #include "KFCJump.h"				// ClearFrontSelection - ClearSelection's door; IsLanding - IsLanding's
 #include "KFCResultHistory.h"		// QueryReadsAsTier, RenameLiveFromQuery - the lists' names are this half's
 #include "KFCResultTree.h"			// ShowStatus - ShowNotice's line
+#include "KFCDiag.h"				// KFC_DIAG_FAULT - test builds only (bg-first-view)
+#ifdef KFC_DIAG
+#include "ILayoutViewUtils.h"		// GetAllLayoutViews - bg-first-view's old way, a test build's only
+#endif
 
 namespace
 {
@@ -163,6 +167,29 @@ namespace
 		Utils<ISelectionUtils> selectionUtils;
 		if (db == nil || !docUI || !selectionUtils)
 			return;
+#ifdef KFC_DIAG
+		// (Fault switch bg-first-view, a test build's only - KFCDiag.h: the document's first layout view alone, the
+		// old way - a minimised window and a second window passed over: obj-bg-sel-minimised-armed and
+		// obj-bg-sel-second-window-armed.)
+		if (KFC_DIAG_FAULT("bg-first-view"))
+		{
+			Utils<ILayoutViewUtils> viewUtils;
+			K2Vector<IControlView*> views;
+			if (viewUtils)
+				viewUtils->GetAllLayoutViews(views, nil, db);
+			for (size_t i = 0; i < views.size(); ++i)
+			{
+				if (views[i] == nil)
+					continue;
+				InterfacePtr<ISelectionManager> manager(selectionUtils->QueryViewSelectionManager(views[i]));
+				ISelectionManager* const m = manager;
+				if (m != nil && m != skip)
+					fn(nil, 0, m);
+				return;
+			}
+			return;
+		}
+#endif
 		PresentationSequence windows;
 		FindPresentation_PreferCriteria noPreference;
 		(void)docUI->FindPresentationsForDocument(db, windows, &FindPresCriteria::is_layout, noPreference);

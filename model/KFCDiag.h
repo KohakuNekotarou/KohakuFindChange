@@ -187,6 +187,10 @@
 //                rows in place of kKFCCollectObjectLimit - the limit measured before it was chosen (M6 of
 //                docs/superpowers/specs/2026-10-18-kfc-narrow-down-design.md -
 //                work\note-scripts\2026-10-18-kfc-narrow\m6.ps1)
+//    bg-first-view  (UI half) ui/KFCUIServices.cpp's ForEachWindowSelection hands back each document's first layout
+//                view alone (ILayoutViewUtils::GetAllLayoutViews), the old way: an object search's walk leaves its last
+//                item selected in a minimised window and in a document's second window (obj-bg-sel-minimised-armed,
+//                obj-bg-sel-second-window-armed)
 //
 //  AND TIMERS: KFC_CLOCK / KFC_SPENT add up the milliseconds a stretch of code takes, and KFCDiagPhase
 //  writes "PHASE <name> begin" and "PHASE <name> end <ms>" around a scope - all of it nothing without KFC_DIAG.
