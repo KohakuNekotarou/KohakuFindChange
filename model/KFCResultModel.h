@@ -250,9 +250,10 @@ namespace KFCResultModel
 		uint32		itemPrintLength;
 		// GONE WITH ITS DOCUMENT'S SESSION: the chapter's document was closed and opened again without the item - one
 		// never saved. Its UID can then name only ANOTHER object: InDesign hands a never-saved item's UID to the next
-		// item made after the reopen (measured 2026-10-20 - a book's chapter closed unsaved and opened again, a new
-		// rectangle took the gone one's UID, and the old row's click selected it). Set where the chapter is bound again
-		// (RebindChapterDoc), asked by every door that takes the row's item (RowItemIsThere, IsHitItemGone).
+		// item made after the reopen (measured - a book's chapter closed unsaved and opened again, a new rectangle
+		// took the gone one's UID, and the old row's click selected it: case obj-book-uid-reused). Set where the
+		// chapter is bound again (RebindChapterDoc), asked by every door that takes the row's item (RowItemIsThere,
+		// IsHitItemGone).
 		bool		itemGone;
 
 		Hit() : pageIndex(-1), isOverset(false), isLocked(false), isHidden(false),

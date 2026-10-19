@@ -20,11 +20,11 @@
 //
 //  THE MODEL IS HELD (AddRef at Initialize, Release in the destructor), as InDesign's own focus holds it. InDesign
 //  purges a story nobody holds - on a switch between documents among other times - and tells its foci nothing
-//  (no DeRegisterFromModel): measured in KT after KFC crashed with a raw pointer here (2026-10-14 21:46:58, heap
-//  corruption in KFCRowFoci's StillUsable, which asked this focus for its model) - work/note-scripts/2026-10-14-focus-undo/
-//  focus-purge-probe-out.txt: the raw focus's story was gone and back as another instance before any purge was asked
-//  for, while InDesign's own focus and a holding one kept theirs through two purges. Held, the story stays in memory
-//  with its focus manager, so the focus also goes on following the edits.
+//  (no DeRegisterFromModel): measured in KT after KFC crashed with a raw pointer here (heap corruption in KFCRowFoci's
+//  StillUsable, which asked this focus for its model) -
+//  work/note-scripts/2026-10-14-focus-undo/focus-purge-probe-out.txt: the raw focus's story was gone and back as
+//  another instance before any purge was asked for, while InDesign's own focus and a holding one kept theirs through
+//  two purges. Held, the story stays in memory with its focus manager, so the focus also goes on following the edits.
 //
 //========================================================================================
 

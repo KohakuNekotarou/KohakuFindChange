@@ -31,7 +31,7 @@
 namespace KFCMarkerExpiryIdleTask
 {
 	/** (Re)start the countdown to clearing the marker. Called every time a marker is shown, so an
-	    already-running countdown starts over: each jump shows its marker for the full time. */
+	    already-running countdown starts over: each marker is shown for the full time. */
 	void Start();
 
 	/** Cancel the countdown. Safe to call when it is not running. */

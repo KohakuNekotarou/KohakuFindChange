@@ -9,7 +9,7 @@
 //  to the front, scrolls the view so the match is centred, and SELECTS the match with the Type tool
 //  on (the author's calls: the tree does what Edit > Find/Change's Find Next does, so the selection
 //  is the pointer and no marker goes over it - JMP-06). The keyboard stays on the list. As Find/Change's
-//  own Find Next does (measured 2026-10-17 - the author's calls), a zero-width match gets the caret, and
+//  own Find Next does (measured - the author's calls), a zero-width match gets the caret, and
 //  an overset match or a hidden layer's is selected with nothing of it showing - which is said. A match
 //  that cannot be selected - locked, no longer found - gets the marker on its characters instead
 //  (KFCHitMarker - a global text adornment), which takes itself down after about a second, and nothing

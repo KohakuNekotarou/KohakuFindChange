@@ -309,8 +309,8 @@ namespace
 	    SCROLLING TO A POINT ASSUMES THE VIEW IS ALREADY ON THAT POINT'S SPREAD. The scroll below
 	    moves the view to a pasteboard POINT, and a point taken from one spread means something else -
 	    or nothing at all - to a view showing another. A MASTER spread is where this shows up plainly,
-	    because it is not in the ordinary spreads' continuous pasteboard at all: measured with Include
-	    Master Pages on and the scroll alone, the row read "PA master cat one" correctly and clicking
+	    because it is not in the ordinary spreads' continuous pasteboard at all: measured with
+	    Include Master Pages on and the scroll alone, the row read "PA master cat one" correctly and clicking
 	    it left the window on EMPTY PASTEBOARD - no page, no text, no marker, nothing said - while the
 	    body row beside it landed correctly in the same test run.
 
@@ -595,8 +595,8 @@ namespace
 	}
 
 	// Make a chapter reachable: reopen it windowless if the user closed it since the search, and
-	// rebind the model so later work uses the live database. Shared by JumpToHit and ShowChapter -
-	// the two differ in what they do AFTER this, not in how they get there.
+	// rebind the model so later work uses the live database. Shared by every landing and the object rows' Replace (its
+	// callers are the list) - they differ in what they do AFTER this, not in how they get there.
 	//
 	// Returns false when the chapter cannot be reached at all; the caller has already been told
 	// why through the status line, so it should just return.
@@ -703,13 +703,13 @@ private:
 	HandBackChapterOnExit& operator=(const HandBackChapterOnExit&);
 };
 
-// THE "HIDE PREVIOUS CHAPTER" SWEEP IS DECIDED WHEN THE OPERATION IS OVER, NOT IN ITS MIDDLE (the author's call, 2026-10-12 -
-// the fatal-path re-check's proposal P-C). FrontChapter asks for the sweep as it brings the row's document forward; which
+// THE "HIDE PREVIOUS CHAPTER" SWEEP IS DECIDED WHEN THE OPERATION IS OVER, NOT IN ITS MIDDLE (the author's call - the
+// spec map's JMP-26c). FrontChapter asks for the sweep as it brings the row's document forward; which
 // chapters need no save and have a window is asked, and their closes scheduled, by this object's destructor - once everything
 // the operation does is done: the landing's dirty guard put back, its chapter handed back, a GREP row's preview, an object
 // row's write. A write anywhere in the operation has made its document one that needs a save BEFORE the sweep looks, so the
-// shape of the 10-11 night K-3 - a sweep scheduled, then the same operation writing a chapter it named, and the close
-// throwing the write away - cannot be built any more. The closes stay scheduled (kSchedule): what the user sees is the same,
+// shape this guards against - a sweep scheduled, then the same operation writing a chapter it named, and the close
+// throwing the write away - cannot be built. The closes stay scheduled (kSchedule): what the user sees is the same,
 // InDesign carries them out before the next input.
 // One per operation, declared at its top right after its ActivationGuard (ActivateNode, ReplaceObjectRow, ReplaceObjectRows),
 // so it ends after everything else of the operation and while the landing guard still stands. With none standing,
@@ -777,12 +777,11 @@ bool RowFoundOrFoundAgain(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, 
 // A row that is no longer found keeps its stored place, and an edit made since the search can have cut the
 // story short of it. Measured unclamped: a row at 40 in a story cut to 8 characters went on as 40 to the
 // overset test, the spread and the wax lookup - InDesign answered "overset" for a place that is not in the
-// story at all, and the double click's selection of the time then refused with the overset reason instead
-// of "not found". The other doors bound it too: KFCSearchEngine's RowReadsAsFound, SelectMatchOnClick's
-// clamp, and the SDK's gotolasttextedit ("reset text index if it is out of range",
-// GTTxtEdtUtils.cpp:107-109). The story's last character is the nearest place there is to where the row
-// was, so the view still goes where the hit used to be. A story that has gone (its UID deleted) reads
-// as nil here and below (IDataBase.h:152-156).
+// story at all, and a selection made there refused with the overset reason instead of "not found". The other
+// doors bound it too: KFCSearchEngine's RowReadsAsFound, SelectMatchOnClick's clamp, and the SDK's
+// gotolasttextedit ("reset text index if it is out of range", GTTxtEdtUtils.cpp:107-109). The story's last
+// character is the nearest place there is to where the row was, so the view still goes where the hit used to be. A
+// story that has gone (its UID deleted) reads as nil here and below (IDataBase.h:152-156).
 void ClampIntoStory(const UIDRef& storyRef, TextIndex& start, TextIndex& end)
 {
 	InterfacePtr<ITextModel> textModel(storyRef, UseDefaultIID());
@@ -803,13 +802,13 @@ void ClampIntoStory(const UIDRef& storyRef, TextIndex& start, TextIndex& end)
 // moves nothing must not appear to do nothing - and then, with "Hide Previous Chapter" ON, ask for the sweep that
 // closes every other displayed clean chapter of the searched book (the landed-in document is the exception;
 // a document outside the book stays; book results only - see ShouldHidePreviousChapter). The operation's
-// SweepAtEnd runs it once the operation is over (P-C); with none standing it runs here, at once. Shared by
-// JumpToHit and ShowChapter.
+// SweepAtEnd runs it once the operation is over (JMP-26c); with none standing it runs here, at once. Shared by
+// every landing and the object rows' Replace (its callers are the list).
 // hidePreviousChapters = false: the window alone, no sweep - for a landing that WRITES other chapters after it
 // (KFCJump::ReplaceObjectRows): a sweep scheduled in the middle ran its closes once the write was over, by which time the
 // chapters they named held the write, and a close without UI threw it away (measured - case sel-book-objects-open-hide:
-// "Replaced 2 objects in 2 documents", objC1 closed, its file's K1 as before the Replace). Since P-C the sweep is decided
-// at the end (SweepAtEnd), which that shape cannot get past.
+// "Replaced 2 objects in 2 documents", objC1 closed, its file's K1 as before the Replace). A sweep decided at the end
+// (SweepAtEnd) cannot be caught so: a chapter the write named needs a save by the time it looks.
 bool FrontChapter(const UIDRef& docRef, bool hidePreviousChapters = true)
 {
 	if (!EnsureDocFrontmost(docRef))
@@ -820,7 +819,7 @@ bool FrontChapter(const UIDRef& docRef, bool hidePreviousChapters = true)
 	if (hidePreviousChapters && ShouldHidePreviousChapter())
 	{
 		// (Fault switch sweep-at-once, a test build's only - KFCDiag.h: the sweep scheduled here, in the middle of the
-		// operation, the way it was before P-C - with object-rows-sweep, the case that shows a write thrown away.)
+		// operation, the old way - with object-rows-sweep, the case that shows a write thrown away.)
 		const bool atOnce = KFC_DIAG_FAULT("sweep-at-once");
 		if (gSweepAtEnd != nil && !atOnce)
 			gSweepAtEnd->Request(docRef);
@@ -850,9 +849,10 @@ void ClearSelection()
 // dialog answers as well (All Documents -> Document - the probe t1-locked-all_documents; both probes are in
 // work/kbs-regress/archive). The dialog's own Find Next leaves Search: alone. So every activation (ActivateNode)
 // remembers the tab's Search: BEFORE it does anything, and a change to it within kScopeKeepMs is put back -
-// KFCPanelTitle's observer hears the change and calls KFCJump::KeepSearchScopeAfterClick. Measured: written back, the open dialog shows the value again and keeps it.
-// A change later than that is the user's own; one inside it is put back too - who made it cannot be told. A row's
-// Replace leaves Search: as it is (measured: replace-keeps-scope), so nothing arms for it.
+// KFCPanelTitle's observer hears the change and calls KFCJump::KeepSearchScopeAfterClick. Measured: written back, the
+// open dialog shows the value again and keeps it. A change later than that is the user's own; one inside it is put
+// back too - who made it cannot be told. A row's Replace leaves Search: as it is (measured: replace-keeps-scope), so
+// nothing arms for it.
 struct ScopeKeep
 {
 	bool	armed;
@@ -898,7 +898,7 @@ void ArmScopeKeep()
 // more accurately called DoesToolDeactivateTextEditor" and that the Zoom, Gradient and Hand tools
 // return kTrue from it as well - then names this call as the one to use "for traditional 'text'
 // tools that select text". Measured on the running application with IsTextTool: with the Hand,
-// Zoom or Gradient tool active, the double click of the time left that tool in place and made the selection
+// Zoom or Gradient tool active, a jump's selection left that tool in place and selected
 // anyway - text highlighted in a window the user cannot type into, which is the
 // one outcome the paragraph above says must not happen. (The Selection tool was the control
 // group and switched correctly, before and after.)
@@ -919,17 +919,17 @@ bool PutTypeToolOn()
 	return true;
 }
 
-// HOW A CLICK LEFT ITS ROW'S MATCH (the author's call: a text row's click says why it cannot select - and, since
-// 2026-10-17, what cannot be seen of a match it did select). Said by ActivateNode once the landing is over: on a GREP row
+// HOW A CLICK LEFT ITS ROW'S MATCH (the author's call: a text row's click says why it cannot select - and what cannot
+// be seen of a match it did select). Said by ActivateNode once the landing is over: on a GREP row
 // whose preview comes up, in the preview's heading ("Preview Text (not selected - locked):" - the author chose both); on
 // any other row as the row's note (KFCResultTree::ShowRowNote - the row's, like a preview: the next row landed on takes
 // it away). kNotSelectedQuietly: no reason to give - a row whose text is gone (the jump has said "Not found") or a step
 // InDesign refused.
-// WHAT FIND/CHANGE ITSELF DOES (measured 2026-10-17 against its dialog's Find Next button - the author's model for the
-//  tree, JMP-29): it selects an OVERSET match (nothing of it on a page; the dialog says "(Overset Text)" beside Find
+// WHAT FIND/CHANGE ITSELF DOES (measured against its dialog's Find Next button - the author's model for the tree,
+//  JMP-29): it selects an OVERSET match (nothing of it on a page; the dialog says "(Overset Text)" beside Find
 //  what), a match on a HIDDEN layer (found only with Include Hidden Layers on, as the tree's rows are), and puts the caret
 //  at a ZERO-WIDTH one (^, $, a lookaround); it warns about a LOCKED one and selects nothing. So do these, the author's
-//  calls of the same night: the caret as InDesign puts it, every zero-width GREP match alike; an overset match selected
+//  calls: the caret as InDesign puts it, every zero-width GREP match alike; an overset match selected
 //  with the jump as it was (to the "+"), said as the dialog says it; a hidden layer's selected; a locked one as before
 //  (the menu's Find Next selects a locked match - the dialog's button, the tree's model, does not).
 enum NotSelected
@@ -942,7 +942,7 @@ enum NotSelected
 };
 
 // Did the landing leave the row's match selected (a caret, for a zero-width one)? The selection is then the pointer and
-// no marker goes over it (JMP-17's reason - a selection under an inversion cannot be read).
+// no marker goes over it (JMP-29 - a selection under an inversion cannot be read).
 bool LandedSelected(NotSelected why)
 {
 	return why == kSelected || why == kSelectedOverset || why == kSelectedHidden;
@@ -1034,8 +1034,8 @@ NotSelected SelectMatchOnClick(int32 chapterIdx, int32 hitIdx, const UIDRef& sto
 
 // THE MARKER GOES AT EVERY EXIT OF A LANDING BUT THE ONE THAT RAISES IT (JumpToHit's; JumpToObject raises none): a
 // landing that goes nowhere, or lands where the selection points, must not leave the previous row's marker standing
-// over what the panel says - and an exit added later cannot forget to take it down (the block 12 audit's B-3 once found
-// the exits uneven). Declared after the landing's HandBackChapterOnExit: the marker goes before its chapter can be
+// over what the panel says - and an exit added later cannot forget to take it down (written out at each exit, the exits
+// went uneven). Declared after the landing's HandBackChapterOnExit: the marker goes before its chapter can be
 // handed back.
 class MarkerUnlessRaised
 {
@@ -1061,8 +1061,8 @@ private:
     it - or raise the marker on one that cannot be selected (SelectMatchOnClick). An unreachable
     chapter (missing / locked file) reports through the status line. An overset match has no on-page
     location of its own, so the view scrolls to the frame's overset "+" instead and NO marker is raised
-    - those pixels belong to the indicator, not to the text; the match is selected all the same (2026-10-17),
-    as Find/Change's Find Next selects it.
+    - those pixels belong to the indicator, not to the text; the match is selected all the same, as
+    Find/Change's Find Next selects it.
     The marker comes up at once, whichever door asked (see the note at the head of KFCJump.h).
 
     Reached only through ActivateNode, where the "one activation at a time" guard lives - which is why
@@ -1140,8 +1140,8 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx, NotSelected& outWhy)
 	const bool overset = KFCRuns()->IsPositionOverset(storyRef, start);
 
 	// A match in another document needs that document's window in front before any scrolling; if no
-	// window can be produced, the panel has said so and the view is left where it was. (With "Hide
-	// Previous Chapter" ON the tour has moved, and every other displayed clean chapter of the book is closed.)
+	// window can be produced, the panel has said so and the view is left where it was. (With "Hide Previous Chapter"
+	// ON, every other displayed clean chapter of the book is closed once the landing is over - SweepAtEnd.)
 	if (!FrontChapter(docRef))
 		return false;
 #ifdef KFC_DIAG
@@ -1183,7 +1183,7 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx, NotSelected& outWhy)
 		const KFCOversetLoc loc = KFCRuns()->FindOversetLocator(storyRef, start);
 		if (loc.found)
 			ScrollViewToPoint(frontView, loc.outportPb);	// scroll only - no marker on the "+" locator
-		// SELECTED WHERE NOTHING OF IT SHOWS (2026-10-17, the author: "select it, and the jump as it is") - Find Next's own
+		// SELECTED WHERE NOTHING OF IT SHOWS (the author: "select it, and the jump as it is") - Find Next's own
 		// way with an overset match, said as its dialog says it ("(Overset Text)"). A locked one stays unselected and says
 		// so; a row whose text has gone says only the "Not found" below.
 		outWhy = SelectMatchOnClick(chapterIdx, hitIdx, storyRef, start, end, sameOccurrence);
@@ -1207,7 +1207,7 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx, NotSelected& outWhy)
 			// keeps (the user's request).
 			//
 			// A match that can be selected IS selected, and no marker goes over it - a selection under an
-			// inversion cannot be read (JMP-17's reason). Every other row is marked as above, and the answer says
+			// inversion cannot be read (JMP-29). Every other row is marked as above, and the answer says
 			// why it was not selected (ActivateNode says it).
 			outWhy = SelectMatchOnClick(chapterIdx, hitIdx, storyRef, start, end, sameOccurrence);
 			if (!LandedSelected(outWhy))
@@ -1324,8 +1324,9 @@ bool RowItemIsThere(int32 chapterIdx, int32 hitIdx, const UIDRef& itemRef)
 	return hier != nil;
 }
 
-// THE VIEW ON THE ITEM (spec O9): its spread first - a parent page's included, the rule EnsureSpreadInView keeps - then
-// the middle of its outline scrolled to the window's centre. The document is already in front.
+// THE VIEW ON THE ITEM (the spec map's OBJ-09): its spread first - a parent page's included, the rule
+// EnsureSpreadInView keeps - then the middle of its outline scrolled to the window's centre. The document is already
+// in front.
 void ShowItemInView(const UIDRef& itemRef)
 {
 	InterfacePtr<IControlView> frontView(Utils<ILayoutUIUtils>()->QueryFrontView());
@@ -1415,10 +1416,11 @@ void LeaveRowItemSelected(int32 chapterIdx, int32 hitIdx, const UIDRef& itemRef)
 		ClearSelection();
 }
 
-/** Jump to an OBJECT row (spec O9): its document in front (a windowless chapter given its window - JMP-09), the view on
-    the item, then the item selected where the click may select (SelectItemOnClick - form S). An item no longer there: the
-    document still comes forward, the row reads Missing. An item in overset text: the view on the "+" its text overflows
-    at, nothing selected, and the row's note says why. Returns true when it landed on the item. */
+/** Jump to an OBJECT row (the spec map's OBJ-09): its document in front (a windowless chapter given its window -
+    JMP-09), the view on the item, then the item selected where the click may select (SelectItemOnClick - form S). An
+    item no longer there: the document still comes forward, the row reads Missing. An item in overset text: the view on
+    the "+" its text overflows at, nothing selected, and the row's note says why. Returns true when it landed on the
+    item. */
 bool JumpToObject(int32 chapterIdx, int32 hitIdx, UID item)
 {
 	const HandBackChapterOnExit handBack(chapterIdx);		// before the dirty guard below - see the class
@@ -1482,17 +1484,18 @@ void KFCJump::ActivateNode(int32 chapterIdx, int32 hitIdx)
 	// A previous landing is still inside its own document-open - the click is dropped, exactly as
 	// the keyboard walk drops its key (see gActivating above JumpToHit).
 	// ...AND SO WHILE A WRITE OR A RUN OF THE MODEL'S IS UNDER WAY (KFCRunGuard - a row's Replace counts): it can be standing
-	// inside its own message loop - reopening a closed chapter, giving one a window - and this landing's Hide Previous
-	// Chapter sweep would schedule the close of a chapter that write is about to write, the K-3 shape.
+	// inside its own message loop - reopening a closed chapter, giving one a window - and this landing's
+	// "Hide Previous Chapter" sweep would schedule the close of a chapter that write is about to write, the close
+	// throwing the write away (JMP-26c).
 	if (gActivating || KFCRuns()->IsAnyRunning())
 		return;
 	ActivationGuard activationGuard;
 	// The "Hide Previous Chapter" sweep this landing asks for runs when all of it is over - the jump, its hand-back, a GREP
-	// row's preview (SweepAtEnd, P-C).
+	// row's preview (SweepAtEnd - JMP-26c).
 	SweepAtEnd sweepAtEnd;
 
-	// Search: as it is BEFORE this activation fronts a document or changes the selection - put back if Edit >
-	// Find/Change re-picks it in answer (ScopeKeep, above JumpToHit).
+	// Search: as it is BEFORE this activation fronts a document or changes the selection - put back if
+	// Edit > Find/Change re-picks it in answer (ScopeKeep, above JumpToHit).
 	ArmScopeKeep();
 
 	// A GREP row landed on: what its Replace would write, on the message area (KFCResultTree::ShowRowPreview).
@@ -1581,8 +1584,8 @@ bool KFCJump::ReplaceObjectRow(int32 chapterIdx, int32 hitIdx, PMString& outStat
 	if (gActivating)
 		return false;		// a landing is still opening a document (see gActivating) - the next press will land
 	ActivationGuard activationGuard;
-	// The sweep FrontChapter asks for runs after the write and the item's selection (SweepAtEnd, P-C) - the written document
-	// is spared by name besides, and needs a save by then.
+	// The sweep FrontChapter asks for runs after the write and the item's selection (SweepAtEnd - JMP-26c) - the
+	// written document is spared by name besides, and needs a save by then.
 	SweepAtEnd sweepAtEnd;
 	// (The check below can reopen the chapter windowless - it is handed back on every way out that leaves it without its
 	//  window: HandBackChapterOnExit, before the dirty guard below.)
@@ -1625,7 +1628,7 @@ bool KFCJump::ReplaceObjectRows(const KFCRowsByChapter& rows, int32 shownChapter
 		return false;		// a landing is still opening a document (see gActivating) - the next press will land
 	ActivationGuard activationGuard;
 	// (No sweep is asked for here - below. One a test build's fault switch puts back runs after the write all the same:
-	//  SweepAtEnd, P-C.)
+	//  SweepAtEnd - JMP-26c.)
 	SweepAtEnd sweepAtEnd;
 	// (As one row's: the check below can reopen a chapter windowless - every document's, the shown row's among them -
 	// HandBackChapterOnExit, for every chapter of the rows. The write hands back what it reached and did not write -
@@ -1648,12 +1651,13 @@ bool KFCJump::ReplaceObjectRows(const KFCRowsByChapter& rows, int32 shownChapter
 		// NO "HIDE PREVIOUS CHAPTER" SWEEP HERE: asked in the middle, its closes ran after the write,
 		// and the rows' other chapters are what the write goes on to write - a clean one with a window was closed with the
 		// write in it, thrown away (FrontChapter's hidePreviousChapters - measured, case sel-book-objects-open-hide). One
-		// row's Replace keeps the sweep: it spares the one document that row writes (ReplaceObjectRow). Since P-C a sweep
-		// asked here would run at the end (SweepAtEnd) and find the written chapters needing a save - kept off all the same:
+		// row's Replace keeps the sweep: it spares the one document that row writes (ReplaceObjectRow). A sweep asked
+		// here would run at the end (SweepAtEnd) and find the written chapters needing a save - kept off all the same:
 		// whether rows replaced together close the other chapters is a behaviour of its own, not decided here.
-		// (Fault switch object-rows-sweep, a test build's only - KFCDiag.h: the sweep asked for here - deferred by SweepAtEnd
-		// now, case sel-book-objects-open-hide-deferred; with sweep-at-once as well, scheduled in the middle as before K-3 -
-		// the case that shows the test build's written-document check catching the close, KFCDiagWrittenDocs.h.)
+		// (Fault switch object-rows-sweep, a test build's only - KFCDiag.h: the sweep asked for here, deferred by
+		// SweepAtEnd - case sel-book-objects-open-hide-deferred; with sweep-at-once as well, scheduled in the
+		// middle, the old way - the case that shows the test build's written-document check catching the close,
+		// KFCDiagWrittenDocs.h.)
 		const bool sweep = KFC_DIAG_FAULT("object-rows-sweep");
 		IDataBase::SaveRestoreModifiedState dirtyGuard(db);
 		if (!FrontChapter(docRef, sweep /*hidePreviousChapters*/))

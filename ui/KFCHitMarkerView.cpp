@@ -60,7 +60,7 @@ void KFCHitMarkerView::Show(IDataBase* db, UID storyUID, TextIndex start, TextIn
 		KFCHitMarkerRepaint(previousDB);
 	KFCHitMarkerRepaint(db);
 
-	// A pointer, not a highlight: the countdown takes it away again (restarted by every jump).
+	// A pointer, not a highlight: the countdown takes it away again (restarted by every marker shown).
 	KFCMarkerExpiryIdleTask::Start();
 }
 

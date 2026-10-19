@@ -4,7 +4,8 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  The jump marker: the inversion laid over a jumped-to hit's characters for about a second.
+//  The jump marker: the inversion laid for about a second over the characters of a jumped-to hit the jump could not
+//  select (locked, or no longer where it was). A hit it selected is shown by its selection (KFCJump.h).
 //
 //  A GLOBAL TEXT ADORNMENT, NOT A DRAW EVENT. A rectangle in pasteboard coordinates, worked out by
 //  hand from the hit's first wax line and painted on the spread front, has to be right for vertical

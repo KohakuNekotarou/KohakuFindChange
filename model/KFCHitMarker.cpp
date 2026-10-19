@@ -169,8 +169,10 @@ bool KFCHitMarkerRunPart(const IWaxRun* waxRun, int32& outCharStart, int32& outC
 	return true;
 }
 
-// The rectangle to invert in this run, in the run's own coordinates (what Draw is handed). False when
-// the run cannot be measured - an inline graphic has neither glyphs nor render data.
+// The rectangle to invert in this run, in the run's own coordinates (what Draw is handed). False when the run gives
+// nothing to measure (no render data, no glyphs). AN INLINE MATCH GETS NO BOX, ON PURPOSE (the author's call): its
+// landing selects it - the anchor and the object with it, as Find Next does - and the marker is for a match that cannot
+// be selected. Not for want of a way to measure one: IInlineData::GetGlyphBoundingBox does.
 // CHARACTERS ARE NOT GLYPHS. The range is mapped with MapCharsToGlyphs before any width
 // is added up - the call the product's spelling squiggle makes (DynamicSpellCheckAdornment.cpp), and
 // KCM's GetMarkBoxes after it.

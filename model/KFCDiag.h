@@ -99,13 +99,13 @@
 //                the old way - not the window the system sends the keys to as well: the case that shows what the second
 //                question stops, a Return pressed after Find/Change's title bar was clicked (ret-after-fc-title-armed)
 //    object-rows-sweep  (UI half) ui/KFCJump.cpp's ReplaceObjectRows fronts the shown row's chapter WITH the
-//                "Hide Previous Chapter" sweep. The sweep is decided at the end of the operation (P-C), after the
-//                write, and keeps the written chapters (sel-book-objects-open-hide-deferred); with sweep-at-once as
-//                well it is scheduled in the middle, the old way - the other chapters it is about to write are closed
-//                after the write, the write in them: the case that shows the written-document check
+//                "Hide Previous Chapter" sweep. The sweep is decided at the end of the operation (the spec map's
+//                JMP-26c), after the write, and keeps the written chapters (sel-book-objects-open-hide-deferred); with
+//                sweep-at-once as well it is scheduled in the middle, the old way - the other chapters it is about to
+//                write are closed after the write, the write in them: the case that shows the written-document check
 //                (KFCDiagWrittenDocs.h) catching it (sel-book-objects-open-hide-armed)
 //    sweep-at-once  (UI half) ui/KFCJump.cpp's FrontChapter schedules the "Hide Previous Chapter" sweep on the spot, in the
-//                middle of the operation, instead of leaving it to the operation's SweepAtEnd - the way before P-C
+//                middle of the operation, instead of leaving it to the operation's SweepAtEnd - the old way
 //                (sel-book-objects-open-hide-armed, with object-rows-sweep)
 //    clean-after-write  KFCReplaceEngine.cpp's row Replace takes each written document's "unsaved" flag down after the
 //                write - a close would then throw the write away unasked: the case that shows the written-document check

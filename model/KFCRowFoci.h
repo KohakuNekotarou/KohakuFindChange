@@ -9,11 +9,11 @@
 //  (docs/superpowers/plans/2026-10-14-kfc-row-focus-undo.md, measured in KT: docs/ai-notes/text-focus-undo-spike-2026-10-14.md).
 //  So a row's focus stands where its text is through any edit and any Undo, but one: a focus that met an Undo or a Redo
 //  it could not follow (an edit older than the focus, undone) is LOST (KFCRowFocus::IsLost) and never trusted again.
-//  KFCSearchEngine::FollowStoryFoci moves the rows onto their foci before a Replace, a preview and a jump - the author's
-//  call of 2026-10-14 night, which overturned F14 of docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md
-//  ("a row's Replace never reads the focus"). The focus was a hint for the jump only before (2026-10-08 -
-//  docs/superpowers/specs/2026-10-08-kfc-text-focus-jump-design.md); the jump's reading of a focus that is not followed
-//  (KFCSearchEngine::LocateRow) is still that hint's.
+//  KFCSearchEngine::FollowStoryFoci moves the rows onto their foci before KFC reads their places - a Replace, a
+//  preview, a jump, a search again, a tier switched to (its callers and FollowChapterFoci's are the list) - the
+//  author's call, which overturned F14 of docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md
+//  ("a row's Replace never reads the focus"). The jump's reading of a focus that is not followed
+//  (KFCSearchEngine::LocateRow) is the hint of docs/superpowers/specs/2026-10-08-kfc-text-focus-jump-design.md.
 //  Attached only where KFC still knows the story (its version unchanged); put back on the rows' places after KFC's own
 //  writes - inside the write's step, so its Undo and Redo hold it; released before its document closes, its target
 //  database cleared first. The main thread only.
@@ -55,9 +55,10 @@ namespace KFCRowFoci
 	    inStep = inside a write's step (KFCReplaceEngine): marked first (PreDirtyFocus), so the step holds the move. */
 	void Reanchor(int32 chapterIdx, int32 hitIdx, bool inStep = false);
 
-	/** The row's focus put on [start, end) - a place a jump found it at, which is not stored in the row (spec T3).
-	    inStep as Reanchor's. Outside a step only a lost focus, or one already there, is moved in practice: an Undo after
-	    a move made outside a step reads back the range of before it (KT, S7). */
+	/** The row's focus put on [start, end) - a place a jump found it at, which is not stored in the row (the
+	    text-focus spec's T3). inStep as Reanchor's. Outside a step only a lost focus, or one already there, is moved in
+	    practice: an Undo after a move made outside a step reads back the range of before it (the KT spike note's
+	    S7). */
 	void MoveTo(int32 chapterIdx, int32 hitIdx, TextIndex start, TextIndex end, bool inStep = false);
 
 	/** Reanchor for every row of that chapter and story that has a focus - and the story's searched part's focus made,
@@ -81,7 +82,7 @@ namespace KFCRowFoci
 	/** Every focus let go (the rows are gone). */
 	void DetachAll();
 
-	// THE FOCI OF A LIST PUT ASIDE AS A TIER (the author's call, 10-14 night: "a grey tier's rows keep their foci too"):
+	// THE FOCI OF A LIST PUT ASIDE AS A TIER (the author's call: "a grey tier's rows keep their foci too"):
 	// held while the list is grey, so InDesign goes on moving them with every edit - KFC's own writes from another tier
 	// among them - and the user's Undo and Redo put them back, and given back when the tier is switched to (KFCTierStore).
 	// Let go when the last holder goes (the cap, Clear Results, Clear These Results, the shutdown) and, for a closing

@@ -17,7 +17,7 @@
 #include "IViewObjectChanges.h"	// a focus's target database (KFCRowFocus.h)
 
 // General includes:
-#include "IDThreadingPrimitives.h"	// IDThreading::IsMainThreadDomain - every entry point's gate (spec T10)
+#include "IDThreadingPrimitives.h"	// IsMainThreadDomain - every entry point's gate (the text-focus spec's T10)
 #include "RangeData.h"
 
 #include <map>
@@ -73,11 +73,11 @@ bool InManager(ITextFocusManager* mgr, const ITextFocus* f)
 	return false;
 }
 
-// Let one go (spec T9): its target database cleared, then out of its story's manager, then our reference - the last
-// two only while it is still in that manager's list. Otherwise it is dropped untouched: a leak beats a call into what
-// may be gone (the close responder lets every focus of a closing document go while the document still stands -
-// DetachDocument). The target is cleared whenever the document stands, its story gone or not: a focus left behind
-// must not keep pointing the view-interface records (KFCRowFocus.h) at a database that will close.
+// Let one go (the text-focus spec's T9): its target database cleared, then out of its story's manager, then our
+// reference - the last two only while it is still in that manager's list. Otherwise it is dropped untouched: a leak
+// beats a call into what may be gone (the close responder lets every focus of a closing document go while the document
+// still stands - DetachDocument). The target is cleared whenever the document stands, its story gone or not: a focus
+// left behind must not keep pointing the view-interface records (KFCRowFocus.h) at a database that will close.
 void Let(Kept& k)
 {
 	if (k.focus != nil && DocOpen(k.db))
@@ -156,7 +156,7 @@ void PlacePart(int32 chapterIdx, UID story, IDataBase* db, bool inStep)
 		return;
 	uint32 now = 0;
 	if (!KFCSearchEngine::ReadStoryVersion(db, story, now) || now != part.version)
-		return;		// the recorded place is not exact for the story as it stands (T5's rule for the rows)
+		return;		// the recorded place is not exact for the story as it stands (the text-focus spec's T5)
 	InterfacePtr<ITextModel> model(db, story, UseDefaultIID());
 	InterfacePtr<ITextFocusManager> mgr(model, UseDefaultIID());
 	if (model == nil || mgr == nil || part.start < 0 || part.end < part.start || part.end > model->TotalLength())
@@ -242,7 +242,8 @@ void KFCRowFoci::AttachChapter(int32 chapterIdx)
 			known = knownStory.insert(std::make_pair(story, same)).first;
 		}
 		if (!known->second)
-			continue;	// KFC does not know this story as it stands - its stored places are not to be trusted (T5)
+			continue;	// KFC does not know this story as it stands - its stored places are not to be trusted
+						// (the text-focus spec's T5)
 		InterfacePtr<ITextModel> model(db, story, UseDefaultIID());
 		InterfacePtr<ITextFocusManager> mgr(model, UseDefaultIID());
 		if (model == nil || mgr == nil || end > model->TotalLength())
@@ -322,7 +323,8 @@ void KFCRowFoci::MoveTo(int32 chapterIdx, int32 hitIdx, TextIndex start, TextInd
 		return;
 	// Inside a write's step the move is marked first, so the step's snapshot holds it and the step's Undo and Redo put
 	// the focus where the write left it (KFCRowFocus.h). Outside a step there is no step to hold it, and an Undo after it
-	// reads back the range of before (KT, S7) - out there only a lost focus, or one already in place, is moved.
+	// reads back the range of before (the KT spike note's S7) - out there only a lost focus, or one already in place,
+	// is moved.
 	if (inStep)
 		f->PreDirtyFocus();
 	f->SetRange(kFalse, RangeData(start, end, RangeData::kLeanForward));
