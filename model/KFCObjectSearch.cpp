@@ -266,8 +266,11 @@ WalkEnd WalkDoc(IFindChangeService* svc, IObjectWalker* shared, const UIDRef& do
 		{
 			// (Test builds only) Each step's answer and what it left selected - the trace behind WalkAftercare's NOTHING SELECTED.
 			InterfacePtr<IKFCUIServices> diagUi(KFCQueryUIServices());
-			KFC_DIAG_LOG("OBJWALK step=%d result=%d current=%u selected=%d", static_cast<int>(step), static_cast<int>(result),
-				static_cast<unsigned>(shared->GetCurrentItem().GetUID().Get()),
+			const UID diagItem = shared->GetCurrentItem().GetUID();
+			const unsigned diagClass = (diagItem != kInvalidUID && db->IsValidUID(diagItem))
+				? static_cast<unsigned>(db->GetClass(diagItem).Get()) : 0u;
+			KFC_DIAG_LOG("OBJWALK step=%d result=%d current=%u class=0x%x selected=%d", static_cast<int>(step),
+				static_cast<int>(result), static_cast<unsigned>(diagItem.Get()), diagClass,
 				(diagUi != nil && diagUi->HasAnySelection()) ? 1 : 0);
 		}
 #endif
@@ -284,13 +287,22 @@ WalkEnd WalkDoc(IFindChangeService* svc, IObjectWalker* shared, const UIDRef& do
 			return kWalkBroke;
 		if (!seen.insert(current.GetUID()).second)
 			return kWalkDone;
+		// NOT A PAGE ITEM - NOT A ROW: passed over. For a table that runs into overset text InDesign's walk hands back
+		// the table's own frame (kTableFrameBoss, which has no IHierarchy - measured: OBJWALK class=0xb651 for every
+		// overset table, a graphic cell or not), which nobody can see, select or change; InDesign's own Find Next
+		// selects nothing there. Listed, it was a row "overset [ID...:[]]" that a click took for gone (Missing).
 		// NOT MEETING A NARROWED LIST'S CONDITIONS (narrow): built to be asked, then passed over. The limit counts only
 		// the rows that pass.
+		const bool pageItem = KFCPageItemFacts::ItemIsThere(db, current.GetUID());
 		KFCResultModel::Hit hit;
-		const bool built = (narrow != nil);
+		const bool built = (pageItem && narrow != nil);
 		if (built)
 			KFCObjectSearch::BuildRow(docRef, current.GetUID(), hit);
-		if (narrow != nil && !narrow->KeepObject(hit, db))
+		if (!pageItem)
+		{
+			KFC_DIAG_LOG("OBJSKIP item=%u - not a page item, passed over", current.GetUID().Get());
+		}
+		else if (narrow != nil && !narrow->KeepObject(hit, db))
 		{
 			KFC_DIAG_LOG("NARROWOBJ item=%u pb=%d page=%s - passed over", current.GetUID().Get(), hit.onPasteboard ? 1 : 0,
 				hit.pageString.GetUTF8String().c_str());
