@@ -15,7 +15,9 @@
 // Interface includes:
 #include "ICommand.h"			// SetItemList - kOpenLayoutCmdBoss takes the document as its item
 #include "IDataBase.h"
-#include "IDocumentUIUtils.h"	// FindPresentationForDocument (has-a-window test)
+#include "IDocumentUIUtils.h"	// FindPresentationForDocument (has-a-window test), FindPresentationsForDocument
+#include "IDocumentPresentation.h"	// ...the windows it lists - a background document's every layout window
+#include "IPanelControlData.h"	// FindWidget - a window's layout pane(s), by WidgetID
 #include "IOpenLayoutCmdData.h"	// GetResultingPresentation - did the window actually appear?
 #include "IWindow.h"			// the window kOpenLayoutCmdBoss is supposed to have produced
 #include "IConcreteSelection.h"	// ReadSelectedItems - a selection's concrete selection
@@ -24,21 +26,20 @@
 #include "ISelectionUtils.h"	// GetActiveSelection, QueryLayoutHitTestSuite
 #include "ISelectionManager.h"	// ActiveSelectionExists - SelectionExists by the CSB's class
 #include "TextEditorID.h"		// kTextSelectionBoss
-#include "IActiveContext.h"		// GetContextDocument - which document is in front (the background selections)
+#include "IActiveContext.h"		// GetContextSelection - the front view's selection (the background selections leave it)
 #include "IApplication.h"		// QueryDocumentList - the documents behind the front one
 #include "IDocument.h"
 #include "IDocumentList.h"
 #include "ILayoutSelectionSuite.h"	// SelectPageItems - a background document's items selected again
-#include "ILayoutViewUtils.h"	// GetAllLayoutViews - a document's layout views, front or behind
-#include "IControlView.h"		// ...which it hands back as control views
+#include "IControlView.h"		// a window's layout pane, as FindWidget hands it back
 #include "PersistUtils.h"		// ::GetDataBase - a document's database
 
 // General includes:
 #include "CmdUtils.h"
 #include "CPMUnknown.h"
-#include "DocumentPresFindCriteria.h"	// FindPresCriteria::accept_all (WidgetBin - this is the UI half)
+#include "DocumentPresFindCriteria.h"	// FindPresCriteria::accept_all / is_layout (WidgetBin - this is the UI half)
 #include "ErrorUtils.h"			// GlobalErrorStatePreserver / PMSetGlobalErrorCode
-#include "LayoutUIID.h"			// kOpenLayoutCmdBoss
+#include "LayoutUIID.h"			// kOpenLayoutCmdBoss; kLayoutWidgetID / kLayoutSecondaryPanelWidgetID (panes)
 #include "ProgressBar.h"		// RangeProgressBar
 #include "UIDList.h"
 #include "Utils.h"
@@ -113,7 +114,7 @@ namespace
 	    (SnpInspectLayoutModel.cpp: ILayoutTarget::GetUIDList(kStripStandoffs)), reached through the manager's layout
 	    hit-test suite's concrete selection (csxsdemo's VDActionComponent.cpp; KT measured it) - into outItems. False =
 	    no layout selection to read, outItems left as it was. The one reading of a selection's items here: the active
-	    selection's (GetSelectedPageItems) and each background document's (Snapshot / RestoreBackgroundSelections). */
+	    selection's (GetSelectedPageItems) and each background window's (Snapshot / RestoreBackgroundSelections). */
 	bool ReadSelectedItems(ISelectionManager* manager, UIDList& outItems)
 	{
 		Utils<ISelectionUtils> selectionUtils;
@@ -128,44 +129,96 @@ namespace
 		return true;
 	}
 
-	// ----- THE SELECTIONS OF THE DOCUMENTS BEHIND THE FRONT ONE (IKFCUIServices::SnapshotBackgroundSelections) -----
+	// ----- THE SELECTIONS OF THE WINDOWS BEHIND THE FRONT VIEW (IKFCUIServices::SnapshotBackgroundSelections) -----
 
-	/** One document's selection as an object search found it: its page items, or nothing, or something else. */
+	/** One layout window's selection as an object search found it: its page items, or nothing, or something else - a
+	    window of a document behind the front one, or one of the front document's other than the front view (whose
+	    selection is the snapshot's own, KFCObjectSearch's SelectionKeeper). */
 	struct BackSelection
 	{
-		IDataBase*	db;			// compared with the open documents' before anything reads it (a document closed since is gone)
-		UIDList		items;		// the page items selected then - none: nothing, or `other`
-		bool		other;		// something that is not page items was selected then - text, a table's cells
-		BackSelection() : db(nil), other(false) {}
+		IDataBase*						db;		// checked against the open documents before anything reads it
+		const IDocumentPresentation*	window;	// which window - only compared with the document's windows
+		int32							pane;	// kLayoutWidgetID 0, a split window's second pane 1
+		UIDList							items;	// the page items selected then - none: nothing, or `other`
+		bool							other;	// something else was selected then - text, a table's cells
+		BackSelection() : db(nil), window(nil), pane(0), other(false) {}
 	};
 	std::vector<BackSelection> gBackSelections;
 
-	/** The selection manager of a document's layout view - the first of its views, front or behind: the official way to
-	    reach a selection that is not the active one (KCM's QuerySelectionManagerFor, KCMStoryJump.cpp - after Adobe's
-	    trackers and SnpManipulateStructureView.cpp). AddRef'ed; nil for a document with no layout window - and for one
-	    whose window is minimised: GetAllLayoutViews lists no view of it then (KIDMCP measured it), and whether an
-	    object search's walk selects in such a window is not measured. */
-	ISelectionManager* QueryDocSelectionManager(IDataBase* db)
+	/** Each layout window of a document - a minimised one too, a split window's second pane too - with its
+	    selection manager: fn(window, pane, manager) once for each manager but skip (the front view's). EVERY
+	    WINDOW, not the document's first layout view alone: an object search's walk selects in a window of each
+	    document it walks (IFindChangeService::SearchObject), and measured (block 0's O-1 / O-2) it left its last
+	    item selected in a minimised window - ILayoutViewUtils::GetAllLayoutViews lists no view of one - and in a
+	    document's second window. The windows as IDocumentUIUtils lists them (is_layout: a story editor or a galley
+	    holds no layout selection), each window's layout pane by its WidgetID - the product's way (spellpanel's
+	    PrivateSpellingUtils.cpp, KCM's KCMViewLookup.cpp, KIDMCP's KIDMCPUIWindows.cpp): kLayoutWidgetID, and
+	    kLayoutSecondaryPanelWidgetID in a split window. The manager is the pane's view's
+	    (ISelectionUtils::QueryViewSelectionManager - Adobe's trackers' way, KCM's QuerySelectionManagerFor in
+	    KCMStoryJump.cpp). */
+	template <typename Fn>
+	void ForEachWindowSelection(IDataBase* db, const ISelectionManager* skip, Fn fn)
 	{
-		Utils<ILayoutViewUtils> viewUtils;
+		Utils<IDocumentUIUtils> docUI;
 		Utils<ISelectionUtils> selectionUtils;
-		if (db == nil || !viewUtils || !selectionUtils)
-			return nil;
-		K2Vector<IControlView*> views;
-		viewUtils->GetAllLayoutViews(views, nil, db);
-		for (size_t i = 0; i < views.size(); ++i)
-			if (views[i] != nil)
-				return selectionUtils->QueryViewSelectionManager(views[i]);
-		return nil;
+		if (db == nil || !docUI || !selectionUtils)
+			return;
+		PresentationSequence windows;
+		FindPresentation_PreferCriteria noPreference;
+		(void)docUI->FindPresentationsForDocument(db, windows, &FindPresCriteria::is_layout, noPreference);
+		const WidgetID panes[2] = { kLayoutWidgetID, kLayoutSecondaryPanelWidgetID };
+		for (size_t w = 0; w < windows.size(); ++w)
+		{
+			InterfacePtr<IPanelControlData> panel(windows[w], UseDefaultIID());
+			const ISelectionManager* seen = nil;
+			for (int32 p = 0; panel != nil && p < 2; ++p)
+			{
+				IControlView* const view = panel->FindWidget(panes[p]);
+				InterfacePtr<ISelectionManager> manager(
+					(view != nil) ? selectionUtils->QueryViewSelectionManager(view) : nil);
+				ISelectionManager* const m = manager;
+				if (m == nil || m == skip || m == seen)
+					continue;		// (a split window's two panes can share one)
+				seen = m;
+				fn(windows[w], p, m);
+			}
+		}
 	}
 
-	/** The front document's database - the active context's (IActiveContext::GetContextDocument, the one question KFC's UI
-	    half asks it with); nil with none. */
-	IDataBase* FrontDocDB()
+	/** One window's selection given back as the snapshot found it (RestoreBackgroundSelections). */
+	void GiveBack(const BackSelection& kept, ISelectionManager* manager)
 	{
-		IActiveContext* const context = GetExecutionContextSession()->GetActiveContext();
-		IDocument* const doc = (context != nil) ? context->GetContextDocument() : nil;
-		return (doc != nil) ? ::GetDataBase(doc) : nil;
+		// A selection is no change to the document - the guard is SelectItem's (KFCJump.cpp), for the same reason.
+		IDataBase::SaveRestoreModifiedState dirtyGuard(kept.db);
+		UIDList now(kept.db);
+		(void)ReadSelectedItems(manager, now);
+		if (kept.items.Length() > 0)
+		{
+			// THE ITEMS SELECTED THEN, selected again - the ones still there - when the walks changed them.
+			UIDList again(kept.db);
+			for (int32 i = 0; i < kept.items.Length(); ++i)
+				if (kept.db->IsValidUID(kept.items[i]))
+					again.Append(kept.items[i]);
+			if (again == now)
+				return;
+			InterfacePtr<ILayoutSelectionSuite> layoutSuite(
+				Utils<ISelectionUtils>()->QueryLayoutSelectionSuite(manager));
+			manager->DeselectAll(nil);
+			if (layoutSuite != nil && again.Length() > 0)
+				layoutSuite->SelectPageItems(again, Selection::kReplace, Selection::kDontScrollLayoutSelection);
+		}
+		else if (!kept.other)
+		{
+			// NOTHING SELECTED THEN: whatever a walk selected, taken away.
+			if (manager->SelectionExists(kInvalidClass, ISelectionManager::kAnySelection) != kFalse)
+				manager->DeselectAll(nil);
+		}
+		else if (now.Length() > 0)
+		{
+			// TEXT OR CELLS SELECTED THEN - not read back here: the items a walk selected over them taken away, rather
+			// than left selected for the next key to act on.
+			manager->DeselectAll(nil);
+		}
 	}
 
 	/** Is this database an open document's now? Compared, never dereferenced (a closed document's pointer dangles): the
@@ -314,7 +367,10 @@ public:
 	virtual void SnapshotBackgroundSelections()
 	{
 		gBackSelections = std::vector<BackSelection>();
-		IDataBase* const front = FrontDocDB();
+		// THE FRONT VIEW'S SELECTION IS LEFT OUT - it is the snapshot's own (KFCObjectSearch's SelectionKeeper); every
+		// other layout window of every open document is taken, the front document's other windows too.
+		IActiveContext* const context = GetExecutionContextSession()->GetActiveContext();
+		const ISelectionManager* const front = (context != nil) ? context->GetContextSelection() : nil;
 		InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
 		InterfacePtr<IDocumentList> docs((app != nil) ? app->QueryDocumentList() : nil);
 		const int32 count = (docs != nil) ? docs->GetDocCount() : 0;
@@ -322,19 +378,20 @@ public:
 		{
 			IDocument* const doc = docs->GetNthDoc(d);
 			IDataBase* const db = (doc != nil) ? ::GetDataBase(doc) : nil;
-			if (db == nil || db == front)
-				continue;		// the front view's selection is the snapshot's (KFCObjectSearch's SelectionKeeper)
-			InterfacePtr<ISelectionManager> manager(QueryDocSelectionManager(db));
-			if (manager == nil)
-				continue;		// no layout window: a walk selects nothing there to give back (a minimised one:
-								// QueryDocSelectionManager)
-			BackSelection kept;
-			kept.db = db;
-			kept.items = UIDList(db);
-			(void)ReadSelectedItems(manager, kept.items);
-			kept.other = kept.items.Length() == 0
-				&& manager->SelectionExists(kInvalidClass, ISelectionManager::kAnySelection) != kFalse;
-			gBackSelections.push_back(kept);
+			// (a document with no layout window lists none: a walk selects nothing there to give back)
+			ForEachWindowSelection(db, front, [&](const IDocumentPresentation* window, int32 pane,
+				ISelectionManager* manager)
+			{
+				BackSelection kept;
+				kept.db = db;
+				kept.window = window;
+				kept.pane = pane;
+				kept.items = UIDList(db);
+				(void)ReadSelectedItems(manager, kept.items);
+				kept.other = kept.items.Length() == 0
+					&& manager->SelectionExists(kInvalidClass, ISelectionManager::kAnySelection) != kFalse;
+				gBackSelections.push_back(kept);
+			});
 		}
 	}
 
@@ -345,39 +402,13 @@ public:
 			const BackSelection& kept = gBackSelections[k];
 			if (!IsOpenDocDB(kept.db))
 				continue;
-			InterfacePtr<ISelectionManager> manager(QueryDocSelectionManager(kept.db));
-			if (manager == nil)
-				continue;
-			// A selection is no change to the document - the guard is SelectItem's (KFCJump.cpp), for the same reason.
-			IDataBase::SaveRestoreModifiedState dirtyGuard(kept.db);
-			UIDList now(kept.db);
-			(void)ReadSelectedItems(manager, now);
-			if (kept.items.Length() > 0)
+			// THE SAME WINDOW AND PANE, among the document's windows now (one closed since is not there).
+			ForEachWindowSelection(kept.db, nil, [&](const IDocumentPresentation* window, int32 pane,
+				ISelectionManager* manager)
 			{
-				// THE ITEMS SELECTED THEN, selected again - the ones still there - when the walks changed them.
-				UIDList again(kept.db);
-				for (int32 i = 0; i < kept.items.Length(); ++i)
-					if (kept.db->IsValidUID(kept.items[i]))
-						again.Append(kept.items[i]);
-				if (again == now)
-					continue;
-				InterfacePtr<ILayoutSelectionSuite> layoutSuite(Utils<ISelectionUtils>()->QueryLayoutSelectionSuite(manager));
-				manager->DeselectAll(nil);
-				if (layoutSuite != nil && again.Length() > 0)
-					layoutSuite->SelectPageItems(again, Selection::kReplace, Selection::kDontScrollLayoutSelection);
-			}
-			else if (!kept.other)
-			{
-				// NOTHING SELECTED THEN: whatever a walk selected, taken away.
-				if (manager->SelectionExists(kInvalidClass, ISelectionManager::kAnySelection) != kFalse)
-					manager->DeselectAll(nil);
-			}
-			else if (now.Length() > 0)
-			{
-				// TEXT OR CELLS SELECTED THEN - not read back here: the items a walk selected over them taken away, rather
-				// than left selected for the next key to act on.
-				manager->DeselectAll(nil);
-			}
+				if (window == kept.window && pane == kept.pane)
+					GiveBack(kept, manager);
+			});
 		}
 		gBackSelections = std::vector<BackSelection>();		// a fresh one: the storage goes too
 	}
