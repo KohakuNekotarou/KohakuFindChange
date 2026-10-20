@@ -35,9 +35,15 @@
 
 // Project includes:
 #include "KFCHowTo.h"
+#include "KFCBoundaryID.h"		// kKFCDisplayName - the page's title is built from it
 
 namespace
 {
+
+// The page's title: the ScriptUI window's title bar, and the head of the CAlert fallback (Show). Built from the display
+// name's one definition, so a rename moves it too; wide, as the reference text is (the "L" on the first piece makes the
+// whole concatenation wide).
+const wchar_t* const kHowToTitle = L"" kKFCDisplayName " - How to Use";
 
 //========================================================================================
 // The reference text, one wide literal per language
@@ -195,7 +201,9 @@ void KFCHowTo::Show()
 		std::string js;
 		js.reserve(16384);
 		js += "(function () {\n"
-			  "  var w = new Window(\"dialog\", \"Kohaku Find/Change - How to Use\");\n"
+			  "  var w = new Window(\"dialog\", \"";
+		AppendJSEscaped(js, kHowToTitle);
+		js += "\");\n"
 			  "  var t = w.add(\"edittext\", undefined, \"";
 		AppendJSEscaped(js, text);
 		js += "\", {multiline: true, scrolling: true});\n"
@@ -217,17 +225,18 @@ void KFCHowTo::Show()
 	// failure (measured on a throw, a parse error and a failing DOM call) - so nothing is cleared first.
 	//
 	// It is the one route that needs a heading. The reference itself carries none - the ScriptUI
-	// window puts "Kohaku Find/Change - How to Use" in its title bar, so a first line saying the same
+	// window puts the title (kHowToTitle) in its title bar, so a first line saying the same
 	// thing would just repeat it (the author's call) - but CAlert has no title of its own to
 	// borrow: its bar says "Adobe InDesign", and the text would start mid-reference with nothing
-	// naming what it belongs to. Same wording as the window title, in both languages, so the two
+	// naming what it belongs to. The window's own title, in both languages, so the two
 	// routes are recognisably the same document.
 	//
-	// The cast below works because wchar_t IS a UTF-16 code unit on Windows, which is what AppendW
+	// The casts below work because wchar_t IS a UTF-16 code unit on Windows, which is what AppendW
 	// wants (the plug-in is Windows-only).
 	PMString fallback;
 	fallback.SetTranslatable(kFalse);
-	fallback.Append("Kohaku Find/Change - How to Use\n\n");
+	fallback.AppendW(reinterpret_cast<const UTF16TextChar*>(kHowToTitle));
+	fallback.Append("\n\n");
 	fallback.AppendW(reinterpret_cast<const UTF16TextChar*>(text));
 	CAlert::InformationAlert(fallback);
 }
