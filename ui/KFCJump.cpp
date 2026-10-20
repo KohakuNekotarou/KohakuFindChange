@@ -19,6 +19,7 @@
 #include "VCPlugInHeaders.h"
 
 // Interface includes:
+#include "IBoolData.h"				// a spread's hidden state (IID_IHIDESPREADBOOLDATA - SpreadIsHidden)
 #include "IControlView.h"
 #include "IDocument.h"
 #include "IDocumentPresentation.h"	// MakeActive; what the layout predicate is handed
@@ -53,7 +54,7 @@
 #include "TextEditorID.h"			// kIBeamToolBoss - the Type tool a click switches to (PutTypeToolOn)
 #include "TextID.h"					// kFrameListBoss, IID_IWAXSTRAND
 #include "LayoutUIID.h"				// kOpenLayoutCmdBoss
-#include "SpreadID.h"				// kSetSpreadCmdBoss - put a spread in the layout view
+#include "SpreadID.h"				// kSetSpreadCmdBoss - put a spread in the layout view; IID_IHIDESPREADBOOLDATA
 #include "ErrorUtils.h"				// GlobalErrorStatePreserver / PMSetGlobalErrorCode - a window or a
 									// spread change can raise an error state that is not this run's
 #include "CmdUtils.h"
@@ -300,6 +301,19 @@ namespace
 	{
 		const UID frameUID = KFCRuns()->EditableFrameForMatch(storyRef, pos);
 		return (frameUID != kInvalidUID) ? SpreadOfItem(UIDRef(storyRef.GetDataBase(), frameUID)) : kInvalidUID;
+	}
+
+	// IS THE SPREAD HIDDEN (the Pages panel's Hide Spread)? No view can show one: Find/Change's own Find Next says the
+	// item is on a hidden spread and moves neither the view nor the selection (measured) - a row on one does the same
+	// (the author's call). An IBoolData on kSpreadBoss, IID_IHIDESPREADBOOLDATA, true = hidden (SpreadID.h - KCM reads
+	// it so, KCMIsPageOnHiddenSpread). A master spread answers no: InDesign has no way to hide one. False for
+	// kInvalidUID.
+	bool SpreadIsHidden(IDataBase* db, UID spread)
+	{
+		if (db == nil || spread == kInvalidUID)
+			return false;
+		InterfacePtr<IBoolData> hidden(db, spread, IID_IHIDESPREADBOOLDATA);
+		return hidden != nil && hidden->GetBool() != kFalse;
 	}
 
 	void EnsureSpreadUIDInView(IControlView* view, IDataBase* db, UID targetSpread);	// below EnsureSpreadInView
@@ -932,13 +946,17 @@ bool PutTypeToolOn()
 //  calls: the caret as InDesign puts it, every zero-width GREP match alike; an overset match selected
 //  with the jump as it was (to the "+"), said as the dialog says it; a hidden layer's selected; a locked one as before
 //  (the menu's Find Next selects a locked match - the dialog's button, the tree's model, does not).
+//  And a match on a HIDDEN SPREAD (the Pages panel's Hide Spread): Find Next says the item is on a hidden spread and
+//  moves neither the view nor the selection - a click the same (the author's call: it is hidden, so nothing should
+//  move).
 enum NotSelected
 {
 	kSelected = 0,
 	kNotSelectedLocked,
 	kNotSelectedQuietly,
 	kSelectedOverset,		// selected - nothing of it on a page (the view went to the frame's "+")
-	kSelectedHidden			// selected - on a hidden layer, nothing of it on screen
+	kSelectedHidden,		// selected - on a hidden layer, nothing of it on screen
+	kNotShownHiddenSpread	// neither shown nor selected - on a hidden spread (the view and the selection stayed)
 };
 
 // Did the landing leave the row's match selected (a caret, for a zero-width one)? The selection is then the pointer and
@@ -958,6 +976,7 @@ PMString NotSelectedSentence(NotSelected why)
 		case kNotSelectedLocked:	text = "That match is locked - it cannot be selected."; break;
 		case kSelectedOverset:		text = "(Overset Text) The match is selected, past the end of its frames - nothing of it shows on the page."; break;
 		case kSelectedHidden:		text = "The match is selected, on a hidden layer - nothing of it shows."; break;
+		case kNotShownHiddenSpread:	text = "That match is on a hidden spread - it cannot be shown or selected."; break;
 		default:					break;
 	}
 	PMString sentence(text);
@@ -974,6 +993,7 @@ const char* NotSelectedWords(NotSelected why)
 		case kNotSelectedLocked:	return "not selected - locked";
 		case kSelectedOverset:		return "Overset Text";
 		case kSelectedHidden:		return "hidden layer";
+		case kNotShownHiddenSpread:	return "not shown - hidden spread";
 		default:					return nil;
 	}
 }
@@ -1057,12 +1077,42 @@ private:
 	MarkerUnlessRaised& operator=(const MarkerUnlessRaised&);
 };
 
+// A ROW WHOSE TEXT HAS CHANGED UNDERNEATH says so from here on, and its Replace goes grey, so the panel stops
+// offering a replacement that would be refused anyway. The tree's SHAPE is untouched - same chapters, same rows - so
+// the rows are repainted rather than rebuilt. (JumpToHit's, at both of its ends that find the row's text gone.)
+void SayRowTextGone(int32 chapterIdx, int32 hitIdx)
+{
+	// A REPLACED row is a different case, and one the row itself cannot show: SetHitOutcome
+	// turns those away (a row that was replaced had nothing go wrong with it), so marking it
+	// would change nothing on screen while the status line announced a problem - the panel
+	// saying two things at once. What the mismatch means there is also different: the row's
+	// match text is what the REPLACE wrote, so finding something else in its place means the
+	// replacement is gone, undone or edited away, not that the search's text has moved.
+	bool replaced = false, locked = false;
+	KFCResults()->GetHitFlags(chapterIdx, hitIdx, replaced, locked);
+
+	PMString message;
+	message.SetTranslatable(kFalse);
+	if (replaced)
+	{
+		message.Append("The replacement is no longer here - undone, or edited since.");
+	}
+	else
+	{
+		KFCResults()->SetHitOutcome(chapterIdx, hitIdx, KFCResultModel::kOutcomeMissing);
+		KFCResultTree::RefreshRows();
+		message.Append("Not found - the text is no longer where the search left it. Search again.");
+	}
+	KFCResultTree::ShowStatus(message);
+}
+
 /** Jump to hit 'hitIdx' of chapter 'chapterIdx': front its document, scroll to the match, and select
     it - or raise the marker on one that cannot be selected (SelectMatchOnClick). An unreachable
     chapter (missing / locked file) reports through the status line. An overset match has no on-page
     location of its own, so the view scrolls to the frame's overset "+" instead and NO marker is raised
     - those pixels belong to the indicator, not to the text; the match is selected all the same, as
-    Find/Change's Find Next selects it.
+    Find/Change's Find Next selects it. A match on a HIDDEN SPREAD moves nothing - not its document,
+    not the view, not the selection - and outWhy says why (kNotShownHiddenSpread).
     The marker comes up at once, whichever door asked (see the note at the head of KFCJump.h).
 
     Reached only through ActivateNode, where the "one activation at a time" guard lives - which is why
@@ -1070,7 +1120,8 @@ private:
     @param outWhy  kSelected, or how the landing left the match (NotSelected - selected with nothing of it
           showing, or why it was not selected) - for ActivateNode to say once the preview, if any, is up.
     @return true when the jump LANDED ON THE ROW - its document in front and the text at its place
-          still the text the row describes (overset or not). False for every other end: a bad index,
+          still the text the row describes (overset or not); on a hidden spread, that text still there
+          with nothing moved. False for every other end: a bad index,
           a row with no place, an unreachable chapter, a window that could not be fronted, a row whose
           text is no longer there (each of which has said why, or has nothing to say). */
 bool JumpToHit(int32 chapterIdx, int32 hitIdx, NotSelected& outWhy)
@@ -1138,6 +1189,20 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx, NotSelected& outWhy)
 	}
 #endif
 	const bool overset = KFCRuns()->IsPositionOverset(storyRef, start);
+
+	// A MATCH ON A HIDDEN SPREAD MOVES NOTHING (SpreadIsHidden - the author's call, as Find Next): not its document to
+	// the front, not the view, not the selection - the jump used to put the spread it could in view, scroll to the
+	// hidden page's place and select there. The row says why (kNotShownHiddenSpread - ActivateNode); one whose text has
+	// gone says only "Not found", and is marked so. The previous row's marker comes down, as at every exit but one
+	// (MarkerUnlessRaised).
+	if (SpreadIsHidden(db, SpreadForMatch(storyRef, start)))
+	{
+		if (sameOccurrence)
+			outWhy = kNotShownHiddenSpread;
+		else
+			SayRowTextGone(chapterIdx, hitIdx);
+		return sameOccurrence;
+	}
 
 	// A match in another document needs that document's window in front before any scrolling; if no
 	// window can be produced, the panel has said so and the view is left where it was. (With "Hide Previous Chapter"
@@ -1215,34 +1280,8 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx, NotSelected& outWhy)
 		}
 	}
 
-	// A row whose text has changed underneath says so from here on, and its Replace goes grey, so
-	// the panel stops offering a replacement that would be refused anyway. The tree's SHAPE is
-	// untouched - same chapters, same rows - so the rows are repainted rather than rebuilt.
 	if (!sameOccurrence)
-	{
-		// A REPLACED row is a different case, and one the row itself cannot show: SetHitOutcome
-		// turns those away (a row that was replaced had nothing go wrong with it), so marking it
-		// would change nothing on screen while the status line announced a problem - the panel
-		// saying two things at once. What the mismatch means there is also different: the row's
-		// match text is what the REPLACE wrote, so finding something else in its place means the
-		// replacement is gone, undone or edited away, not that the search's text has moved.
-		bool replaced = false, locked = false;
-		KFCResults()->GetHitFlags(chapterIdx, hitIdx, replaced, locked);
-
-		PMString message;
-		message.SetTranslatable(kFalse);
-		if (replaced)
-		{
-			message.Append("The replacement is no longer here - undone, or edited since.");
-		}
-		else
-		{
-			KFCResults()->SetHitOutcome(chapterIdx, hitIdx, KFCResultModel::kOutcomeMissing);
-			KFCResultTree::RefreshRows();
-			message.Append("Not found - the text is no longer where the search left it. Search again.");
-		}
-		KFCResultTree::ShowStatus(message);
-	}
+		SayRowTextGone(chapterIdx, hitIdx);
 	return sameOccurrence;
 }
 
@@ -1326,13 +1365,16 @@ bool RowItemIsThere(int32 chapterIdx, int32 hitIdx, const UIDRef& itemRef)
 
 // THE VIEW ON THE ITEM (the spec map's OBJ-09): its spread first - a parent page's included, the rule
 // EnsureSpreadInView keeps - then the middle of its outline scrolled to the window's centre. The document is already
-// in front.
+// in front. Nothing for an item on a hidden spread (SpreadIsHidden - no view can show one): the view stays where it is.
 void ShowItemInView(const UIDRef& itemRef)
 {
+	const UID spread = SpreadOfItem(itemRef);
+	if (SpreadIsHidden(itemRef.GetDataBase(), spread))
+		return;
 	InterfacePtr<IControlView> frontView(Utils<ILayoutUIUtils>()->QueryFrontView());
 	if (frontView == nil)
 		return;
-	EnsureSpreadUIDInView(frontView, itemRef.GetDataBase(), SpreadOfItem(itemRef));		// (nothing for kInvalidUID)
+	EnsureSpreadUIDInView(frontView, itemRef.GetDataBase(), spread);		// (nothing for kInvalidUID)
 	InterfacePtr<IGeometry> geometry(itemRef, UseDefaultIID());
 	if (geometry == nil)
 		return;
@@ -1406,11 +1448,13 @@ void SelectItemOnClick(int32 chapterIdx, int32 hitIdx, const UIDRef& itemRef)
 
 // A REPLACED ROW'S ITEM LEFT SELECTED (step 9 - the author's call: the item stays selected after its Replace;
 // for rows replaced together, the item of the row selected last - the page shows that row, as their click did): selected
-// the way its click selects it (a locked or hidden one: nothing, and the row's note says why); one gone meanwhile, or in
-// overset text, leaves nothing selected. InDesign's walk and replace selected what they met, which this puts right.
+// the way its click selects it (a locked or hidden one: nothing, and the row's note says why); one gone meanwhile, in
+// overset text or on a hidden spread (SpreadIsHidden), leaves nothing selected. InDesign's walk and replace selected
+// what they met, which this puts right.
 void LeaveRowItemSelected(int32 chapterIdx, int32 hitIdx, const UIDRef& itemRef)
 {
-	if (RowItemIsThere(chapterIdx, hitIdx, itemRef) && SpreadOfItem(itemRef) != kInvalidUID)
+	const UID spread = RowItemIsThere(chapterIdx, hitIdx, itemRef) ? SpreadOfItem(itemRef) : kInvalidUID;
+	if (spread != kInvalidUID && !SpreadIsHidden(itemRef.GetDataBase(), spread))
 		SelectItemOnClick(chapterIdx, hitIdx, itemRef);
 	else
 		ClearSelection();
@@ -1419,8 +1463,8 @@ void LeaveRowItemSelected(int32 chapterIdx, int32 hitIdx, const UIDRef& itemRef)
 /** Jump to an OBJECT row (the spec map's OBJ-09): its document in front (a windowless chapter given its window -
     JMP-09), the view on the item, then the item selected where the click may select (SelectItemOnClick - form S). An
     item no longer there: the document still comes forward, the row reads Missing. An item in overset text: the view on
-    the "+" its text overflows at, nothing selected, and the row's note says why. Returns true when it landed on the
-    item. */
+    the "+" its text overflows at, nothing selected, and the row's note says why. An item on a hidden spread: nothing
+    moves, and the row's note says why. Returns true when it landed on the item. */
 bool JumpToObject(int32 chapterIdx, int32 hitIdx, UID item)
 {
 	const HandBackChapterOnExit handBack(chapterIdx);		// before the dirty guard below - see the class
@@ -1438,6 +1482,16 @@ bool JumpToObject(int32 chapterIdx, int32 hitIdx, UID item)
 	IDataBase::SaveRestoreModifiedState dirtyGuard(db);
 	const UIDRef itemRef(db, item);
 	const bool there = RowItemIsThere(chapterIdx, hitIdx, itemRef);
+	// AN ITEM ON A HIDDEN SPREAD MOVES NOTHING - as a text row's match there (JumpToHit) and as Find Next (the author's
+	// call): not its document to the front, not the view, not the selection. The row's note says why, as a locked
+	// one's does.
+	if (there && SpreadIsHidden(db, SpreadOfItem(itemRef)))
+	{
+		PMString message("That object is on a hidden spread - not shown, not selected.");
+		message.SetTranslatable(kFalse);
+		KFCResultTree::ShowRowNote(message);
+		return false;
+	}
 	if (!FrontChapter(docRef))
 		return false;
 	if (!there)
