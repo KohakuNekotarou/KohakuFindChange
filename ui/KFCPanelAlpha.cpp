@@ -90,6 +90,8 @@
 #include "CPMUnknown.h"			// the implementation base
 #include "IMouseRollOver.h"		// MouseEnter / MouseOver / MouseLeave (ui/IMouseRollOver.h)
 
+#include <functional>			// std::function - KFCForEachVisibilitySubscription
+
 // *windows.h is in already: the precompiled header (VCPlugInHeaders.h -> WShukHeaders.h) brings it in
 //  AHEAD of every SDK header above, so this line adds nothing to the build and its place in the list
 //  keeps no macro away from an SDK name (memory plugin-pch-brings-windows-h; a probe placed right
@@ -317,6 +319,23 @@ static bool KFCIsFloatingContainer(HWND h)
 	return ::wcscmp(cls, L"OWL.Dock") == 0 || ::wcscmp(cls, L"OWL.FrameDrawer") == 0;
 }
 
+// Is the alpha on 'h' already 'want'? The hook's test, for the panel's window and the Find/Change dialog alike, before
+// anything is written.
+// **A READ THAT FAILS IS "NO" - not defensive padding, but the documented state of a window before WE have written to
+//   it. Microsoft: "GetLayeredWindowAttributes can be called only if the application has previously called
+//   SetLayeredWindowAttributes on the window. The function will fail if the layered window was setup with
+//   UpdateLayeredWindow." WS_EX_LAYERED on OWL.Dock is INDESIGN'S doing (see the file header) and a dialog just opened
+//   has had nothing from us, so until our first write the read can legitimately answer nothing at all - and "cannot
+//   read it" has to mean "write it", never "it is already right": taking a failure for agreement would leave a freshly
+//   built window opaque with the toggle on. Once written, the read works - which is why the hook's measurement
+//   (1477 events, 1 write) holds in the steady state.
+static bool KFCAlphaIs(HWND h, BYTE want)
+{
+	BYTE  cur = 0;
+	DWORD key = 0, flags = 0;
+	return ::GetLayeredWindowAttributes(h, &key, &cur, &flags) && cur == want;
+}
+
 // See the declaration in KFCPanelAlpha.h.
 bool KFCIsFindChangeShapedWindow(HWND h)
 {
@@ -490,6 +509,26 @@ static void KFCReleaseFormerFaintWindow(HWND current)
 	KFC_DIAG_LOG("PANELALPHA the window the panel left (0x%llx) back to 255", static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(h)));
 }
 
+// The panel window's SHADOW - OWL.ShadowView, a separate top-level window, the floating window's owner - or nullptr
+// (a drawer's ("OWL.FrameDrawer") owner need not be one).
+static HWND KFCShadowOf(HWND target)
+{
+	HWND shadow = ::GetWindow(target, GW_OWNER);
+	return KFCClassIs(shadow, L"OWL.ShadowView") ? shadow : nullptr;
+}
+
+// Should the shadow show? **It follows the TOGGLE, not the alpha (as KCM settled it): while ON it stays hidden even
+// when the pointer has made the panel opaque. Asked here alone - the applying side writes it, the hook checks it.
+//   !Why (a defect found on the real application): a panel is moved by its tab band or title band - which is where
+//     the pointer IS, so it is opaque there - and following the alpha would therefore SHOW THE SHADOW MID-DRAG.
+//     InDesign does not move a shadow during a drag (it draws it when the move is committed), so one forced out now
+//     is left behind at the old position.
+//   *Side benefit: no more flicker as the shadow blinks in and out with every pass of the pointer over the panel.
+static bool KFCShadowWanted()
+{
+	return !sPanelTranslucent;
+}
+
 #endif // WINDOWS
 
 bool16 KFCApplyPanelTranslucency()
@@ -537,20 +576,10 @@ bool16 KFCApplyPanelTranslucency()
 	//     Which leaves it a one-way door for us, exactly as measured.
 	//   ?SW_SHOWNA = show without activating (the shadow window is WS_EX_NOACTIVATE; it must not
 	//     come forward).
-	//   ?When a drawer's ("OWL.FrameDrawer") owner is not a ShadowView, the test below just skips.
-	//   **The shadow follows the TOGGLE, not the alpha (as KCM settled it). While ON, the
-	//     shadow stays hidden even when the pointer has made the panel opaque.
-	//     !Why (a defect found on the real application): a panel is moved by its tab band or title
-	//       band - which is where the pointer IS, so it is opaque there - and following the alpha
-	//       would therefore SHOW THE SHADOW MID-DRAG. InDesign does not move a shadow during a drag
-	//       (it draws it when the move is committed), so one forced out now is left behind at the
-	//       old position.
-	//     *Side benefit: no more flicker as the shadow blinks in and out with every pass of the
-	//       pointer over the panel.
-	const bool16 hideShadow = KFCGetPanelTranslucent();
-	HWND shadow = ::GetWindow(target, GW_OWNER);
-	if (KFCClassIs(shadow, L"OWL.ShadowView"))
-		::ShowWindow(shadow, hideShadow ? SW_HIDE : SW_SHOWNA);
+	//   **Whether it shows follows the TOGGLE, not the alpha - KFCShadowWanted, the one place the hook asks too.
+	HWND shadow = KFCShadowOf(target);
+	if (shadow != nullptr)
+		::ShowWindow(shadow, KFCShadowWanted() ? SW_SHOWNA : SW_HIDE);
 
 	return ok ? kTrue : kFalse;
 #else
@@ -1054,17 +1083,8 @@ static void CALLBACK KFCWinEventProc(HWINEVENTHOOK /*hook*/, DWORD /*event*/, HW
 	if (sFindChangeTranslucent)
 	{
 		HWND fc = KFCQueryFindChangeWindow();
-		if (fc != nullptr)
-		{
-			// *The failing arm means "apply", for the reason set out at the panel's own read below: a
-			//   dialog just opened has had nothing written to it by us, and the read is documented to
-			//   work only on a window the application itself has already written to.
-			const BYTE fcWant = KFCEffectiveFindChangeAlpha(fc);
-			BYTE  fcCur = 0;
-			DWORD fcKey = 0, fcFlags = 0;
-			if (!::GetLayeredWindowAttributes(fc, &fcKey, &fcCur, &fcFlags) || fcCur != fcWant)
-				KFCApplyFindChangeTranslucency();
-		}
+		if (fc != nullptr && !KFCAlphaIs(fc, KFCEffectiveFindChangeAlpha(fc)))
+			KFCApplyFindChangeTranslucency();
 	}
 
 	// ---- the panel. *This feature only does anything while the toggle is ON (the hook is not even
@@ -1119,34 +1139,15 @@ static void CALLBACK KFCWinEventProc(HWINEVENTHOOK /*hook*/, DWORD /*event*/, HW
 	// **This is called many times over during a move. Only go on to the real work when the state is
 	//   NOT what it should be (measured: 1477 events, 1 actual write).
 
-	// (1) is the alpha what it should be? (with the pointer on it, "what it should be" is opaque)
-	// **The FAILING arm is not defensive padding - it is the documented state of this very window
-	//   before we have ever written to it. Microsoft: "GetLayeredWindowAttributes can be called only
-	//   if the application has previously called SetLayeredWindowAttributes on the window. The
-	//   function will fail if the layered window was setup with UpdateLayeredWindow."
-	//   *WS_EX_LAYERED on OWL.Dock is INDESIGN'S doing, not ours (see the file header), so until our
-	//     first write this call can legitimately answer nothing at all - and "cannot read it" has to
-	//     mean "apply", never "it is already right". Treating a failure as agreement would leave a
-	//     freshly built Dock opaque with the toggle on.
-	//   *Once we have written to it the read works, which is why the measurement behind the comment
-	//     below (1477 events, 1 write) holds in the steady state.
-	const BYTE want = KFCEffectiveAlpha(target);
-	BYTE  cur = 0;
-	DWORD key = 0, flags = 0;
-	const bool16 alphaOk = (::GetLayeredWindowAttributes(target, &key, &cur, &flags) && cur == want) ? kTrue : kFalse;
+	// (1) is the alpha what it should be? (with the pointer on it, "what it should be" is opaque; a read that fails
+	//     counts as "no" - KFCAlphaIs says why)
+	const bool alphaOk = KFCAlphaIs(target, KFCEffectiveAlpha(target));
 
-	// (2) is the shadow (OWL.ShadowView) shown or hidden as it should be?
+	// (2) is the shadow (OWL.ShadowView) shown or hidden as it should be (KFCShadowWanted)?
 	//   *InDesign puts the shadow back when the panel is dragged. Watching the alpha alone leaves
 	//     "the shadow came back and it looks heavy" standing (found on the real application).
-	bool16 shadowOk = kTrue;
-	HWND   shadow   = ::GetWindow(target, GW_OWNER);
-	if (KFCClassIs(shadow, L"OWL.ShadowView"))
-	{
-		const bool16 visible = ::IsWindowVisible(shadow) ? kTrue : kFalse;
-		// *What it should be follows the TOGGLE, not the alpha (keep this in step with the applying
-		//   side above). Only ON gets this far, so it should always be hidden.
-		shadowOk = (visible == kFalse);
-	}
+	HWND shadow = KFCShadowOf(target);
+	const bool shadowOk = (shadow == nullptr || (::IsWindowVisible(shadow) != FALSE) == KFCShadowWanted());
 
 	if (alphaOk && shadowOk)
 		return;					// both as they should be = nothing to do
@@ -1278,8 +1279,8 @@ void        KFCShutdownPanelAlpha() {}
 //     then the observer can no longer be reached (measured on a quit), so a detach left to it never
 //     happens. The subjects outliving the observer is the whole problem: what they keep is a pointer
 //     into code that is going away, and leaving it there is what makes a late notification reach freed
-//     code. The three attachments below are undone in the same three places, and nothing attaches
-//     after that (sVisibilityObserverClosed).
+//     code. The three subscriptions are one list the attach and the detach both walk
+//     (KFCForEachVisibilitySubscription), and nothing attaches after the detach (sVisibilityObserverClosed).
 //========================================================================================
 
 //========================================================================================
@@ -1538,6 +1539,42 @@ static bool KFCQueryVisibilityObserver(InterfacePtr<IObserver>& outObs, Interfac
 //   the plug-in's shutdown can no longer reach the observer - so one made then would outlive the observer.
 static bool sVisibilityObserverClosed = false;
 
+// THE OBSERVER'S THREE SUBSCRIPTIONS, IN ONE LIST that the attach and the detach both walk - so one cannot be added to
+// the attach and forgotten in the detach (linksui carries a live bug from attaching and detaching asymmetrically).
+// Each subject that exists is handed to 'each' with the protocol it is listened on; the answer is whether the panel
+// manager is up. Both sides use the one attachment type, kKFCVisibilityAttachment.
+//   (1) kPanelManagerBoss / IID_IPANELMGR - kPaletteVisibilityChangedMessage: the panel opened, closed, restored from
+//       an icon or drawer-expanded. *The panel manager comes up partway through the application's own startup
+//       sequence (there is a kPanelMgrHasStartedMsg for it), so it can be absent when the startup service asks, and
+//       it can be gone when a late detach asks. **That is not a reason to give up on the rest: the two APPLICATION
+//       subscriptions have nothing to do with it - one of them is what follows InDesign's own Find/Change dialog.
+//       The panel's AutoAttach asks again (KFCPanelTitle.cpp), so this one is picked up then; nothing asks again on
+//       behalf of the window list.
+//   (2) kAppBoss / IID_IAPPLICATION - "docked and expanded -> dragged out to float" does not reach the panel manager;
+//       on 2025 it arrives here as kDockedPaletteAreaChangedByUserMsg (!**it does not on 2026**, where the Win32 hook
+//       covers it - the 2025 fallback). kApplicationSuspendMsg comes this way too.
+//   (3) kAppBoss / IID_IWINDOWLIST - the application's list of windows: kWindowAddedMessage / kRemoveWindowMessage say
+//       InDesign's own Find/Change dialog has just been opened or closed. Same boss as (2), a different protocol - so a
+//       second, separate subscription.
+static const ISubject::AttachmentType kKFCVisibilityAttachment = ISubject::kRegularAttachment;
+
+static bool KFCForEachVisibilitySubscription(IApplication* app,
+	const std::function<void(ISubject*, const PMIID&)>& each)
+{
+	InterfacePtr<IPanelMgr> panelMgr(app->QueryPanelManager());
+	InterfacePtr<ISubject> panelSubject(panelMgr, IID_ISUBJECT);
+	if (panelSubject != nil)
+		each(panelSubject, IID_IPANELMGR);
+
+	InterfacePtr<ISubject> appSubject(app, IID_ISUBJECT);
+	if (appSubject != nil)
+	{
+		each(appSubject, IID_IAPPLICATION);
+		each(appSubject, IID_IWINDOWLIST);
+	}
+	return panelMgr != nil;
+}
+
 void KFCAttachPanelVisibilityObserver()
 {
 	if (sVisibilityObserverClosed)
@@ -1548,53 +1585,22 @@ void KFCAttachPanelVisibilityObserver()
 	if (!KFCQueryVisibilityObserver(obs, app))
 		return;
 
-	// *The panel manager comes up partway through the application's own startup sequence (there is a
-	//   kPanelMgrHasStartedMsg for it), so this can be nil when called from a startup service.
-	//   **That is not a reason to give up on the rest: one of the two APPLICATION
-	//     subjects below is what follows InDesign's own Find/Change dialog, which has nothing to do
-	//     with the panel manager. The panel's AutoAttach calls this again (KFCPanelTitle.cpp), so the
-	//     palette subject is picked up then; nothing calls it again on behalf of the window list.
 	int32 attached = 0;		// (test builds: what this call actually added)
-	InterfacePtr<IPanelMgr> panelMgr(app->QueryPanelManager());
-	if (panelMgr != nil)
+	const bool panelMgrUp = KFCForEachVisibilitySubscription(app, [&](ISubject* subject, const PMIID& protocol)
 	{
-		InterfacePtr<ISubject> subject(panelMgr, IID_ISUBJECT);
-		if (subject != nil &&
-			!subject->IsAttached(ISubject::kRegularAttachment, obs, IID_IPANELMGR, IID_IKFCPANELVISIBILITYOBSERVER))
+		if (!subject->IsAttached(kKFCVisibilityAttachment, obs, protocol, IID_IKFCPANELVISIBILITYOBSERVER))
 		{
-			subject->AttachObserver(ISubject::kRegularAttachment, obs, IID_IPANELMGR, IID_IKFCPANELVISIBILITYOBSERVER);
+			subject->AttachObserver(kKFCVisibilityAttachment, obs, protocol, IID_IKFCPANELVISIBILITYOBSERVER);
 			++attached;
 		}
-	}
-
-	// *The second subject = kAppBoss / IID_IAPPLICATION.
-	//   "Docked and expanded -> dragged out to float" does not reach the panel manager; on 2025 it
-	//   arrives here as kDockedPaletteAreaChangedByUserMsg. !**It does not on 2026**, where the Win32
-	//   hook is what covers it. This is the 2025 fallback.
-	InterfacePtr<ISubject> appSubject(app, IID_ISUBJECT);
-	if (appSubject != nil &&
-		!appSubject->IsAttached(ISubject::kRegularAttachment, obs, IID_IAPPLICATION, IID_IKFCPANELVISIBILITYOBSERVER))
-	{
-		appSubject->AttachObserver(ISubject::kRegularAttachment, obs, IID_IAPPLICATION, IID_IKFCPANELVISIBILITYOBSERVER);
-		++attached;
-	}
-
-	// *The third subject = kAppBoss / IID_IWINDOWLIST, the application's list of windows. This is
-	//   what says that InDesign's own Find/Change dialog has just been opened or closed
-	//   (kWindowAddedMessage / kRemoveWindowMessage). Same boss as above, different protocol - so it
-	//   is a second, separate attachment.
-	if (appSubject != nil &&
-		!appSubject->IsAttached(ISubject::kRegularAttachment, obs, IID_IWINDOWLIST, IID_IKFCPANELVISIBILITYOBSERVER))
-	{
-		appSubject->AttachObserver(ISubject::kRegularAttachment, obs, IID_IWINDOWLIST, IID_IKFCPANELVISIBILITYOBSERVER);
-		++attached;
-	}
-	KFC_DIAG_LOG("PANELVIS attach: panel manager %s, %d attached", panelMgr != nil ? "up" : "not up", attached);
+	});
+	KFC_DIAG_LOG("PANELVIS attach: panel manager %s, %d attached", panelMgrUp ? "up" : "not up", attached);
+	(void)panelMgrUp;
 }
 
-// The mirror of the above. Every attachment the function above can make is undone here, with the SAME
-// attachment type - ISubject.h:288 is the counterpart of the AttachObserver at :280, and a Regular
-// attachment must be released as a Regular one.
+// The mirror of the above: every subscription the attach can make is undone here - the same list
+// (KFCForEachVisibilitySubscription) and the same attachment type, as ISubject.h:288 is the counterpart of the
+// AttachObserver at :280 and a Regular attachment must be released as a Regular one.
 //   *WHEN: as the palette manager is about to close the palettes - IPaletteMgrService::
 //     PaletteMgrAboutToShutdown, from KFC's palette-manager service (KFCBookPanelPlacement.cpp), the
 //     official moment and the one KFCBookPanelPlacement's own observer of the panel manager stops at.
@@ -1622,37 +1628,17 @@ void KFCDetachPanelVisibilityObserver()
 		return;
 	}
 
-	// *The panel manager can be down already during teardown; the two application subjects below are
-	//  independent of it, so a nil here must not take them with it - the same rule as the attach side.
 	int32 detached = 0;		// (test builds: what this call actually took off)
-	InterfacePtr<IPanelMgr> panelMgr(app->QueryPanelManager());
-	if (panelMgr != nil)
+	const bool panelMgrUp = KFCForEachVisibilitySubscription(app, [&](ISubject* subject, const PMIID& protocol)
 	{
-		InterfacePtr<ISubject> subject(panelMgr, IID_ISUBJECT);
-		if (subject != nil &&
-			subject->IsAttached(ISubject::kRegularAttachment, obs, IID_IPANELMGR, IID_IKFCPANELVISIBILITYOBSERVER))
+		if (subject->IsAttached(kKFCVisibilityAttachment, obs, protocol, IID_IKFCPANELVISIBILITYOBSERVER))
 		{
-			subject->DetachObserver(ISubject::kRegularAttachment, obs, IID_IPANELMGR, IID_IKFCPANELVISIBILITYOBSERVER);
+			subject->DetachObserver(kKFCVisibilityAttachment, obs, protocol, IID_IKFCPANELVISIBILITYOBSERVER);
 			++detached;
 		}
-	}
-
-	InterfacePtr<ISubject> appSubject(app, IID_ISUBJECT);
-	if (appSubject != nil &&
-		appSubject->IsAttached(ISubject::kRegularAttachment, obs, IID_IAPPLICATION, IID_IKFCPANELVISIBILITYOBSERVER))
-	{
-		appSubject->DetachObserver(ISubject::kRegularAttachment, obs, IID_IAPPLICATION,
-			IID_IKFCPANELVISIBILITYOBSERVER);
-		++detached;
-	}
-	if (appSubject != nil &&
-		appSubject->IsAttached(ISubject::kRegularAttachment, obs, IID_IWINDOWLIST, IID_IKFCPANELVISIBILITYOBSERVER))
-	{
-		appSubject->DetachObserver(ISubject::kRegularAttachment, obs, IID_IWINDOWLIST,
-			IID_IKFCPANELVISIBILITYOBSERVER);
-		++detached;
-	}
-	KFC_DIAG_LOG("PANELVIS detach: panel manager %s, %d detached", panelMgr != nil ? "up" : "gone", detached);
+	});
+	KFC_DIAG_LOG("PANELVIS detach: panel manager %s, %d detached", panelMgrUp ? "up" : "gone", detached);
+	(void)panelMgrUp;
 }
 
 // End, KFCPanelAlpha.cpp.
