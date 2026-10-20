@@ -68,12 +68,11 @@ public:
 	{
 		// Symmetric with the attach in Startup: while attached the session holds a pointer into this .pln.
 		KFCModelObserverDetach();
-		// Stop listening before tearing anything down: while attached, the panel manager and the
-		// application each hold a pointer to an observer whose code is in this .pln (KFCPanelAlpha.cpp,
-		// KFCAttachPanelVisibilityObserver), and the panel being destroyed during teardown raises a
-		// notification.
-		// *Symmetric with the KFCAttachPanelVisibilityObserver in Startup above - as KFCBookWatchDetach
-		//  is for its own subject.
+		// The Translucent Panel observer: while attached, the panel manager and the application each hold
+		// a pointer to an observer whose code is in this .pln (KFCPanelAlpha.cpp). Normally already
+		// detached at the palette manager's PaletteMgrAboutToShutdown - by this point the observer can
+		// no longer be reached (measured on a quit); this is the backstop for a shutdown that never went
+		// through the palette manager. Safe to run twice.
 		KFCDetachPanelVisibilityObserver();
 		// "Remember Book Panel Placement" - the same subject, and the same reason, plus its timers (the
 		// restore's and the Home screen's) and its command interceptor, all holding raw pointers into

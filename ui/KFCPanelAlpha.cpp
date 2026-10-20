@@ -1272,12 +1272,14 @@ void        KFCShutdownPanelAlpha() {}
 //
 //   *The observer implementation is aggregated onto kActiveContextBoss in the .fr - the proven
 //     arrangement KCM uses for its own observers.
-//   **It IS detached at shutdown, by KFCDetachPanelVisibilityObserver - as KFCBookWatch detaches its
-//     own, the attach there carrying the reason: "linksui carries a live bug from attaching and
-//     detaching asymmetrically". The subject outliving the .pln is the whole
-//     problem: what the session keeps is a pointer into a plug-in that is being unloaded, and leaving
-//     it there is what makes a late notification reach freed code. The three attachments below are
-//     therefore undone in the same three places.
+//   **It IS detached (KFCDetachPanelVisibilityObserver) - as the palette manager is about to close the
+//     palettes, the moment KFCBookPanelPlacement's observer of the same subject stops at, while the
+//     session, the active context and the panel manager are all up. NOT at the plug-in's shutdown: by
+//     then the observer can no longer be reached (measured on a quit), so a detach left to it never
+//     happens. The subjects outliving the observer is the whole problem: what they keep is a pointer
+//     into code that is going away, and leaving it there is what makes a late notification reach freed
+//     code. The three attachments below are undone in the same three places, and nothing attaches
+//     after that (sVisibilityObserverClosed).
 //========================================================================================
 
 //========================================================================================
@@ -1532,8 +1534,15 @@ static bool KFCQueryVisibilityObserver(InterfacePtr<IObserver>& outObs, Interfac
 	return outApp != nil;
 }
 
+// **The detach below has run: never attach again. Nothing after it could take an attachment back off -
+//   the plug-in's shutdown can no longer reach the observer - so one made then would outlive the observer.
+static bool sVisibilityObserverClosed = false;
+
 void KFCAttachPanelVisibilityObserver()
 {
+	if (sVisibilityObserverClosed)
+		return;
+
 	InterfacePtr<IObserver> obs;
 	InterfacePtr<IApplication> app;
 	if (!KFCQueryVisibilityObserver(obs, app))
@@ -1545,6 +1554,7 @@ void KFCAttachPanelVisibilityObserver()
 	//     subjects below is what follows InDesign's own Find/Change dialog, which has nothing to do
 	//     with the panel manager. The panel's AutoAttach calls this again (KFCPanelTitle.cpp), so the
 	//     palette subject is picked up then; nothing calls it again on behalf of the window list.
+	int32 attached = 0;		// (test builds: what this call actually added)
 	InterfacePtr<IPanelMgr> panelMgr(app->QueryPanelManager());
 	if (panelMgr != nil)
 	{
@@ -1553,6 +1563,7 @@ void KFCAttachPanelVisibilityObserver()
 			!subject->IsAttached(ISubject::kRegularAttachment, obs, IID_IPANELMGR, IID_IKFCPANELVISIBILITYOBSERVER))
 		{
 			subject->AttachObserver(ISubject::kRegularAttachment, obs, IID_IPANELMGR, IID_IKFCPANELVISIBILITYOBSERVER);
+			++attached;
 		}
 	}
 
@@ -1565,6 +1576,7 @@ void KFCAttachPanelVisibilityObserver()
 		!appSubject->IsAttached(ISubject::kRegularAttachment, obs, IID_IAPPLICATION, IID_IKFCPANELVISIBILITYOBSERVER))
 	{
 		appSubject->AttachObserver(ISubject::kRegularAttachment, obs, IID_IAPPLICATION, IID_IKFCPANELVISIBILITYOBSERVER);
+		++attached;
 	}
 
 	// *The third subject = kAppBoss / IID_IWINDOWLIST, the application's list of windows. This is
@@ -1575,31 +1587,44 @@ void KFCAttachPanelVisibilityObserver()
 		!appSubject->IsAttached(ISubject::kRegularAttachment, obs, IID_IWINDOWLIST, IID_IKFCPANELVISIBILITYOBSERVER))
 	{
 		appSubject->AttachObserver(ISubject::kRegularAttachment, obs, IID_IWINDOWLIST, IID_IKFCPANELVISIBILITYOBSERVER);
+		++attached;
 	}
+	KFC_DIAG_LOG("PANELVIS attach: panel manager %s, %d attached", panelMgr != nil ? "up" : "not up", attached);
 }
 
-// The mirror of the above, called from the plug-in's shutdown. Every attachment the
-// function above can make is undone here, with the SAME attachment type - ISubject.h:288 is the
-// counterpart of the AttachObserver at :280, and a Regular attachment must be released as a Regular
-// one.
-//   *Why it exists: what the session holds while attached is a pointer into this .pln. Leaving it
-//     there means a notification arriving during teardown - the panel being destroyed raises one -
-//     runs Update in code that is going away. Same reasoning, same shape as KFCBookWatchDetach.
-//   *Asked before detached, exactly as the attach side asks before attaching: this is reached once
-//     from Shutdown, but the attach side is called from two places (startup and the panel's
-//     AutoAttach), so "is it actually on?" is the honest question on both sides.
-//   !Order at shutdown: this runs BEFORE KFCShutdownPanelAlpha, so the notifications stop first and
-//     the timer and hook are torn down after. sPanelAlphaShutdown then covers anything still in
-//     flight (KFCPanelAlpha.cpp's timer section).
+// The mirror of the above. Every attachment the function above can make is undone here, with the SAME
+// attachment type - ISubject.h:288 is the counterpart of the AttachObserver at :280, and a Regular
+// attachment must be released as a Regular one.
+//   *WHEN: as the palette manager is about to close the palettes - IPaletteMgrService::
+//     PaletteMgrAboutToShutdown, from KFC's palette-manager service (KFCBookPanelPlacement.cpp), the
+//     official moment and the one KFCBookPanelPlacement's own observer of the panel manager stops at.
+//     The session, the active context and the panel manager are all up then. The plug-in's shutdown
+//     calls this again as the backstop, but by then the observer cannot be reached (measured on a quit:
+//     KFCQueryVisibilityObserver came back empty there) - the palette manager's moment is the one that
+//     counts.
+//   *Why it exists: while attached, the application and the panel manager hold a pointer to an observer
+//     whose code is in this .pln, and the application outlives the session the observer lives in. Same
+//     reasoning, same shape as KFCBookWatchDetach.
+//   *Asked before detached, exactly as the attach side asks before attaching: the attach side is called
+//     from two places (startup and the panel's AutoAttach), so "is it actually on?" is the honest
+//     question on both sides.
+//   !So the notifications stop before KFCShutdownPanelAlpha tears the timer and the hook down;
+//     sPanelAlphaShutdown covers anything still in flight (this file's timer section).
 void KFCDetachPanelVisibilityObserver()
 {
+	sVisibilityObserverClosed = true;		// **first: nothing attaches again after this
+
 	InterfacePtr<IObserver> obs;
 	InterfacePtr<IApplication> app;
 	if (!KFCQueryVisibilityObserver(obs, app))
+	{
+		KFC_DIAG_LOG("PANELVIS detach: the observer cannot be reached");
 		return;
+	}
 
 	// *The panel manager can be down already during teardown; the two application subjects below are
 	//  independent of it, so a nil here must not take them with it - the same rule as the attach side.
+	int32 detached = 0;		// (test builds: what this call actually took off)
 	InterfacePtr<IPanelMgr> panelMgr(app->QueryPanelManager());
 	if (panelMgr != nil)
 	{
@@ -1608,18 +1633,26 @@ void KFCDetachPanelVisibilityObserver()
 			subject->IsAttached(ISubject::kRegularAttachment, obs, IID_IPANELMGR, IID_IKFCPANELVISIBILITYOBSERVER))
 		{
 			subject->DetachObserver(ISubject::kRegularAttachment, obs, IID_IPANELMGR, IID_IKFCPANELVISIBILITYOBSERVER);
+			++detached;
 		}
 	}
 
 	InterfacePtr<ISubject> appSubject(app, IID_ISUBJECT);
-	if (appSubject == nil)
-		return;
-
-	if (appSubject->IsAttached(ISubject::kRegularAttachment, obs, IID_IAPPLICATION, IID_IKFCPANELVISIBILITYOBSERVER))
-		appSubject->DetachObserver(ISubject::kRegularAttachment, obs, IID_IAPPLICATION, IID_IKFCPANELVISIBILITYOBSERVER);
-
-	if (appSubject->IsAttached(ISubject::kRegularAttachment, obs, IID_IWINDOWLIST, IID_IKFCPANELVISIBILITYOBSERVER))
-		appSubject->DetachObserver(ISubject::kRegularAttachment, obs, IID_IWINDOWLIST, IID_IKFCPANELVISIBILITYOBSERVER);
+	if (appSubject != nil &&
+		appSubject->IsAttached(ISubject::kRegularAttachment, obs, IID_IAPPLICATION, IID_IKFCPANELVISIBILITYOBSERVER))
+	{
+		appSubject->DetachObserver(ISubject::kRegularAttachment, obs, IID_IAPPLICATION,
+			IID_IKFCPANELVISIBILITYOBSERVER);
+		++detached;
+	}
+	if (appSubject != nil &&
+		appSubject->IsAttached(ISubject::kRegularAttachment, obs, IID_IWINDOWLIST, IID_IKFCPANELVISIBILITYOBSERVER))
+	{
+		appSubject->DetachObserver(ISubject::kRegularAttachment, obs, IID_IWINDOWLIST,
+			IID_IKFCPANELVISIBILITYOBSERVER);
+		++detached;
+	}
+	KFC_DIAG_LOG("PANELVIS detach: panel manager %s, %d detached", panelMgr != nil ? "up" : "gone", detached);
 }
 
 // End, KFCPanelAlpha.cpp.

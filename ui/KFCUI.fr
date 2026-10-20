@@ -430,9 +430,9 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	},
 
 	/*
-	 * ...and the service that tells it when to start and stop: kPaletteMgrService, which calls
-	 * PaletteMgrStarted once the palettes are laid out and PaletteMgrAboutToShutdown just before
-	 * they close (IPaletteMgrService.h). InDesign's own Book panel is the one product user of this
+	 * ...and the service that tells it when to start and stop - and the Translucent Panel observer when to stop:
+	 * kPaletteMgrService, which calls PaletteMgrStarted once the palettes are laid out and PaletteMgrAboutToShutdown
+	 * just before they close (IPaletteMgrService.h). InDesign's own Book panel is the one product user of this
 	 * service (kBookPanelStartupShutdownBoss). No stock provider exists for it, hence ours.
 	 */
 	Class

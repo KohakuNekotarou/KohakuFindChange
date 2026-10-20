@@ -162,17 +162,21 @@ void	KFCForgetFindChangeWindow();
 //   own AutoAttach (KFCPanelTitle.cpp). !The second one is not belt and braces - the panel manager
 //   comes up partway through the application's startup sequence, so at Startup it can still be nil,
 //   and that subscription is picked up on the AutoAttach pass instead. Each attachment asks
-//   IsAttached first, so repeating the call attaches nothing twice.
+//   IsAttached first, so repeating the call attaches nothing twice. Does nothing once the detach below
+//   has run.
 // *How: kPaletteVisibilityChangedMessage, broadcast from kPanelManagerBoss's IID_IPANELMGR subject
 //   (identified on a debug build's Spy). Two further subjects hang off kAppBoss - see
 //   the function itself.
 void	KFCAttachPanelVisibilityObserver();
 
-// Undo every attachment the above makes. Called from the plug-in's shutdown, BEFORE
+// Undo every attachment the above makes, and attach nothing again after it. Called as the palette
+// manager is about to close the palettes (KFC's palette-manager service, KFCBookPanelPlacement.cpp) -
+// the session, the active context and the panel manager are all up then - and again from the plug-in's
+// shutdown as the backstop, where the observer can no longer be reached (measured). Either way before
 // KFCShutdownPanelAlpha, so that notifications stop before the timer and the hook are torn down.
-// *Why it exists: while attached, the session holds a pointer into this .pln, and a
-//   notification arriving during teardown would run the observer in code that is going away - the
-//   same reasoning, and the same shape, as KFCBookWatchDetach.
+// *Why it exists: while attached, the application and the panel manager hold a pointer to an observer
+//   whose code is in this .pln, and a notification arriving during teardown would run it in code that
+//   is going away - the same reasoning, and the same shape, as KFCBookWatchDetach.
 void	KFCDetachPanelVisibilityObserver();
 
 // Tear down everything this file has put anywhere. Called from the plug-in's shutdown
