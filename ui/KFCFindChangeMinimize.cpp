@@ -273,9 +273,9 @@ static bool KFCApplyFindChangeToggles()
 
 // The chase. **There is deliberately no "already booked, do not stack" gate - a broken chain would
 //   leave such a flag raised and the feature dead for the rest of the session (the panel side's note
-//   on KFCScheduleReapply). ICallbackTimer holds one booking per instance, so
-//   StartTimer over a live booking merely replaces it, and re-arming unconditionally debounces as a
-//   side effect (the count goes back to the full number every time).
+//   on KFCScheduleReapply). Re-arming unconditionally debounces as a side effect (the count goes back
+//   to the full number every time); a booking still live is stopped before the new one is started
+//   (KFCChaseFindChangeWindow - the official re-arm, as the panel side does).
 static uint32 KFCFindChangeChaseProc(void* /*refPtr*/)
 {
 	--sRetriesLeft;
@@ -345,6 +345,11 @@ void KFCChaseFindChangeWindow()
 	if (sRetryTimer == nil)
 		return;
 
+	// *A booking still live is taken off before the new one is started: the official re-arm stops the
+	//  running timer before it starts one (HTTPAssetLinkResourceHandler.cpp), and ICallbackTimer.h
+	//  promises nothing for a StartTimer over a live booking. (Never reached from inside the chase's own
+	//  callback - the window-list observer is the caller.)
+	sRetryTimer->StopTimer();
 	sRetryTimer->StartTimer(KFCFindChangeChaseProc, kKFCFindChangeChaseDelayMillis, nil);
 #endif
 }
