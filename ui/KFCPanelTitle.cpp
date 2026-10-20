@@ -58,8 +58,7 @@ namespace
 // The plain panel name. It has to be spelled out on THIS side, not read back from the panel, because
 // there is no way to read it back at run time: PaletteRefUtils::GetPaletteLabel returns an empty
 // string for a palette that has never been visible, and IWindow::GetTitle only ever hands back the
-// last value SET (both stated in the headers). So "remember the old name, restore it later" is not
-// available.
+// last value SET (both stated in the headers). So the name every label starts from is this one.
 //
 // It is kKFCDisplayName rather than a literal of its own: that macro is the ONE definition of the
 // display name - the UI half's string table (KFCUI_enUS.fr) puts it under kKFCPanelTitleKey and the
@@ -70,11 +69,8 @@ const char* const kKFCPlainPanelName = kKFCDisplayName;
 /** Put a label on the panel's tab. Does nothing unless the panel exists and sits in a palette. */
 void SetTabLabel(const PMString& label)
 {
-	// THE SESSION CAN BE GONE DURING SHUTDOWN, and KFCPanelTitle::Restore is called from the UI half's shutdown
-	// (KFCUIStartupShutdown) - the one entry here that runs during teardown; the rest of this plug-in reaches the
-	// session from inside UI events (a click, a key, a draw), where it is certainly alive. QueryPanelManager asks
-	// for the session before it uses it and answers nil then. (No failure has been seen: the tab is restored FIRST
-	// in Shutdown, "while the UI is still standing".)
+	// nil once the session is gone (QueryPanelManager asks for it first) - which no caller here meets: they all
+	// run inside UI events (a click, a key, a draw, a search), and nothing calls this during teardown.
 	InterfacePtr<IPanelMgr> panelMgr(KFCBookPanelLookup::QueryPanelManager());
 	if (panelMgr == nil)
 		return;
@@ -160,14 +156,6 @@ void KFCPanelTitle::Update()
 	// observer, so only while the panel is shown; with it closed, the line is asked again when the dialog opens and
 	// when Run is pressed.)
 	KFCQueryDialogRefreshScope();
-}
-
-void KFCPanelTitle::Restore()
-{
-	PMString title(kKFCPlainPanelName);
-	title.SetTranslatable(kFalse);
-
-	SetTabLabel(title);
 }
 
 namespace

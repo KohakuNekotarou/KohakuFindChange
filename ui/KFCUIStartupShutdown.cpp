@@ -24,7 +24,6 @@
 // Project includes:
 #include "KFCUIID.h"
 #include "KFCMarkerExpiryIdleTask.h"
-#include "KFCPanelTitle.h"
 #include "KFCPanelAlpha.h"		// "Translucent Panel": start following the panel, and stop cleanly
 #include "KFCFindChangeMinimize.h"	// "Minimizable Find/Change": put the dialog's style back at the end
 #include "KFCAppBarSearchEnter.h"	// "Link the Application Bar's Search Field to This Panel": its hooks off at the end
@@ -59,13 +58,11 @@ public:
 		KFCModelObserverAttach();
 	}
 
-	/** Put the panel tab's name back, retire the marker idle task (it must leave the queue, and never
-	    be re-created, before the app tears down) and release the UI half's static storage. */
+	/** Retire the marker idle task (it must leave the queue, and never be re-created, before the app
+	    tears down) and release the UI half's static storage. The panel tab's scoped name is not put
+	    back: a label lives only in the running palette (KFCPanelTitle.h). */
 	virtual void Shutdown()
 	{
-		// The tab name first, while the UI is still standing: a tab renamed with the current scope
-		// must not be what a saved workspace remembers.
-		KFCPanelTitle::Restore();
 		// Symmetric with the attach in Startup: while attached the session holds a pointer into this .pln.
 		KFCModelObserverDetach();
 		// Stop listening before tearing anything down: while attached, the panel manager and the

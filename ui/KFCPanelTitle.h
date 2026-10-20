@@ -32,9 +32,11 @@ namespace KFCPanelTitle
 	    Safe to call when the panel has never been opened (does nothing then). */
 	void Update();
 
-	/** Put the tab back to the plain name from the .fr. Called at shutdown, so a renamed tab can
-	    never be the thing a saved workspace remembers. */
-	void Restore();
+	// NOTHING PUTS THE TAB BACK AT SHUTDOWN. A label lives only in the running palette: the saved workspace
+	// names a panel by its resource KEY (OWLPaletteLeaf name="0x1EA600kKFCPanelTitleKey") and the session's
+	// SavedData holds no label. Measured with KT's palettelabel probe: a built-in panel's label set at run
+	// time was in neither file after a quit, and the next start showed the panel's own name. A Restore() did
+	// it until then, first thing in the UI half's shutdown - a call into palettes being torn down, for nothing.
 }
 
 #endif // __KFCPanelTitle_h__
