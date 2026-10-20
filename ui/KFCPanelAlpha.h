@@ -14,7 +14,7 @@
 //    A docked panel is a child of the main frame and cannot be made translucent on its own -
 //    the flag is still set, and the moment the panel floats again it applies.
 //
-//  The measurements this rests on = memory/win32-window-alpha-transparency.md
+//  The measurements this rests on = memory win32-window-alpha-transparency
 //                                   docs/ai-notes/win32-window-transparency.md
 //
 //========================================================================================
@@ -111,7 +111,7 @@ bool16	KFCApplyFindChangeTranslucency();
 //   . the result is CACHED, and the cache is dropped by the window-list observer whenever a window
 //     is added or removed - so ask again rather than keeping the handle
 //   . do not hold the returned HWND across events. The OS recycles handles, and a stale one
-//     can name somebody else's window (memory/panel-hwnd-from-paletteref.md)
+//     can name somebody else's window (memory panel-hwnd-from-paletteref)
 //   . nullptr means "not open", and also "open, but the platform window does not exist yet"
 #ifdef WINDOWS
 // (HWND is windows.h's, which the precompiled header has brought into every .cpp before this header is

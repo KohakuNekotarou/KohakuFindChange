@@ -21,15 +21,16 @@
 //  The dialog's own style, for reference: STYLE 0x94C80000, EXSTYLE 0x00000180
 //  (WS_EX_WINDOWEDGE | WS_EX_TOOLWINDOW). The title bar turned out to be the OS's own non-client
 //  drawing, not something InDesign paints - which is why setting the bits is enough.
-//  Full record = memory/window-minimize-presentation-system.md
+//  Full record = memory window-minimize-presentation-system
 //
-//  WS_EX_APPWINDOW is added as well, so the minimised dialog lands on the TASKBAR (the author's
-//  choice). Without it Windows leaves a 160x28 title-bar-only window at the bottom left of the
-//  screen - the owned-popup behaviour, measured at L=0 T=700 R=160 B=728.
+//  WS_EX_APPWINDOW is added as well, so the minimised dialog lands on the TASKBAR
+//  (the author's call - the spec map's WIN-18). Without it Windows leaves a 160x28 title-bar-only
+//  window at the bottom left of the screen - the owned-popup behaviour, measured at
+//  L=0 T=700 R=160 B=728.
 //  *A dialog CLOSED while minimised comes back at the screen's top-left: InDesign remembers where a
-//   dialog was when it closed, and a minimised window sits off screen (-32000). Left so (the
-//   author's call) - restoring it inside the window list's "removed" notice would move a dialog
-//   InDesign is in the middle of closing.
+//   dialog was when it closed, and a minimised window sits off screen (-32000). Left so
+//   (the author's call - the spec map's WIN-27): restoring it inside the window list's "removed"
+//   notice would move a dialog InDesign is in the middle of closing.
 //
 //  The window is found by KFCQueryFindChangeWindow (KFCPanelAlpha.h) - the SAME lookup the
 //  translucency toggle uses, deliberately not a second copy of that judgement. And the chase that asks
@@ -58,8 +59,8 @@
 //     chase too, whatever its hook does.)
 //  *8 x 50ms = about 400ms, the figure the panel side settled on for the same kind of settling
 //   (kKFCPanelAlphaReapplyTries in KFCPanelAlpha.cpp). The count bounds it, so it always stops.
-//   (The first run comes 0.5 to 1 second after the booking - see KFCFindChangeChaseProc - and found the
-//    first-time dialog on that run in both traces taken.)
+//   (The first run comes 0.5 to 1 second after the booking - see KFCFindChangeChaseProc - and in the
+//    traces taken it found the first-time dialog on that run.)
 static const int32  kKFCFindChangeChaseTries       = 8;
 static const uint32 kKFCFindChangeChaseDelayMillis = 50;
 
@@ -90,19 +91,22 @@ bool16	KFCApplyFindChangeMinimizable();
 void	KFCChaseFindChangeWindow();
 
 // If the Find/Change dialog is open and MINIMISED, restore it and return kTrue; otherwise kFalse and
-// nothing is touched. For the panel's Open Find/Change... (the author's call): InDesign's own
-// Edit > Find/Change is a TOGGLE that closes an open dialog, a minimised
-// one included (measured), and from KFC's menu item that read as the dialog being thrown away. Not tied
-// to the toggle: a minimised dialog is brought back whoever minimised it. Windows only; kFalse on Mac.
+// nothing is touched. Asked first wherever KFC opens the dialog - the panel's Open Find/Change...
+// (the author's call - the spec map's WIN-23) and KFCShowFindChangeDialog below: InDesign's own
+// Edit > Find/Change is a TOGGLE that closes an open dialog, a minimised one included (measured,
+// pressed as KFC presses it), and from KFC's menu item that read as the dialog being thrown away.
+// Not tied to the toggle: a minimised dialog is brought back whoever minimised it. Windows only;
+// kFalse on Mac.
 bool16	KFCRestoreMinimizedFindChange();
 
-// BRING THE DIALOG UP, NEVER CLOSING IT - for a query double-clicked in the query dialog (the author's call: "open it
-// and show" - called BEFORE the query is put in, KFCQueryDialog.cpp says why). Open and on screen: left alone - it shows
-// what is put into Find/Change. Minimised:
-// restored, as above. Closed: InDesign's own Edit > Find/Change through the action manager, as the panel's Open
-// Find/Change... runs it - the toggle, which opens a closed dialog and is therefore NOT pressed while one is open.
-// "Is it open" is the window lookup (KFCQueryFindChangeWindow). kFalse = the action manager could not be reached, and
-// on Mac (nothing is done there - the lookup is Windows only).
+// BRING THE DIALOG UP, NEVER CLOSING IT - for a query double-clicked in the query dialog
+// (the author's call: "open it and show" - called BEFORE the query is put in, KFCQueryDialog.cpp
+// says why). Open and on screen: left alone - it shows what is put into Find/Change. Minimised:
+// restored, as above. Closed: InDesign's own Edit > Find/Change through the action manager, as the
+// panel's Open Find/Change... runs it - the toggle, which opens a closed dialog and is therefore NOT
+// pressed while one is open. "Is it open" is the window lookup (KFCQueryFindChangeWindow). kFalse:
+// the action manager could not be reached, and on Mac (nothing is done there - the lookup is
+// Windows only).
 bool16	KFCShowFindChangeDialog();
 
 // Put the dialog back as it was, stop the chase and release the timer. Called from the plug-in's

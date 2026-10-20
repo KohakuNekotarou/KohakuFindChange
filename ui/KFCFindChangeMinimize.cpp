@@ -5,8 +5,8 @@
 //  KohakuFindChange (KFC)
 //
 //  "Minimizable Find/Change" - the implementation. See KFCFindChangeMinimize.h for why the SDK
-//  cannot do this and Win32 can, and for why the chase at the foot of this file has to exist (it
-//  serves Translucent Find/Change too).
+//  cannot do this and Win32 can, and for why the chase in this file (KFCChaseFindChangeWindow) has
+//  to exist (it serves Translucent Find/Change too).
 //
 //========================================================================================
 
@@ -122,15 +122,15 @@ static bool KFCStillOurFindChangeWindow(const KFCMinimizeRecord& r)
 	return true;
 }
 
-// Put the window we changed back as it was, and forget it. One place for it, because there are
-// three callers: the toggle going OFF, a different dialog window turning up, and shutdown.
+// Put the window we changed back as it was, and forget it. One place for it, shared by its callers:
+// the toggle going OFF, a different dialog window turning up, and shutdown.
 static void KFCRestoreFindChangeStyle()
 {
 	if (sRecord.window == nullptr)
 		return;
 	// *Forgotten first, and whether or not anything below succeeds. A handle the OS has recycled must
 	//  never be written to on a later pass - it can name a different window by then
-	//  (memory/panel-hwnd-from-paletteref.md records the same hazard on the panel side).
+	//  (memory panel-hwnd-from-paletteref records the same hazard on the panel side).
 	KFCMinimizeRecord r = sRecord;
 	sRecord = KFCMinimizeRecord();
 #ifdef KFC_DIAG
@@ -152,9 +152,9 @@ static void KFCRestoreFindChangeStyle()
 	HWND h = r.window;
 
 	// RESTORE IT FIRST IF IT IS MINIMISED. Putting WS_EX_TOOLWINDOW back while the window
-	//   is iconic takes it off the taskbar - and the taskbar is the only way back to it. The user
-	//   would be left with a Find/Change dialog that exists, is not on screen, and cannot be reached
-	//   by any means this plug-in offers.
+	//   is iconic takes it off the taskbar - and the taskbar is the ordinary way back to it. The user
+	//   would be left with a Find/Change dialog that exists and is not on screen, with no taskbar
+	//   button to bring it back by.
 	if (::IsIconic(h))
 		::ShowWindow(h, SW_RESTORE);
 
@@ -218,8 +218,8 @@ bool16 KFCApplyFindChangeMinimizable()
 	// NOT WHILE IT IS MINIMISED. Rebuilding the frame of an iconic window with
 	//   SWP_FRAMECHANGED was followed once by the window being destroyed outright, and
 	//   there is nothing to gain by doing it: a minimised window shows no title bar, so a button
-	//   added now could not be seen anyway. Reported as done, NOT as "no window" - "no window" would
-	//   set the chase running against a state that will not change on its own.
+	//   added now could not be seen anyway. Reported as done, NOT as "not open" - kFalse is the menu's
+	//   "applies when the Find/Change dialog is open" (see the header), and this dialog is open.
 	//   *The user's way out is the ordinary one: restore the dialog, and switch the toggle again.
 	if (::IsIconic(h))
 		return kTrue;
@@ -258,9 +258,9 @@ static bool KFCAnyFindChangeToggleOn()
 // Put each toggle that is ON on the dialog's window, if the lookup can tell the window. True when it
 // could (the toggles are then applied - each one's own Apply decides what that means, "already done" and
 // "minimised, not now" included); false when the dialog cannot be told, which is what the chase waits on.
-// ONE LOOKUP FOR BOTH. The two features are set
-//   going by the same cue and wait on the same window, so the question "is the dialog there yet" is
-//   asked once here, not by each feature's own Apply.
+// ONE LOOKUP FOR BOTH. The two features are set going by the same cue and wait on the same window, so
+//   whether the dialog is there yet is settled once, here - not by what either Apply returns. Each Apply
+//   asks the lookup again and is answered from its cache: the window just found.
 static bool KFCApplyFindChangeToggles()
 {
 	if (KFCQueryFindChangeWindow() == nullptr)
@@ -358,7 +358,7 @@ void KFCChaseFindChangeWindow()
 bool16 KFCRestoreMinimizedFindChange()
 {
 #ifdef WINDOWS
-	// Asked afresh, for both callers (the panel's Open Find/Change... and KFCShowFindChangeDialog): a "not open"
+	// Asked afresh, for its callers (the panel's Open Find/Change... and KFCShowFindChangeDialog): a "not open"
 	// the lookup has cached must not answer here - the caller would go on to InDesign's toggle, which closes a
 	// dialog that is open after all. (How such a "not open" comes about: the chase in the header.) The walk is cheap.
 	KFCForgetFindChangeWindow();
