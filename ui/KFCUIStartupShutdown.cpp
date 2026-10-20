@@ -5,9 +5,10 @@
 //  KohakuFindChange (KFC)
 //
 //  The UI half's startup/shutdown service (the model/UI split). A startup/shutdown service is declared
-//  per boss, and a model plug-in's runs on background threads' start and end as well (guide vol1-07,
-//  "Threading and startup/shutdown services"), so the panel's share - the saved settings, the windows
-//  it follows, the marker's countdown, the ear on the model half - stands here, on a boss of its own.
+//  per boss, and the panel's share - the saved settings, the windows it follows, the marker's countdown,
+//  the ear on the model half - is UI work: it stands here, on a boss of its own in the UI half. (A model
+//  plug-in's service can also be called at each background thread's start and end - guide vol1-07,
+//  "Threading and startup/shutdown services"; KFC's model one is main-thread only, model/KFC.fr says why.)
 //  The model's share is in KFCStartupShutdown.cpp. Neither depends on the other having run: InDesign
 //  does not promise the order two services are called in.
 //
@@ -58,9 +59,11 @@ public:
 		KFCModelObserverAttach();
 	}
 
-	/** Retire the marker idle task (it must leave the queue, and never be re-created, before the app
-	    tears down) and release the UI half's static storage. The panel tab's scoped name is not put
-	    back: a label lives only in the running palette (KFCPanelTitle.h). */
+	/** Take down everything that holds a pointer into this .pln - the observers, the hooks, the timers,
+	    the Return filter and the marker's idle task (which must leave the queue, and never be re-created,
+	    before the app tears down) - put back what KFC changed on InDesign's own windows, and release the
+	    UI half's static storage. The panel tab's scoped name is not put back: a label lives only in the
+	    running palette (KFCPanelTitle.h). */
 	virtual void Shutdown()
 	{
 		// Symmetric with the attach in Startup: while attached the session holds a pointer into this .pln.
@@ -72,34 +75,35 @@ public:
 		// *Symmetric with the KFCAttachPanelVisibilityObserver in Startup above - as KFCBookWatchDetach
 		//  is for its own subject.
 		KFCDetachPanelVisibilityObserver();
-		// "Remember Book Panel Placement" - the same subject, and the same reason, plus its one-shot
-		// timer and its command interceptor (both hold raw pointers into this .pln). Normally already
-		// done by the palette manager's PaletteMgrAboutToShutdown; this is the backstop for a
-		// shutdown that never went through it. Safe to run twice.
+		// "Remember Book Panel Placement" - the same subject, and the same reason, plus its timers (the
+		// restore's and the Home screen's) and its command interceptor, all holding raw pointers into
+		// this .pln. Normally already done by the palette manager's PaletteMgrAboutToShutdown; this is
+		// the backstop for a shutdown that never went through it. Safe to run twice.
 		KFCBookPanelPlacement::ShutdownCleanup();
-		// The Win32 event hook and the one-shot timer of the translucency toggle. *ICallbackTimer's
-		// callback is a raw function pointer that is not reference counted, and a WinEvent hook left
-		// up is a leaked resource - neither may outlive this .pln.
+		// The translucency toggles': the Win32 event hook, the reapply timer, and the WS_EX_LAYERED KFC
+		// put on InDesign's own Find/Change dialog, taken back off. *ICallbackTimer's callback is a raw
+		// function pointer that is not reference counted, and a WinEvent hook left up is a leaked
+		// resource - neither may outlive this .pln.
 		KFCShutdownPanelAlpha();
-		// InDesign's OWN Find/Change dialog again - its window STYLE this time. The same reason as
-		// the WS_EX_LAYERED on the line above: it is somebody else's window, and what we put on it
-		// must not outlive us. *It also restores a MINIMISED dialog before undoing anything - see
-		//  KFCRestoreFindChangeStyle for why that order is not optional.
+		// InDesign's OWN Find/Change dialog again - its window STYLE this time, after the retry timer that
+		// books it is let go. The same reason as the WS_EX_LAYERED on the line above: it is somebody
+		// else's window, and what we put on it must not outlive us. *It also restores a MINIMISED dialog
+		// before undoing anything - see KFCRestoreFindChangeStyle for why that order is not optional.
 		KFCShutdownFindChangeMinimize();
-		// The Application Bar link's two hooks, its observer and its pending search and write-back: the
+		// The Application Bar link's hooks, its observer and its pending search and write-back: the
 		// hook procedures and the timers' callbacks are raw pointers into this .pln -
 		// KFCShutdownAppBarSearchEnter.
 		KFCShutdownAppBarSearchEnter();
-		// The marker's countdown. (The marker's own state is the model half's, emptied by its own
-		// shutdown - KFCHitMarker::ShutdownCleanup refuses every call after it, so a countdown that fires
-		// in between finds nothing to take down, whichever service InDesign calls first.)
+		// The marker's countdown. (The marker's own state is the model half's - KFCStartupShutdown.cpp
+		// says why either order of the two services is safe.)
 		KFCMarkerExpiryIdleTask::Shutdown();
-		// ...and the line the panel last reported: a static PMString (see KFCResultTree::ShutdownCleanup).
+		// ...and the line the panel last reported - a static PMString - and the Return filter the list pushes on
+		// the application's event dispatcher: both in KFCResultTree::ShutdownCleanup.
 		KFCResultTree::ShutdownCleanup();
-		// ...and the query dialog's two lists: static vectors of PMStrings and IDFiles (a review found them left for
-		// the unload).
+		// ...and the query dialog's two lists: static vectors of PMStrings and IDFiles.
 		KFCQueryOrder::ShutdownCleanup();
-		// ...and the results kept in tiers: their copies of the rows are PMStrings in static vectors (KFCResultHistory).
+		// ...and the results kept in tiers: their copies of the rows are PMStrings in static vectors, and the tier
+		// switch's booking timer (KFCResultHistory).
 		KFCResultHistory::ShutdownCleanup();
 	}
 };

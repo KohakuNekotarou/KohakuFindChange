@@ -7,12 +7,11 @@
 //  "How to Use..." on the panel's flyout menu: the plug-in's operating reference,
 //  shown in a ScriptUI dialog run through the plug-in's own script engine - a multiline edit box,
 //  so the text can be scrolled, selected and copied, none of which CAlert's static text can do.
-//  The recipe (private engine name, pure-ASCII script built by escaping every non-ASCII code unit
-//  as \uXXXX, CAlert as the fallback) is KESCL's, written for the same job.
+//  The recipe - a private engine name, a pure-ASCII script (every non-ASCII code unit escaped as
+//  \uXXXX), CAlert as the fallback - is the one KESCL's How to Use uses too.
 //
 //  Why the text is here and not in the string tables: odfrc caps a single string literal at about
-//  3.1KB and this reference is several times that - the reason KESCL moved its own reference into
-//  C++ as well.
+//  3.1KB, and this reference is several times that.
 //
 //  NOTE: this file holds Japanese text and MUST stay UTF-8 WITH BOM - without it MSVC reads it as
 //  CP932 and the wide literals below break.
@@ -147,9 +146,10 @@ const wchar_t* const kHowToJA =
 // Helpers
 //========================================================================================
 
-/** Append 'text' to 'out' as the body of a JavaScript double-quoted string literal.
-	Everything outside printable ASCII goes out as \uXXXX, so the generated script is pure
-	ASCII whatever the text held - no encoding to get wrong on the way to the engine. */
+/** Append 'text' to 'out' as the body of a JavaScript double-quoted string literal: the quote and
+	the backslash escaped, a line break or a tab as \n, \r or \t, and every other code unit outside
+	printable ASCII as \uXXXX (a surrogate pair as two), so the generated script is pure ASCII
+	whatever the text held - no encoding to get wrong on the way to the engine. */
 void AppendJSEscaped(std::string& out, const wchar_t* text)
 {
 	for (const wchar_t* p = text; *p != 0; ++p)
@@ -186,8 +186,8 @@ void AppendJSEscaped(std::string& out, const wchar_t* text)
 
 void KFCHowTo::Show()
 {
-	// Japanese InDesign gets the Japanese reference, everything else the English one - the one thing KFC switches by
-	// UI language (the string tables are English in every UI language - model/KFC.fr's LocaleIndex note). What is
+	// A Japanese UI gets the Japanese reference, every other the English one - the one text of KFC's own that follows
+	// the UI language (the string tables are English in every UI language - model/KFC.fr's LocaleIndex note). What is
 	// asked is the UI LANGUAGE, not the featureset (PMLocaleId keeps them as separate axes - PMLocaleId.h:39-43): a
 	// Roman-engine install running a Japanese UI gets the Japanese page.
 	const wchar_t* const text = (LocaleSetting::GetLocale().GetUserInterfaceId() == k_jaJP) ? kHowToJA : kHowToEN;
@@ -222,7 +222,8 @@ void KFCHowTo::Show()
 
 	// Script route unavailable or failed: the plain (non-scrollable) alert is better than no
 	// reference at all. A failed run leaves no global error standing - the return code carries the
-	// failure (measured on a throw, a parse error and a failing DOM call) - so nothing is cleared first.
+	// failure (measured with KT's scripterr probe on a throw, a parse error and a failing DOM call:
+	// docs/ai-notes/kfc-block13-inspections-2026-10-20.md) - so nothing is cleared first.
 	//
 	// It is the one route that needs a heading. The reference itself carries none - the ScriptUI
 	// window puts the title (kHowToTitle) in its title bar, so a first line saying the same

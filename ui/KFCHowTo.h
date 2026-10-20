@@ -17,9 +17,9 @@
 
 namespace KFCHowTo
 {
-	/** Show the operating reference. Japanese on a Japanese InDesign, English otherwise - the one
-	    thing KFC switches by UI language, asked in Show() itself (everything from the string
-	    table is English in every UI language). */
+	/** Show the operating reference: Japanese when InDesign's UI language is Japanese, English
+	    otherwise - the one text of KFC's own that follows the UI language (everything from the
+	    string tables is English in every UI language), asked in Show() itself. */
 	void Show();
 }
 
