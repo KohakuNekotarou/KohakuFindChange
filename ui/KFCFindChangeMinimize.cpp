@@ -43,7 +43,9 @@ static bool16 sFindChangeMinimizable = kFalse;
 
 #ifdef WINDOWS
 
-// The window WE changed, and which of the three flags it already had.
+// The window WE changed, and which of the three flags it already had - ONE record, kept as ONE value: taken in one
+// assignment (KFCApplyFindChangeMinimizable) and forgotten in one (KFCRestoreFindChangeStyle), and the check and the
+// restore read the copy they are handed - never what is left behind once the record is forgotten.
 //  *ONE set, not a list: a modeless dialog can only be open once at a time, whatever
 //   allowMultipleCopies says (IDialogMgr.h:67).
 //
@@ -60,10 +62,14 @@ static bool16 sFindChangeMinimizable = kFalse;
 //    KFCPanelAlpha.cpp masks one bit off the value it has just read).
 //   *Remembering "did it already have this?" rather than "clear what we set" still protects a
 //    window that arrived carrying the flag: a future build might, and it must keep it.
-static HWND sMinWnd     = nullptr;
-static bool sHadMinBox  = false;	// did it already have WS_MINIMIZEBOX?
-static bool sHadToolWin = false;	// did it already have WS_EX_TOOLWINDOW? (in practice it does)
-static bool sHadAppWin  = false;	// did it already have WS_EX_APPWINDOW?
+struct KFCMinimizeRecord
+{
+	HWND window     = nullptr;	// nullptr = no record
+	bool hadMinBox  = false;	// did it already have WS_MINIMIZEBOX?
+	bool hadToolWin = false;	// did it already have WS_EX_TOOLWINDOW? (in practice it does)
+	bool hadAppWin  = false;	// did it already have WS_EX_APPWINDOW?
+};
+static KFCMinimizeRecord sRecord;
 
 // The chase - for both toggles on the dialog's window (see the constants in the header).
 static ICallbackTimer* sRetryTimer   = nil;
@@ -104,14 +110,14 @@ static HWND KFCDiagDecoyWindow()
 //       (KFCIsFindChangeShapedWindow in KFCPanelAlpha.cpp, which the translucency side's restore and
 //       the cached handle ask as well)
 //     . OUR marks are still on it - what we changed still reads the way we left it
-static bool KFCStillOurFindChangeWindow(HWND h)
+static bool KFCStillOurFindChangeWindow(const KFCMinimizeRecord& r)
 {
-	if (!KFCIsFindChangeShapedWindow(h))
+	if (!KFCIsFindChangeShapedWindow(r.window))
 		return false;
-	const LONG_PTR ex = ::GetWindowLongPtr(h, GWL_EXSTYLE);
-	if (!sHadAppWin && (ex & WS_EX_APPWINDOW) == 0)
+	const LONG_PTR ex = ::GetWindowLongPtr(r.window, GWL_EXSTYLE);
+	if (!r.hadAppWin && (ex & WS_EX_APPWINDOW) == 0)
 		return false;		// we put it on, and it is not there
-	if (sHadToolWin && (ex & WS_EX_TOOLWINDOW) != 0)
+	if (r.hadToolWin && (ex & WS_EX_TOOLWINDOW) != 0)
 		return false;		// we took it off, and it is back
 	return true;
 }
@@ -120,30 +126,30 @@ static bool KFCStillOurFindChangeWindow(HWND h)
 // three callers: the toggle going OFF, a different dialog window turning up, and shutdown.
 static void KFCRestoreFindChangeStyle()
 {
-	if (sMinWnd == nullptr)
+	if (sRecord.window == nullptr)
 		return;
+	// *Forgotten first, and whether or not anything below succeeds. A handle the OS has recycled must
+	//  never be written to on a later pass - it can name a different window by then
+	//  (memory/panel-hwnd-from-paletteref.md records the same hazard on the panel side).
+	KFCMinimizeRecord r = sRecord;
+	sRecord = KFCMinimizeRecord();
 #ifdef KFC_DIAG
 	if (HWND decoy = KFCDiagDecoyWindow())
 	{
 		KFC_DIAG_LOG("FCMIN restore: the record (0x%llx) pointed at the decoy 0x%llx",
-			static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(sMinWnd)),
+			static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(r.window)),
 			static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(decoy)));
-		sMinWnd = decoy;
+		r.window = decoy;
 	}
 #endif
 
-	HWND h = sMinWnd;
-	// *Forgotten first, and whether or not anything below succeeds. A handle the OS has recycled must
-	//  never be written to on a later pass - it can name a different window by then
-	//  (memory/panel-hwnd-from-paletteref.md records the same hazard on the panel side).
-	sMinWnd = nullptr;
-
-	if (!KFCStillOurFindChangeWindow(h))
+	if (!KFCStillOurFindChangeWindow(r))
 	{
 		KFC_DIAG_LOG("FCMIN restore: 0x%llx is no longer the dialog we styled - left alone",
-			static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(h)));
+			static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(r.window)));
 		return;
 	}
+	HWND h = r.window;
 
 	// RESTORE IT FIRST IF IT IS MINIMISED. Putting WS_EX_TOOLWINDOW back while the window
 	//   is iconic takes it off the taskbar - and the taskbar is the only way back to it. The user
@@ -153,16 +159,16 @@ static void KFCRestoreFindChangeStyle()
 		::ShowWindow(h, SW_RESTORE);
 
 	// EACH FLAG ON ITS OWN, LAID ON TOP OF THE CURRENT WORD. Never a saved word written back
-	//   wholesale - see the note over sMinWnd for what that costs.
+	//   wholesale - see the note over KFCMinimizeRecord for what that costs.
 	LONG_PTR st = ::GetWindowLongPtr(h, GWL_STYLE);
-	if (!sHadMinBox)
+	if (!r.hadMinBox)
 		st &= ~WS_MINIMIZEBOX;
 	::SetWindowLongPtr(h, GWL_STYLE, st);
 
 	LONG_PTR ex = ::GetWindowLongPtr(h, GWL_EXSTYLE);
-	if (sHadToolWin)
+	if (r.hadToolWin)
 		ex |= WS_EX_TOOLWINDOW;
-	if (!sHadAppWin)
+	if (!r.hadAppWin)
 		ex &= ~WS_EX_APPWINDOW;
 	::SetWindowLongPtr(h, GWL_EXSTYLE, ex);
 
@@ -202,11 +208,11 @@ bool16 KFCApplyFindChangeMinimizable()
 
 	HWND h = KFCQueryFindChangeWindow();
 	KFC_DIAG_LOG("FCMIN apply: dialog window 0x%llx%s", static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(h)),
-		(h != nullptr && h == sMinWnd) ? " (already ours)" : "");
+		(h != nullptr && h == sRecord.window) ? " (already ours)" : "");
 	if (h == nullptr)
 		return kFalse;		// not open (or not built yet); the chase below is what answers that
 
-	if (h == sMinWnd)
+	if (h == sRecord.window)
 		return kTrue;		// already done, to this very window
 
 	// NOT WHILE IT IS MINIMISED. Rebuilding the frame of an iconic window with
@@ -224,11 +230,13 @@ bool16 KFCApplyFindChangeMinimizable()
 
 	const LONG_PTR st = ::GetWindowLongPtr(h, GWL_STYLE);
 	const LONG_PTR ex = ::GetWindowLongPtr(h, GWL_EXSTYLE);
-	// Remember only whether each flag was ALREADY there - not the words themselves. See sMinWnd.
-	sHadMinBox  = ((st & WS_MINIMIZEBOX)   != 0);
-	sHadToolWin = ((ex & WS_EX_TOOLWINDOW) != 0);
-	sHadAppWin  = ((ex & WS_EX_APPWINDOW)  != 0);
-	sMinWnd     = h;
+	// Remember only whether each flag was ALREADY there - not the words themselves. See KFCMinimizeRecord.
+	KFCMinimizeRecord taken;
+	taken.window     = h;
+	taken.hadMinBox  = ((st & WS_MINIMIZEBOX)   != 0);
+	taken.hadToolWin = ((ex & WS_EX_TOOLWINDOW) != 0);
+	taken.hadAppWin  = ((ex & WS_EX_APPWINDOW)  != 0);
+	sRecord = taken;
 
 	::SetWindowLongPtr(h, GWL_STYLE,   st | WS_MINIMIZEBOX);
 	::SetWindowLongPtr(h, GWL_EXSTYLE, (ex & ~WS_EX_TOOLWINDOW) | WS_EX_APPWINDOW);
@@ -330,8 +338,6 @@ void KFCChaseFindChangeWindow()
 	sRetriesLeft = kKFCFindChangeChaseTries;
 	if (sRetriesLeft <= 0)
 		return;		// the constant is 0 = the chase is turned off
-	KFC_DIAG_LOG("FCCHASE no dialog window - %d tries %ums apart booked", kKFCFindChangeChaseTries,
-		kKFCFindChangeChaseDelayMillis);
 
 	if (sRetryTimer == nil)
 		sRetryTimer = ::CreateObject2<ICallbackTimer>(kCallbackTimerBoss, IID_ICALLBACKTIMER);
@@ -344,6 +350,8 @@ void KFCChaseFindChangeWindow()
 	//  callback - the window-list observer is the caller.)
 	sRetryTimer->StopTimer();
 	sRetryTimer->StartTimer(KFCFindChangeChaseProc, kKFCFindChangeChaseDelayMillis, nil);
+	KFC_DIAG_LOG("FCCHASE no dialog window - %d tries %ums apart booked", kKFCFindChangeChaseTries,
+		kKFCFindChangeChaseDelayMillis);
 #endif
 }
 
