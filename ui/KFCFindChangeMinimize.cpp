@@ -76,25 +76,18 @@ static bool            sMinimizeShutdown = false;
 static uint32 KFCFindChangeChaseProc(void* refPtr);
 
 #ifdef KFC_DIAG
-// Fault switch "fcmin-decoy" (test builds only): %TEMP%\kbs-diag-fault-fcmin-decoy holds a
-// window handle in hex, and the record is pointed at it just before it is put back - what a handle the
-// OS has since given to somebody else's window looks like. A test makes a window of its own for it.
+// Fault switch "fcmin-decoy" (test builds only): its file holds a window handle in hex, and the record is
+// pointed at it just before it is put back - what a handle the OS has since given to somebody else's window
+// looks like. A test makes a window of its own for it. The file is read the way every switch's is
+// (KFCDiagFaultText in KFCDiag.h - where the file is, and its first line).
 static HWND KFCDiagDecoyWindow()
 {
-	char* temp = nullptr;
-	size_t len = 0;
-	if (_dupenv_s(&temp, &len, "TEMP") != 0 || temp == nullptr)
+	std::string text;
+	if (!KFCDiagFaultText("fcmin-decoy", text))
 		return nullptr;
-	char path[600] = { 0 };
-	_snprintf_s(path, sizeof(path), _TRUNCATE, "%s\\kbs-diag-fault-fcmin-decoy", temp);
-	free(temp);
-	FILE* f = nullptr;
-	if (fopen_s(&f, path, "r") != 0 || f == nullptr)
-		return nullptr;
-	unsigned long long value = 0;
-	const int read = fscanf_s(f, "%llx", &value);
-	fclose(f);
-	return (read == 1) ? reinterpret_cast<HWND>(static_cast<uintptr_t>(value)) : nullptr;
+	char* end = nullptr;
+	const unsigned long long value = ::strtoull(text.c_str(), &end, 16);
+	return (end != text.c_str()) ? reinterpret_cast<HWND>(static_cast<uintptr_t>(value)) : nullptr;
 }
 #endif
 
@@ -357,8 +350,9 @@ void KFCChaseFindChangeWindow()
 bool16 KFCRestoreMinimizedFindChange()
 {
 #ifdef WINDOWS
-	// Asked afresh - the window list has not changed since the dialog was minimised, so the cache would
-	// do, but a menu press is rare and the walk is cheap.
+	// Asked afresh, for both callers (the panel's Open Find/Change... and KFCShowFindChangeDialog): a "not open"
+	// the lookup has cached must not answer here - the caller would go on to InDesign's toggle, which closes a
+	// dialog that is open after all. (How such a "not open" comes about: the chase in the header.) The walk is cheap.
 	KFCForgetFindChangeWindow();
 	HWND h = KFCQueryFindChangeWindow();
 	if (h == nullptr || !::IsIconic(h))
@@ -376,16 +370,14 @@ bool16 KFCRestoreMinimizedFindChange()
 bool16 KFCShowFindChangeDialog()
 {
 #ifdef WINDOWS
-	// Asked afresh, as above: a cached "not open" must not answer for a dialog opened since.
-	KFCForgetFindChangeWindow();
-	HWND h = KFCQueryFindChangeWindow();
-	if (h != nullptr)
+	// Minimised: restored, by the one function that does it (KFCRestoreMinimizedFindChange - it asks the window
+	// afresh, and says why).
+	if (KFCRestoreMinimizedFindChange())
+		return kTrue;
+	// Open and on screen: left alone. (Asked afresh just now, above - the lookup answers from that.)
+	if (HWND h = KFCQueryFindChangeWindow())
 	{
-		const bool wasMinimized = (::IsIconic(h) != FALSE);
-		if (wasMinimized)
-			::ShowWindow(h, SW_RESTORE);
-		KFC_DIAG_LOG("FCSHOW 0x%llx was open%s", static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(h)),
-			wasMinimized ? " and minimized - restored" : "");
+		KFC_DIAG_LOG("FCSHOW 0x%llx was open", static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(h)));
 		return kTrue;
 	}
 	ISession* session = GetExecutionContextSession();
