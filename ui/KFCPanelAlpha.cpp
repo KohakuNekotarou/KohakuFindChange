@@ -56,6 +56,7 @@
 #include "KFCFindChangeMinimize.h"	// the minimize box rides the same window-list notification
 #include "KFCUIID.h"				// kKFCPanelWidgetID (the panel to aim at) + our IIDs / ImplIDs
 #include "KFCDiag.h"				// KFC_DIAG_LOG (test builds only)
+#include "KFCBookPanelLookup.h"		// QueryPanelManager - the panel manager, nil once the session is gone
 
 // For the observer that follows the panel being shown, hidden, docked or floated:
 #include "CObserver.h"
@@ -304,6 +305,18 @@ static bool KFCClassIs(HWND h, const wchar_t* wanted)
 	return ::wcscmp(cls, wanted) == 0;
 }
 
+// Is 'h' one of the two windows a panel floats in - "OWL.Dock" (floating) or "OWL.FrameDrawer" (pulled out of an
+// icon as a drawer)? Asked here alone - for the window the panel is on now and for the one it left.
+// !Testing for "OWL.Dock" alone silently leaves the drawer out (seen in KCM).
+// *The class is read once, not once per name: the hook asks on every cursor move.
+static bool KFCIsFloatingContainer(HWND h)
+{
+	wchar_t cls[64] = { 0 };
+	if (h == nullptr || ::GetClassNameW(h, cls, 64) == 0)
+		return false;
+	return ::wcscmp(cls, L"OWL.Dock") == 0 || ::wcscmp(cls, L"OWL.FrameDrawer") == 0;
+}
+
 // See the declaration in KFCPanelAlpha.h.
 bool KFCIsFindChangeShapedWindow(HWND h)
 {
@@ -343,16 +356,7 @@ bool KFCIsFindChangeShapedWindow(HWND h)
 // cases are handled, and it has measurements behind it.
 static HWND KFCQueryPanelPaletteFromSDK()
 {
-	// *The session can be gone during shutdown.
-	ISession* session = GetExecutionContextSession();
-	if (session == nil)
-		return nullptr;
-
-	InterfacePtr<IApplication> app(session->QueryApplication());
-	if (app == nil)
-		return nullptr;
-
-	InterfacePtr<IPanelMgr> panelMgr(app->QueryPanelManager());
+	InterfacePtr<IPanelMgr> panelMgr(KFCBookPanelLookup::QueryPanelManager());
 	if (panelMgr == nil)
 		return nullptr;
 
@@ -425,8 +429,8 @@ static void KFCForgetPaletteWindow()
 //                       with it -> cannot be controlled on its own
 //     "OWL.Dock"        floating. EXSTYLE = 0x08080000
 //     "OWL.FrameDrawer" pulled out of an icon as a drawer. EXSTYLE = 0x08080000
-//   InDesign itself put WS_EX_LAYERED on the latter two, so they are treated identically.
-// !Testing for "OWL.Dock" alone silently leaves the drawer out (seen in KCM).
+//   InDesign itself put WS_EX_LAYERED on the latter two, so they are treated identically
+//   (KFCIsFloatingContainer).
 static HWND KFCQueryTranslucentTarget(HWND palette)
 {
 	if (palette == nullptr)
@@ -436,14 +440,7 @@ static HWND KFCQueryTranslucentTarget(HWND palette)
 	if (root == nullptr || root == palette)
 		return nullptr;
 
-	wchar_t cls[64] = { 0 };
-	if (::GetClassNameW(root, cls, 64) == 0)
-		return nullptr;
-
-	if (::wcscmp(cls, L"OWL.Dock") == 0 || ::wcscmp(cls, L"OWL.FrameDrawer") == 0)
-		return root;
-
-	return nullptr;		// "indesign" = the main frame = docked and expanded
+	return KFCIsFloatingContainer(root) ? root : nullptr;	// "indesign" = the main frame = docked and expanded
 }
 
 // THE FLOATING WINDOW WE LAST LEFT FAINT.
@@ -486,7 +483,7 @@ static void KFCReleaseFormerFaintWindow(HWND current)
 	::GetWindowThreadProcessId(h, &pid);
 	if (pid != ::GetCurrentProcessId())
 		return;
-	if (!KFCClassIs(h, L"OWL.Dock") && !KFCClassIs(h, L"OWL.FrameDrawer"))
+	if (!KFCIsFloatingContainer(h))
 		return;
 
 	::SetLayeredWindowAttributes(h, 0, 255, LWA_ALPHA);
@@ -738,9 +735,27 @@ void KFCForgetFindChangeWindow()
 	sFcLookedUp = kFalse;
 }
 
-// See the declaration in the header - what was measured, and why changedBy is matched by value first.
+// Could the window a kWindowAddedMessage names be InDesign's own Find/Change dialog? The chase waits
+// for that dialog's window (KFCChaseFindChangeWindow - both toggles'), and without this test it is set
+// going by EVERY window that opens - !MEASURED with the dialog closed: a new document's window started
+// it, and it walked the window list 8 times over about a second before giving up.
+// What the message carries, measured on a test build: changedBy IS the added IWindow (the
+// same pointer as the newest entry of the window list), and
+//   . a document window is no dialog (IDialog absent)                 -> kFalse
+//   . the Find/Change dialog opened for the FIRST time in a session is a dialog whose panel is NOT SET
+//     YET (GetDialogPanel nil) - which is why the window-list lookup cannot see it at that moment, and
+//     why the chase exists (not on every first opening: one session's first dialog was styled at
+//     the cue itself, untraced, and the next session's was not - its trace read "1 dialog(s)
+//     without a panel")                                                -> kTrue
+//     (another dialog opened for the first time looks the same, and is chased the same - the chase is
+//      bounded, and a dialog's first opening is rare next to documents opening)
+//   . opened again later, it carries kFindChangeParentWidgetID at once -> kTrue
+//   . any other dialog, its panel set                                  -> kFalse
+// *changedBy is matched against the list's own pointers BY VALUE before anything is asked of it, so a
+//  pointer of some other kind is never dereferenced; one that matches nothing answers kTrue - the chase
+//  runs, rather than a dialog being left without its button. Always kFalse on Mac.
 // *GetNthWindow hands back pointers that are NOT addref'd (as in KFCQueryFindChangeIWindow above).
-bool16 KFCWindowMayBeFindChange(void* changedBy)
+static bool16 KFCWindowMayBeFindChange(void* changedBy)
 {
 	ISession* session = GetExecutionContextSession();
 	InterfacePtr<IApplication> app(session != nil ? session->QueryApplication() : nil);
@@ -1225,7 +1240,7 @@ void KFCShutdownPanelAlpha()
 
 static void KFCScheduleReapply() {}
 void        KFCForgetFindChangeWindow() {}		// *not static - see the declaration in the header
-bool16      KFCWindowMayBeFindChange(void*) { return kFalse; }
+static bool16 KFCWindowMayBeFindChange(void*) { return kFalse; }
 static void KFCForgetPaletteWindow() {}
 void        KFCShutdownPanelAlpha() {}
 

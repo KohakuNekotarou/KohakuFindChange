@@ -157,27 +157,6 @@ void	KFCCommitWindowStyle(HWND h);
 //  both toggles share (KFCChaseFindChangeWindow in KFCFindChangeMinimize.h).
 void	KFCForgetFindChangeWindow();
 
-// Could the window a kWindowAddedMessage names be InDesign's own Find/Change dialog? The chase waits
-// for that dialog's window (KFCChaseFindChangeWindow - both toggles'), and without this test it is set
-// going by EVERY window that opens - !MEASURED with the dialog closed: a new document's window started
-// it, and it walked the window list 8 times over about a second before giving up.
-// What the message carries, measured on a test build: changedBy IS the added IWindow (the
-// same pointer as the newest entry of the window list), and
-//   . a document window is no dialog (IDialog absent)                 -> kFalse
-//   . the Find/Change dialog opened for the FIRST time in a session is a dialog whose panel is NOT SET
-//     YET (GetDialogPanel nil) - which is why the window-list lookup cannot see it at that moment, and
-//     why the chase exists (not on every first opening: one session's first dialog was styled at
-//     the cue itself, untraced, and the next session's was not - its trace read "1 dialog(s)
-//     without a panel")                                                -> kTrue
-//     (another dialog opened for the first time looks the same, and is chased the same - the chase is
-//      bounded, and a dialog's first opening is rare next to documents opening)
-//   . opened again later, it carries kFindChangeParentWidgetID at once -> kTrue
-//   . any other dialog, its panel set                                  -> kFalse
-// *changedBy is matched against the list's own pointers BY VALUE before anything is asked of it, so a
-//  pointer of some other kind is never dereferenced; one that matches nothing answers kTrue - the chase
-//  runs, rather than a dialog being left without its button. Always kFalse on Mac.
-bool16	KFCWindowMayBeFindChange(void* changedBy);
-
 // Start listening for the panel being shown, hidden, docked or floated.
 // *Called from TWO places, and safe to call again: KFCUIStartupShutdown::Startup, and the panel's
 //   own AutoAttach (KFCPanelTitle.cpp). !The second one is not belt and braces - the panel manager
