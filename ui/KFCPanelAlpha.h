@@ -162,14 +162,14 @@ void	KFCForgetFindChangeWindow();
 //   own AutoAttach (KFCPanelTitle.cpp). !The second one is not belt and braces - the panel manager
 //   comes up partway through the application's startup sequence, so at Startup it can still be nil,
 //   and that subscription is picked up on the AutoAttach pass instead. Each attachment asks
-//   IsAttached first, so repeating the call attaches nothing twice. Does nothing once the detach below
-//   has run.
+//   IsAttached first, so repeating the call attaches nothing twice. Does nothing while the application
+//   is going down (the detach below is the quit's).
 // *How: kPaletteVisibilityChangedMessage, broadcast from kPanelManagerBoss's IID_IPANELMGR subject
 //   (identified on a debug build's Spy). Two further subjects hang off kAppBoss - see
 //   the function itself.
 void	KFCAttachPanelVisibilityObserver();
 
-// Undo every attachment the above makes, and attach nothing again after it. Called as the palette
+// Undo every attachment the above makes. Called as the palette
 // manager is about to close the palettes (KFC's palette-manager service, KFCBookPanelPlacement.cpp) -
 // the session, the active context and the panel manager are all up then - and again from the plug-in's
 // shutdown as the backstop, where the observer can no longer be reached (measured). Either way before

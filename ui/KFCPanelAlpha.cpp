@@ -1280,7 +1280,7 @@ void        KFCShutdownPanelAlpha() {}
 //     happens. The subjects outliving the observer is the whole problem: what they keep is a pointer
 //     into code that is going away, and leaving it there is what makes a late notification reach freed
 //     code. The three subscriptions are one list the attach and the detach both walk
-//     (KFCForEachVisibilitySubscription), and nothing attaches after the detach (sVisibilityObserverClosed).
+//     (KFCForEachVisibilitySubscription), and nothing attaches while the application is going down.
 //========================================================================================
 
 //========================================================================================
@@ -1535,10 +1535,6 @@ static bool KFCQueryVisibilityObserver(InterfacePtr<IObserver>& outObs, Interfac
 	return outApp != nil;
 }
 
-// **The detach below has run: never attach again. Nothing after it could take an attachment back off -
-//   the plug-in's shutdown can no longer reach the observer - so one made then would outlive the observer.
-static bool sVisibilityObserverClosed = false;
-
 // THE OBSERVER'S THREE SUBSCRIPTIONS, IN ONE LIST that the attach and the detach both walk - so one cannot be added to
 // the attach and forgotten in the detach (linksui carries a live bug from attaching and detaching asymmetrically).
 // Each subject that exists is handed to 'each' with the protocol it is listened on; the answer is whether the panel
@@ -1577,12 +1573,17 @@ static bool KFCForEachVisibilitySubscription(IApplication* app,
 
 void KFCAttachPanelVisibilityObserver()
 {
-	if (sVisibilityObserverClosed)
-		return;
-
 	InterfacePtr<IObserver> obs;
 	InterfacePtr<IApplication> app;
 	if (!KFCQueryVisibilityObserver(obs, app))
+		return;
+
+	// **NEVER WHILE THE APPLICATION IS GOING DOWN. Nothing after the detach below could take an attachment back off -
+	//   the plug-in's shutdown can no longer reach the observer - so one made then would outlive the observer. The
+	//   detach's moment is the quit's own (measured: the palette manager's close comes at kShuttingDown), so asking
+	//   the application covers it exactly, and leaves the observer free to come back if the palettes ever closed
+	//   while the application ran on (a "detached for good" flag would not).
+	if (app->GetApplicationState() >= IApplication::kQuitting)
 		return;
 
 	int32 attached = 0;		// (test builds: what this call actually added)
@@ -1594,7 +1595,8 @@ void KFCAttachPanelVisibilityObserver()
 			++attached;
 		}
 	});
-	KFC_DIAG_LOG("PANELVIS attach: panel manager %s, %d attached", panelMgrUp ? "up" : "not up", attached);
+	KFC_DIAG_LOG("PANELVIS attach: panel manager %s, %d attached (application state %d)", panelMgrUp ? "up" : "not up",
+		attached, static_cast<int>(app->GetApplicationState()));
 	(void)panelMgrUp;
 }
 
@@ -1618,8 +1620,6 @@ void KFCAttachPanelVisibilityObserver()
 //     sPanelAlphaShutdown covers anything still in flight (this file's timer section).
 void KFCDetachPanelVisibilityObserver()
 {
-	sVisibilityObserverClosed = true;		// **first: nothing attaches again after this
-
 	InterfacePtr<IObserver> obs;
 	InterfacePtr<IApplication> app;
 	if (!KFCQueryVisibilityObserver(obs, app))
@@ -1637,7 +1637,8 @@ void KFCDetachPanelVisibilityObserver()
 			++detached;
 		}
 	});
-	KFC_DIAG_LOG("PANELVIS detach: panel manager %s, %d detached", panelMgrUp ? "up" : "gone", detached);
+	KFC_DIAG_LOG("PANELVIS detach: panel manager %s, %d detached (application state %d)", panelMgrUp ? "up" : "gone",
+		detached, static_cast<int>(app->GetApplicationState()));
 	(void)panelMgrUp;
 }
 
