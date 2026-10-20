@@ -26,6 +26,10 @@
 //  WS_EX_APPWINDOW is added as well, so the minimised dialog lands on the TASKBAR (the author's
 //  choice). Without it Windows leaves a 160x28 title-bar-only window at the bottom left of the
 //  screen - the owned-popup behaviour, measured at L=0 T=700 R=160 B=728.
+//  *A dialog CLOSED while minimised comes back at the screen's top-left: InDesign remembers where a
+//   dialog was when it closed, and a minimised window sits off screen (-32000). Left so (the
+//   author's call) - restoring it inside the window list's "removed" notice would move a dialog
+//   InDesign is in the middle of closing.
 //
 //  The window is found by KFCQueryFindChangeWindow (KFCPanelAlpha.h) - the SAME lookup the
 //  translucency toggle uses, deliberately not a second copy of that judgement. And the chase that asks
