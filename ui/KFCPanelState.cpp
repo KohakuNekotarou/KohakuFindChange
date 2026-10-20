@@ -46,8 +46,9 @@
 #include "KFCBookPanelPlacement.h"	// "Remember Book Panel Placement" and the placement it keeps
 #include "KFCModelAccess.h"		// KFCChapters() - Find/Change Selected Documents (Book) is the model half's flag
 
-// MoveFileEx - the side file put in place (KFCWriteWholeFile). KFC is Windows alone. After
-// the SDK headers, so its macros cannot collide with SDK names (as KFCPanelAlpha.cpp).
+// MoveFileEx - the side file put in place (KFCWriteWholeFile). KFC is Windows alone. (windows.h is in
+// already, ahead of the SDK headers - the precompiled header brings it, KFCPanelAlpha.cpp says how - so
+// this line only marks the file as one that reaches Win32.)
 #include <windows.h>
 
 // The file name, in the roaming preferences folder itself.

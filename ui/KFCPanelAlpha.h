@@ -114,13 +114,8 @@ bool16	KFCApplyFindChangeTranslucency();
 //     can name somebody else's window (memory/panel-hwnd-from-paletteref.md)
 //   . nullptr means "not open", and also "open, but the platform window does not exist yet"
 #ifdef WINDOWS
-// *HWND is named here WITHOUT pulling windows.h into this header: most of the .cpp files that include
-//  it have no business with Win32, and the ones that do include windows.h themselves (a grep for
-//  windows.h lists them). This is the declaration windows.h itself makes (DECLARE_HANDLE expands to
-//  exactly this), so the two can appear in either order.
-struct HWND__;
-typedef struct HWND__* HWND;
-
+// (HWND is windows.h's, which the precompiled header has brought into every .cpp before this header is
+//  read - the SDK's own WSysType.h names HWND the same way.)
 HWND	KFCQueryFindChangeWindow();
 
 // One of the Find/Change dialog's own widgets, by its WidgetID - its Query menu

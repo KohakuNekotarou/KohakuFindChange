@@ -59,7 +59,8 @@
 #include "KFCUIID.h"
 
 #ifdef WINDOWS
-// windows.h goes AFTER the SDK headers, so its macros cannot collide with SDK names (KCMBookDialog.cpp, KFCFindChangeMinimize.cpp).
+// windows.h is in already, ahead of the SDK headers - the precompiled header brings it (KFCPanelAlpha.cpp
+// says how) - so this line only marks the file as one that reaches Win32 (the dialog's minimize box).
 #include <windows.h>
 #endif
 

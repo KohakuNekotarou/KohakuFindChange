@@ -89,7 +89,12 @@
 #include "CPMUnknown.h"			// the implementation base
 #include "IMouseRollOver.h"		// MouseEnter / MouseOver / MouseLeave (ui/IMouseRollOver.h)
 
-// *windows.h goes AFTER the SDK headers, so its macros cannot collide with SDK names.
+// *windows.h is in already: the precompiled header (VCPlugInHeaders.h -> WShukHeaders.h) brings it in
+//  AHEAD of every SDK header above, so this line adds nothing to the build and its place in the list
+//  keeps no macro away from an SDK name (memory plugin-pch-brings-windows-h; a probe placed right
+//  after VCPlugInHeaders.h finds windows.h's guard defined -
+//  docs/ai-notes/kfc-block14-inspections-2026-10-20.md). It stays as the mark the grep in this file's
+//  head counts.
 #ifdef WINDOWS
 #include <windows.h>
 #endif
@@ -935,10 +940,12 @@ static uint32 KFCReapplyTimerProc(void* refPtr);
 // **There is deliberately no "already booked, do not stack" gate (KCM took its one out in a
 //   self-review): if the chain below ever broke, such a flag would stay raised and THIS FUNCTION
 //   would become a permanent no-op - the translucency could never be re-applied again for the rest
-//   of the session. ICallbackTimer holds one booking per instance, so calling
-//   StartTimer over a live booking merely replaces it. Re-arming unconditionally on every
-//   notification works whatever the timer does underneath (and since the count goes back to
-//   kKFCPanelAlphaReapplyTries each time, it debounces as a side effect).
+//   of the session. Re-arming unconditionally on every notification works whatever the timer does
+//   underneath (and since the count goes back to kKFCPanelAlphaReapplyTries each time, it debounces
+//   as a side effect).
+// *A booking still live is taken off before the new one is started: the official re-arm stops the
+//   running timer before it starts one (HTTPAssetLinkResourceHandler.cpp), and ICallbackTimer.h
+//   promises nothing for a StartTimer over a live booking.
 static void KFCScheduleReapply()
 {
 	// **Nothing is ever booked again once the clean-up has run (see sPanelAlphaShutdown above).
@@ -954,6 +961,7 @@ static void KFCScheduleReapply()
 	if (sReapplyTimer == nil)
 		return;
 
+	sReapplyTimer->StopTimer();
 	sReapplyTimer->StartTimer(KFCReapplyTimerProc, kKFCPanelAlphaReapplyDelayMillis, nil);
 }
 
