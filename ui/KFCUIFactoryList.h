@@ -88,3 +88,7 @@ REGISTER_PMINTERFACE(KFCQueryListWidgetMgr, kKFCQueryListWidgetMgrImpl)
 // KFCQueryRowTip.cpp).
 REGISTER_PMINTERFACE(KFCQueryContentsHandler, kKFCQueryContentsHandlerImpl)
 REGISTER_PMINTERFACE(KFCQueryRowTip, kKFCQueryRowTipImpl)
+// InDesign's hidden-spread alert answered OK inside a walk of ours: the alert handler and its service provider
+// (KFCAlertAnswer.cpp).
+REGISTER_PMINTERFACE(KFCAlertAnswer, kKFCAlertAnswerImpl)
+REGISTER_PMINTERFACE(KFCAlertAnswerService, kKFCAlertAnswerServiceImpl)

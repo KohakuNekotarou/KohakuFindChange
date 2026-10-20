@@ -11,6 +11,7 @@
 #include "VCPlugInHeaders.h"
 
 // Interface includes:
+#include "IBoolData.h"				// a spread's hidden state (IID_IHIDESPREADBOOLDATA - IsSpreadHidden)
 #include "IComposeScanner.h"
 #include "IDataBase.h"
 #include "IDocumentLayer.h"
@@ -23,7 +24,10 @@
 #include "IOwnedItem.h"				// GetFrameRef - the frame an inline's anchor is composed into (AnchorLayerUID)
 #include "IPageItemVisibilityFacade.h"
 #include "IPageList.h"
+#include "IPasteboardUtils.h"		// QuerySpread - the spread an item stands on (SpreadOf)
+#include "ISpread.h"
 #include "ISpreadLayer.h"
+#include "ISpreadList.h"			// a document's spreads (HasHiddenSpread)
 #include "ITextModel.h"
 #include "ITextStoryThread.h"
 #include "ITextUtils.h"
@@ -495,6 +499,35 @@ UID DocLayerNamed(const UIDRef& docRef, const PMString& name)
 		return kInvalidUID;
 	InterfacePtr<ILayerList> layers(docRef, UseDefaultIID());
 	return (layers != nil) ? layers->FindByName(name) : kInvalidUID;
+}
+
+UID SpreadOf(const UIDRef& item)
+{
+	InterfacePtr<IHierarchy> hier(item, UseDefaultIID());
+	if (hier == nil)
+		return kInvalidUID;
+	InterfacePtr<ISpread> spread(Utils<IPasteboardUtils>()->QuerySpread(hier));
+	return (spread != nil) ? ::GetUID(spread) : kInvalidUID;
+}
+
+bool IsSpreadHidden(IDataBase* db, UID spread)
+{
+	if (db == nil || spread == kInvalidUID)
+		return false;
+	InterfacePtr<IBoolData> hidden(db, spread, IID_IHIDESPREADBOOLDATA);
+	return hidden != nil && hidden->GetBool() != kFalse;
+}
+
+bool HasHiddenSpread(const UIDRef& docRef)
+{
+	IDataBase* const db = docRef.GetDataBase();
+	InterfacePtr<ISpreadList> spreads(docRef, UseDefaultIID());
+	if (db == nil || spreads == nil)
+		return false;
+	for (int32 s = 0; s < spreads->GetSpreadCount(); ++s)
+		if (IsSpreadHidden(db, spreads->GetNthSpreadUID(s)))
+			return true;
+	return false;
 }
 
 

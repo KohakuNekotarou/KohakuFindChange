@@ -390,11 +390,12 @@ struct FrameFacts
 	bool		isHidden;
 	bool		isLocked;
 	bool		onPasteboard;	// the page named is a spread ("PB") - the frame is out on the pasteboard (Narrow Down)
+	bool		onHiddenSpread;	// the frame's spread is hidden (the Pages panel's Hide Spread - OBJ-23)
 	UID			pageUID;		// the page (or spread) named (Narrow Down's Pages)
 	UID			layer;			// the frame's document layer (Narrow Down's On Active Layer)
 
-	FrameFacts() : pageIndex(-1), hasPage(false), isHidden(false), isLocked(false), onPasteboard(false), pageUID(kInvalidUID),
-		layer(kInvalidUID) {}
+	FrameFacts() : pageIndex(-1), hasPage(false), isHidden(false), isLocked(false), onPasteboard(false),
+		onHiddenSpread(false), pageUID(kInvalidUID), layer(kInvalidUID) {}
 };
 
 // Keyed by story as well as frame. kInvalidUID stands for "no frame", which matches in two
@@ -422,6 +423,9 @@ const FrameFacts& LookUpFrame(const UIDRef& docRef, const UIDRef& storyRef, UID 
 	}
 	facts.pageString.SetTranslatable(kFalse);
 	facts.layer = KFCPageItemFacts::DocLayerOf(docRef.GetDataBase(), frameUID);	// (kInvalidUID for no frame)
+	// The frame's spread, as a row's click asks it (the UI half's SpreadForMatch - the same frame, the same question).
+	facts.onHiddenSpread = frameUID != kInvalidUID && KFCPageItemFacts::IsSpreadHidden(docRef.GetDataBase(),
+		KFCPageItemFacts::SpreadOf(UIDRef(docRef.GetDataBase(), frameUID)));
 	facts.isHidden = IsFrameHidden(docRef.GetDataBase(), frameUID);
 	facts.isLocked = !KFCSearchEngine::IsFrameEditable(storyRef, frameUID);
 	return cache.insert(std::make_pair(key, facts)).first->second;
@@ -854,6 +858,10 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 	outHit.pageString = facts->pageString;		// empty when the frame has no page
 	outHit.pageString.SetTranslatable(kFalse);
 	outHit.pageIndex = facts->pageIndex;		// -1 then, which sorts the hit to the end
+
+	// A match on a HIDDEN SPREAD (OBJ-23): listed, and the row says so - its click moves nothing, InDesign showing no
+	// hidden spread (JMP-34).
+	outHit.onHiddenSpread = facts->onHiddenSpread;
 
 	// A match on a switched-off layer is only reachable at all because the Find/Change dialog's
 	// "Include Hidden Layers" is on. The row has to say so - the text is there and the jump works,

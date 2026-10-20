@@ -446,6 +446,23 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	},
 
 	/*
+	 * InDesign's hidden-spread alert answered OK inside a walk of ours (KFCAlertAnswer.cpp - the spec map's OBJ-23):
+	 * the alert handler, registered under kAlertHandlerService - "If alerts are set to not show, rather than showing an
+	 * alert we ask the service registry for a list of IAlertHandlers" (IAlertHandler.h). No parent class: a service is
+	 * found by the ServiceID its provider states, so there is nothing to inherit (KIDMCP's alert handler was declared
+	 * so).
+	 */
+	Class
+	{
+		kKFCAlertAnswerBoss,
+		kInvalidClass,
+		{
+			IID_IALERTHANDLER,		kKFCAlertAnswerImpl,
+			IID_IK2SERVICEPROVIDER,	kKFCAlertAnswerServiceImpl,
+		}
+	},
+
+	/*
 	 * ...and the command interceptor that catches a book as it is about to close. Measured:
 	 * closing a book - by script and by the Book panel's own "Close Book" alike -
 	 * destroys its panel without one notification on the panel manager's subject, so the observer

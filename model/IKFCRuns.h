@@ -159,6 +159,14 @@ public:
 	    list's own search run once more over what it searched, with its conditions and `step`, into a new list (a new
 	    tier). False = refused, nothing changed (outStatus says why), or cancelled. */
 	virtual bool NarrowList(const KFCNarrowStep& step, PMString& outStatus) = 0;
+	/** = KFCHiddenSpreadAlert::IsArmed (appended) - is a walk of ours answering InDesign's hidden-spread alert now
+	    (the spec map's OBJ-23): the UI half's alert handler's WantToOverrideAlert. */
+	virtual bool IsAnsweringAlerts() = 0;
+	/** = KFCHiddenSpreadAlert::AnswerAlert (appended) - the button for an alert raised while one is (the alert's
+	    untranslated strings, as IAlertHandler::HandleAlert has them): 1 to 3, or kKFCAlertShowIt /
+	    kKFCAlertLeaveToDefault (KFCModelTypes.h) - the UI half's HandleAlert. */
+	virtual int16 AnswerAlert(const PMString& message, const PMString& button1, const PMString& button2,
+		const PMString& button3, int16 defaultButton) = 0;
 };
 
 #endif // __IKFCRuns_h__

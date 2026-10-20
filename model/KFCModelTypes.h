@@ -186,6 +186,16 @@ struct KFCOversetLoc
 	KFCOversetLoc() : found(false), frameUID(kInvalidUID), outportPb(0.0, 0.0) {}
 };
 
+/** What the UI half's alert handler does with an alert raised inside a walk of ours (IKFCRuns::AnswerAlert - the
+    model's KFCHiddenSpreadAlert.h): a button to press, 1 to 3 - or one of these. */
+enum
+{
+	// Put it on screen as it would have been: alerts were on before the walk switched them off.
+	kKFCAlertShowIt = 0,
+	// Its default button, as with no handler: alerts were off already (a script's run).
+	kKFCAlertLeaveToDefault = -1
+};
+
 /** What one notification from the model half to the UI half carries (the model/UI split; sent by
     KFCModelNotify.h, received by KFCModelObserver.cpp). The model never calls the panel: it
     says what happened on the session's subject, and the panel - when there is one listening - does the

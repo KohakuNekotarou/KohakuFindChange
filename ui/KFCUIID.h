@@ -105,6 +105,9 @@ DECLARE_PMID(kClassIDSpace, kKFCResultEyeWidgetBoss, kKFCUIPrefix + 29)
 // ...and its TRACE - a drag over the column (KFCResultEyeDrag.cpp): the drag's data exchange handler, the Layers panel's
 // kLayerEyeDEHandlerBoss in shape. + 30: the next after the highest spent.
 DECLARE_PMID(kClassIDSpace, kKFCResultEyeDEHandlerBoss, kKFCUIPrefix + 30)
+// InDesign's hidden-spread alert answered OK inside a walk of ours (KFCAlertAnswer.cpp - the spec map's OBJ-23): an
+// alert handler registered as a service (kAlertHandlerService). + 31: the next after the highest spent.
+DECLARE_PMID(kClassIDSpace, kKFCAlertAnswerBoss, kKFCUIPrefix + 31)
 
 
 // InterfaceIDs:
@@ -213,6 +216,10 @@ DECLARE_PMID(kImplementationIDSpace, kKFCResultEyeEHImpl, kKFCUIPrefix + 52)
 DECLARE_PMID(kImplementationIDSpace, kKFCResultEyeDEHandlerImpl, kKFCUIPrefix + 53)
 DECLARE_PMID(kImplementationIDSpace, kKFCResultEyeDragSourceImpl, kKFCUIPrefix + 54)
 DECLARE_PMID(kImplementationIDSpace, kKFCResultEyeDropTargetImpl, kKFCUIPrefix + 55)
+// The hidden-spread alert's handler and the service provider that registers it (KFCAlertAnswer.cpp). + 56 and + 57: the
+// next after the highest spent.
+DECLARE_PMID(kImplementationIDSpace, kKFCAlertAnswerImpl, kKFCUIPrefix + 56)
+DECLARE_PMID(kImplementationIDSpace, kKFCAlertAnswerServiceImpl, kKFCUIPrefix + 57)
 
 
 // ActionIDs:

@@ -57,6 +57,26 @@ namespace KFCPageItemFacts
 	/** A document's layer of that name - the one ILayerList::FindByName finds (Move to Active Layer's, and Narrow Down's
 	    On Active Layer's in each document). kInvalidUID = none, or no name. */
 	UID DocLayerNamed(const UIDRef& docRef, const PMString& name);
+
+	/** THE SPREAD AN ITEM STANDS ON NOW, ASKED OF THE ITEM (IPasteboardUtils::QuerySpread - IsOnSpread asks it too):
+	    kInvalidUID for an item on none - an inline in overset text. A text row's frame is asked it, an object row's
+	    item, and a row's click the same (the UI half's SpreadOfItem in KFCJump.cpp). NOT THE SHARED OBJECT WALKER'S
+	    IObjectWalker::GetCurrentSpread - IT BROUGHT InDesign DOWN (the author's Find Objects on Active Layer;
+	    reproduced): a walker initialized for Search: = Selection walks the items it was given and puts no document in
+	    its document list, while GetCurrentSpread reads that list's first entry whatever the scope (TEXT WALKER.RPLN -
+	    Initialize +0xb9cd0, GetCurrentSpread +0xb9110, read in the disassembly). The list keeps the storage a document
+	    walk gave it, so a selection walk read a stale entry - until the session's FIRST object walk was a selection's,
+	    with no storage yet: a read of address 0 (+0xb9151), at the first item it listed. The header promises "the
+	    spread being walked" and says nothing of the scope. */
+	UID SpreadOf(const UIDRef& item);
+
+	/** IS THE SPREAD HIDDEN (the Pages panel's Hide Spread)? An IBoolData on kSpreadBoss, IID_IHIDESPREADBOOLDATA, true
+	    = hidden (SpreadID.h - KCM reads it so, KCMIsPageOnHiddenSpread; the UI half's SpreadIsHidden in KFCJump.cpp the
+	    same). A parent spread answers no: InDesign has no way to hide one. False for kInvalidUID. */
+	bool IsSpreadHidden(IDataBase* db, UID spread);
+
+	/** Does the document hold a hidden spread now (IsSpreadHidden, over its spread list)? */
+	bool HasHiddenSpread(const UIDRef& docRef);
 }
 
 #endif // __KFCPageItemFacts_h__

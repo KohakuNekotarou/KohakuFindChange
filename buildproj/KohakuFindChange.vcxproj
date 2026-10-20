@@ -255,6 +255,7 @@
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
       </ClCompile>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCPageItemFacts.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCHiddenSpreadAlert.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCMemXferBytes.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCObjectSearch.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCNarrow.cpp"/>
@@ -294,6 +295,7 @@
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCSavedQueries.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCUndoFollow.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCPageItemFacts.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCHiddenSpreadAlert.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCMemXferBytes.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCObjectSearch.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCNarrow.h"/>

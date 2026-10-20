@@ -151,6 +151,15 @@ public:
 	    is passed over. */
 	virtual void				SnapshotBackgroundSelections() = 0;
 	virtual void				RestoreBackgroundSelections() = 0;
+	/** WHERE THE LAYOUT VIEWS STOOD, AROUND AN OBJECT WALK (appended - KFCObjectSearch::ViewKeeper, the spec map's
+	    OBJ-06): InDesign's object search scrolls to every item it shows (measured: a search begun on page 2 ended on
+	    page 3, its last match's, the zoom kept). Snapshot = every layout window's view of every open document read now
+	    (the panes SnapshotBackgroundSelections reads - the front view's too): its spread, its zoom and the point at its
+	    centre; Restore = each one moved since put back on them - its spread first (as a row's jump puts a view on a
+	    spread), then its zoom, then its centre. Nested pairs: the outermost one acts. A document or window closed since
+	    is passed over. */
+	virtual void				SnapshotViewPlaces() = 0;
+	virtual void				RestoreViewPlaces() = 0;
 };
 
 /** HOW THE MODEL HALF ASKS FOR IKFCUIServices - the only way. IKFCUIServices has no kDefaultIID, so a Query of its

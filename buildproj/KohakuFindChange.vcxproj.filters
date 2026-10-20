@@ -111,6 +111,9 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCPageItemFacts.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCHiddenSpreadAlert.cpp">
+         <Filter>Source Files</Filter>
+      </ClCompile>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCMemXferBytes.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
@@ -219,6 +222,9 @@
          <Filter>Header Files</Filter>
       </ClInclude>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCPageItemFacts.h">
+         <Filter>Header Files</Filter>
+      </ClInclude>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCHiddenSpreadAlert.h">
          <Filter>Header Files</Filter>
       </ClInclude>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCMemXferBytes.h">

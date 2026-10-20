@@ -25,6 +25,7 @@
 #include "IKFCRuns.h"
 #include "KFCBookScope.h"
 #include "KFCChangeAll.h"
+#include "KFCHiddenSpreadAlert.h"	// IsArmed / AnswerAlert - the UI half's alert handler asks them
 #include "KFCHitMarker.h"
 #include "KFCObjectReplace.h"
 #include "KFCObjectOutline.h"		// OutlineRows - an object row's Special Operations > Create Outlines
@@ -152,6 +153,12 @@ public:
 	// Under the list's own query, as Search These Results Again: a Narrow Down searches with it
 	// (docs/superpowers/specs/2026-10-18-kfc-narrow-down-design.md N3).
 	virtual bool NarrowList(const KFCNarrowStep& step, PMString& outStatus) { return KFCUnderListQuery(outStatus, false /*writes*/, [&]() { return KFCSearchEngine::NarrowList(step, outStatus); }); }
+	virtual bool IsAnsweringAlerts() { return KFCHiddenSpreadAlert::IsArmed(); }
+	virtual int16 AnswerAlert(const PMString& message, const PMString& button1, const PMString& button2,
+		const PMString& button3, int16 defaultButton)
+	{
+		return KFCHiddenSpreadAlert::AnswerAlert(message, button1, button2, button3, defaultButton);
+	}
 };
 
 CREATE_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)

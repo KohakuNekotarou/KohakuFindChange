@@ -48,6 +48,9 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCFindChangeMinimize.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCAlertAnswer.cpp">
+         <Filter>Source Files</Filter>
+      </ClCompile>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCHitMarkerView.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>

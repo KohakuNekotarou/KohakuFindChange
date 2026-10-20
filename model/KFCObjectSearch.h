@@ -15,9 +15,12 @@
 //  even when it searched a windowless one, where it selects the item of the same number (measured). So a listing takes
 //  the text walker's selection snapshot first and gives it back at the end (O6) - the selections in the windows behind
 //  the front view, and an empty selection, too (WalkAftercare, in the .cpp) - NEVER around a replace: given back after
-//  ReplaceObject, the snapshot brought InDesign down (KT). And the shared walker is aimed at the front document again
-//  when a run of ours is over (O7): it would go on naming a chapter the run has closed, for Edit > Find/Change's next
-//  search.
+//  ReplaceObject, the snapshot brought InDesign down (KT). It SCROLLS to what it finds as well: where each window's
+//  view stood is put back too (ViewKeeper - around a Replace's write as well). And the shared walker is aimed at the
+//  front document again when a run of ours is over (O7): it would go on naming a chapter the run has closed, for
+//  Edit > Find/Change's next search.
+//  An item on a HIDDEN SPREAD cannot be shown, and InDesign stops on an alert of its own to say so: each call is made
+//  under KFCHiddenSpreadAlert's Answering, which answers it OK (OBJ-23).
 //
 //========================================================================================
 
@@ -38,6 +41,7 @@
 #include "KFCSearchEngine.h"	// RunScope
 #include "KFCNarrow.h"			// Filter - a narrowed list's conditions (Narrow Down)
 
+class IKFCUIServices;
 class IObjectWalker;
 
 namespace KFCObjectSearch
@@ -120,15 +124,33 @@ namespace KFCObjectSearch
 	bool IsOnSpread(const UIDRef& item);
 
 	/** WHERE AN OBJECT ROW'S ITEM STANDS, as its row reads it (O8): its page (Pages-panel style) and its place in the
-	    document's page order, on the pasteboard or a parent page, in a group, inline or anchored, overset, hidden, locked -
-	    io's fields of those, set whole. The search reads it as it builds a row; a special operation of KFC's own reads it
-	    again after its write (KFCObjectSpecial - a move can take the item to another page, Lock and Hide change its words).
-	    false = no such item (io as it was). */
-	bool ReadItemPlace(const UIDRef& docRef, UID item, KFCResultModel::Hit& io);
+	    document's page order, on the pasteboard or a parent page, in a group, inline or anchored, overset, on a hidden
+	    spread, hidden, locked - io's fields of those, set whole. The search reads it as it builds a row; a special
+	    operation of KFC's own reads it again after its write (KFCObjectSpecial - a move can take the item to another
+	    page, Lock and Hide change its words). false = no such item (io as it was). */ bool ReadItemPlace(const UIDRef&
+	    docRef, UID item, KFCResultModel::Hit& io);
 
 	/** The shared object walker aimed at the front document again (O7) - after every run of ours that aimed it elsewhere.
 	    No front document: nothing is done. */
 	void AimSharedWalkerAtFront();
+
+	/** THE LAYOUT VIEWS PUT BACK AS IT GOES (the spec map's OBJ-06): InDesign's object search SHOWS what it finds -
+	    each find scrolled to in its document's window (measured: a search begun on page 2 ended on page 3, its last
+	    match's, the zoom kept), and a Replace's walk scrolls past every match before its row's item. Every layout
+	    window's view - its spread, zoom and centre - taken as this is made and put back as it goes
+	    (IKFCUIServices::SnapshotViewPlaces / RestoreViewPlaces): around a listing's walks (WalkAftercare, in the .cpp)
+	    and a Replace's write (KFCObjectReplace - taken after the row's item was put in view, so that is where its view
+	    stays). No UI half: nothing is done. */
+	class ViewKeeper
+	{
+	public:
+		ViewKeeper();
+		~ViewKeeper();
+	private:
+		IKFCUIServices*	fUi;		// held as made (KFCQueryUIServices) - nil with no UI half
+		ViewKeeper(const ViewKeeper&);
+		ViewKeeper& operator=(const ViewKeeper&);
+	};
 
 	/** The walker options the Object tab's settings make for one document (O4): its five Include switches and its Type;
 	    kSelection over `items` when there are any, kDocument otherwise. */
@@ -139,6 +161,14 @@ namespace KFCObjectSearch
 
 	/** InDesign's find/change service (kFindChangeServiceBoss - IFindChangeService has no kDefaultIID). */
 	IFindChangeService* CreateFindChangeService();
+
+	/** InDesign's SearchObject / ReplaceObject, made under KFCHiddenSpreadAlert's Answering over `db` - armed when
+	    hiddenSpreads (KFCPageItemFacts::HasHiddenSpread, asked once a walk): an item on a hidden spread is then handed
+	    back as found and its spread left hidden, where InDesign would have stopped on its own alert (OBJ-23). Every
+	    call of ours to either goes through these. */
+	IFindChangeService::FindChangeResult CallSearchObject(IFindChangeService* svc, IDataBase* db, bool hiddenSpreads,
+		bool16 initializeWalker);
+	IFindChangeService::FindChangeResult CallReplaceObject(IFindChangeService* svc, IDataBase* db, bool hiddenSpreads);
 
 	/** HOW ONE STEP OF A WALK ENDED - SearchObject's answer read with the global error state, the one reading every walk of
 	    ours makes (the search's WalkDoc, a Replace's walk to its rows - KFCObjectReplace): kWalkStepOn = on an item

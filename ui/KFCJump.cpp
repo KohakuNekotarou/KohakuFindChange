@@ -1530,6 +1530,11 @@ void KFCJump::ClearFrontSelection()
 	ClearSelection();
 }
 
+void KFCJump::PutViewOnSpread(IControlView* view, IDataBase* db, UID spread)
+{
+	EnsureSpreadUIDInView(view, db, spread);
+}
+
 void KFCJump::ActivateNode(int32 chapterIdx, int32 hitIdx)
 {
 	// One door for every row, so a click and a keyboard walk can never drift apart - the reason

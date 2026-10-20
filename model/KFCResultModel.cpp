@@ -1317,20 +1317,25 @@ void KFCResultModel::BuildHitLocator(Hit& hit)
 	}
 	// What the row cannot show any other way, each separated by a space. The tests below ARE the list -
 	// two kinds of word, kept in two strings:
-	//   on the locator, in the row's own colour = facts about the row: hidden (on a switched-off layer,
+	//   on the locator, in the row's own colour = facts about the row: hidden spread (on a spread the Pages panel hid -
+	//     nothing of it can be shown or selected: OBJ-23), hidden (on a switched-off layer,
 	//     so the page will look empty on arrival), locked (its Replace is greyed; the replace will not touch it) -
 	//     and, FIRST, Missing (the text is not where the search left it - see below);
 	//   on accentFlag, drawn as a run of its own in the accent colour = refused (InDesign's own replace
 	//     would not run there).
-	// Only hidden and locked come from the search itself; the rest are put there later - by a replace
+	// Only hidden spread, hidden and locked come from the search itself; the rest are put there later - by a replace
 	// or a jump that finds the text gone. They stack on
-	// either shape: "P1(2) overset hidden locked", "Missing overset", "P7 hidden".
+	// either shape: "P1(2) overset hidden locked", "Missing overset", "P7 hidden", "P3 hidden spread".
+	// THE SPREAD'S WORD FIRST, before the layer's: the outermost reason, and kept apart from "hidden" by its own second
+	// word ("P3 hidden spread hidden" - a hidden layer's frame on a hidden spread).
 	//
 	// A space, not a "+": InDesign's own overset marker IS a "+", so "P5+locked" reads as "page 5,
 	// overset". EVERY word is spelled out in full (the author's call): these are what explain
 	// a row the user cannot act on, so they are worth the characters. Clipped forms were tried and
 	// dropped - "hid" / "lck" are hard to read, "loc" reads as "location" in English, and "ov" left
 	// the one word a reader most needs to recognise as the least legible of the set.
+	if (hit.onHiddenSpread)
+		hit.locator.Append(" hidden spread");
 	if (hit.isHidden)
 		hit.locator.Append(" hidden");
 	if (hit.isLocked || hit.outcome == kOutcomeLocked)
@@ -1853,6 +1858,7 @@ void KFCResultModel::MarkItemSpecial(int32 chapterIdx, int32 hitIdx, int32 op, u
 	h->isInline = place->isInline;
 	h->isAnchored = place->isAnchored;
 	h->isOverset = place->isOverset;
+	h->onHiddenSpread = place->onHiddenSpread;
 	h->isHidden = place->isHidden;
 	h->isLocked = place->isLocked;
 	BuildHitLocator(*h);

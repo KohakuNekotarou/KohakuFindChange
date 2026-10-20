@@ -134,6 +134,11 @@ namespace KFCResultModel
 								// Only reachable when the Find/Change dialog's "Include Hidden
 								// Layers" is on, and then the text is composed and jumpable but
 								// draws nothing, so the row has to say why the page looks empty.
+		bool		onHiddenSpread;	// the frame the row names its page after (a text row's - the "+"
+								// frame's for an overset match -, an object row's item) stands on a
+								// HIDDEN SPREAD (the Pages panel's Hide Spread) -> the locator gets
+								// " hidden spread" (the spec map's OBJ-23). Read as the search builds
+								// the row: listed, but nothing of it can be shown or selected there.
 
 		int32		fontGroup;	// which of its chapter's fontGroups (its STORY group) this hit belongs
 		int32		fontGroupPos;	// to, and where it sits inside that group. -1 until the model groups
@@ -256,7 +261,7 @@ namespace KFCResultModel
 		// IsHitItemGone).
 		bool		itemGone;
 
-		Hit() : pageIndex(-1), isOverset(false), isLocked(false), isHidden(false),
+		Hit() : pageIndex(-1), isOverset(false), isLocked(false), isHidden(false), onHiddenSpread(false),
 				fontGroup(-1), fontGroupPos(-1), storyUID(kInvalidUID),
 				textStart(kInvalidTextIndex), textEnd(kInvalidTextIndex), matchHash(0),
 				replaced(false), outlined(false), special(0), kept(false), cleared(false), inTable(false),
@@ -870,8 +875,8 @@ namespace KFCResultModel
 	/** Build hit.locator from the hit's own fields. THE one definition - the search's page-ordering
 	    pass and the outcome setter (SetHitOutcome) both call it, so they cannot drift apart.
 
-	        [Missing ]P<page>(<n>) overset hidden locked     -> hit.locator
-	        refused                                        -> hit.accentFlag, drawn after it in accent colour
+	        [Missing ]P<page>(<n>) overset hidden spread hidden locked   -> hit.locator
+	        refused                                                    -> hit.accentFlag, drawn after it, accent colour
 
 	    The page ordinal comes from hit.pageOrdinal (0 = leave it out). The flags are separated by
 	    spaces and spelled out IN FULL rather than clipped, because each one explains a row the user

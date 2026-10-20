@@ -32,6 +32,9 @@
 #include "IDocumentList.h"
 #include "ILayoutSelectionSuite.h"	// SelectPageItems - a background document's items selected again
 #include "IControlView.h"		// a window's layout pane, as FindWidget hands it back
+#include "ILayoutControlData.h"	// GetSpreadRef - the spread a view shows (the views' places)
+#include "ILayoutUIUtils.h"		// MakeZoomCmd - a view's zoom put back
+#include "IPanorama.h"			// a view's zoom and centre, read and put back
 #include "PersistUtils.h"		// ::GetDataBase - a document's database
 
 // General includes:
@@ -148,27 +151,54 @@ namespace
 	};
 	std::vector<BackSelection> gBackSelections;
 
-	/** Each layout window of a document - a minimised one too, a split window's second pane too - with its
-	    selection manager: fn(window, pane, manager) once for each manager but skip (the front view's). EVERY
-	    WINDOW, not the document's first layout view alone: an object search's walk selects in a window of each
-	    document it walks (IFindChangeService::SearchObject), and measured (block 0's O-1 / O-2) it left its last
-	    item selected in a minimised window - ILayoutViewUtils::GetAllLayoutViews lists no view of one - and in a
-	    document's second window. The windows as IDocumentUIUtils lists them (is_layout: a story editor or a galley
-	    holds no layout selection), each window's panes by WidgetID - the product's way (spellpanel's
-	    PrivateSpellingUtils.cpp; KCM's KCMViewLookup.cpp the same): the window's kLayoutWidgetID, and in a split
-	    window the kLayoutWidgetID inside the kLayoutSecondaryPanelWidgetID panel, while that view is shown. The
-	    manager is the pane's view's (ISelectionUtils::QueryViewSelectionManager - Adobe's trackers' way, KCM's
-	    QuerySelectionManagerFor in KCMStoryJump.cpp). Measured with KT's panesel probe (2026-10-19): a split
-	    window's second pane has a manager of its own (what is selected there is not the window's DOM selection);
-	    the PANEL answers the first pane's manager, so handed over as it stands it never reached the second pane
-	    (1b4e6a9 did that); and every window has a hidden second pane with a manager of its own - left out, as the
-	    product leaves it. */
+	/** Each layout window of a document - a minimised one too, a split window's second pane too - and its panes'
+	    layout views: fn(window, pane, view) once for each. EVERY WINDOW, not the document's first layout view alone:
+	    an object search's walk selects in a window of each document it walks (IFindChangeService::SearchObject), and
+	    measured (block 0's O-1 / O-2) it left its last item selected in a minimised window -
+	    ILayoutViewUtils::GetAllLayoutViews lists no view of one - and in a document's second window. The windows as
+	    IDocumentUIUtils lists them (is_layout: a story editor or a galley holds no layout view), each window's panes by
+	    WidgetID - the product's way (spellpanel's PrivateSpellingUtils.cpp; KCM's KCMViewLookup.cpp the same): the
+	    window's kLayoutWidgetID, and in a split window the kLayoutWidgetID inside the kLayoutSecondaryPanelWidgetID
+	    panel, while that view is shown. Measured with KT's panesel probe (2026-10-19): every window has a hidden second
+	    pane - left out, as the product leaves it. The one reading of which panes a window has: the background
+	    selections' (ForEachWindowSelection) and the views' places (SnapshotViewPlaces). */
+	template <typename Fn>
+	void ForEachLayoutPane(IDataBase* db, Fn fn)
+	{
+		Utils<IDocumentUIUtils> docUI;
+		if (db == nil || !docUI)
+			return;
+		PresentationSequence windows;
+		FindPresentation_PreferCriteria noPreference;
+		(void)docUI->FindPresentationsForDocument(db, windows, &FindPresCriteria::is_layout, noPreference);
+		for (size_t w = 0; w < windows.size(); ++w)
+		{
+			InterfacePtr<IPanelControlData> panel(windows[w], UseDefaultIID());
+			if (panel == nil)
+				continue;
+			IControlView* panes[2] = { panel->FindWidget(kLayoutWidgetID), nil };
+			InterfacePtr<IPanelControlData> split(panel->FindWidget(kLayoutSecondaryPanelWidgetID), UseDefaultIID());
+			IControlView* const second = (split != nil) ? split->FindWidget(kLayoutWidgetID) : nil;
+			if (second != nil && second->IsVisible())
+				panes[1] = second;
+			for (int32 p = 0; p < 2; ++p)
+				if (panes[p] != nil)
+					fn(windows[w], p, panes[p]);
+		}
+	}
+
+	/** Each layout pane of a document (ForEachLayoutPane) with its selection manager: fn(window, pane, manager) once
+	    for each manager but skip (the front view's). The manager is the pane's view's
+	    (ISelectionUtils::QueryViewSelectionManager - Adobe's trackers' way, KCM's QuerySelectionManagerFor in
+	    KCMStoryJump.cpp). Measured with KT's panesel probe (2026-10-19): a split window's second pane has a manager of
+	    its own (what is selected there is not the window's DOM selection); the PANEL answers the first pane's manager,
+	    so handed over as it stands it never reached the second pane (1b4e6a9 did that); and the hidden second pane
+	    every window has holds a manager of its own (ForEachLayoutPane leaves it out). */
 	template <typename Fn>
 	void ForEachWindowSelection(IDataBase* db, const ISelectionManager* skip, Fn fn)
 	{
-		Utils<IDocumentUIUtils> docUI;
 		Utils<ISelectionUtils> selectionUtils;
-		if (db == nil || !docUI || !selectionUtils)
+		if (db == nil || !selectionUtils)
 			return;
 #ifdef KFC_DIAG
 		// (Fault switch bg-first-view, a test build's only - KFCDiag.h: the document's first layout view alone, the
@@ -193,31 +223,22 @@ namespace
 			return;
 		}
 #endif
-		PresentationSequence windows;
-		FindPresentation_PreferCriteria noPreference;
-		(void)docUI->FindPresentationsForDocument(db, windows, &FindPresCriteria::is_layout, noPreference);
-		for (size_t w = 0; w < windows.size(); ++w)
+		const IDocumentPresentation* window = nil;
+		const ISelectionManager* seen = nil;		// the window's first pane's - asked of its second
+		ForEachLayoutPane(db, [&](const IDocumentPresentation* paneWindow, int32 pane, IControlView* view)
 		{
-			InterfacePtr<IPanelControlData> panel(windows[w], UseDefaultIID());
-			if (panel == nil)
-				continue;
-			IControlView* panes[2] = { panel->FindWidget(kLayoutWidgetID), nil };
-			InterfacePtr<IPanelControlData> split(panel->FindWidget(kLayoutSecondaryPanelWidgetID), UseDefaultIID());
-			IControlView* const second = (split != nil) ? split->FindWidget(kLayoutWidgetID) : nil;
-			if (second != nil && second->IsVisible())
-				panes[1] = second;
-			const ISelectionManager* seen = nil;
-			for (int32 p = 0; p < 2; ++p)
+			if (paneWindow != window)
 			{
-				InterfacePtr<ISelectionManager> manager(
-					(panes[p] != nil) ? selectionUtils->QueryViewSelectionManager(panes[p]) : nil);
-				ISelectionManager* const m = manager;
-				if (m == nil || m == skip || m == seen)
-					continue;		// (never seen shared - this only keeps a manager from being given back twice)
-				seen = m;
-				fn(windows[w], p, m);
+				window = paneWindow;
+				seen = nil;
 			}
-		}
+			InterfacePtr<ISelectionManager> manager(selectionUtils->QueryViewSelectionManager(view));
+			ISelectionManager* const m = manager;
+			if (m == nil || m == skip || m == seen)
+				return;		// (never seen shared - this only keeps a manager from being given back twice)
+			seen = m;
+			fn(paneWindow, pane, m);
+		});
 	}
 
 	/** One window's selection given back as the snapshot found it (RestoreBackgroundSelections). */
@@ -263,6 +284,66 @@ namespace
 		InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
 		InterfacePtr<IDocumentList> docs((app != nil) ? app->QueryDocumentList() : nil);
 		return docs != nil && docs->FindDocByDataBase(db) != nil;
+	}
+
+	// ----- WHERE THE LAYOUT VIEWS STOOD (IKFCUIServices::SnapshotViewPlaces - the spec map's OBJ-06) -----
+
+	/** One layout pane's view as a walk found it: the spread it showed, its zoom and the point at its centre - what a
+	    view copied onto another is made of in KCM's view sync (KCMViewSync.cpp: the effective zoom and the visible
+	    centre). */
+	struct ViewPlace
+	{
+		IDataBase*						db;		// checked against the open documents before anything reads it
+		const IDocumentPresentation*	window;	// which window - only compared with the document's windows
+		int32							pane;	// kLayoutWidgetID 0, a split window's second pane 1
+		UID								spread;	// ILayoutControlData::GetSpreadRef
+		PMReal							zoom;	// IPanorama::GetXScaleFactor(kTrue) - the effective zoom
+		PBPMPoint						centre;	// IPanorama::GetContentLocationAtFrameCenter
+		ViewPlace() : db(nil), window(nil), pane(0), spread(kInvalidUID), zoom(1.0) {}
+	};
+	std::vector<ViewPlace> gViewPlaces;
+	int32 gViewPlacesDepth = 0;		// nested Snapshot / Restore pairs: the outermost one acts
+
+	/** One view put back on its place (RestoreViewPlaces) - nothing when it has not moved, the ordinary case. In the
+	    order KCM's view sync copies a view, and for its reasons: the spread first, since a pasteboard point means
+	    nothing to a view on another spread (KFCJump::PutViewOnSpread - a row's jump's own way); then the zoom, through
+	    the command the UI's zoom field uses (ILayoutUIUtils::MakeZoomCmd - kZoomToCmdBoss: no command scrolls to an
+	    arbitrary point, and the scroll is the view's state, not the document's); then the centre, at that zoom. The
+	    centre is "moved" beyond about 1.5 screen pixels, converted through the zoom (KCMViewSync's tolerance - a scroll
+	    is quantised to screen pixels). */
+	void PutViewBack(IControlView* view, const ViewPlace& kept)
+	{
+		InterfacePtr<ILayoutControlData> layout(view, IID_ILAYOUTCONTROLDATA);
+		InterfacePtr<IPanorama> pano(view, UseDefaultIID());
+		if (layout == nil || pano == nil)
+			return;
+		const bool spreadMoved = layout->GetSpreadRef().GetUID() != kept.spread;
+		const bool zoomMoved = abs(pano->GetXScaleFactor(kTrue) - kept.zoom) > PMReal(0.0001);
+		const PMPoint centre = pano->GetContentLocationAtFrameCenter();
+		const PMReal tolerance = (kept.zoom > PMReal(0.0001)) ? (PMReal(1.5) / kept.zoom) : PMReal(1.0);
+		const bool scrolled = abs(centre.X() - kept.centre.X()) > tolerance
+			|| abs(centre.Y() - kept.centre.Y()) > tolerance;
+		if (!spreadMoved && !zoomMoved && !scrolled)
+			return;
+		KFC_DIAG_LOG("VIEWBACK window=%p pane=%d spread=%u->%u zoom-moved=%d scrolled=%d", (const void*)kept.window,
+			kept.pane, (unsigned)layout->GetSpreadRef().GetUID().Get(), (unsigned)kept.spread.Get(), zoomMoved ? 1 : 0,
+			scrolled ? 1 : 0);
+		if (spreadMoved)
+			KFCJump::PutViewOnSpread(view, kept.db, kept.spread);
+		if (zoomMoved)
+		{
+			// The caller's error state kept, and cleared for the command (EnsureSpreadUIDInView's pair - ErrorUtils.h):
+			// a standing error fails whatever is attempted next.
+			GlobalErrorStatePreserver zoomErrorState;
+			ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+			// (The effective zoom, as KCMViewSync hands it over and measured it landing - the header's "zoom
+			// percentage".)
+			Utils<ILayoutUIUtils> layoutUIUtils;
+			InterfacePtr<ICommand> zoomCmd(layoutUIUtils ? layoutUIUtils->MakeZoomCmd(view, kept.zoom) : nil);
+			if (zoomCmd != nil)
+				(void)CmdUtils::ProcessCommand(zoomCmd);		// the scroll still runs either way
+		}
+		pano->ScrollContentLocationToFrameCenter(kept.centre, kTrue /*forceRedraw*/);
 	}
 }
 
@@ -444,6 +525,57 @@ public:
 			});
 		}
 		gBackSelections = std::vector<BackSelection>();		// a fresh one: the storage goes too
+	}
+
+	virtual void SnapshotViewPlaces()
+	{
+		if (gViewPlacesDepth++ > 0)
+			return;		// nested: the outermost pair's snapshot stands
+		gViewPlaces = std::vector<ViewPlace>();
+		InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
+		InterfacePtr<IDocumentList> docs((app != nil) ? app->QueryDocumentList() : nil);
+		const int32 count = (docs != nil) ? docs->GetDocCount() : 0;
+		for (int32 d = 0; d < count; ++d)
+		{
+			IDocument* const doc = docs->GetNthDoc(d);
+			IDataBase* const db = (doc != nil) ? ::GetDataBase(doc) : nil;
+			ForEachLayoutPane(db, [&](const IDocumentPresentation* window, int32 pane, IControlView* view)
+			{
+				InterfacePtr<ILayoutControlData> layout(view, IID_ILAYOUTCONTROLDATA);
+				InterfacePtr<IPanorama> pano(view, UseDefaultIID());
+				if (layout == nil || pano == nil)
+					return;
+				ViewPlace kept;
+				kept.db = db;
+				kept.window = window;
+				kept.pane = pane;
+				kept.spread = layout->GetSpreadRef().GetUID();
+				kept.zoom = pano->GetXScaleFactor(kTrue);
+				kept.centre = pano->GetContentLocationAtFrameCenter();
+				gViewPlaces.push_back(kept);
+			});
+		}
+	}
+
+	virtual void RestoreViewPlaces()
+	{
+		if (gViewPlacesDepth <= 0)
+			return;
+		if (--gViewPlacesDepth > 0)
+			return;		// nested: the outermost pair puts back
+		for (size_t k = 0; k < gViewPlaces.size(); ++k)
+		{
+			const ViewPlace& kept = gViewPlaces[k];
+			if (!IsOpenDocDB(kept.db))
+				continue;
+			// THE SAME WINDOW AND PANE, among the document's windows now (one closed since is not there).
+			ForEachLayoutPane(kept.db, [&](const IDocumentPresentation* window, int32 pane, IControlView* view)
+			{
+				if (window == kept.window && pane == kept.pane)
+					PutViewBack(view, kept);
+			});
+		}
+		gViewPlaces = std::vector<ViewPlace>();		// a fresh one: the storage goes too
 	}
 };
 

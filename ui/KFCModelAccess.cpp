@@ -158,6 +158,11 @@ namespace
 		virtual bool SpecialRows(int32, const KFCRowsByChapter&, const KFCSpecialParams&, PMString& outStatus) { SayWhy(outStatus); return false; }
 		virtual bool CanSpecialHit(int32, int32, int32) { return false; }
 		virtual bool NarrowList(const KFCNarrowStep&, PMString& outStatus) { SayWhy(outStatus); return false; }
+		virtual bool IsAnsweringAlerts() { return false; }
+		virtual int16 AnswerAlert(const PMString&, const PMString&, const PMString&, const PMString&, int16)
+		{
+			return kKFCAlertLeaveToDefault;
+		}
 	};
 
 	class KFCChaptersStandInImpl : public IKFCChapters

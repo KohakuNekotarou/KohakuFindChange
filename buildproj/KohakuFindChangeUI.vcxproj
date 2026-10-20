@@ -226,6 +226,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCBookPanelPlacement.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCColorTextView.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCFindChangeMinimize.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCAlertAnswer.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCAppBarSearchEnter.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCHitMarkerView.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCHowTo.cpp"/>

@@ -27,11 +27,9 @@
 #include "IPageItemAdapter.h"		// the wrapper of an item placed in text or in a table - its story (WriteReach)
 #include "IPageItemNameFacade.h"	// a row's item by the name the Layers panel shows
 #include "IPageList.h"				// GetPageString / GetPageIndex
-#include "IPasteboardUtils.h"		// QuerySpread - the spread an item stands on
 #include "IPMPersist.h"				// SaveAll - an item's own persistent data, the fingerprint (O12)
 #include "IPMStream.h"
 #include "ISession.h"
-#include "ISpread.h"
 #include "ISpreadList.h"			// where the walk stands, for the bar inside a document
 #include "ITextFrameColumn.h"		// a text frame's column - the composition, left out of the fingerprint
 #include "ITextModel.h"				// GetChangeCount - a story's version (the fingerprint)
@@ -59,6 +57,7 @@
 // Project includes:
 #include "IKFCUIServices.h"			// GetSelectedPageItems - the selection is the UI half's
 #include "KFCDiag.h"				// KFC_DIAG_LOG - the OBJWALK / OBJSEL trace, test builds only
+#include "KFCHiddenSpreadAlert.h"	// Answering - InDesign's hidden-spread alert answered OK inside a walk
 #include "KFCMemXferBytes.h"
 #include "KFCObjectSearch.h"
 #include "KFCPageItemFacts.h"
@@ -116,7 +115,8 @@ private:
 //    walks select what they find in every document with a window, and an All Documents search with nothing selected
 //    anywhere left the last item it found selected in the document behind - in a minimised window and a document's
 //    second window as well, so every layout window is read; the snapshot is the front view's alone);
-//  - the shared walker, aimed at the front document again (O7).
+//  - the shared walker, aimed at the front document again (O7);
+//  - where each layout window's view stood (KFCObjectSearch::ViewKeeper - OBJ-06): put back last, after all the above.
 // Made before the walks' bar (whose events can come in while it stands) and after the page items Search: = Selection
 // names are read.
 class WalkAftercare
@@ -141,6 +141,7 @@ public:
 		KFCObjectSearch::AimSharedWalkerAtFront();
 	}
 private:
+	KFCObjectSearch::ViewKeeper		fViews;		// first: made before the rest, and so put back after it
 	InterfacePtr<IKFCUIServices>	fUi;
 	const bool						fNothingSelected;
 	SelectionKeeper					fKeep;		// the snapshot - taken after the question above
@@ -209,23 +210,10 @@ private:
 	DocProgress& operator=(const DocProgress&);
 };
 
-// THE SPREAD AN ITEM STANDS ON, ASKED OF THE ITEM (IPasteboardUtils::QuerySpread - IsOnSpread asks it too): what the
-// bar inside a document moves by (DocProgress). kInvalidUID for an item on no spread - an inline in overset text.
-// NOT THE SHARED WALKER'S IObjectWalker::GetCurrentSpread - IT BROUGHT InDesign DOWN (the author's
-// Find Objects on Active Layer; reproduced): a walker initialized for Search: = Selection walks the items it was given
-// and puts no document in its document list, while GetCurrentSpread reads that list's first entry whatever the scope
-// (TEXT WALKER.RPLN - Initialize +0xb9cd0, GetCurrentSpread +0xb9110, read in the disassembly). The list keeps the
-// storage a document walk gave it, so a selection walk read a stale entry - until the session's FIRST object walk was a
-// selection's, with no storage yet: a read of address 0 (+0xb9151), at the first item it listed. The header promises
-// "the spread being walked" and says nothing of the scope.
-UID SpreadOf(const UIDRef& item)
-{
-	InterfacePtr<IHierarchy> hier(item, UseDefaultIID());
-	if (hier == nil)
-		return kInvalidUID;
-	InterfacePtr<ISpread> spread(Utils<IPasteboardUtils>()->QuerySpread(hier));
-	return (spread != nil) ? ::GetUID(spread) : kInvalidUID;
-}
+// THE SPREAD AN ITEM STANDS ON, ASKED OF THE ITEM - what the bar inside a document moves by (DocProgress), where an
+// item stands (IsOnSpread), and whether its spread is hidden: KFCPageItemFacts::SpreadOf, which says why it is never
+// the shared walker's GetCurrentSpread.
+using KFCPageItemFacts::SpreadOf;
 
 // ONE DOCUMENT'S WALK (O2 / O5): the shared walker initialised for it, InDesign's SearchObject asked "as is" until it
 // stops answering kSuccess, each match read off the shared walker. Read-only: the document's "unsaved" flag is put back
@@ -248,6 +236,9 @@ WalkEnd WalkDoc(IFindChangeService* svc, IObjectWalker* shared, const UIDRef& do
 	IDataBase::SaveRestoreModifiedState dirtyGuard(db);
 	if (!fromSearchScope)
 		shared->Initialize(KFCObjectSearch::WalkerOptionsFor(docRef, items));
+	// A HIDDEN SPREAD IN THE DOCUMENT: each step made under the Answering (OBJ-23 - CallSearchObject). Asked once: the
+	// walk processes no command that could hide or show one.
+	const bool hiddenSpreads = KFCPageItemFacts::HasHiddenSpread(docRef);
 	DocProgress progress(bar, docRef, barBase, barSpan);
 #ifdef KFC_DIAG
 	// (Test builds only) Fault switch objsearch-cancel - KFCDiag.h: Cancel taken as pressed once this document's walk has
@@ -259,9 +250,9 @@ WalkEnd WalkDoc(IFindChangeService* svc, IObjectWalker* shared, const UIDRef& do
 	std::set<UID> seen;
 	for (int32 step = 0; ; ++step)
 	{
-		UIDRef found;	// stays empty even on kSuccess (measured) - the match is the shared walker's current item
-		const IFindChangeService::FindChangeResult result =
-			svc->SearchObject(found, (fromSearchScope && step == 0) ? kTrue : kFalse);
+		// (Its OUT argument stays empty even on kSuccess - measured: the match is the shared walker's current item.)
+		const IFindChangeService::FindChangeResult result = KFCObjectSearch::CallSearchObject(svc, db, hiddenSpreads,
+			(fromSearchScope && step == 0) ? kTrue : kFalse);
 #ifdef KFC_DIAG
 		{
 			// (Test builds only) Each step's answer and what it left selected - the trace behind WalkAftercare's NOTHING SELECTED.
@@ -499,6 +490,35 @@ IFindChangeService* KFCObjectSearch::CreateFindChangeService()
 {
 	// As SnpFindAndReplace.cpp makes it - IFindChangeService has no kDefaultIID.
 	return static_cast<IFindChangeService*>(::CreateObject(kFindChangeServiceBoss, IID_IFINDCHANGSERVICE));
+}
+
+IFindChangeService::FindChangeResult KFCObjectSearch::CallSearchObject(IFindChangeService* svc, IDataBase* db,
+	bool hiddenSpreads, bool16 initializeWalker)
+{
+	const KFCHiddenSpreadAlert::Answering answering(db, hiddenSpreads);
+	UIDRef found;
+	return svc->SearchObject(found, initializeWalker);
+}
+
+IFindChangeService::FindChangeResult KFCObjectSearch::CallReplaceObject(IFindChangeService* svc, IDataBase* db,
+	bool hiddenSpreads)
+{
+	const KFCHiddenSpreadAlert::Answering answering(db, hiddenSpreads);
+	return svc->ReplaceObject(kFalse);
+}
+
+KFCObjectSearch::ViewKeeper::ViewKeeper() : fUi(KFCQueryUIServices())
+{
+	if (fUi != nil)
+		fUi->SnapshotViewPlaces();
+}
+
+KFCObjectSearch::ViewKeeper::~ViewKeeper()
+{
+	if (fUi == nil)
+		return;
+	fUi->RestoreViewPlaces();
+	fUi->Release();
 }
 
 KFCObjectSearch::WalkStep KFCObjectSearch::ReadWalkStep(IFindChangeService::FindChangeResult result)
@@ -891,7 +911,11 @@ bool KFCObjectSearch::ReadItemPlace(const UIDRef& docRef, UID item, KFCResultMod
 
 	// NO SPREAD HOLDS IT - an inline in overset text (QuerySpread answers nil): its row reads "overset" (BuildHitLocator),
 	// nothing of it is shown or selected, and its row's Replace is refused (IsOnSpread).
-	io.isOverset = !IsOnSpread(itemRef);
+	// ON A HIDDEN SPREAD (OBJ-23): listed, its row reading "hidden spread" - nothing of it can be shown or selected
+	// there, and its row's Replace writes it as Change All does.
+	const UID spread = SpreadOf(itemRef);
+	io.isOverset = (spread == kInvalidUID);
+	io.onHiddenSpread = KFCPageItemFacts::IsSpreadHidden(db, spread);
 
 	// Out of the user's reach where it is (the text rows' two words, by the same code).
 	io.isHidden = KFCPageItemFacts::IsFrameHidden(db, item);

@@ -32,6 +32,9 @@
 #include "PMString.h"
 #include "KFCModelTypes.h"		// KFCRowsByChapter - the rows selected together, by document
 
+class IControlView;
+class IDataBase;
+
 namespace KFCJump
 {
 	/** The single door every result row goes through: a hit row jumps (front its document, scroll to
@@ -81,6 +84,11 @@ namespace KFCJump
 	/** Nothing selected in the front document - DeselectAll on the active selection, when there is one: the click's own
 	    clearing, for the object search's "nothing was selected" given back (IKFCUIServices::ClearSelection). */
 	void ClearFrontSelection();
+
+	/** A layout view put on ONE SPREAD the way a row's jump puts it there (kSetSpreadCmdBoss - the view's own document
+	    only, the caller's error state kept): for a view put back where it stood before an object walk
+	    (IKFCUIServices::RestoreViewPlaces). Nothing for kInvalidUID, or a view on that spread already. */
+	void PutViewOnSpread(IControlView* view, IDataBase* db, UID spread);
 
 	/** The "Hide Previous Chapter" flyout toggle (session state; starts ON). Read as a hit row or a
 	    chapter row lands, to decide whether to close the other displayed chapters; the flyout drives it.

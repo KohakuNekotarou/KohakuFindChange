@@ -326,11 +326,14 @@ using KFCObjectReplace::FollowRowsTheWriteMoved;
 // ends (spec O5) - InDesign has no more, an item comes round again, or the walker stands in another document - or when it
 // broke off (outWalkFailed): KFCObjectSearch::ReadWalkStep reads any answer with the error state raised so, and the error
 // is left standing for the write's step to end by - nothing is written over it.
-bool NextItemOfWalk(IFindChangeService* svc, IObjectWalker* shared, IDataBase* db, std::set<UID>& seen, UID& outItem,
-	bool& outWalkFailed)
+// hiddenSpreads: the document holds a hidden spread - the step is made under the Answering (OBJ-23), so a match there
+// before the rows' items stops nothing.
+bool NextItemOfWalk(IFindChangeService* svc, IObjectWalker* shared, IDataBase* db, bool hiddenSpreads,
+	std::set<UID>& seen, UID& outItem, bool& outWalkFailed)
 {
-	UIDRef found;		// stays empty (measured) - the match is the shared walker's current item
-	const KFCObjectSearch::WalkStep at = KFCObjectSearch::ReadWalkStep(svc->SearchObject(found, kFalse));
+	// (The match is the shared walker's current item - the call's OUT argument stays empty, measured.)
+	const KFCObjectSearch::WalkStep at = KFCObjectSearch::ReadWalkStep(
+		KFCObjectSearch::CallSearchObject(svc, db, hiddenSpreads, kFalse));
 	if (at != KFCObjectSearch::kWalkStepOn)
 	{
 		outWalkFailed = (at == KFCObjectSearch::kWalkStepBroke);
@@ -473,6 +476,10 @@ ObjectWriteResult WriteObjectRows(std::vector<ObjectChapterWrite>& chapters, KFC
 	PMString& outStatus)
 {
 	ObjectWriteResult result;
+	// WHERE THE VIEWS STOOD, put back as the write ends (OBJ-06 - KFCObjectSearch::ViewKeeper): the walk scrolls past
+	// every match before a row's item. Taken after the door put its row's item in view - so the view stays on it - or,
+	// on a hidden spread, left where it was.
+	const KFCObjectSearch::ViewKeeper views;
 	// A Frames list's write: the Object tab aimed at its frames for the length of it (FramesObjectQuery - before any
 	// command sequence below begins, put back after the last one ends).
 	const FramesObjectQuery framesQuery;
@@ -526,10 +533,13 @@ ObjectWriteResult WriteObjectRows(std::vector<ObjectChapterWrite>& chapters, KFC
 		// 7-8 FOR EVERY ROW IN ONE WALK of its document: InDesign's own matching from the document's first match, and its
 		// replace on each row's item as the walk stands on it - its own Change/Find, item after item. The walk ends when
 		// every item has been met, or by itself (NextItemOfWalk).
+		// A HIDDEN SPREAD IN THE DOCUMENT (OBJ-23): every call made under the Answering - a match there, a row's item
+		// there too, hands its item back and leaves the spread hidden. Asked once: the walk hides or shows no spread.
 		shared->Initialize(KFCObjectSearch::WalkerOptionsFor(chapter.docRef, nil));
+		const bool hiddenSpreads = KFCPageItemFacts::HasHiddenSpread(chapter.docRef);
 		std::set<UID> seen;
 		UID at = kInvalidUID;
-		while (!walkMisses && NextItemOfWalk(svc, shared, db, seen, at, chapter.walkFailed))
+		while (!walkMisses && NextItemOfWalk(svc, shared, db, hiddenSpreads, seen, at, chapter.walkFailed))
 		{
 			if (chapter.wanted.count(at) == 0)
 				continue;
@@ -539,7 +549,8 @@ ObjectWriteResult WriteObjectRows(std::vector<ObjectChapterWrite>& chapters, KFC
 			// (EndWriteStep, below - rolled back when one stands), so with one standing the whole step goes back, no row is
 			// marked Changed over a write InDesign takes back, and nothing more is written into it. The text Replace asks
 			// both (KFCReplaceEngine's walks: the command's ErrorCode and its result).
-			const bool replacedIt = (svc->ReplaceObject(kFalse) == IFindChangeService::kSuccess);
+			const bool replacedIt =
+				(KFCObjectSearch::CallReplaceObject(svc, db, hiddenSpreads) == IFindChangeService::kSuccess);
 			if (ErrorUtils::PMGetGlobalErrorCode() != kSuccess)
 			{
 				result.errorStands = true;
