@@ -15,7 +15,7 @@
 //  *The steps:
 //    1. ask the SDK for this panel's OWL.Palette window -
 //       IPanelMgr::GetPanelFromWidgetID -> GetPaletteRefContainingPanel -> PaletteRef::GetOWLControl
-//       *KCM's route (the author's call), not an EnumWindows walk matching the window's TITLE
+//       *The author's call, not an EnumWindows walk matching the window's TITLE
 //        against this plug-in's display name: that identifies a window by a string that is a UI
 //        label - KFC renames its own tab to carry the scope, so the test would have to be a PREFIX
 //        rather than an equality - and a WidgetID is a number that no rename or translation can move.
@@ -105,7 +105,7 @@
 // ---- The tuning constants ----
 
 // The alpha the panel is drawn with while the toggle is ON (0 = invisible, 255 = opaque).
-// *77 is about 30% - the author's figure, settled on in KCM after 128 (50%) read as too solid.
+// *77 is about 30% - the author's figure, chosen after 128 (50%) read as too solid.
 // Putting the pointer on the panel brings it back to opaque, so the resting state can afford to be
 // faint. There is no slider and no steps: changing how faint it is means changing this one line.
 // **...but not to 0, and not to anything near it (Microsoft's contract): "hit
@@ -143,7 +143,7 @@ static bool16 sFindChangeTranslucent = kFalse;
 
 // Is the pointer over the target window (the top-level window the panel is on right now)?
 //
-// **No flag is kept - it is measured every time it is asked (as KCM settled it). A static flag
+// **No flag is kept - it is measured every time it is asked. A static flag
 //   raised and lowered from IMouseRollOver has two weak points; measuring has neither, structurally:
 //     (a) MouseLeave does not fire when the panel is closed, docked, or another application is
 //         switched to WITH the pointer still on it. Miss one and "the pointer is on it" sticks: the
@@ -350,7 +350,7 @@ bool KFCIsFindChangeShapedWindow(HWND h)
 	return KFCClassIs(h, L"DroverLord - Window Class");
 }
 
-// THIS PANEL'S OWL.Palette WINDOW, ASKED OF THE SDK - KCM's route.
+// THIS PANEL'S OWL.Palette WINDOW, ASKED OF THE SDK.
 //
 //   IPanelMgr::GetPanelFromWidgetID(WidgetID)      ... a number - no rename or translation moves it
 //     -> IPanelMgr::GetPaletteRefContainingPanel() ... the PaletteRef carrying that panel
@@ -517,7 +517,7 @@ static HWND KFCShadowOf(HWND target)
 	return KFCClassIs(shadow, L"OWL.ShadowView") ? shadow : nullptr;
 }
 
-// Should the shadow show? **It follows the TOGGLE, not the alpha (as KCM settled it): while ON it stays hidden even
+// Should the shadow show? **It follows the TOGGLE, not the alpha: while ON it stays hidden even
 // when the pointer has made the panel opaque. Asked here alone - the applying side writes it, the hook checks it.
 //   !Why (a defect found on the real application): a panel is moved by its tab band or title band - which is where
 //     the pointer IS, so it is opaque there - and following the alpha would therefore SHOW THE SHADOW MID-DRAG.
@@ -816,8 +816,8 @@ static bool16 KFCWindowMayBeFindChange(void* changedBy)
 //  which is exactly the mistake the panel side is written to avoid.
 static HWND sFcStyledWnd = nullptr;
 
-// Put the window we styled back as it was, and forget it. One place for it, because there are three
-// callers and each could skip it:
+// Put the window we styled back as it was, and forget it. One place for it, because each of its
+// callers could skip it:
 //   . the toggle going OFF - even with the dialog CLOSED, or the record stands while the status
 //     line says "off."
 //   . the toggle applying to a DIFFERENT window (the dialog closed and re-opened while ON) - or the
@@ -969,24 +969,25 @@ bool16 KFCApplyFindChangeTranslucency()
 static ICallbackTimer* sReapplyTimer = nil;
 static int32           sReapplyLeft  = 0;			// tries left (0 = stop; the runaway guard)
 
-// **KFCShutdownPanelAlpha has run: never build the timer again (KCM keeps the same flag).
-//   !What it stops: the observer below is detached at shutdown, but the toggle can still be ON
-//     and a notification can still be in flight when the panel is destroyed during teardown. That
-//     reaches KFCScheduleReapply, which finds sReapplyTimer == nil and CREATES ANOTHER ONE - after
-//     the clean-up has already run. The booking would then be live as the .pln goes down, which is
-//     the exact thing this file's header calls "a crash".
-//   *Belt and braces with the detach: either one alone closes the path, and neither costs anything.
+// **KFCShutdownPanelAlpha has run: never build the timer again.
+//   !What it stops: the toggle can still be ON when the clean-up runs, and something already on its
+//     way - a Win32 event queued before the hook came down, a notification the observer took before
+//     the palette manager's close - can still arrive afterwards. That reaches KFCScheduleReapply,
+//     which finds sReapplyTimer == nil and CREATES ANOTHER ONE - after the clean-up has already run.
+//     The booking would then be live as the .pln goes down, which is the exact thing this file's
+//     header calls "a crash".
+//   *Belt and braces with the detach and the unhook, which stop what could still arrive later; the
+//     flag answers for what was already on its way. It costs nothing.
 static bool            sPanelAlphaShutdown = false;
 
 static uint32 KFCReapplyTimerProc(void* refPtr);
 
 // Called from the notification side. (Re)starts the chase while the windows settle.
-// **There is deliberately no "already booked, do not stack" gate (KCM took its one out in a
-//   self-review): if the chain below ever broke, such a flag would stay raised and THIS FUNCTION
-//   would become a permanent no-op - the translucency could never be re-applied again for the rest
-//   of the session. Re-arming unconditionally on every notification works whatever the timer does
-//   underneath (and since the count goes back to kKFCPanelAlphaReapplyTries each time, it debounces
-//   as a side effect).
+// **There is deliberately no "already booked, do not stack" gate: if the chain below ever broke, such
+//   a flag would stay raised and THIS FUNCTION would become a permanent no-op - the translucency could
+//   never be re-applied again for the rest of the session. Re-arming unconditionally on every
+//   notification works whatever the timer does underneath (and since the count goes back to
+//   kKFCPanelAlphaReapplyTries each time, it debounces as a side effect).
 // *A booking still live is taken off before the new one is started: the official re-arm stops the
 //   running timer before it starts one (HTTPAssetLinkResourceHandler.cpp), and ICallbackTimer.h
 //   promises nothing for a StartTimer over a live booking.
@@ -1023,7 +1024,7 @@ static uint32 KFCReapplyTimerProc(void* /*refPtr*/)
 
 	KFCApplyPanelTranslucency();
 
-	// **The chain is made with the RETURN VALUE (as KCM settled it). Calling StartTimer again from in
+	// **The chain is made with the RETURN VALUE. Calling StartTimer again from in
 	//   here and then returning kEndOfTime cancels the booking just made: 8 runs became 2 (measured
 	//   rp=2). The return value IS the reschedule, so returning the delay is how it continues.
 	//   !ICallbackTimer's published contract is one-shot ("register a one time only callback"), so
@@ -1271,8 +1272,10 @@ void        KFCShutdownPanelAlpha() {}
 //       kAboutToClosePaletteMsg, which fires just before one closes - opening, docking changes and
 //       icon restores are all in this single message.
 //
-//   *The observer implementation is aggregated onto kActiveContextBoss in the .fr - the proven
-//     arrangement KCM uses for its own observers.
+//   *The observer implementation is aggregated onto kActiveContextBoss in the .fr and attached with its
+//     own IID as asObserver - the interface it actually sits on, which the subject goes by
+//     (ISubject.h:118). An observer on a boss of its own made with CreateObject2 was measured to
+//     receive nothing (memory panorama-layout-view-sync).
 //   **It IS detached (KFCDetachPanelVisibilityObserver) - as the palette manager is about to close the
 //     palettes, the moment KFCBookPanelPlacement's observer of the same subject stops at, while the
 //     session, the active context and the panel manager are all up. NOT at the plug-in's shutdown: by
@@ -1327,7 +1330,7 @@ private:
 
 CREATE_PMINTERFACE(KFCPanelRollOver, kKFCPanelRollOverImpl)
 
-// NOTHING IS TOUCHED WHILE THE TOGGLE IS OFF (as in KCM).
+// NOTHING IS TOUCHED WHILE THE TOGGLE IS OFF.
 //   **KFCApplyPanelTranslucency does not reject OFF** - it rejects "no panel", "docked" and Mac.
 //     While OFF it still writes alpha 255 to the top-level window AND shows the shadow with
 //     SW_SHOWNA. Called on every pass of the pointer, that would cost two things:
@@ -1336,8 +1339,8 @@ CREATE_PMINTERFACE(KFCPanelRollOver, kKFCPanelRollOverImpl)
 //       of ours - the 255 written here lands on the very window carrying that panel's 77.
 //     . a shadow the user never asked for is forced out - the left-behind-shadow defect's shape:
 //       InDesign does not move a shadow mid-drag, so one shown at the wrong moment is left behind.
-//   *Where the guard belongs: **in the callers, not inside KFCApplyPanelTranslucency** - the same
-//     conclusion KCM reached. Switching the toggle OFF has to write 255 and put the shadow back,
+//   *Where the guard belongs: **in the callers, not inside KFCApplyPanelTranslucency**. Switching
+//     the toggle OFF has to write 255 and put the shadow back,
 //     and that is done by calling this very function from the menu handler (KFCActionComponent's
 //     FlipWindowToggle). A guard inside would kill the restore. Every other caller asks first.
 void KFCPanelRollOver::MouseEnter(const PMPoint& localMousePos)
@@ -1374,7 +1377,7 @@ bool8 KFCPanelRollOver::IsMouseOver() const
 	//     precisely the flag this class does not keep. Measuring gives a better answer than such a flag
 	//     would (MouseLeave does not fire when the panel is closed, docked, or switched away from with
 	//     the pointer still on it), and with no flag there is nothing else here to answer with - but it
-	//     is a different answer from the one the words describe (KCM's twin says the same).
+	//     is a different answer from the one the words describe.
 #ifdef WINDOWS
 	// *Nothing is measured while the toggle is OFF. This AddIn exists for the translucency toggle,
 	//   and while it is off nobody uses the answer - whereas KFCQueryPaletteWindow goes out to the
@@ -1389,7 +1392,7 @@ bool8 KFCPanelRollOver::IsMouseOver() const
 }
 
 /** Re-applies the translucency when the panel's visibility changes. Subscribed to the panel
-    manager's subject (and to the application's, for the two messages noted below). */
+    manager's subject (and to the application's, for the messages noted below). */
 class KFCPanelVisibilityObserver : public CObserver
 {
 public:
@@ -1614,8 +1617,8 @@ void KFCAttachPanelVisibilityObserver()
 //     whose code is in this .pln, and the application outlives the session the observer lives in. Same
 //     reasoning, same shape as KFCBookWatchDetach.
 //   *Asked before detached, exactly as the attach side asks before attaching: the attach side is called
-//     from two places (startup and the panel's AutoAttach), so "is it actually on?" is the honest
-//     question on both sides.
+//     from startup and from the panel's AutoAttach, so "is it actually on?" is the honest question on
+//     both sides.
 //   !So the notifications stop before KFCShutdownPanelAlpha tears the timer and the hook down;
 //     sPanelAlphaShutdown covers anything still in flight (this file's timer section).
 void KFCDetachPanelVisibilityObserver()

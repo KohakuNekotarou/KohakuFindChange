@@ -25,9 +25,9 @@
 #include "BaseType.h"
 
 // (The tuning constants - the alpha (kKFCPanelAlphaValue) and the chase's count and interval - are at
-//  the top of KFCPanelAlpha.cpp, the one file that reads them: the shape KCM gives its own and the
-//  product code uses for a file-local tuning value (linksui/LinksUIUtils.cpp:606-608). Nothing that
-//  includes this header needs them.)
+//  the top of KFCPanelAlpha.cpp, the one file that reads them: the shape the product code uses for a
+//  file-local tuning value (linksui/LinksUIUtils.cpp:606-608). Nothing that includes this header
+//  needs them.)
 
 // The toggle's current state (*OFF by default).
 bool16	KFCGetPanelTranslucent();
@@ -47,8 +47,8 @@ void	KFCSetPanelTranslucent(bool16 on);
 //    See the note over KFCPanelRollOver::MouseEnter in the .cpp.
 //  - Does nothing (and does NOT report an error) when the panel is absent or docked
 //  - Callers, by name: the menu item (KFCActionComponent.cpp), the panel's AutoAttach
-//    (KFCPanelTitle.cpp), and five in KFCPanelAlpha.cpp itself - the palette-visibility observer,
-//    the chase timer, the Win32 event hook, and KFCPanelRollOver's MouseEnter and MouseLeave.
+//    (KFCPanelTitle.cpp), and in KFCPanelAlpha.cpp itself the palette-visibility observer, the
+//    chase timer, the Win32 event hook, and KFCPanelRollOver's MouseEnter and MouseLeave.
 //  - Returns kTrue when an alpha actually reached a window; kFalse when there is no panel, when it
 //    is docked, or on Mac. The menu uses that to say "it is on" or "it is on but the panel is
 //    docked", rather than leaving a click with no visible result unexplained.
@@ -158,8 +158,8 @@ void	KFCCommitWindowStyle(HWND h);
 void	KFCForgetFindChangeWindow();
 
 // Start listening for the panel being shown, hidden, docked or floated.
-// *Called from TWO places, and safe to call again: KFCUIStartupShutdown::Startup, and the panel's
-//   own AutoAttach (KFCPanelTitle.cpp). !The second one is not belt and braces - the panel manager
+// *Called from KFCUIStartupShutdown::Startup and from the panel's own AutoAttach
+//   (KFCPanelTitle.cpp), and safe to call again. !The second one is not belt and braces - the panel manager
 //   comes up partway through the application's startup sequence, so at Startup it can still be nil,
 //   and that subscription is picked up on the AutoAttach pass instead. Each attachment asks
 //   IsAttached first, so repeating the call attaches nothing twice. Does nothing while the application
