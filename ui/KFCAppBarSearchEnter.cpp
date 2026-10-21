@@ -75,13 +75,16 @@ static bool            sShutdown = false;
 
 // INDESIGN'S OWN TEXT, WRITTEN OVER AGAIN - THE WRITE-BACK (the author's call).
 // InDesign puts its own "Adobe Stock" into the field when it builds the field - measured: about 24 s into a launch
-// the field is made anew, already holding it - and when a menu is used (the user's observation). Find/Change does
-// not change then, so without this the field goes on saying "Adobe Stock" until its next change, and a Return there
-// searches for "Adobe Stock". A second thread hook, WH_CALLWNDPROCRET, sees the field being created (WM_CREATE) or
-// written (WM_SETTEXT) - both are SENT messages, which the WH_GETMESSAGE hook never sees - and books the query to
-// be written back one idle later. Typing is not a WM_SETTEXT (WM_CHAR, the IME and a paste edit the text from
-// inside the Edit - how a Win32 Edit works; NOT YET MEASURED with a person typing into the field, which is hidden
-// on the machine these were measured on), so what the person types is not written over. Two guards:
+// the field is made anew, already holding it - and, the user reported, when a menu is used (not reproduced: a menu
+// opened and closed, and View > Zoom In, wrote nothing - docs/ai-notes/kfc-block17-inspections-2026-10-22.md
+// section 5). Find/Change does not change then, so without this the field goes on saying "Adobe Stock" until its
+// next change, and a Return there searches for "Adobe Stock". A second thread hook, WH_CALLWNDPROCRET, sees the
+// field being created (WM_CREATE) or written (WM_SETTEXT) - both are SENT messages, which the WH_GETMESSAGE hook
+// never sees - and books the query to be written back one idle later. It cannot tell who sent a WM_SETTEXT: one
+// from outside InDesign is written over as well (measured). Typing is not a WM_SETTEXT (WM_CHAR, the IME and a
+// paste edit the text from inside the Edit - how a Win32 Edit works; measured with real keystrokes: a click into
+// the field, then CTRL+A and typed text, was not written over - the IME and a paste are not measured), so what the
+// person types is not written over. Two guards:
 //   . the field has the keyboard focus -> nothing is written: that is the person's editing (InDesign may clear its
 //     own text as the field takes the focus);
 //   . InDesign writes again within kKFCAppBarRewriteGuardMs of a WRITE-BACK of ours -> it is answering us, so the
@@ -148,9 +151,9 @@ static std::wstring ClassOf(HWND w)
 }
 
 // Is `w` the application bar's search field? A Win32 Edit inside an OWL.ApplicationBarHostView (measured: the
-// window tree, docs/ai-notes/indesign-win32-window-tree.md, and both spikes). The hook asks it of every Return's
-// own window; AppBarField asks it again of the handle it remembers before each use, since a handle the field
-// once had could name another window by now.
+// window tree, docs/ai-notes/indesign-win32-window-tree.md, and both spikes). Both hooks ask it - of every Return's
+// own window, and of every window a WM_SETTEXT or a WM_CREATE is sent to; AppBarField asks it again of the handle
+// it remembers before each use, since a handle the field once had could name another window by now.
 static bool IsAppBarSearchField(HWND w)
 {
 	if (ClassOf(w) != L"Edit")
@@ -185,14 +188,14 @@ static std::wstring FieldText(HWND field)
 // Colour, which this panel does not search, leave the field alone). Measured in a spike (branch
 // spike/2026-10-03-appbar-mirror): a settings change arrives on IID_IFINDCHANGEOPTIONS for every keystroke in
 // Find what, not only at Done; the field's usual "Adobe Stock" is real text in the Edit (so a cue banner shows
-// only while the field is focused and empty), and WM_SETTEXT shows at once; InDesign puts its own text back when
-// a menu is used - written over again at once (the write-back - see the second hook, above).
+// only while the field is focused and empty), and WM_SETTEXT shows at once. InDesign's own text written into the
+// field again is written over (the write-back - see the second hook, above).
 // (A design that took the tab from the field's triangle - Adobe Stock = Text, Adobe Help = GREP - was dropped
 //  once the field showed the dialog's own query. What it measured stays in the note:
 //  kSessionBoss's IID_IBOOLDATA, kStockSearchPrefImpl, is true for Adobe HELP.)
 
-// What the field is given: the UTF-16 of a PMString, which is UTF-16 already. One converter: the Text and GREP
-// tabs' WideString arrives here through PMString's own constructor from it.
+// What the field is given: the UTF-16 of a PMString, which is UTF-16 already. One converter: the Text and
+// GREP tabs' WideString arrives here through PMString's own constructor from it.
 static std::wstring WideOf(const PMString& s)
 {
 	int32 units = 0;

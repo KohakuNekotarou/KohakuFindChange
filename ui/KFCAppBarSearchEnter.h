@@ -9,8 +9,8 @@
 //  triangle) and Edit > Find/Change work as one:
 //    . the field SHOWS the query of the tab the dialog is on, and follows it as it is typed (Text / GREP: the
 //      find string; Glyph: the glyph; Transliterate: the character type; Object / Colour: left alone) - and puts
-//      it back when InDesign writes its own "Adobe Stock" there (as it builds the field at startup, and when a
-//      menu is used), unless the person is in the field (the WRITE-BACK - a WH_CALLWNDPROCRET hook);
+//      it back when InDesign writes its own "Adobe Stock" there (as it builds the field at startup and - the user
+//      reported - when a menu is used), unless the person is in the field (the WRITE-BACK - a WH_CALLWNDPROCRET hook);
 //    . Return in the field searches with this panel instead of Adobe Stock / Help - on the Text and GREP tabs
 //      only, the field's text put into that tab first when it differs (KFCSearchEngine::SetQuery). On the
 //      other tabs Return is still stopped but nothing is searched; the status line says so while the panel
