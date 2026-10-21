@@ -60,21 +60,23 @@ namespace
 
 	const char* const kQueriesFolder = "Find-Change Queries";
 
-	/** kKinds' index for a folder's name, -1 for none. Case-insensitive: these are Windows folder names. */
+	/** kKinds' index for a folder's name - kKindCount for none, as KindIndexOfMode says it. Case-insensitive: these are
+	    Windows folder names. */
 	int32 KindIndexOfFolder(const PMString& folderName)
 	{
 		for (int32 i = 0; i < kKindCount; ++i)
 			if (folderName.IsEqual(PMString(kKinds[i].folder), kFalse))
 				return i;
-		return -1;
+		return kKindCount;
 	}
 
+	/** kKinds' index for a mode - kKindCount for none (the list puts such a query after all five). */
 	int32 KindIndexOfMode(int32 mode)
 	{
 		for (int32 i = 0; i < kKindCount; ++i)
 			if (kKinds[i].mode == mode)
 				return i;
-		return kKindCount;		// no kind: after all five
+		return kKindCount;
 	}
 
 	/** InDesign's own queries' root, without a language: <InDesign>\Presets\Find-Change Queries (List puts each kind's
@@ -182,7 +184,7 @@ void KFCSavedQueries::Describe(const IDFile& file, KFCSavedQuery& out)
 	PMString parentName;
 	FileUtils::GetFileName(parent, parentName);
 	int32 kind = KindIndexOfFolder(parentName);
-	if (kind < 0)
+	if (kind == kKindCount)
 	{
 		IDFile grandparent;
 		if (FileUtils::GetParentDirectory(parent, grandparent) != kFalse)
@@ -192,7 +194,7 @@ void KFCSavedQueries::Describe(const IDFile& file, KFCSavedQuery& out)
 			kind = KindIndexOfFolder(grandparentName);
 		}
 	}
-	if (kind >= 0)
+	if (kind < kKindCount)
 		out.mode = kKinds[kind].mode;
 }
 

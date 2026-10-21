@@ -149,6 +149,29 @@ void AppendSkipped(PMString& s, const char* why, const std::vector<PMString>& na
 	s.Append(").");
 }
 
+// WHY A QUERY IS SKIPPED, in the order the message says them - the run collects each skipped query under one of these
+// and the message walks the table, so no reason is collected without its words: nothing to find (a Colour query
+// included - the spec map's QRY-22 - and an Object query with no Find Object Format); a file InDesign's query reader
+// could not read (it read "nothing to find" too); and, O14
+// (docs/superpowers/specs/2026-10-09-kfc-object-search-design.md), an Object query on a run over part of a document,
+// and one with nothing to change to.
+enum SkipReason
+{
+	kSkipNothingToFind,
+	kSkipUnread,
+	kSkipPartOfDocument,
+	kSkipNoChangeTo,
+	kSkipReasons			// how many there are
+};
+const char* const kSkipWords[] =
+{
+	"nothing to find",
+	"the file could not be read",
+	"an Object query runs on whole documents",
+	"nothing to change to",
+};
+static_assert(sizeof(kSkipWords) / sizeof(kSkipWords[0]) == kSkipReasons, "each skip reason has its words");
+
 // THE RUN: these queries, in this order - each one with InDesign's own Change All, a document at a time. outSummary =
 // the panel's message line. Returns how many were replaced (0 for a refusal, a cancel or a failure). Its ways in are
 // RunFiles (the query dialog's Run) and, in a test build, RunFromDiagSwitch - both name each query as the dialog does.
@@ -241,14 +264,7 @@ int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 
 	// ===== ONE SEQUENCE AROUND EVERY QUERY (one Ctrl+Z - the query-sequence spec's D5).
 	std::vector<int32> perQuery(queries.size(), -1);
-	// The queries skipped, by the reason the message gives: nothing to find - a Colour query included (the spec map's
-	// QRY-22), and an Object query with no Find Object Format - and, apart from those, a file InDesign's query reader could
-	// not read (it read "nothing to find" too). And (O14 - docs/superpowers/specs/2026-10-09-kfc-object-search-design.md)
-	// an Object query on a run over part of a document, and one with nothing to change to.
-	std::vector<PMString> skippedNothing;
-	std::vector<PMString> skippedUnread;
-	std::vector<PMString> skippedPart;		// an Object query on a run over part of a document
-	std::vector<PMString> skippedNoChange;	// an Object query with nothing to change to
+	std::vector<PMString> skipped[kSkipReasons];		// the queries skipped, by their reason (kSkipWords)
 	bool objectRan = false;					// an Object query aimed the shared object walker at the run's documents
 	std::vector<bool> wroteTo(targets.size(), false);		// by target: did any query's Change All write anything there
 	int32 replaced = 0;
@@ -264,6 +280,13 @@ int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 		return 0;
 	}
 	seq->SetName(kKFCRunQueriesStepKey);
+
+	// WHAT EACH WRITE COVERS, from the run's scope once: a book, All Documents and Search: Document write each document
+	// whole; Story / To End of Story / Selection write that part of the front document (the one target).
+	const bool wholeDocuments = scope.fromBook || scope.allDocuments
+		|| scope.selectionScope == static_cast<int32>(IWalkerScopeFactoryUtils::kDocumentScope);
+	const int32 writeScope = wholeDocuments
+		? static_cast<int32>(IWalkerScopeFactoryUtils::kDocumentScope) : scope.selectionScope;
 
 	// ONE BAR FOR THE WHOLE RUN: a query x document a step, its Cancel
 	// asked between steps - one document's Change All does not stop half way (the dialog's own rule). It comes down
@@ -289,9 +312,9 @@ int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 		{
 			const QueryItem& query = queries[q];
 			// A QUERY SKIPPED is named under its reason, and the bar moves on past its steps (one per document).
-			const auto skip = [&](std::vector<PMString>& under)
+			const auto skip = [&](SkipReason reason)
 			{
-				under.push_back(query.name);
+				skipped[reason].push_back(query.name);
 				unit += static_cast<int32>(targets.size());
 				runBar.SetPosition(Place(q + 1, 0));
 			};
@@ -305,25 +328,24 @@ int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 				break;
 			}
 			const bool loaded = KFCSavedQueries::LoadIntoFindChange(query.file);
-			if (!loaded || !KFCSearchEngine::CanSearchTab(KFCSearchEngine::CurrentSearchMode())
-				|| !KFCSearchEngine::HasFindQueryNow())
+			const int32 mode = KFCSearchEngine::CurrentSearchMode();		// the tab the query turned Find/Change to
+			if (!loaded || !KFCSearchEngine::CanSearchTab(mode) || !KFCSearchEngine::HasFindQueryNow())
 			{
-				skip(loaded ? skippedNothing : skippedUnread);
+				skip(loaded ? kSkipNothingToFind : kSkipUnread);
 				continue;
 			}
 			// AN OBJECT QUERY (spec O14) writes WHOLE DOCUMENTS with InDesign's object Change All: the object walker has
 			// no story, and a text Selection names no page item - so on a run over part of the front document it is skipped
 			// and said; and one with nothing to change to is skipped as Change All in Book refuses it.
-			const bool objectQuery = (KFCSearchEngine::CurrentSearchMode() == IFindChangeOptions::kObjectSearch);
-			if (objectQuery && !(scope.fromBook || scope.allDocuments)
-				&& scope.selectionScope != static_cast<int32>(IWalkerScopeFactoryUtils::kDocumentScope))
+			const bool objectQuery = (mode == IFindChangeOptions::kObjectSearch);
+			if (objectQuery && !wholeDocuments)
 			{
-				skip(skippedPart);
+				skip(kSkipPartOfDocument);
 				continue;
 			}
 			if (objectQuery && !KFCObjectSearch::HasChangeObjectFormat())
 			{
-				skip(skippedNoChange);
+				skip(kSkipNoChangeTo);
 				continue;
 			}
 			// The tab and the change side are stated for a text query only: an Object query's write is the service's own
@@ -393,10 +415,7 @@ int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 				}
 
 				// EACH DOCUMENT WITH InDesign's OWN CHANGE ALL (F7 - docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md
-				// section 5): no rows collected, no limit. A book or All Documents writes each document whole; Story / To End
-				// of Story / Selection write that part of the front document (the one target).
-				const int32 writeScope = (scope.fromBook || scope.allDocuments)
-					? static_cast<int32>(IWalkerScopeFactoryUtils::kDocumentScope) : scope.selectionScope;
+				// section 5): no rows collected, no limit - over writeScope (asked once, above the loops).
 				int32 count = 0, partial = 0;
 				const bool wrote = objectQuery
 					? KFCObjectReplace::ReplaceAllInDoc(targets[d].docRef, count, partial)
@@ -522,10 +541,8 @@ int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 		outSummary.AppendNumber(selection.total);
 	}
 	outSummary.Append(".");		// one undo step; nothing said of Ctrl+Z (spec F20)
-	AppendSkipped(outSummary, "nothing to find", skippedNothing);
-	AppendSkipped(outSummary, "the file could not be read", skippedUnread);
-	AppendSkipped(outSummary, "an Object query runs on whole documents", skippedPart);
-	AppendSkipped(outSummary, "nothing to change to", skippedNoChange);
+	for (int32 r = 0; r < kSkipReasons; ++r)
+		AppendSkipped(outSummary, kSkipWords[r], skipped[r]);
 	KFCBookScope::AppendUnopenableNote(outSummary, unopenable);
 	KFCBookScope::AppendUnclosedNote(outSummary, unclosed);
 	return replaced;
