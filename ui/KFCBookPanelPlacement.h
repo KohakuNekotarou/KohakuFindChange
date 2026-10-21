@@ -46,7 +46,8 @@
 //      same dock at the same place);
 //    * a neighbour the user has closed, docked or floating, and a dock the user has emptied by closing
 //      its panels: the Book panel is not put where it cannot be seen - the next neighbour is tried, then
-//      a column of its own or its own place and size, and else it stays where InDesign put it.
+//      a column of its own or its own place and size, and else it stays where InDesign put it. (A
+//      neighbour in a column folded into icons, or hidden with the rest by the Tab key, is not closed.)
 //
 //  The file: KBSPanelState.json, the one "Save Panel Settings" writes. The toggle itself is written
 //  to it the moment it is flipped (one key), and "Save Panel Settings" writes all of it. EVERY key of

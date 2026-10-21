@@ -498,17 +498,37 @@ PaletteRef ContainerOfPanel(IPanelMgr* panelMgr, int32 widgetID)
 }
 
 #ifdef KFC_DIAG
-/** A test build's look at a neighbour before the book panel is put beside it (JoinNeighbours): its container's own
+/** A test build's look at one palette: its kind (c container, g tab group, p column, d dock, f floating dock), its own
     visible flag (GetVisibleState), its effective visibility (IsPaletteVisible), the close box's mark (GetIsClosed), and
-    its tab group's two visibilities - what a neighbour the user closed looks like there. */
+    a column's mode ("icons"). */
+std::string DescribePalette(const PaletteRef& pal)
+{
+	const bool column = PaletteRefUtils::IsTabPane(pal) != kFalse;
+	const char* kind = PaletteRefUtils::IsFloatingTabbedPaletteDock(pal) ? "f" : PaletteRefUtils::IsDock(pal) ? "d"
+		: column ? "p" : PaletteRefUtils::IsTabGroup(pal) ? "g" : PaletteRefUtils::IsTabPanelContainer(pal) ? "c" : "?";
+	char one[80];
+	_snprintf_s(one, sizeof(one), _TRUNCATE, " %s[own=%d eff=%d closed=%d%s]", kind,
+		PaletteRefUtils::GetVisibleState(pal) ? 1 : 0, PaletteRefUtils::IsPaletteVisible(pal) ? 1 : 0,
+		PaletteRefUtils::GetIsClosed(pal) ? 1 : 0,
+		column && PaletteRefUtils::GetTabPaneMode(pal) == PaletteRefUtils::kIcon_TabPaneMode ? " icons" : "");
+	return one;
+}
+
+/** A test build's look at a neighbour before the book panel is put beside it (JoinNeighbours): every palette from its
+    container up to its dock or floating dock (DescribePalette) - what a neighbour the user closed, or one in a column
+    folded into icons, looks like at each level. */
 void LogNeighbour(IPanelMgr* panelMgr, const char* role, int32 widgetID)
 {
-	const PaletteRef c = ContainerOfPanel(panelMgr, widgetID);
-	const PaletteRef group = ParentOf(c);
-	KFC_DIAG_LOG("BOOKPANEL NEIGHBOUR %s=%d valid=%d own=%d effective=%d closed=%d groupOwn=%d groupEffective=%d", role,
-		widgetID, c.IsValid() ? 1 : 0, Is(c, &PaletteRefUtils::GetVisibleState) ? 1 : 0,
-		Is(c, &PaletteRefUtils::IsPaletteVisible) ? 1 : 0, Is(c, &PaletteRefUtils::GetIsClosed) ? 1 : 0,
-		Is(group, &PaletteRefUtils::GetVisibleState) ? 1 : 0, Is(group, &PaletteRefUtils::IsPaletteVisible) ? 1 : 0);
+	std::string levels;
+	PaletteRef pal = ContainerOfPanel(panelMgr, widgetID);
+	for (int32 guard = 0; guard < 16 && pal.IsValid(); ++guard)
+	{
+		levels += DescribePalette(pal);
+		if (PaletteRefUtils::IsDock(pal) || PaletteRefUtils::IsFloatingTabbedPaletteDock(pal))
+			break;
+		pal = PaletteRefUtils::GetParentOfPalette(pal);
+	}
+	KFC_DIAG_LOG("BOOKPANEL NEIGHBOUR %s=%d%s", role, widgetID, levels.empty() ? " (no container)" : levels.c_str());
 }
 
 /** A test build's look at the book panel on each visibility message: floating or docked, its dock's effective and own
@@ -921,35 +941,39 @@ void RestoreFloating(IControlView* bookPanel, const PaletteRef& container, const
 	ApplyIconState(FindAncestor(container, &PaletteRefUtils::IsTabPane), p);
 }
 
-/** Is this palette, and every palette above it up to the first dock or floating dock, shown by its own flag
-    (GetVisibleState) and not closed (GetIsClosed)? false for an invalid one. NeighbourIsOpen says why. */
-bool OpenToTheDock(const PaletteRef& from)
+/** Is this dock or floating dock on show (IsPaletteVisible) and not closed (GetIsClosed)? false for an invalid
+    one. NeighbourIsOpen says why its own flag alone does not decide. */
+bool DockOnShow(const PaletteRef& dock)
 {
-	PaletteRef pal = from;
-	for (int32 guard = 0; guard < 16 && pal.IsValid(); ++guard)
-	{
-		if (!PaletteRefUtils::GetVisibleState(pal) || PaletteRefUtils::GetIsClosed(pal))
-			return false;
-		if (PaletteRefUtils::IsDock(pal) || PaletteRefUtils::IsFloatingTabbedPaletteDock(pal))
-			return true;
-		pal = PaletteRefUtils::GetParentOfPalette(pal);
-	}
-	return from.IsValid();
+	return dock.IsValid() && PaletteRefUtils::IsPaletteVisible(dock) && !PaletteRefUtils::GetIsClosed(dock);
 }
 
 /** IS A NEIGHBOUR STILL OPEN - asked before the book panel is put beside it, docked or floating
-    (JoinNeighbours)? A panel the user has closed keeps its container where it was, and a book panel put
-    beside it stands in what was closed, nowhere on screen. Measured (block 16's defect re-check,
-    work/note-scripts/2026-10-21-kfc-block16-defect/live_b16d.ps1, scene K): the Pages panel, alone in the
-    right dock, closed from the Window menu kept its container and its tab group shown by their own flags and
-    hid the DOCK above them - and the book panel the restore put into its group stood in that hidden dock with
-    the book open. So every level up to the dock is asked (OpenToTheDock), not the container alone; and by its
-    own flag, which is what a close clears, rather than by IsPaletteVisible - what that says of a panel in a
-    column collapsed to icons is not measured. (Asked of a floating neighbour's floating dock only, before:
-    a closed panel in a palette still on show passed.) */
+    (JoinNeighbours)? A panel the user has closed keeps its container where it was, and a book panel put beside
+    it stands in what was closed, nowhere on screen. Measured, each palette from the neighbour's container up to
+    its dock (block 16's defect re-check, work/note-scripts/2026-10-21-kfc-block16-defect/live_b16d.ps1):
+      closed from the Window menu, alone in the right dock (scene K) - its TAB GROUP marked closed
+        (GetIsClosed), the column and the dock hidden by their own flags, the container still shown by its own;
+        the book panel put into that group stood in the hidden dock with the book open.
+      open in a column folded into icons (scene I) - its tab group hidden by its own flag, not closed, the
+        column and the dock on show (its container's own flag read 0 once too: KBSBookPanelDiag.log, 2026-09-25).
+      open, every palette hidden with the Tab key (scene T) - the dock CONCEALED and still on show, its column
+        and tab group hidden by their own flags, nothing closed.
+    So an own flag below the dock does not say closed - a column of icons and the Tab key clear them too. What
+    does is the close mark, at any level up to the dock, and the dock not on show (DockOnShow - a dock emptied by
+    closing its panels); both are asked here. */
 bool NeighbourIsOpen(IPanelMgr* panelMgr, int32 widgetID)
 {
-	return OpenToTheDock(ContainerOfPanel(panelMgr, widgetID));
+	PaletteRef pal = ContainerOfPanel(panelMgr, widgetID);
+	for (int32 guard = 0; guard < 16 && pal.IsValid(); ++guard)
+	{
+		if (PaletteRefUtils::GetIsClosed(pal))
+			return false;
+		if (PaletteRefUtils::IsDock(pal) || PaletteRefUtils::IsFloatingTabbedPaletteDock(pal))
+			return DockOnShow(pal);
+		pal = PaletteRefUtils::GetParentOfPalette(pal);
+	}
+	return false;		// in no dock that can be found - nothing to vouch for
 }
 
 /** Back beside the same neighbours, the closest one that can still be found first: into a mate's
@@ -1065,11 +1089,12 @@ void RestoreDocked(IPanelMgr* panelMgr, const PaletteRef& container, const Place
 		if (Is(dock, &PaletteRefUtils::IsDock))
 			before = ChildAtOrEnd(dock, p.columnIndex);
 	}
-	// ...and only into a dock still open: one the user emptied by closing its panels is hidden by its own flag
-	// (measured - NeighbourIsOpen), and a new column in it would stand hidden with the book panel in it.
-	if (Is(dock, &PaletteRefUtils::IsDock) && !OpenToTheDock(dock))
+	// ...and only into a dock on show: one the user emptied by closing its panels is not (measured -
+	// NeighbourIsOpen), and a new column in it would stand hidden with the book panel in it.
+	if (Is(dock, &PaletteRefUtils::IsDock) && !DockOnShow(dock))
 	{
-		KFC_DIAG_LOG("BOOKPANEL RESTORE docked: the dock is closed - left where InDesign put it");
+		KFC_DIAG_LOG("BOOKPANEL RESTORE docked: the dock is not on show (%s) - left where InDesign put it",
+			DescribePalette(dock).c_str());
 		return;
 	}
 	if (!Is(dock, &PaletteRefUtils::IsDock))
