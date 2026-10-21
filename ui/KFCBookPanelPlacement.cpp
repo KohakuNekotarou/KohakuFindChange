@@ -270,6 +270,12 @@ const char* const kKeyColumnIndex = "bookPanelColumnIndex";
     says the same of its own). */
 ICommandInterceptor* gCmdWatch = nil;
 
+/** **Once ShutdownCleanup has run, nothing is installed or booked again - not the interceptor, not either timer.
+    Each leaves InDesign holding a raw pointer into this .pln, and nothing promises that no menu press
+    (ToggleAndSave) or notification comes between the clean-up and the unload: stopping them is half of it,
+    never starting them again the other half (memory plugin-teardown-robustness). */
+bool gShutDown = false;
+
 //----------------------------------------------------------------------------------------
 // The palette tree
 //----------------------------------------------------------------------------------------
@@ -1052,6 +1058,9 @@ uint32 RestoreTimerCallback(void* /*refPtr*/)
 /** Arm the deferred restore (or restart its wait if one is pending). */
 void ArmRestoreTimer(uint32 delayMs = kKFCBookPanelRestoreDelayMs)
 {
+	if (gShutDown)
+		return;		// past the clean-up (see gShutDown) - not even the restore done at once below
+
 	if (gRestoreTimer == nil)
 		gRestoreTimer = ::CreateObject2<ICallbackTimer>(kCallbackTimerBoss, IID_ICALLBACKTIMER);
 
@@ -1132,7 +1141,7 @@ void EndHomeWindow(const char* why)
     untouched. */
 void MaybeCheckHomeScreen()
 {
-	if (gLeftHomeScreen || gHomeWindowOver)
+	if (gShutDown || gLeftHomeScreen || gHomeWindowOver)
 		return;
 	// Past launch, for good (see gHomeTimer): the window has run out, or a document is open now (the
 	// interceptor ends it as one opens - this is the backstop for a toggle switched on with one open).
@@ -1264,7 +1273,7 @@ ICommandProcessor* QueryCommandProcessor()
     keeps its own resident, and that is right there: recording commands is what that tool is for.) */
 void InstallCmdWatch()
 {
-	if (gCmdWatch != nil)
+	if (gShutDown || gCmdWatch != nil)
 		return;
 
 	InterfacePtr<ICommandProcessor> processor(QueryCommandProcessor());
@@ -1496,6 +1505,7 @@ void KFCBookPanelPlacement::Stop()
 
 void KFCBookPanelPlacement::ShutdownCleanup()
 {
+	gShutDown = true;		// **first: from here nothing is installed or booked again (see gShutDown)
 	AttachObserver(false);
 	// The interceptor above all: the command processor holds a raw pointer into this .pln.
 	UninstallCmdWatch();

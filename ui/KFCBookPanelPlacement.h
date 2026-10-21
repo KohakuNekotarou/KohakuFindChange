@@ -96,7 +96,8 @@ namespace KFCBookPanelPlacement
 	void Stop();
 
 	/** Application shutdown (KFCUIStartupShutdown::Shutdown): stop following and give the timers and the
-	    interceptor back, in case Stop was never reached. Safe to call twice. */
+	    interceptor back, in case Stop was never reached - and install or book none of them again after it,
+	    whatever still comes (the toggle, a notification). Safe to call twice. */
 	void ShutdownCleanup();
 }
 
