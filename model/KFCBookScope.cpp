@@ -1104,6 +1104,21 @@ KFCBookScope::ChapterDoc KFCBookScope::DocAsChapter(IDocument* doc)
 	return one;
 }
 
+void KFCBookScope::ListOpenDocuments(std::vector<ChapterDoc>& out)
+{
+	InterfacePtr<IDocumentList> docList(KFCBookScope::QueryOpenDocumentList());
+	const int32 docCount = (docList != nil) ? docList->GetDocCount() : 0;
+	for (int32 d = 0; d < docCount; ++d)
+	{
+		IDocument* doc = docList->GetNthDoc(d);
+		if (doc == nil)
+			continue;
+		const ChapterDoc one = KFCBookScope::DocAsChapter(doc);
+		if (!KFCBookScope::IsHeldDoc(one.docRef))
+			out.push_back(one);
+	}
+}
+
 void KFCBookScope::AppendChapterNote(PMString& outSummary, const char* what,
 	const std::vector<PMString>& names, const char* tail)
 {

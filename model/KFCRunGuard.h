@@ -15,7 +15,7 @@
 //  not around its bar alone (a test build says whether each windowless open and window was counted - REOPEN
 //  and WINDOW in KFCBookScope.cpp). InDesign's own doors - a document closed - are not KFC's to shut: a write
 //  that reaches several documents asks again whether each is still open before it writes (ReplaceRowsNow in
-//  KFCReplaceEngine.cpp, KFCObjectReplace::ReplaceRows, KFCChangeAll::Run, KFCQuerySequence::Run).
+//  KFCReplaceEngine.cpp, KFCObjectReplace::ReplaceRows, KFCChangeAll::Run, KFCQuerySequence.cpp's Run).
 //
 //  WHY THIS IS NEEDED AT ALL
 //

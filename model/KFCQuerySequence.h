@@ -29,20 +29,11 @@
 
 namespace KFCQuerySequence
 {
-	/** One query of a run: its name as the list shows it, and its .xml. */
-	struct QueryItem
-	{
-		PMString	name;
-		IDFile		file;
-	};
-
-	/** Run these queries, in this order - each one with InDesign's own Change All, a document at a time. outSummary =
-	    the panel's message line. Returns how many were replaced (0 for a refusal, a cancel or a failure). */
-	int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary);
-
 	/** THE QUERY DIALOG'S RUN (docs/superpowers/specs/_done/2026-10-07-kfc-query-dialog-and-selected-documents-design.md):
 	    these query files, in this order, each named as the dialog names it (KFCSavedQueries::Describe - the file's
-	    name without .xml), then Run. A file that is not there is Run's to refuse - nothing is run, and it is named. */
+	    name without .xml), then run - each one with InDesign's own Change All, a document at a time. A file that is
+	    not there is the run's to refuse - nothing is run, and it is named. outSummary = the panel's message line.
+	    Returns how many were replaced (0 for a refusal, a cancel or a failure). */
 	int32 RunFiles(const std::vector<IDFile>& files, PMString& outSummary);
 
 	/** Is a run going on (KFCRunGuard counts it)? */
@@ -50,8 +41,8 @@ namespace KFCQuerySequence
 
 #ifdef KFC_DIAG
 	/** THE TEST BUILD'S WAY IN without the dialog (the regression cases qs-*, xq-*): the fault switch queries-run's file
-	    holds one query path per line (UTF-8) - a line starting "#" is skipped; SearchBook hands its run here while the
-	    switch is on. */
+	    holds one query path per line (UTF-8) - a line starting "#" is skipped - each query named as the dialog names
+	    it; SearchBook hands its run here while the switch is on. */
 	int32 RunFromDiagSwitch(PMString& outSummary);
 #endif
 }

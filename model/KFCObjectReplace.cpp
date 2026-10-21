@@ -884,7 +884,7 @@ bool KFCObjectReplace::ReplaceAllInDoc(const UIDRef& docRef, int32& outReplaced,
 	const IFindChangeService::FindChangeResult result = svc->ReplaceAllObject(&found, &fully, &partially, kFalse);
 	// FAILED = its answer is kFailure, OR it left the error state raised - the text side's Change All asks both of its
 	// command (WriteDocument). The state is cleared here either way, and a failure is the caller's to act on: it rolls
-	// its whole step back (KFCChangeAll::Run, KFCQuerySequence::Run).
+	// its whole step back (KFCChangeAll::Run, KFCQuerySequence.cpp's Run).
 	const bool errorStood = (ErrorUtils::PMGetGlobalErrorCode() != kSuccess);
 	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 	if (result == IFindChangeService::kFailure || errorStood)

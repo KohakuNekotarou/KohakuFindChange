@@ -15,7 +15,6 @@
 #include "ICommandSequence.h"		// IAbortableCmdSeq - the run's one undo step, and a cancel that is stated
 #include "IDataBase.h"
 #include "IDocument.h"
-#include "IDocumentList.h"
 #include "IFindChangeOptions.h"		// kObjectSearch - an Object query
 #include "IWalkerScopeFactoryUtils.h"	// kDocumentScope - a book or All Documents writes each document whole
 
@@ -56,6 +55,26 @@ struct RunningFlagGuard
 	~RunningFlagGuard()	{ gRunning = false; }
 };
 
+/** One query of a run: its name as the list shows it, and its .xml. */
+struct QueryItem
+{
+	PMString	name;
+	IDFile		file;
+};
+
+// One query file onto a run's list, named as the dialog names it (KFCSavedQueries::Describe - the file's name without
+// .xml): the dialog's files (RunFiles) and the test build's (RunFromDiagSwitch). Copied in: a std::vector of IDFile
+// does not link in this plug-in (KFCBookScope.cpp, KFCSearchedBookChapterFiles).
+void AppendItem(std::vector<QueryItem>& queries, const IDFile& file)
+{
+	KFCSavedQuery described;
+	KFCSavedQueries::Describe(file, described);
+	QueryItem item;
+	item.name = described.name;
+	item.file = file;
+	queries.push_back(item);
+}
+
 // EDIT > FIND/CHANGE EMPTIED AFTER THE RUN (the query-sequence spec's D7 - FindChangeByList.jsx empties the strings
 // and the formats after every query). kClearFindChangeOptionsCmdBoss (TextWalkerServiceProviderID.h:109) - measured on
 // a live run (docs/ai-notes/kfc-query-sequence-engine-2026-10-04.md, M2): the four strings (Text and GREP, find and
@@ -89,6 +108,17 @@ void AppendPerQuery(PMString& s, const std::vector<int32>& perQuery)
 	}
 }
 
+// "A, B" - the queries a message names, in the run's order (the two below).
+void AppendNames(PMString& s, const std::vector<PMString>& names)
+{
+	for (size_t i = 0; i < names.size(); ++i)
+	{
+		if (i > 0)
+			s.Append(", ");
+		s.Append(names[i]);
+	}
+}
+
 // "Nothing was run - a query in the run order cannot be found (A)." / "... 2 queries in the run order cannot be found
 // (A, B)." - the refusal for a run order holding a query whose file is gone.
 void AppendNotFound(PMString& s, const std::vector<PMString>& names)
@@ -101,12 +131,7 @@ void AppendNotFound(PMString& s, const std::vector<PMString>& names)
 		s.AppendNumber(static_cast<int32>(names.size()));
 		s.Append(" queries in the run order cannot be found (");
 	}
-	for (size_t i = 0; i < names.size(); ++i)
-	{
-		if (i > 0)
-			s.Append(", ");
-		s.Append(names[i]);
-	}
+	AppendNames(s, names);
 	s.Append(").");
 }
 
@@ -120,23 +145,14 @@ void AppendSkipped(PMString& s, const char* why, const std::vector<PMString>& na
 	s.Append(names.size() == 1 ? " query: " : " queries: ");
 	s.Append(why);
 	s.Append(" (");
-	for (size_t i = 0; i < names.size(); ++i)
-	{
-		if (i > 0)
-			s.Append(", ");
-		s.Append(names[i]);
-	}
+	AppendNames(s, names);
 	s.Append(").");
 }
 
-}	// anonymous namespace
-
-bool KFCQuerySequence::IsRunning()
-{
-	return gRunning;
-}
-
-int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& outSummary)
+// THE RUN: these queries, in this order - each one with InDesign's own Change All, a document at a time. outSummary =
+// the panel's message line. Returns how many were replaced (0 for a refusal, a cancel or a failure). Its ways in are
+// RunFiles (the query dialog's Run) and, in a test build, RunFromDiagSwitch - both name each query as the dialog does.
+int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 {
 	KFC_DIAG_WRITTEN_DOCS_CHECK("query-run");	// (test builds: when the run is over - KFCDiagWrittenDocs.h)
 	outSummary.Clear();
@@ -201,19 +217,7 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 				targets.push_back(listed[i]);
 	}
 	else if (scope.allDocuments)
-	{
-		InterfacePtr<IDocumentList> docList(KFCBookScope::QueryOpenDocumentList());
-		const int32 docCount = (docList != nil) ? docList->GetDocCount() : 0;
-		for (int32 d = 0; d < docCount; ++d)
-		{
-			IDocument* doc = docList->GetNthDoc(d);
-			if (doc == nil)
-				continue;
-			const KFCBookScope::ChapterDoc one = KFCBookScope::DocAsChapter(doc);
-			if (!KFCBookScope::IsHeldDoc(one.docRef))
-				targets.push_back(one);
-		}
-	}
+		KFCBookScope::ListOpenDocuments(targets);		// as the search's All Documents lists them
 	else
 	{
 		IDocument* doc = KFCBookScope::ActiveDocument();
@@ -285,6 +289,13 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 		for (size_t q = 0; q < queries.size() && !cancelled && !failed; ++q)
 		{
 			const QueryItem& query = queries[q];
+			// A QUERY SKIPPED is named under its reason, and the bar moves on past its steps (one per document).
+			const auto skip = [&](std::vector<PMString>& under)
+			{
+				under.push_back(query.name);
+				unit += static_cast<int32>(targets.size());
+				runBar.SetPosition(Place(q + 1, 0));
+			};
 			// Every file was there at the door; one gone since (deleted while the run went) stops the run like a failed
 			// write - the whole of it taken back - by the same rule.
 			if (!FileUtils::DoesFileExist(query.file))
@@ -298,9 +309,7 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 			if (!loaded || !KFCSearchEngine::CanSearchTab(KFCSearchEngine::CurrentSearchMode())
 				|| !KFCSearchEngine::HasFindQueryNow())
 			{
-				(loaded ? skippedNothing : skippedUnread).push_back(query.name);
-				unit += static_cast<int32>(targets.size());
-				runBar.SetPosition(Place(q + 1, 0));
+				skip(loaded ? skippedNothing : skippedUnread);
 				continue;
 			}
 			// AN OBJECT QUERY (spec O14) writes WHOLE DOCUMENTS with InDesign's object Change All: the object walker has
@@ -310,16 +319,12 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 			if (objectQuery && !(scope.fromBook || scope.allDocuments)
 				&& scope.selectionScope != static_cast<int32>(IWalkerScopeFactoryUtils::kDocumentScope))
 			{
-				skippedPart.push_back(query.name);
-				unit += static_cast<int32>(targets.size());
-				runBar.SetPosition(Place(q + 1, 0));
+				skip(skippedPart);
 				continue;
 			}
 			if (objectQuery && !KFCObjectSearch::HasChangeObjectFormat())
 			{
-				skippedNoChange.push_back(query.name);
-				unit += static_cast<int32>(targets.size());
-				runBar.SetPosition(Place(q + 1, 0));
+				skip(skippedNoChange);
 				continue;
 			}
 			// The tab and the change side are stated for a text query only: an Object query's write is the service's own
@@ -523,24 +528,24 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 	return replaced;
 }
 
+}	// anonymous namespace
+
+bool KFCQuerySequence::IsRunning()
+{
+	return gRunning;
+}
+
 int32 KFCQuerySequence::RunFiles(const std::vector<IDFile>& files, PMString& outSummary)
 {
 	std::vector<QueryItem> queries;
 	for (size_t i = 0; i < files.size(); ++i)
-	{
-		KFCSavedQuery described;
-		KFCSavedQueries::Describe(files[i], described);
-		QueryItem item;
-		item.name = described.name;
-		item.file = files[i];
-		queries.push_back(item);
-	}
+		AppendItem(queries, files[i]);
 	return Run(queries, outSummary);
 }
 
 #ifdef KFC_DIAG
-// The test build's way in (KFCQuerySequence.h). One path per line, UTF-8; a BOM and CR LF are tolerated. The
-// query's name = the file's name without ".xml".
+// The test build's way in (KFCQuerySequence.h). One path per line, UTF-8; a BOM and CR LF are tolerated. Each query is
+// named as the dialog names it (AppendItem).
 int32 KFCQuerySequence::RunFromDiagSwitch(PMString& outSummary)
 {
 	std::vector<QueryItem> queries;
@@ -551,16 +556,9 @@ int32 KFCQuerySequence::RunFromDiagSwitch(PMString& outSummary)
 		const std::string& line = lines[n];
 		if (line[0] == '#')		// a line starting "#" is skipped
 			continue;
-		QueryItem item;
 		PMString p;
 		p.SetUTF8String(line);
-		item.file = FileUtils::PMStringToSysFile(p);
-		std::string base = line.substr(line.find_last_of("\\/") + 1);
-		if (base.size() > 4 && base.compare(base.size() - 4, 4, ".xml") == 0)
-			base.erase(base.size() - 4);
-		item.name.SetUTF8String(base);
-		item.name.SetTranslatable(kFalse);
-		queries.push_back(item);
+		AppendItem(queries, FileUtils::PMStringToSysFile(p));
 	}
 	KFC_DIAG_LOG("queries-run: %d queries from the switch", (int)queries.size());
 	return Run(queries, outSummary);

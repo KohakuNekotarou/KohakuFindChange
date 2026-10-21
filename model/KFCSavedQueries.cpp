@@ -77,20 +77,19 @@ namespace
 		return kKindCount;		// no kind: after all five
 	}
 
-	/** InDesign's own queries' root, without a language: <InDesign>\Presets\Find-Change Queries. Empty when the presets
-	    folder cannot be had. */
-	PMString PresetsRootPath()
+	/** InDesign's own queries' root, without a language: <InDesign>\Presets\Find-Change Queries (List puts each kind's
+	    language folder under the kind's). False when the presets folder cannot be had. The one place List and
+	    IsUnderPresets learn where InDesign keeps its queries. */
+	bool GetPresetsRoot(IDFile& out)
 	{
-		IDFile root;
-		if (FileUtils::GetPresetsFolder(&root, PMString(kQueriesFolder), PMLocaleId()) == kFalse)
-			return PMString();
-		return FileUtils::SysFileToPMString(root);
+		return FileUtils::GetPresetsFolder(&out, PMString(kQueriesFolder), PMLocaleId()) != kFalse;
 	}
 
 	/** Is this file under InDesign's own queries' root? Compared as path text, case-insensitively (Windows). */
 	bool IsUnderPresets(const IDFile& file)
 	{
-		PMString root = PresetsRootPath();
+		IDFile rootFolder;
+		PMString root = GetPresetsRoot(rootFolder) ? FileUtils::SysFileToPMString(rootFolder) : PMString();
 		if (root.IsEmpty())
 			return false;
 		root.Append("\\");
@@ -143,7 +142,7 @@ void KFCSavedQueries::List(std::vector<KFCSavedQuery>& out)
 	// UNDER the kind's, so it is appended after the kind (AppendLocalizedFolder) rather than through GetPresetsFolder's
 	// own locale argument, which would put it straight under Find-Change Queries.
 	IDFile presetsRoot;
-	const bool havePresetsRoot = FileUtils::GetPresetsFolder(&presetsRoot, PMString(kQueriesFolder), PMLocaleId()) != kFalse;
+	const bool havePresetsRoot = GetPresetsRoot(presetsRoot);
 
 	for (int32 k = 0; k < kKindCount; ++k)
 	{

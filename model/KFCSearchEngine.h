@@ -163,7 +163,8 @@ namespace KFCSearchEngine
 	bool ResolveRunTarget(bool fromBook, PMString& outRefusal);
 
 	/** Its refusal of an empty book - and the same words from every run's safety net past its commit point, where
-	    KFCBookScope::ListBookChapters finds no chapters after all (SearchBook, KFCChangeAll::Run, KFCQuerySequence::Run). */
+	    KFCBookScope::ListBookChapters finds no chapters after all (SearchBook, KFCChangeAll::Run,
+	    KFCQuerySequence.cpp's Run). */
 	const char* const kBookHasNoChapters = "That book has no chapters.";
 
 	/** WHAT A RUN WOULD RUN ON, IN WORDS (docs/superpowers/specs/_done/2026-10-07-kfc-query-dialog-and-selected-documents-design.md
@@ -248,7 +249,7 @@ namespace KFCSearchEngine
 
 	    @return true when it is safe to replace.
 	    @note Same as CommitSearchMode - call it OUTSIDE any command sequence (and the same one exception:
-	          the query run, KFCQuerySequence::Run, states it for each query inside the run's sequence). */
+	          the query run, KFCQuerySequence.cpp's Run, states it for each query inside the run's sequence). */
 	bool CommitReplaceSide();
 
 	/** The Find/Change dialog's English name for a tab (an IFindChangeOptions::SearchMode value):
@@ -387,7 +388,7 @@ namespace KFCSearchEngine
 	    rather than keeping the three in step by hand. Worth having no exceptions to even where a
 	    part has nothing to do - the search's own commit point remembers the format again a moment
 	    later. (One place still pairs two of them by hand and keeps the book: a query run's end -
-	    KFCQuerySequence::Run, whose list is left empty - the no-track-change-all spec's F7.) */
+	    KFCQuerySequence.cpp's Run, whose list is left empty - the no-track-change-all spec's F7.) */
 	void DropResults();
 
 	/** The walker scope options EVERY KFC walk uses: the five switches read straight off the

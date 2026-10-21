@@ -146,6 +146,12 @@ namespace KFCBookScope
 	    tells the engines it is not a book's chapter (see ChapterDoc). */
 	ChapterDoc DocAsChapter(class IDocument* doc);
 
+	/** ALL DOCUMENTS' TARGETS - the search's and the query run's: every document open now, in the document list's order
+	    (QueryOpenDocumentList), each as DocAsChapter makes it, WINDOW OR NOT - InDesign's own All Documents searches a
+	    document opened without a window too (measured: app.findText() counted one) - and none KFC holds open from a
+	    BOOK search (IsHeldDoc): that one is not a document the user opened. Appended to out. */
+	void ListOpenDocuments(std::vector<ChapterDoc>& out);
+
 	/** A chapter that could NOT be turned into a searchable document, and why. Reported rather
 	    than dropped: a chapter missing from the list is indistinguishable from a chapter that
 	    simply held no matches, and there is no way for the user to see through that. */

@@ -3735,25 +3735,13 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	}
 	else if (allDocuments)
 	{
-		// EVERY OPEN DOCUMENT, WINDOW OR NOT. InDesign's own All Documents searches a document opened
-		// without a window too (measured: app.findText() counted one), so this does. Each is a "chapter"
-		// of the run - its rows kept apart from the others' - but none is ours to open or close: no file
-		// is recorded (a chapter with no file is found again by its docRef, as the Document search's
-		// always has been), and a chapter KFC holds open from a BOOK search is left out - it is not a
-		// document the user opened. Each is walked from the top by the document form, in this order (the
-		// walk below - not by the dialog's own All Documents scope, which starts at the caret), and this
-		// list is what the matches are filed under, and the T of "M of T document(s)".
-		InterfacePtr<IDocumentList> docList(KFCBookScope::QueryOpenDocumentList());
-		const int32 docCount = (docList != nil) ? docList->GetDocCount() : 0;
-		for (int32 d = 0; d < docCount; ++d)
-		{
-			IDocument* doc = docList->GetNthDoc(d);
-			if (doc == nil)
-				continue;
-			const KFCBookScope::ChapterDoc one = KFCBookScope::DocAsChapter(doc);
-			if (!KFCBookScope::IsHeldDoc(one.docRef))
-				targets.push_back(one);
-		}
+		// EVERY OPEN DOCUMENT, WINDOW OR NOT, but none KFC holds from a book search (KFCBookScope::ListOpenDocuments
+		// says why - the query run's All Documents takes the same list). Each is a "chapter" of the run - its rows kept
+		// apart from the others' - but none is ours to open or close: no file is recorded (a chapter with no file is
+		// found again by its docRef, as the Document search's always has been). Each is walked from the top by the
+		// document form, in this order (the walk below - not by the dialog's own All Documents scope, which starts at
+		// the caret), and this list is what the matches are filed under, and the T of "M of T document(s)".
+		KFCBookScope::ListOpenDocuments(targets);
 		if (targets.empty())
 			return refusePastCommit(kNoDocumentToSearch);
 	}

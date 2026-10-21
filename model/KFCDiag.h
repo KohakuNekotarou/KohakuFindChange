@@ -60,10 +60,10 @@
 //    replace-walk-fail  KFCReplaceEngine.cpp's WalkStoryReplacing takes InDesign's find as having stopped with an error
 //                before the first match - the row's Replace must say so, not "not found where the search found it"
 //                (work\kbs-regress\xq-cases.tsv). Throwaway documents only.
-//    queries-cancel  the file holds "<n>": KFCQuerySequence::Run takes Cancel as pressed while its step n (1-based, a
-//                query x document) was being written - heard where the run asks the bar next, so a test can press it
-//                in the run's last step, which only the ask after the loop hears (work\kbs-regress\xq-cases.tsv).
-//                Throwaway documents only.
+//    queries-cancel  the file holds "<n>": KFCQuerySequence.cpp's Run takes Cancel as pressed while its step n
+//                (1-based, a query x document) was being written - heard where the run asks the bar next, so a test can
+//                press it in the run's last step, which only the ask after the loop hears
+//                (work\kbs-regress\xq-cases.tsv). Throwaway documents only.
 //    book-selection  (UI half) the file's first line "book=<a book's file name>", then one chapter's short name a line:
 //                ui/KFCBookPanelLookup.cpp's GetPanelBookSelection answers with those chapters as the Book panel's
 //                selection for that book (nothing selected for any other), judged by the same rule as a real one -
@@ -110,9 +110,10 @@
 //    clean-after-write  KFCReplaceEngine.cpp's row Replace takes each written document's "unsaved" flag down after the
 //                write - a close would then throw the write away unasked: the case that shows the written-document check
 //                catching it (written-cleaned-armed)
-//    queries-error-stands  KFCQuerySequence::Run raises the global error code after its last step, reporting nothing - the
-//                run must take itself back and say "Stopped", and process no command over the error on its way out
-//                (ClearFindChange - a command processed over it is InDesign's protective shutdown) (xq-error-stands)
+//    queries-error-stands  KFCQuerySequence.cpp's Run raises the global error code after its last step, reporting
+//                nothing - the run must take itself back and say "Stopped", and process no command over the error on
+//                its way out (ClearFindChange - a command processed over it is InDesign's protective shutdown)
+//                (xq-error-stands)
 //    landing-return  (UI half) ui/KFCJump.cpp's JumpToHit replaces its own row through the panel's door
 //                (KFCResultTree::ReplaceRows) once its window is in front - the Return a landing's message loop can
 //                dispatch: the door must turn it away (landing-return)
