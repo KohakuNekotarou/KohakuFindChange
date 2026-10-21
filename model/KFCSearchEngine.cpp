@@ -5399,6 +5399,24 @@ bool AskListDocuments(const std::function<bool(const UIDRef&)>& ask, bool& outAs
 	return false;
 }
 
+// A CHAPTER A CLOSE EMPTIED (KFCResultModel::EmptyChapter - its rows gone with its document, its name and the file it was
+// closed from kept) whose document is still not open: Search Text in These Objects names it as not open where its objects
+// would have been searched (the text-in-objects spec's T7). false for any other chapter - one opened again since has
+// nothing left to search either (its rows went with the close), and is not named.
+bool ClosedChapterName(int32 chapterIdx, PMString& outName)
+{
+	IDFile closed;
+	if (!KFCResultModel::GetChapterClosedFile(chapterIdx, closed) || !KFCBookScope::ChapterHasFile(closed))
+		return false;
+	UIDRef open;
+	if (KFCBookScope::FindOpenChapterDoc(closed, open))
+		return false;
+	int32 rows = 0;
+	(void)KFCResultModel::GetChapterDisplay(chapterIdx, outName, rows);
+	outName.SetTranslatable(kFalse);
+	return !outName.IsEmpty();
+}
+
 // SEARCH TEXT IN THESE OBJECTS' DOCUMENTS - its first search's (KFCSearchEngine::SearchTextInObjects) and its searches
 // again's (SearchListOnceMore), one reading: each of again.objects (the list's chapter chapterOf[k]) found as Search These
 // Results Again finds a document - a book's list: its book open, each chapter by its file (one not open is opened for the
@@ -5566,14 +5584,22 @@ bool SearchListOnceMore(const KFCNarrowStep* step, PMString& outStatus)
 		{
 			KFCSearchEngine::AgainTarget::ObjectsInChapter one;
 			if (!KFCResultModel::GetChapterSearchedObjects(c, one.items) || one.items.empty())
-				continue;		// a chapter a close emptied (EmptyChapter): nothing of it is known now
+			{
+				// a chapter a close emptied (EmptyChapter): nothing of it is known now - named while its document stays closed
+				PMString closedName;
+				if (ClosedChapterName(c, closedName))
+					again.notOpen.push_back(closedName);
+				continue;
+			}
 			again.objects.push_back(one);
 			chapterOf.push_back(c);
 		}
 		if (again.objects.empty())
 		{
 			outStatus.Append(lead);
-			outStatus.Append("what these results searched is no longer known (its document was closed) - search again with Find.");
+			outStatus.Append(again.notOpen.empty()
+				? "what these results searched is no longer known (its document was closed) - search again with Find."
+				: "the documents of these results are not open - open them, then search again.");
 			return false;
 		}
 		if (!ReachObjectDocuments(again, chapterOf, lead, outStatus))
@@ -5725,14 +5751,21 @@ bool KFCSearchEngine::SearchTextInObjects(PMString& outStatus)
 				one.items.push_back(item);
 		}
 		if (one.items.empty())
+		{
+			// a document closed since the object search (its chapter emptied by the close): named, as not open (T7)
+			PMString closedName;
+			if (ClosedChapterName(c, closedName))
+				again.notOpen.push_back(closedName);
 			continue;
+		}
 		again.objects.push_back(one);
 		chapterOf.push_back(c);
 	}
 	if (again.objects.empty())
 	{
 		outStatus.Append(lead);
-		outStatus.Append("no objects are left in these results.");
+		outStatus.Append(again.notOpen.empty() ? "no objects are left in these results."
+			: "the documents of these results are not open - open them, then search again.");
 		return false;
 	}
 	// THEIR DOCUMENTS, as Search These Results Again finds them (ReachObjectDocuments).
