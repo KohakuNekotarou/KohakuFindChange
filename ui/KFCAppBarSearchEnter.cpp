@@ -66,10 +66,6 @@ static bool16 sAppBarSearchEnter = kFalse;
 
 #ifdef WINDOWS
 
-// The longest field text read. The field is a one-line search box; a query longer than this is cut, which a
-// search box this narrow does not hold in practice.
-static const int32 kKFCAppBarFieldMaxChars = 1024;
-
 static HHOOK           sGetMsgHook = nullptr;
 static ICallbackTimer* sRunTimer   = nil;
 static std::wstring    sPendingText;		// the field's text at the Return, until the search runs
@@ -167,10 +163,19 @@ static bool IsAppBarSearchField(HWND w)
 	return false;
 }
 
+// The field's whole text. Not a fixed buffer: the field holds the dialog's whole query - this file writes it there -
+// and a cut read put a shortened query back into Find/Change at the next Return (measured: a 1,500-character query
+// came back as 1,023 characters). WM_GETTEXTLENGTH may count more than WM_GETTEXT then copies (its contract), so the
+// copy's own count sizes the result.
 static std::wstring FieldText(HWND field)
 {
-	wchar_t text[kKFCAppBarFieldMaxChars] = { 0 };
-	::SendMessageW(field, WM_GETTEXT, kKFCAppBarFieldMaxChars, reinterpret_cast<LPARAM>(text));
+	const LRESULT units = ::SendMessageW(field, WM_GETTEXTLENGTH, 0, 0);
+	if (units <= 0)
+		return std::wstring();
+	std::wstring text(static_cast<size_t>(units) + 1, L'\0');
+	const LRESULT copied = ::SendMessageW(field, WM_GETTEXT, static_cast<WPARAM>(text.size()),
+		reinterpret_cast<LPARAM>(&text[0]));
+	text.resize(copied > 0 ? static_cast<size_t>(copied) : 0);
 	return text;
 }
 
@@ -195,7 +200,7 @@ static std::wstring WideOf(const PMString& s)
 	return (buf != nil && units > 0) ? std::wstring(reinterpret_cast<const wchar_t*>(buf), units) : std::wstring();
 }
 
-// The Glyph tab's query as the field can show it: the character the glyph stands for (when the font says),
+// The Glyph tab's query as the field can show it: the character the glyph stands for (when an installed font says),
 // then the glyph id and the font - "<char> (GID 8123, Kozuka Mincho Pr6N R)". The font is the two attributes the
 // dialog keeps on that tab's list, kTextAttrFontUIDBoss (the family) and kTextAttrFontStyleBoss (the style),
 // read the way SnpInsertGlyph.cpp reads them off text (and the way KFCSearchEngine's query signature counts
@@ -232,9 +237,13 @@ static PMString GlyphDescription(const IFindChangeOptions* opts, bool changeSide
 				font.Append(" ");
 				font.Append(style);
 			}
+			// The character only from the font itself: for a family that is not installed, QueryFace still answers
+			// with a face, and that face's glyph of this id is another font's character (measured: a missing family's
+			// GID 50 came out as a full-width Q). QueryFace's own note says to check the status:
+			// SnpInspectFontMgr.cpp's test.
 			InterfacePtr<IPMFont> face(family->QueryFace(style));
 			Utils<IGlyphUtils> glyphUtils;
-			if (face != nil && glyphUtils)
+			if (face != nil && face->GetFontStatus() == IPMFont::kFontInstalled && glyphUtils)
 				character = glyphUtils->GetUnicodeForGlyphID(face, gid);
 		}
 	}
