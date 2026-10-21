@@ -65,8 +65,9 @@ namespace KFCResultHistory
 	    heading draws "Objects" in the scope's place, WithScope). The list drawn again, the status line set. True = a new list. */
 	bool SearchTextInObjects(PMString& outSummary);
 
-	/** Are tier `tier`'s rows object rows - an Object tab search's, a Frames of These Matches list's (-1 = the live list,
-	    asked of the model; a grey one as its copy noted it)? The heading's Narrow Down greys a text-only condition by it. */
+	/** Are tier `tier`'s rows object rows - an Object tab search's, a Frames of These Matches list's (-1 = the live
+	    list, asked of the model; a grey one as its copy noted it)? The heading's Narrow Down greys a text-only
+	    condition by it, and its Search Text in These Objects is grey over text rows. */
 	bool TierHoldsObjects(int32 tier);
 
 	/** A tier's name - the query Find/Change holds now, in the author's words (F and C rather than Find and Change):

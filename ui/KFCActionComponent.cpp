@@ -1105,10 +1105,11 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 			}
 			case kKFCSearchTextInObjectsActionID:
 			{
-				// A tier's own row's menu: Search Text in These Objects over a tier of object rows (TierHoldsObjects - an Object
-				// tab search's, a Frames of These Matches list's); grey over a tier of text rows, kept on the menu (SET-11). Its
-				// other refusals (Find/Change's tab, nothing to find, no object left, a document or book not open) said on the
-				// status line when pressed - the tab can change after the menu opened (the spec's T2).
+				// A tier's own row's menu: Search Text in These Objects over a tier of object rows (TierHoldsObjects -
+				// an Object tab search's, a Frames of These Matches list's); grey over a tier of text rows, kept on the
+				// menu (SET-11). Its other refusals (Find/Change's tab, nothing to find, no object left, a document or
+				// book not open) said on the status line when pressed - the tab can change after the menu opened (the
+				// text-in-objects spec's T2).
 				int32 tier = -1;
 				const bool enable = RightClickedTier(widget, tier) && KFCResultHistory::TierHoldsObjects(tier);
 				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);

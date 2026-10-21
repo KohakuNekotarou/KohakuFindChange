@@ -329,7 +329,8 @@ namespace KFCResultTree
 	    status line says so and the caller turns it away. True = refused. The one place this is asked - by every door
 	    from the panel that writes, searches, takes rows off or switches: the rows' writes (ReplaceRows - the rows'
 	    Replace and Return -, Create Outlines, Restore from Copy, the Special Operations), Search ... Again,
-	    Clear from Results and Narrow Down, the tier switch, Clear Results, Clear These Results and Save Panel Settings
+	    Search Text in These Objects, Clear from Results and Narrow Down, the tier switch, Clear Results,
+	    Clear These Results and Save Panel Settings
 	    (a description - the callers are the record).
 	    A model half of another build answers here too: its stand-in is "a run standing", its words the reason. */
 	bool RefusedWhileRunning();

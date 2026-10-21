@@ -114,8 +114,9 @@ public:
 	/** = KFCResultModel::NarrowWords (appended) - a narrowed list's conditions in words ("In Tables / Pages 1-5"; empty for
 	    any other list): a tier's heading names them after its name. */
 	virtual void GetNarrowWords(PMString& out) = 0;
-	/** = KFCResultModel::ListHoldsObjects (appended) - the list's rows are object rows (an Object tab search's, Frames of These
-	    Matches'): the heading's menu greys a text-only condition. */
+	/** = KFCResultModel::ListHoldsObjects (appended) - the list's rows are object rows (an Object tab search's, a
+	    Frames of These Matches list's): the heading's menu greys a text-only condition by it, and greys
+	    Search Text in These Objects over text rows. */
 	virtual bool ListHoldsObjects() = 0;
 	/** = KFCResultModel::ClearRows (appended) - Clear from Results: the rows taken off the list. Answers how many. */
 	virtual int32 ClearRows(const KFCRowsByChapter& rows) = 0;

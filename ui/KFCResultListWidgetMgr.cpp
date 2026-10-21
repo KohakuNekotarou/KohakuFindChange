@@ -184,7 +184,7 @@ namespace
 
 	// A DOCUMENT ROW COMES UP OPEN when the results came from neither a book nor All Documents: one document, its rows at
 	// once (Rebuild says why each). Asked by Rebuild and by OpensWhenDrawn - one rule. (Both as the list recorded them, not
-	// its scope: a text list Search Text in These Objects made from an All Documents one is kScopeInObjects - W-TIO-a.)
+	// its scope: a text list Search Text in These Objects made from an All Documents one is kScopeInObjects.)
 	bool DocumentRowsOpen()
 	{
 		return !KFCResults()->IsFromBook() && !KFCResults()->IsFromAllDocuments();

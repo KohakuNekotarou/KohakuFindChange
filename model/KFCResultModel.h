@@ -329,18 +329,22 @@ namespace KFCResultModel
 		// what the tier heading's search again walks again ("a Story search, that story alone" - the author), as the
 		// story row walks its own. kInvalidUID otherwise.
 		UID						searchedStory;
-		// SEARCH TEXT IN THESE OBJECTS' OBJECTS (docs/superpowers/specs/2026-10-21-kfc-text-in-object-results-design.md T6):
-		// the page items whose text it searched in this document - what its searches again make the stretches from again
-		// (KFCObjectText::Collect). Empty for any other search.
+		// SEARCH TEXT IN THESE OBJECTS' OBJECTS (docs/superpowers/specs/2026-10-21-kfc-text-in-object-results-design.md
+		// T6): the page items whose text it searched in this document - what its searches again make the stretches from
+		// again (KFCObjectText::Collect). An object its document came back without is let go - kInvalidUID in its place
+		// (RebindChapterDoc): a search again counts it gone, and never takes the next item made for it. Empty for any
+		// other search.
 		std::vector<UID>		searchedObjects;
-		// SEARCHED AGAIN AND NOTHING FOUND (Search This Document Again, and Search This Story Again over its last story with
-		// rows - the author's calls): shown with no rows, (0/0), so it can be searched again after the next edit. A
-		// chapter with no rows is otherwise not shown - a search
-		// lists only documents that hold a match, and CloseChapter empties a closed one in place (ChapterShown).
+		// SEARCHED AGAIN AND NOTHING FOUND (Search This Document Again, and Search This Story Again over its last story
+		// with rows - the author's calls): shown with no rows, (0/0), so it can be searched again after the next edit.
+		// So is a document whose objects held no match for Search Text in These Objects (FileChapter): it keeps them
+		// for its search again (searchedObjects). A chapter with no rows is otherwise not shown - a search lists only
+		// documents that hold a match, and CloseChapter empties a closed one in place (ChapterShown).
 		bool					shownEmpty;
 		// ITS DOCUMENT CLOSED SINCE IT WAS LAST BOUND (ChapterDocumentClosing): the next document bound to it
 		// (RebindChapterDoc) is a new session of its file - the one bind that can find an object row's item gone for
-		// good (Hit::itemGone). A bind with no close before it (every object write's check binds again) finds an item
+		// good (Hit::itemGone), and that lets go of the Search Text in These Objects' objects it came back without
+		// (searchedObjects). A bind with no close before it (every object write's check binds again) finds an item
 		// missing in this session, deleted - which an Undo can bring back.
 		bool					closedSinceBound;
 
@@ -351,10 +355,10 @@ namespace KFCResultModel
 	};
 
 
-	/** Append one chapter to the model - the ONE way results get in. The search clears the model and
-	    then appends each chapter as it finishes. Only chapters with >=1 hit are appended: a search lists
-	    only the documents that hold a match (one shown with none is Search This Document Again's -
-	    Chapter::shownEmpty).
+	/** Append one chapter to the model - the ONE way results get in. The search clears the model and then appends each
+	    chapter as it finishes. A search appends only the chapters that hold a match - it lists only the documents that
+	    hold one - but for Search Text in These Objects, which appends a document whose objects hold none too, shown
+	    empty, so its search again knows them (Chapter::shownEmpty - as Search This Document Again leaves one).
 
 	    This is also where the chapter's STORY GROUPS are built, from the hits' own stories - so a
 	    caller fills in nothing but the hits, and no result can reach the tree ungrouped. (One entry
@@ -383,7 +387,7 @@ namespace KFCResultModel
 
 	/** Did these results come from an ALL DOCUMENTS search? Recorded on the results as IsFromBook is, beside the scope
 	    (SetSearchScope) - which says All Documents for a list of its own (kScopeAllDocuments) but not for a list Search Text
-	    in These Objects made from one (kScopeInObjects - W-TIO-a): the documents a list was searched over, whatever its scope
+	    in These Objects made from one (kScopeInObjects): the documents a list was searched over, whatever its scope
 	    says. The tree draws such a list's document rows CLOSED and says which document has no window; its searches again
 	    say its documents' count. Cleared by Clear(), set beside SetFromBook. */
 	void SetFromAllDocuments(bool fromAllDocuments);
@@ -394,7 +398,9 @@ namespace KFCResultModel
 	    the way it records IsFromBook, so a Search: changed afterwards does not change how the rows already on
 	    screen are shown: All Documents is drawn as IsFromAllDocuments says;
 	    Story / To End of Story / Selection search one document and are drawn as Document is. kScopeBook =
-	    Book Scope was on (Search: is then Document - any other is refused before the search).
+	    Book Scope was on (Search: is then Document - any other is refused before the search). kScopeInObjects = a list
+	    Search Text in These Objects made: no Search: of its own - its objects' text (Chapter::searchedObjects), its
+	    book and All Documents as IsFromBook / IsFromAllDocuments say.
 	    Recorded beside SetFromBook, after the commit point; Clear() puts it back to kScopeDocument. */
 	// (SearchScopeKind: KFCModelTypes.h.)
 	void SetSearchScope(SearchScopeKind scope);
@@ -409,7 +415,8 @@ namespace KFCResultModel
 	    Pages 1-5" - empty for none. */
 	PMString NarrowWords();
 	/** ARE THE LIST'S ROWS OBJECT ROWS - an Object tab search's, or a Frames of These Matches list's? The heading's menu greys
-	    a condition that only text rows can meet. */
+	    a condition that only text rows can meet, and Search Text in These Objects over text rows - which
+	    KFCSearchEngine::SearchTextInObjects refuses too. */
 	bool ListHoldsObjects();
 	/** Is the list a FRAMES OF THESE MATCHES list - object rows found by a text search, not by the Object tab's (its
 	    Replace writes with the Object tab's Change Object Format alone - KFCObjectReplace, the narrow-down
@@ -641,7 +648,8 @@ namespace KFCResultModel
 	/** Rebind a chapter's document reference: after a closed chapter is reopened - by a jump or a
 	    replace - later calls must use the live database, not the dead one from search time. The first bind after its
 	    document closed (Chapter::closedSinceBound) marks the object rows whose items the document came back without as
-	    gone for good (Hit::itemGone). */
+	    gone for good (Hit::itemGone), and lets go of the Search Text in These Objects' objects it came back without
+	    (Chapter::searchedObjects - kInvalidUID in their place). */
 	void RebindChapterDoc(int32 chapterIdx, const UIDRef& newDocRef);
 
 	/** A DOCUMENT CLOSING (KFCCloseDocResponder, kBeforeCloseDoc - every close): the chapters bound to it take note

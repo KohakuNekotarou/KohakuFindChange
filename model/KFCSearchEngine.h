@@ -105,7 +105,8 @@ namespace KFCSearchEngine
 	};
 
 	/** WHAT ONE WALK OVER A RUN'S TARGETS FOUND - SearchBook's tally, filled by the text tabs' walk
-	    (CollectTargets, in the .cpp) and the Object tab's (KFCObjectSearch::CollectTargets) alike: the rows
+	    (CollectTargets, in the .cpp), the Object tab's (KFCObjectSearch::CollectTargets) and
+	    Search Text in These Objects' (CollectObjectTexts, in the .cpp) alike: the rows
 	    filed, the targets that held one, whether the list reached its limit or the user cancelled, and the
 	    targets the summary has to name - never searched ("name: why"), broken off partway, or opened by the
 	    run and not handed back. */
@@ -125,7 +126,8 @@ namespace KFCSearchEngine
 		// them, and each holds its .indd locked (KFCBookScope::AppendUnclosedNote).
 		std::vector<PMString>	unclosed;
 		// SEARCH TEXT IN THESE OBJECTS' walk (CollectObjectTexts, in the .cpp - KFCObjectText::Ranges): the objects still in
-		// their documents, of which hold no text, and the objects gone since the object search - its summary says them.
+		// their documents, those of them that hold no text, and the objects gone since the object search - its summary
+		// says them.
 		int32					objects;
 		int32					noText;
 		int32					gone;
@@ -133,8 +135,9 @@ namespace KFCSearchEngine
 	};
 
 	/** ONE TARGET'S ROWS INTO THE MODEL AS A CHAPTER, AND INTO THE TALLY - the one way a walk's rows are filed (both
-	    tabs' walks - CollectTargets in the .cpp and KFCObjectSearch::CollectTargets - and a Narrow Down's over part of
-	    a document, SearchPartsAgain): the rows put in page order, each with its "P<page>(<n>)" locator
+	    tabs' walks - CollectTargets in the .cpp and KFCObjectSearch::CollectTargets; Search Text in These Objects' -
+	    CollectObjectTexts in the .cpp; and a Narrow Down's over part of a document, SearchPartsAgain): the rows put in
+	    page order, each with its "P<page>(<n>)" locator
 	    (KFCResultModel::OrderHitsByPage), handed to the model as the target's chapter (KFCResultModel::AppendChapter),
 	    and counted. The rows - and the stories' versions and searched parts, where given - are TAKEN, not copied. For a
 	    target that holds at least one row - or, for Search Text in These Objects, none: its chapter is filed shown empty,
@@ -570,18 +573,21 @@ namespace KFCSearchEngine
 	    so its rows and story rows show the text as it is now. */
 	void FollowChapterFoci(int32 chapterIdx);
 
-	/** Search This Story Again (a story row's right-click menu): that story alone walked again with the search's query,
-	    its rows put back as the walk finds them and its version recorded (KFCResultModel::ReplaceStoryRows). False =
-	    refused or failed: no row put back - though once the story is reached its rows have followed their foci
-	    (FollowStoryFoci), which the panel repaints either way; outStatus says what happened either way. */
+	/** Search This Story Again (a story row's right-click menu): that story alone walked again with the search's query
+	    (for a list Search Text in These Objects made: the story's stretches in the chapter's objects alone, made again
+	    from them, KFCObjectText), its rows put back as the walk finds them and its version recorded
+	    (KFCResultModel::ReplaceStoryRows). False = refused or failed: no row put back - though once the story is
+	    reached its rows have followed their foci (FollowStoryFoci), which the panel repaints either way; outStatus says
+	    what happened either way. */
 	bool SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMString& outStatus);
 
 	/** Search This Document Again (a document row's right-click menu - the author's call): that document walked again
 	    whole with the search's query - the walk the search makes of each document, the Object tab's included - under a
 	    bar with Cancel, its rows put back as the walk finds them and its stories' versions recorded
-	    (KFCResultModel::ReplaceChapterRows). A search over part of a document is refused. False = refused, failed or
-	    cancelled: no row put back - though once the document is reached its rows have followed their foci
-	    (FollowChapterFoci), which the panel repaints either way; outStatus says what happened either way. */
+	    (KFCResultModel::ReplaceChapterRows). A search over part of a document is refused - and a list
+	    Search Text in These Objects made, of its objects' text. False = refused, failed or cancelled: no row put back -
+	    though once the document is reached its rows have followed their foci (FollowChapterFoci), which the panel
+	    repaints either way; outStatus says what happened either way. */
 	bool SearchDocumentAgain(int32 chapterIdx, PMString& outStatus);
 
 	/** SEARCH THESE RESULTS AGAIN (a tier's heading's right-click menu - the author's call): the live list's own search
@@ -591,11 +597,13 @@ namespace KFCSearchEngine
 	    found nothing - the front document, as Find), the documents open now (All Documents), its book (open - the
 	    Book panel's selection of it, as Find takes it), or the part of a document a Search: Story, To End of Story or
 	    Selection searched - its story, or each story's part found again where it stands, walked as
-	    Search This Story Again walks it (SearchPartsAgain, in the .cpp). Its rows replaced in place: the same result
-	    set - the tier keeps its place, its name and its query - in a new layout. Refused, the list as it was: a run up,
-	    a list no search made, an Object tab's Selection list (the objects selected then are not kept), its document or
-	    book not open, a searched part that cannot be walked on its own or whose edge cannot be told. Cancelled: the
-	    list put back. True = searched again (no match too); outStatus says what happened either way. */
+	    Search This Story Again walks it (SearchPartsAgain, in the .cpp); or, for a list Search Text in These Objects
+	    made, the same objects' text as it stands now (Chapter::searchedObjects), their documents found as its first
+	    search found them (RunOverObjects, in the .cpp). Its rows replaced in place: the same result set - the tier
+	    keeps its place, its name and its query - in a new layout. Refused, the list as it was: a run up, a list no
+	    search made, an Object tab's Selection list (the objects selected then are not kept), its document or book not
+	    open, a searched part that cannot be walked on its own or whose edge cannot be told. Cancelled: the list put
+	    back. True = searched again (no match too); outStatus says what happened either way. */
 	bool SearchListAgain(PMString& outStatus);
 
 	/** NARROW DOWN (a tier's heading's right-click menu - docs/superpowers/specs/2026-10-18-kfc-narrow-down-design.md): the live

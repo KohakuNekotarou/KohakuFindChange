@@ -443,9 +443,9 @@ DECLARE_PMID(kActionIDSpace, kKFCCopyTheseResultsActionID, kKFCUIPrefix + 105)
 // NARROW DOWN > ON ACTIVE LAYER (the author's call: Find Objects on Active Layer moved off the panel menu into Narrow
 // Down, text tiers too): the tier's rows kept to the front document's active layer, by its name. + 106.
 DECLARE_PMID(kActionIDSpace, kKFCNarrowOnLayerActionID, kKFCUIPrefix + 106)
-// SEARCH TEXT IN THESE OBJECTS (docs/superpowers/specs/2026-10-21-kfc-text-in-object-results-design.md T2): a tier heading's -
-// the text inside a tier of objects searched with Find/Change's query, into a new tier (KFCResultHistory::SearchTextInObjects).
-// + 107.
+// SEARCH TEXT IN THESE OBJECTS (docs/superpowers/specs/2026-10-21-kfc-text-in-object-results-design.md T2): a tier
+// heading's item - the text inside a tier of objects searched with Find/Change's query, into a new tier
+// (KFCResultHistory::SearchTextInObjects). + 107.
 DECLARE_PMID(kActionIDSpace, kKFCSearchTextInObjectsActionID, kKFCUIPrefix + 107)
 
 

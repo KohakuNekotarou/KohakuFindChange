@@ -160,7 +160,8 @@ public:
 	{
 		return KFCHiddenSpreadAlert::AnswerAlert(message, button1, button2, button3, defaultButton);
 	}
-	// (Not under the list's query - KFCUnderListQuery: it searches with Find/Change's own, as Find does - the spec's T4.)
+	// (Not under the list's query - KFCUnderListQuery: it searches with Find/Change's own, as Find does -
+	// docs/superpowers/specs/2026-10-21-kfc-text-in-object-results-design.md T4.)
 	virtual bool SearchTextInObjects(PMString& outStatus) { return KFCSearchEngine::SearchTextInObjects(outStatus); }
 };
 

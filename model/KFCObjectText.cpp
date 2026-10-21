@@ -36,11 +36,12 @@
 
 namespace
 {
-// ONE FRAME'S OWN TEXT AS A STRETCH (KFCObjectText::Collect): the snippet's form - measured to walk as InDesign's own
-// Search: Selection over the frame's text selected (the spec's M1) and to read right in a windowless document (M2). The
-// overset after it when its last column is its frame list's last: the multi-column item's last child (measured to agree
-// with IMultiColumnTextFrame::GetUIDInFrameList, which is Adobe's internal use only - M3), the story's last character left
-// out as the frame's is. `item` = the item whose frame it is. True = a stretch was taken.
+// ONE FRAME'S OWN TEXT AS A STRETCH (KFCObjectText::Collect): SnpManipulateTextFrame's form (see the header) - measured
+// to walk as InDesign's own Search: Selection over the frame's text selected (the spec's M1) and to read right in a
+// windowless document (M2). The overset after it when its last column is its frame list's last: the multi-column item's
+// last child (measured to agree with IMultiColumnTextFrame::GetUIDInFrameList, which is Adobe's internal use only -
+// M3), the story's last character left out as the frame's is. `item` = the item whose frame it is. True = a stretch was
+// taken.
 bool FrameText(IMultiColumnTextFrame* mcf, UID item, KFCObjectText::Ranges& out)
 {
 	InterfacePtr<IFrameList> frameList(mcf->QueryFrameList());

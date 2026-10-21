@@ -72,7 +72,9 @@ namespace
 		std::vector<int32>		top;		// the rows under the tier's own row, in order
 		bool					open;		// the tier's row open - noted before each rebuild (NoteOpenTiers)
 		bool					holdsObjects;	// its rows are object rows (IKFCResults::ListHoldsObjects when it was kept) -
-												// its heading's Narrow Down greys a text-only condition (TierHoldsObjects)
+												// its heading's Narrow Down greys a text-only condition and
+												// Search Text in These Objects is grey over text rows
+												// (TierHoldsObjects)
 
 		KeptTier() : set(0), open(false), holdsObjects(false) {}
 	};
@@ -507,8 +509,9 @@ bool KFCResultHistory::SearchTextInObjects(PMString& outSummary)
 	outSummary.Clear();
 	outSummary.SetTranslatable(kFalse);
 	KFCPanelTitle::Update();
-	// The list of objects: its copy taken before the model can park it (Find's rule). The new list is named as Find names
-	// one - the query Find/Change holds now, which it is searched with (the spec's T4) - read before the search, as Find's.
+	// The list of objects: its copy taken before the model can park it (Find's rule). The new list is named as Find
+	// names one - the query Find/Change holds now, which it is searched with (the text-in-objects spec's T4) - read
+	// before the search, as Find's.
 	const uint32 setBefore = KFCResults()->GetResultSetId();
 	const PMString label(QueryLabel());
 	KeptTier pending;
