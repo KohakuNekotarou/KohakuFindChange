@@ -32,7 +32,8 @@
 //      book panels before, one or more now), it is put back: moved into its dock next to the same
 //      neighbours (PaletteRefUtils::ReparentPalette); floating, back into the palette of a neighbour
 //      it shared one with if that palette is open, and otherwise moved and sized. Into a neighbour's tab
-//      group, it is brought to the front of it (a column folded into icons is left as icons). Docked, it
+//      group, it is brought to the front of it (a column folded into icons is left as icons, and nothing
+//      is brought forward while the Home screen stands over the docks at launch). Docked, it
 //      is put back AGAIN when InDesign throws it out of the dock into a hidden palette - and only while
 //      it stays there: palettes hidden and shown again (Show/Hide All Palettes, the Tab key) leave a
 //      book panel the user floated where it is.
@@ -49,9 +50,9 @@
 //      its panels: the Book panel is not put where it cannot be seen - the next neighbour is tried, then
 //      a column of its own or its own place and size, and else it stays where InDesign put it. (A
 //      neighbour in a column folded into icons, or hidden with the rest by the Tab key, is not closed.);
-//    * the close of an opening it could not put back (the two above): while the Book panel still stands
-//      where InDesign put it, nothing is written and the placement remembered is kept - moved by the
-//      user since, the new place is recorded (the author's call).
+//    * the close of an opening it could not put back (the two above), and a "Save Panel Settings" during
+//      it: while the Book panel still stands where InDesign put it, the placement remembered is kept -
+//      moved by the user since, the new place is recorded (the author's call).
 //
 //  The file: KBSPanelState.json, the one "Save Panel Settings" writes. The toggle itself is written
 //  to it the moment it is flipped (one key), and "Save Panel Settings" writes all of it. EVERY key of
@@ -85,7 +86,8 @@ namespace KFCBookPanelPlacement
 	/** For "Save Panel Settings": the toggle and the placement, as keys and RAW JSON values, appended
 	    in the order they are to be written. The book panel is measured as it stands NOW if one is
 	    open - an explicit save is a snapshot of the screen - otherwise the placement last measured
-	    (or read at startup) is written again. */
+	    (or read at startup) is written again; and so it is while an opening that could not put the
+	    panel back leaves it where InDesign put it (the author's call - the same rule as a close). */
 	void AppendSaveKeys(std::vector<std::pair<std::string, std::string> >& keys);
 
 	/** The toggle and the placement from the settings file's text, when the file is read - at startup or

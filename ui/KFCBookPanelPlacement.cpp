@@ -224,7 +224,8 @@ bool gRestoredThisOpening = false;
     then measured InDesign's default floating place and wrote it over the placement remembered, which the next opening
     could no longer try. So the place is measured as the restore leaves it (RestoreNow), and the close keeps the
     remembered placement while the panel is still there (RecordPlacement); moved by the user since, the new place is
-    recorded as ever. Put back to false at each opening (RecountAndMaybeRestore). */
+    recorded as ever. "Save Panel Settings" asks the same (PlacementToKeep). Put back to false at each opening
+    (RecountAndMaybeRestore). */
 bool gLeftUnplaced = false;
 Placement gWhereInDesignPutIt;
 
@@ -867,20 +868,31 @@ bool SamePlace(const Placement& a, const Placement& b)
 	return numbersA == numbersB;
 }
 
-/** Measure the book panel open now and keep its placement (RememberAndWrite) - the one way a close records one: the
-    interceptor's (OnBookAboutToClose) and Stop's backstop. Not while this opening's restore has left the panel where
-    InDesign put it and it still stands there (gLeftUnplaced): the remembered placement is kept. */
-void RecordPlacement(bool sayFailure)
+/** The placement to keep for the book panel open now - the one question a close (RecordPlacement) and an explicit
+    save (AppendSaveKeys) both ask: the panel measured as it stands, except while this opening's restore has left it
+    where InDesign put it and it still stands there (gLeftUnplaced) - then false, and the remembered placement is
+    kept (the author's call, for the save as for the close). false too when nothing whole could be measured. */
+bool PlacementToKeep(Placement& out)
 {
 	Placement now;
 	if (!MeasureOpenBookPanel(now))
-		return;
+		return false;
 	if (gLeftUnplaced && SamePlace(now, gWhereInDesignPutIt))
 	{
-		KFC_DIAG_LOG("BOOKPANEL MEASURE not recorded: still where InDesign put it - the remembered placement is kept");
-		return;
+		KFC_DIAG_LOG("BOOKPANEL MEASURE not taken: still where InDesign put it - the remembered placement is kept");
+		return false;
 	}
-	RememberAndWrite(now, sayFailure);
+	out = now;
+	return true;
+}
+
+/** Keep the placement of the book panel open now (PlacementToKeep) and write its keys (RememberAndWrite) - the one
+    way a close records one: the interceptor's (OnBookAboutToClose) and Stop's backstop. */
+void RecordPlacement(bool sayFailure)
+{
+	Placement now;
+	if (PlacementToKeep(now))
+		RememberAndWrite(now, sayFailure);
 }
 
 //----------------------------------------------------------------------------------------
@@ -1213,6 +1225,16 @@ bool RestoreDocked(IPanelMgr* panelMgr, const PaletteRef& container, const Place
 	return true;
 }
 
+int32 OpenDocumentCount();		// beside the Home screen's checks, below
+
+/** Can the Home screen be standing over the docks now (see gHomeTimer)? Only around launch, with no document open
+    and the books not reopened by LeaveHomeScreen - there is no C++ question for the Home screen itself. */
+bool HomeScreenMayStandOverTheDocks()
+{
+	return !gHomeWindowOver && !gLeftHomeScreen && std::chrono::steady_clock::now() - gStartedAt <= kKFCHomeWindowMs
+		&& OpenDocumentCount() == 0;
+}
+
 /** A BOOK PANEL PUT INTO A NEIGHBOUR'S TAB GROUP STAYS BEHIND the tab that was in front (measured: Pages, and the
     floating KFC panel, kept the front - live_b16d.ps1 scenes J and M), so the book just opened shows no panel. It is
     brought forward the way InDesign shows a panel - IPanelMgr::ShowPanelByWidgetID, what a panel's Window-menu item
@@ -1220,9 +1242,10 @@ bool RestoreDocked(IPanelMgr* panelMgr, const PaletteRef& container, const Place
     shows the panel of a book it opens.) Only when the restore moved it into another group (groupBefore): left in its
     own, it is in front already, and one put back where it already stood - after a cancelled close - is not moved. Not
     in a column folded into icons either: every panel there is on show as its icon, and showing one opens its drawer
-    over the document. (Shown, the book panel widened the narrower Pages column to its own width, and InDesign kept that
-    width after the book closed - measured 148 -> 240, scenes J and T. Not a fault of the restore, but a column grown
-    under a floating palette makes Pages' Window-menu item bring it forward instead of closing it - measured.) */
+    over the document; nor while the Home screen may stand over the docks (below). (Shown, the book panel widened the
+    narrower Pages column to its own width, and InDesign kept that width after the book closed - measured 148 -> 240,
+    scenes J and T. Not a fault of the restore, but a column grown under a floating palette makes Pages' Window-menu
+    item bring it forward instead of closing it - measured.) */
 void BringForwardIfJoined(IPanelMgr* panelMgr, IControlView* bookPanel, const PaletteRef& groupBefore)
 {
 	const PaletteRef container = panelMgr->GetPaletteRefContainingPanel(bookPanel);
@@ -1233,6 +1256,15 @@ void BringForwardIfJoined(IPanelMgr* panelMgr, IControlView* bookPanel, const Pa
 	const PaletteRef column = FindAncestor(container, &PaletteRefUtils::IsTabPane);
 	if (column.IsValid() && PaletteRefUtils::GetTabPaneMode(column) == PaletteRefUtils::kIcon_TabPaneMode)
 		return;
+	// NOT UNDER THE HOME SCREEN (measured - live_b16d.ps1, scene DM: InDesign started with the book). Shown while
+	// the Home screen stood over the docks, the panel was taken out of Pages' group into a floating palette at the
+	// screen's top-left, which the re-restore then left as the user's (gRestoredThisOpening) and the close recorded.
+	// The reopening that takes the Home screen away (LeaveHomeScreen) puts it back again, and brings it forward then.
+	if (HomeScreenMayStandOverTheDocks())
+	{
+		KFC_DIAG_LOG("BOOKPANEL RESTORE not brought forward: the Home screen may stand over the docks");
+		return;
+	}
 	KFC_DIAG_LOG("BOOKPANEL RESTORE brought forward in the tab group it joined");
 	panelMgr->ShowPanelByWidgetID(bookPanel->GetWidgetID(), kFalse);
 }
@@ -1732,9 +1764,11 @@ void KFCBookPanelPlacement::AppendSaveKeys(std::vector<std::pair<std::string, st
 {
 	keys.push_back(std::make_pair(std::string(kKeyToggle), BoolValue(gOn)));
 
-	// An explicit save is a snapshot of the screen: the book panel as it stands now, if one is open.
+	// An explicit save is a snapshot of the screen: the book panel as it stands now, if one is open - asked as a
+	// close asks it (PlacementToKeep), so a panel this opening could not put back, still where InDesign put it,
+	// leaves the remembered placement standing here too.
 	Placement now;
-	if (MeasureOpenBookPanel(now))
+	if (PlacementToKeep(now))
 		gRemembered = now;
 	if (gRemembered.IsUsable())
 		AppendPlacementKeys(gRemembered, keys);
