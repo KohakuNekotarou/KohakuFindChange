@@ -1021,6 +1021,16 @@ UID KFCResultModel::GetSearchedStory(int32 chapterIdx)
 	return (c != nil) ? c->searchedStory : kInvalidUID;
 }
 
+bool KFCResultModel::GetChapterSearchedObjects(int32 chapterIdx, std::vector<UID>& out)
+{
+	out.clear();
+	const Chapter* c = ChapterAt(chapterIdx);
+	if (c == nil)
+		return false;
+	out = c->searchedObjects;
+	return true;
+}
+
 bool KFCResultModel::GetHitFlags(int32 chapterIdx, int32 hitIdx, bool& outReplaced, bool& outLocked)
 {
 	const Hit* h = HitAt(chapterIdx, hitIdx);

@@ -502,6 +502,30 @@ bool KFCResultHistory::Narrow(const KFCNarrowStep& step, PMString& outSummary)
 	return committed;
 }
 
+bool KFCResultHistory::SearchTextInObjects(PMString& outSummary)
+{
+	outSummary.Clear();
+	outSummary.SetTranslatable(kFalse);
+	KFCPanelTitle::Update();
+	// The list of objects: its copy taken before the model can park it (Find's rule). The new list is named as Find names
+	// one - the query Find/Change holds now, which it is searched with (the spec's T4) - read before the search, as Find's.
+	const uint32 setBefore = KFCResults()->GetResultSetId();
+	const PMString label(QueryLabel());
+	KeptTier pending;
+	const bool havePending = TakeSnapshot(pending);
+	(void)KFCRuns()->SearchTextInObjects(outSummary);
+	// A NEW LIST = searched (a new result set - the model's commit point, as a search's); refused, nothing has changed.
+	const bool committed = KFCResults()->GetResultSetId() != setBefore;
+	bool keptPending = false;
+	const int32 letGo = FollowNewList(committed, havePending, pending, setBefore, label, keptPending);
+	KFC_DIAG_LOG("STACK textinobjects went=%d kept=%d letgo=%d tiers=%d", committed ? 1 : 0, keptPending ? 1 : 0,
+		static_cast<int>(letGo), static_cast<int>(gKept.size()));
+	if (committed)
+		KFCResultTree::Rebuild();
+	SayFound(outSummary, letGo);
+	return committed;
+}
+
 bool KFCResultHistory::TierHoldsObjects(int32 tier)
 {
 	if (tier < 0)
@@ -556,6 +580,7 @@ namespace
 			case KFCResultModel::kScopeStory:			words = "Story"; break;
 			case KFCResultModel::kScopeToEndOfStory:	words = "To End of Story"; break;
 			case KFCResultModel::kScopeSelection:		words = "Selection"; break;
+			case KFCResultModel::kScopeInObjects:		words = "Objects"; break;		// Search Text in These Objects
 			default:									break;
 		}
 		const CharCounter open = out.IndexOfWChar(UTF32TextChar('['), 0);

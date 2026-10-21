@@ -62,6 +62,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCSelectAllRowsMenuKey,		"Select All Rows",
                 kKFCClearTierResultsMenuKey,	"Clear These Results",
                 kKFCSearchTierAgainMenuKey,	"Search These Results Again",
+                kKFCSearchTextInObjectsMenuKey,	"Search Text in These Objects",
                 kKFCCreateOutlinesMenuKey,	"Create Outlines",
                 kKFCRestoreOriginalMenuKey,	"Restore from Copy",
                 kKFCClearRowsMenuKey,			"Clear from Results",

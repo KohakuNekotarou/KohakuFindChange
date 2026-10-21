@@ -124,7 +124,12 @@ namespace KFCSearchEngine
 		// ...and targets the run OPENED and could not hand back - windowless, so the user can neither see them nor close
 		// them, and each holds its .indd locked (KFCBookScope::AppendUnclosedNote).
 		std::vector<PMString>	unclosed;
-		CollectTally() : total(0), chaptersWithHits(0), truncated(false), cancelled(false) {}
+		// SEARCH TEXT IN THESE OBJECTS' walk (CollectObjectTexts, in the .cpp - KFCObjectText::Ranges): the objects still in
+		// their documents, of which hold no text, and the objects gone since the object search - its summary says them.
+		int32					objects;
+		int32					noText;
+		int32					gone;
+		CollectTally() : total(0), chaptersWithHits(0), truncated(false), cancelled(false), objects(0), noText(0), gone(0) {}
 	};
 
 	/** ONE TARGET'S ROWS INTO THE MODEL AS A CHAPTER, AND INTO THE TALLY - the one way a walk's rows are filed (both
@@ -132,11 +137,13 @@ namespace KFCSearchEngine
 	    a document, SearchPartsAgain): the rows put in page order, each with its "P<page>(<n>)" locator
 	    (KFCResultModel::OrderHitsByPage), handed to the model as the target's chapter (KFCResultModel::AppendChapter),
 	    and counted. The rows - and the stories' versions and searched parts, where given - are TAKEN, not copied. For a
-	    target that holds at least one row. searchedStory: a Search: Story search's story
-	    (KFCResultModel::Chapter::searchedStory). */
+	    target that holds at least one row - or, for Search Text in These Objects, none: its chapter is filed shown empty,
+	    (0/0), so its search again knows its objects (Chapter::shownEmpty, as Search This Document Again leaves one).
+	    searchedStory: a Search: Story search's story (KFCResultModel::Chapter::searchedStory). searchedObjects: Search Text
+	    in These Objects' objects in the target (Chapter::searchedObjects - copied). */
 	void FileChapter(const KFCBookScope::ChapterDoc& target, std::vector<KFCResultModel::Hit>& hits, CollectTally& tally,
 		std::map<UID, uint32>* storyVersions = nil, std::map<UID, KFCResultModel::SearchedRange>* searchedRanges = nil,
-		UID searchedStory = kInvalidUID);
+		UID searchedStory = kInvalidUID, const std::vector<UID>* searchedObjects = nil);
 
 	/** THE SCOPE DOORS SEARCHBOOK HAS ALWAYS ASKED, IN ONE PLACE (so the query run asks the same):
 	    Book Scope with a Search: other than Document, a Search: this panel cannot follow, no target book, an
@@ -593,6 +600,17 @@ namespace KFCSearchEngine
 	    a new list (no match too); false = refused or cancelled (the cancelled run's list is empty, the list it narrowed a tier -
 	    N8). outStatus says what happened either way. */
 	bool NarrowList(const KFCNarrowStep& step, PMString& outStatus);
+
+	/** SEARCH TEXT IN THESE OBJECTS (a tier's heading's right-click menu -
+	    docs/superpowers/specs/2026-10-21-kfc-text-in-object-results-design.md): the text inside the live list's objects - the
+	    object rows not cleared from it, their items still there - searched with the query Find/Change holds now, on its Text,
+	    GREP, Glyph or Transliterate tab, as Find searches: each object's own text (KFCObjectText), walked the way InDesign
+	    walks its own Search: Selection. Into a NEW list (a text list, its scope kScopeInObjects, each chapter keeping its
+	    objects - Chapter::searchedObjects): the list of objects parked as a tier first, as Find parks it. Refused, nothing
+	    changed (outStatus, after "Search Text in These Objects: "): a run standing, a list of text rows, Find/Change on the
+	    Object or Color tab or with nothing to find, no object left, its document or book not open. True = a new list (no match
+	    too); false = refused or cancelled. */
+	bool SearchTextInObjects(PMString& outStatus);
 
 	/** A story's VERSION: ITextModel::GetChangeCount - the counter InDesign moves for every change to the
 	    story's text, attributes, tables and inlines (ITextModel.h, GetChangeCount), and moves BACK on Undo

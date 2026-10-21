@@ -159,6 +159,8 @@ public:
 	{
 		return KFCHiddenSpreadAlert::AnswerAlert(message, button1, button2, button3, defaultButton);
 	}
+	// (Not under the list's query - KFCUnderListQuery: it searches with Find/Change's own, as Find does - the spec's T4.)
+	virtual bool SearchTextInObjects(PMString& outStatus) { return KFCSearchEngine::SearchTextInObjects(outStatus); }
 };
 
 CREATE_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)

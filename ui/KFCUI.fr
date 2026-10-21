@@ -836,6 +836,14 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCSearchTierAgainMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// ...and Search Text in These Objects (docs/superpowers/specs/2026-10-21-kfc-text-in-object-results-design.md T2):
+		// the text inside a tier of objects, into a new tier - a grey tier switched to first
+		// (KFCResultHistory::SearchTextInObjects); grey over a tier of text rows.
+		kKFCSearchTextInObjectsActionID,
+		kKFCResultTierMenuName
+		kKFCSearchTextInObjectsMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 		// ...and Narrow Down (docs/superpowers/specs/2026-10-18-kfc-narrow-down-design.md N1, N2): that tier's search run once more
 		// with its conditions and the one chosen, into a new tier - a grey tier switched to first (KFCResultHistory::Narrow). The
 		// submenu's parent node: ActionID 0 and its path ending in the delimiter (Special Operations' idiom).
@@ -1380,6 +1388,17 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKFCActionComponentBoss,
 		kKFCSearchTierAgainActionID,
 		kKFCSearchTierAgainMenuKey,	// "Search These Results Again"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// Search Text in These Objects - a tier's own row's right-click menu (the text-in-objects spec's T2). kCustomEnabling:
+		// grey over a tier of text rows, and with no tier row (pressed by ID) or while a run is up.
+		kKFCActionComponentBoss,
+		kKFCSearchTextInObjectsActionID,
+		kKFCSearchTextInObjectsMenuKey,	// "Search Text in These Objects"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,

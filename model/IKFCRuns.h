@@ -167,6 +167,10 @@ public:
 	    kKFCAlertLeaveToDefault (KFCModelTypes.h) - the UI half's HandleAlert. */
 	virtual int16 AnswerAlert(const PMString& message, const PMString& button1, const PMString& button2,
 		const PMString& button3, int16 defaultButton) = 0;
+	/** = KFCSearchEngine::SearchTextInObjects (appended - NOT under the list's query: it searches with the query
+	    Find/Change holds now, as Find does) - a tier heading's Search Text in These Objects: the text inside the live list's
+	    objects, into a new list (a new tier). False = refused, nothing changed (outStatus says why), or cancelled. */
+	virtual bool SearchTextInObjects(PMString& outStatus) = 0;
 };
 
 #endif // __IKFCRuns_h__

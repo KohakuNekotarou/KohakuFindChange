@@ -56,7 +56,8 @@ namespace KFCResultModel
 		kScopeAllDocuments,
 		kScopeStory,
 		kScopeToEndOfStory,
-		kScopeSelection
+		kScopeSelection,
+		kScopeInObjects		// Search Text in These Objects: the text of a tier's objects (Chapter::searchedObjects)
 	};
 
 	/** THE MOST TIERS KEPT (the author's call - 50 being too many searches to keep): past it the oldest goes. One

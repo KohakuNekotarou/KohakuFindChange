@@ -123,6 +123,9 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCNarrow.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCObjectText.cpp">
+         <Filter>Source Files</Filter>
+      </ClCompile>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCObjectReplace.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
@@ -234,6 +237,9 @@
          <Filter>Header Files</Filter>
       </ClInclude>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCNarrow.h">
+         <Filter>Header Files</Filter>
+      </ClInclude>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCObjectText.h">
          <Filter>Header Files</Filter>
       </ClInclude>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCObjectReplace.h">

@@ -259,6 +259,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCMemXferBytes.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCObjectSearch.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCNarrow.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCObjectText.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCObjectReplace.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCObjectOutline.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCObjectSpecial.cpp"/>
@@ -299,6 +300,7 @@
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCMemXferBytes.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCObjectSearch.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCNarrow.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCObjectText.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCObjectReplace.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCDiagWrittenDocs.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCTextCut.h"/>

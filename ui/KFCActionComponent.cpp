@@ -719,6 +719,26 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			break;
 		}
 
+		case kKFCSearchTextInObjectsActionID:
+		{
+			// A tier's own row's right-click menu (docs/superpowers/specs/2026-10-21-kfc-text-in-object-results-design.md T2): the
+			// text inside that tier's objects, into a new tier - a grey tier switched to first, as Narrow Down switches (a refusal
+			// says why on the status line) - then searched (KFCResultHistory::SearchTextInObjects: the tiers carried as a search
+			// carries them). Not under a landing or a run, as Narrow Down. No tier row (pressed by its ActionID): nothing.
+			int32 tier = -1;
+			if (KFCJump::IsLanding() || KFCResultTree::RefusedWhileRunning() || !RightClickedTier(widget, tier))
+				break;
+			if (tier >= 0)
+			{
+				NodeID liveRow;
+				if (!KFCResultHistory::SwitchToKeptRow(tier, -1, liveRow))
+					break;
+			}
+			PMString summary;
+			(void)KFCResultHistory::SearchTextInObjects(summary);
+			break;
+		}
+
 		case kKFCCreateOutlinesActionID:
 		{
 			// A row's Special Operations > Create Outlines - an OBJECT row's item outlined whole (the author's call), a
@@ -1085,6 +1105,17 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 				// document or book not open, a list no search made) said on the status line, as Search This Document Again's.
 				int32 tier = -1;
 				const bool enable = RightClickedTier(widget, tier);
+				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
+				break;
+			}
+			case kKFCSearchTextInObjectsActionID:
+			{
+				// A tier's own row's menu: Search Text in These Objects over a tier of object rows (TierHoldsObjects - an Object
+				// tab search's, a Frames of These Matches list's); grey over a tier of text rows, kept on the menu (SET-11). Its
+				// other refusals (Find/Change's tab, nothing to find, no object left, a document or book not open) said on the
+				// status line when pressed - the tab can change after the menu opened (the spec's T2).
+				int32 tier = -1;
+				const bool enable = RightClickedTier(widget, tier) && KFCResultHistory::TierHoldsObjects(tier);
 				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 				break;
 			}

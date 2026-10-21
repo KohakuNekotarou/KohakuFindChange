@@ -329,6 +329,10 @@ namespace KFCResultModel
 		// what the tier heading's search again walks again ("a Story search, that story alone" - the author), as the
 		// story row walks its own. kInvalidUID otherwise.
 		UID						searchedStory;
+		// SEARCH TEXT IN THESE OBJECTS' OBJECTS (docs/superpowers/specs/2026-10-21-kfc-text-in-object-results-design.md T6):
+		// the page items whose text it searched in this document - what its searches again make the stretches from again
+		// (KFCObjectText::Collect). Empty for any other search.
+		std::vector<UID>		searchedObjects;
 		// SEARCHED AGAIN AND NOTHING FOUND (Search This Document Again, and Search This Story Again over its last story with
 		// rows - the author's calls): shown with no rows, (0/0), so it can be searched again after the next edit. A
 		// chapter with no rows is otherwise not shown - a search
@@ -667,6 +671,9 @@ namespace KFCResultModel
 	/** The story a Search: Story search searched (Chapter::searchedStory) - kInvalidUID for any other search, or an index
 	    out of range. */
 	UID GetSearchedStory(int32 chapterIdx);
+	/** The objects a Search Text in These Objects searched in the chapter (Chapter::searchedObjects) - false for an index out
+	    of range; out empty for any other search. */
+	bool GetChapterSearchedObjects(int32 chapterIdx, std::vector<UID>& out);
 
 	/** A hit's row flags: already replaced, and locked - both mean "this row's Replace is greyed", for different
 	    reasons. false = index out of range. */

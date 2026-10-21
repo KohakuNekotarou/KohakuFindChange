@@ -443,6 +443,10 @@ DECLARE_PMID(kActionIDSpace, kKFCCopyTheseResultsActionID, kKFCUIPrefix + 105)
 // NARROW DOWN > ON ACTIVE LAYER (the author's call: Find Objects on Active Layer moved off the panel menu into Narrow
 // Down, text tiers too): the tier's rows kept to the front document's active layer, by its name. + 106.
 DECLARE_PMID(kActionIDSpace, kKFCNarrowOnLayerActionID, kKFCUIPrefix + 106)
+// SEARCH TEXT IN THESE OBJECTS (docs/superpowers/specs/2026-10-21-kfc-text-in-object-results-design.md T2): a tier heading's -
+// the text inside a tier of objects searched with Find/Change's query, into a new tier (KFCResultHistory::SearchTextInObjects).
+// + 107.
+DECLARE_PMID(kActionIDSpace, kKFCSearchTextInObjectsActionID, kKFCUIPrefix + 107)
 
 
 // WidgetIDs:
@@ -562,6 +566,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 #define kKFCClearTierResultsMenuKey	kKFCStringPrefix "kKFCClearTierResultsMenuKey"
 // ...and its Search These Results Again (measured against every other key - key_collisions.py: none reads alike).
 #define kKFCSearchTierAgainMenuKey	kKFCStringPrefix "kKFCSearchTierAgainMenuKey"
+// ...and its Search Text in These Objects (measured against every other key - key_collisions.py: none reads alike).
+#define kKFCSearchTextInObjectsMenuKey	kKFCStringPrefix "kKFCSearchTextInObjectsMenuKey"
 // ...and an object row's Create Outlines (measured against every other key - key_collisions.py: none reads alike).
 #define kKFCCreateOutlinesMenuKey	kKFCStringPrefix "kKFCCreateOutlinesMenuKey"
 // ...and a text row's Restore from Copy (measured against every other key - key_collisions.py).
@@ -786,6 +792,7 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 #define kKFCReplaceHitMenuItemPosition			6.0		// Replace (a hit row's)
 #define kKFCObjectReplaceMenuItemPosition		6.0		// Replace (an object row's - the same action)
 #define kKFCRestoreOriginalMenuItemPosition		7.0		// Restore from Copy
+#define kKFCSearchTextInObjectsMenuItemPosition	7.5		// Search Text in These Objects
 #define kKFCSearchTierAgainMenuItemPosition		8.0		// Search These Results Again
 #define kKFCSearchDocumentAgainMenuItemPosition	9.0		// Search This Document Again
 #define kKFCSearchStoryAgainMenuItemPosition	10.0	// Search This Story Again

@@ -163,6 +163,7 @@ namespace
 		{
 			return kKFCAlertLeaveToDefault;
 		}
+		virtual bool SearchTextInObjects(PMString& outStatus) { SayWhy(outStatus); return false; }
 	};
 
 	class KFCChaptersStandInImpl : public IKFCChapters

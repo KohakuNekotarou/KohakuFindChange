@@ -58,6 +58,13 @@ namespace KFCResultHistory
 	    is what QueryReadsAsTier reads the query against). The list drawn again, the status line set. True = a new list. */
 	bool Narrow(const KFCNarrowStep& step, PMString& outSummary);
 
+	/** SEARCH TEXT IN THESE OBJECTS (docs/superpowers/specs/2026-10-21-kfc-text-in-object-results-design.md - a tier heading's
+	    right-click menu): the text inside the live list's objects searched with the query Find/Change holds now
+	    (KFCRuns()->SearchTextInObjects) into a NEW list, carried as Find carries a search's: the list of objects kept as a tier
+	    when the model kept it, the copies following the model's tiers, the new list named as Find names one (QueryLabel - its
+	    heading draws "Objects" in the scope's place, WithScope). The list drawn again, the status line set. True = a new list. */
+	bool SearchTextInObjects(PMString& outSummary);
+
 	/** Are tier `tier`'s rows object rows - an Object tab search's, a Frames of These Matches list's (-1 = the live list,
 	    asked of the model; a grey one as its copy noted it)? The heading's Narrow Down greys a text-only condition by it. */
 	bool TierHoldsObjects(int32 tier);
