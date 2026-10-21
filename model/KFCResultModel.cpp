@@ -926,6 +926,18 @@ void KFCResultModel::RebindChapterDoc(int32 chapterIdx, const UIDRef& newDocRef)
 				KFC_DIAG_LOG("ITEMGONE chapter=%d hit=%d item=%u - its document came back without it", chapterIdx,
 					static_cast<int>(i), static_cast<unsigned>(h.itemUID.Get()));
 			}
+			// ...and Search Text in These Objects' objects it came back without (Chapter::searchedObjects): their UIDs are as
+			// free for the next item made, which its search again must not take for them - each one let go (kInvalidUID: the
+			// search again counts it gone, KFCObjectText::Collect).
+			for (size_t o = 0; o < c->searchedObjects.size(); ++o)
+			{
+				UID& item = c->searchedObjects[o];
+				if (item == kInvalidUID || KFCPageItemFacts::ItemIsThere(db, item))
+					continue;
+				KFC_DIAG_LOG("OBJECTGONE chapter=%d item=%u - its document came back without it", chapterIdx,
+					static_cast<unsigned>(item.Get()));
+				item = kInvalidUID;
+			}
 		}
 		// THE ONE PLACE A CHAPTER'S ROWS GET THEIR FOCI AFTER A (RE)OPEN (the text-focus spec's T6): every road that
 		// binds a chapter to an open document comes here - a jump's or a replace's reopen, and the user's own open
