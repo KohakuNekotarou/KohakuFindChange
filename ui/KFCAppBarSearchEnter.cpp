@@ -116,6 +116,17 @@ static void BookAtNextIdle(ICallbackTimer*& timer, TimerCallback callback)
 	timer->StartTimer(callback, 1, nil);
 }
 
+// ...and a timer let go for good (the plug-in's shutdown), its booking stopped first: its callback is a raw pointer
+// into this .pln (ICallbackTimer.h).
+static void GiveBackTimer(ICallbackTimer*& timer)
+{
+	if (timer == nil)
+		return;
+	timer->StopTimer();
+	timer->Release();
+	timer = nil;
+}
+
 static std::wstring ClassOf(HWND w)
 {
 	wchar_t name[128] = { 0 };
@@ -467,7 +478,9 @@ static void UnhookAppBar()
 
 #endif	// WINDOWS
 
-bool KFCFindChangeQueryWords(PMString& outWords)
+// THE WORDS OF THE TAB FIND/CHANGE IS ON - its find side or its change side: the one reading behind the two doors
+// below (the header says what each side's words are).
+static bool TabWords(PMString& outWords, bool changeSide)
 {
 	outWords.Clear();
 	outWords.SetTranslatable(kFalse);
@@ -479,40 +492,34 @@ bool KFCFindChangeQueryWords(PMString& outWords)
 	switch (mode)
 	{
 		case IFindChangeOptions::kTextSearch:
-		case IFindChangeOptions::kGrepSearch:			outWords = PMString(opts->GetFindString(mode)); break;
-		case IFindChangeOptions::kGlyphSearch:			outWords = GlyphDescription(opts, false); break;
-		case IFindChangeOptions::kTransliterateSearch:	outWords = CharacterTypeName(opts->GetFindCharacterType()); break;
-		default:										return false;	// Object, Colour: nothing in words
+		case IFindChangeOptions::kGrepSearch:
+			outWords = PMString(changeSide ? opts->GetReplaceString(mode) : opts->GetFindString(mode));
+			break;
+		case IFindChangeOptions::kGlyphSearch:
+			outWords = GlyphDescription(opts, changeSide);
+			break;
+		case IFindChangeOptions::kTransliterateSearch:
+			outWords = CharacterTypeName(changeSide ? opts->GetReplaceCharacterType() : opts->GetFindCharacterType());
+			break;
+		default:
+			return false;	// Object, Colour: nothing in words
 	}
 	outWords.SetTranslatable(kFalse);
 	return true;
 #else
+	(void)changeSide;
 	return false;
 #endif
 }
 
+bool KFCFindChangeQueryWords(PMString& outWords)
+{
+	return TabWords(outWords, false);
+}
+
 bool KFCFindChangeChangeWords(PMString& outWords)
 {
-	outWords.Clear();
-	outWords.SetTranslatable(kFalse);
-#ifdef WINDOWS
-	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
-	if (opts == nil)
-		return false;
-	const IFindChangeOptions::SearchMode mode = opts->GetSearchMode();
-	switch (mode)
-	{
-		case IFindChangeOptions::kTextSearch:
-		case IFindChangeOptions::kGrepSearch:			outWords = PMString(opts->GetReplaceString(mode)); break;
-		case IFindChangeOptions::kGlyphSearch:			outWords = GlyphDescription(opts, true); break;
-		case IFindChangeOptions::kTransliterateSearch:	outWords = CharacterTypeName(opts->GetReplaceCharacterType()); break;
-		default:										return false;	// Object, Colour: nothing in words
-	}
-	outWords.SetTranslatable(kFalse);
-	return true;
-#else
-	return false;
-#endif
+	return TabWords(outWords, true);
 }
 
 // The observer that keeps the field following the dialog. An AddIn onto kActiveContextBoss under its own IID
@@ -624,18 +631,8 @@ void KFCShutdownAppBarSearchEnter()
 	UnhookAppBar();
 	// A fresh value, so the storage goes too - clear() keeps it (KFCResultTree::ShutdownCleanup's reason).
 	std::wstring().swap(sPendingText);
-	if (sRunTimer != nil)
-	{
-		sRunTimer->StopTimer();
-		sRunTimer->Release();
-		sRunTimer = nil;
-	}
-	if (sRemirrorTimer != nil)
-	{
-		sRemirrorTimer->StopTimer();
-		sRemirrorTimer->Release();
-		sRemirrorTimer = nil;
-	}
+	GiveBackTimer(sRunTimer);
+	GiveBackTimer(sRemirrorTimer);
 #endif
 	sAppBarSearchEnter = kFalse;
 }
