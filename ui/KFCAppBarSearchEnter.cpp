@@ -44,7 +44,6 @@
 #include "Utils.h"
 
 #include "PMString.h"
-#include "WideString.h"
 
 // Project includes:
 #include "KFCAppBarSearchEnter.h"
@@ -411,8 +410,9 @@ static uint32 RunPendingSearch(void* /*refPtr*/)
 	// shows that, so an untouched field changes nothing).
 	if (opts == nil || WideOf(opts->GetFindString(mode)) != text)
 	{
-		PMString query(WideString(text.c_str(), static_cast<int32>(text.size())));
-		query.SetTranslatable(kFalse);
+		// No key: the wchar_t constructor makes a string Translate leaves alone (PMString.h - for strings that are not
+		// keys; wchar_t is UTF-16 here), the header's form in place of SetTranslatable(kFalse).
+		const PMString query(text.c_str(), text.size());
 		if (!KFCRuns()->SetQuery(query, mode))
 		{
 			KFCResultTree::ShowStatus("The Application Bar's text could not be put into Find/Change"
