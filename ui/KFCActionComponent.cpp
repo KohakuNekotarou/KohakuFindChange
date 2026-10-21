@@ -234,6 +234,15 @@ bool RightClickedTier(IPMUnknown* widget, int32& outTier)
 	return true;
 }
 
+// A TIER HEADING'S ITEM ON A GREY TIER (Search These Results Again, Narrow Down, Search Text in These Objects): the tier
+// switched to first - the live list, as a click on its heading makes it (KFCResultHistory::SwitchToKeptRow - a refusal says
+// why on the status line). The live tier (-1) as it is. false = refused.
+bool MakeTierLive(int32 tier)
+{
+	NodeID liveRow;
+	return tier < 0 || KFCResultHistory::SwitchToKeptRow(tier, -1, liveRow);
+}
+
 // THE ACTIONS OF AN OBJECT ROW'S OTHER SPECIAL OPERATIONS (docs/superpowers/specs/2026-10-17-kfc-object-special-operations-design.md):
 // each stands for one KFCSpecialOp (KFCModelTypes.h) - one door for them all in DoAction (DoSpecial) and one in
 // UpdateActionStates (the grey).
@@ -348,12 +357,8 @@ void DoNarrow(IActiveContext* ac, int32 kind, IPMUnknown* widget)
 			return;
 		}
 	}
-	if (tier >= 0)
-	{
-		NodeID liveRow;
-		if (!KFCResultHistory::SwitchToKeptRow(tier, -1, liveRow))
-			return;
-	}
+	if (!MakeTierLive(tier))
+		return;
 	PMString summary;
 	(void)KFCResultHistory::Narrow(step, summary);
 }
@@ -707,14 +712,8 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			// line) - then searched again (KFCResultTree::SearchListAgain - the model reads the list's query, scope and
 			// documents). Not under a landing or a run: both doors refuse.
 			int32 tier = -1;
-			if (!RightClickedTier(widget, tier))
+			if (!RightClickedTier(widget, tier) || !MakeTierLive(tier))
 				break;
-			if (tier >= 0)
-			{
-				NodeID liveRow;
-				if (!KFCResultHistory::SwitchToKeptRow(tier, -1, liveRow))
-					break;
-			}
 			(void)KFCResultTree::SearchListAgain();
 			break;
 		}
@@ -726,14 +725,9 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			// says why on the status line) - then searched (KFCResultHistory::SearchTextInObjects: the tiers carried as a search
 			// carries them). Not under a landing or a run, as Narrow Down. No tier row (pressed by its ActionID): nothing.
 			int32 tier = -1;
-			if (KFCJump::IsLanding() || KFCResultTree::RefusedWhileRunning() || !RightClickedTier(widget, tier))
+			if (KFCJump::IsLanding() || KFCResultTree::RefusedWhileRunning() || !RightClickedTier(widget, tier)
+				|| !MakeTierLive(tier))
 				break;
-			if (tier >= 0)
-			{
-				NodeID liveRow;
-				if (!KFCResultHistory::SwitchToKeptRow(tier, -1, liveRow))
-					break;
-			}
 			PMString summary;
 			(void)KFCResultHistory::SearchTextInObjects(summary);
 			break;
@@ -1071,8 +1065,9 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 				// A document row's menu: Search This Document Again over a document row - GREYED OVER A SEARCH OF PART OF A
 				// DOCUMENT (Search: Story, To End of Story, Selection - the author: "greyed may be
 				// fine" - and Search Text in These Objects' objects' text): it walks a whole document, and such a list is
-				// searched again as it was searched by its story rows and its heading. Its other refusals (a changed query) said on the status line, as the story row's are
-				// (KFCSearchEngine::SearchDocumentAgain - which still refuses a part, for a caller that never opened the menu).
+				// searched again as it was searched by its story rows and its heading. Its other refusals (a changed query)
+				// said on the status line, as the story row's are (KFCSearchEngine::SearchDocumentAgain - which still refuses
+				// a part, for a caller that never opened the menu).
 				int32 chapter = -1;
 				const KFCResultModel::SearchScopeKind scope = KFCResults()->GetSearchScope();
 				const bool overPart = (scope == KFCResultModel::kScopeStory || scope == KFCResultModel::kScopeToEndOfStory

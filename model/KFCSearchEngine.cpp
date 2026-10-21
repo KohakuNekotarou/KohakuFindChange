@@ -76,7 +76,8 @@
 #include <map>						// the per-frame cache one document's walk keeps (FrameFacts)
 #include <memory>					// std::unique_ptr - a Search: walk's dirty guards, one per open document
 #include <set>						// the rows a write is handed, the stories it meets
-#include <functional>				// std::function - a Narrow Down's check put to the list's documents (AskListDocuments)
+#include <functional>				// std::function - a Narrow Down's check put to the list's documents (AskListDocuments),
+									// a list's objects read for Search Text in These Objects (RunOverObjects)
 
 // Project includes:
 #include "KFCSearchEngine.h"
@@ -1639,7 +1640,7 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 			continue;
 		}
 		// A NARROWED LIST'S CONDITIONS (Narrow Down - gWalkFilter): a row that does not meet them goes again at once,
-		// and the ceiling is asked of a row that does (the end of this block) - the list's limit counts the rows that
+		// and the ceiling is asked of a row that does (after this block) - the list's limit counts the rows that
 		// pass (the narrow-down spec's N3, the author's call). Where the match's text stands is read for the conditions
 		// that ask it alone (ReadTextPlace); its frame out on the pasteboard came with its page (BuildHit).
 		if (narrowed)
@@ -1683,17 +1684,10 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 					continue;
 				}
 			}
-			// THE CEILING, ASKED OF A ROW THE CONDITIONS LET THROUGH: one past the list goes again, and the list is
-			// full.
-			if (outHits.size() > maxHits)
-			{
-				outHits.pop_back();
-				outCapped = true;
-				break;
-			}
 		}
-		// ...and of a row Search Text in These Objects kept (above), the same way.
-		else if (inObjects && outHits.size() > maxHits)
+		// THE CEILING, ASKED OF A ROW THE CONDITIONS LET THROUGH - or Search Text in These Objects kept (above): one past the
+		// list goes again, and the list is full.
+		if ((narrowed || inObjects) && outHits.size() > maxHits)
 		{
 			outHits.pop_back();
 			outCapped = true;
@@ -2514,9 +2508,10 @@ void AppendKeptStay(PMString& io, int32 stayed)
 	io.Append(stayed == 1 ? " kept row stays." : " kept rows stay.");
 }
 
-// ONE DOCUMENT, BY ITS FILE OR BY ITS OPEN DATABASE (the row eye's carry - CarryKeptRowsByDocument): a book's chapters have
-// files - compared as files (FileUtils::IsEqual, as KFCBookScope compares them); a document of All Documents or of Search:
-// Document has none - the same open database. A chapter emptied by a close is unbound, so it matches nothing.
+// ONE DOCUMENT, BY ITS FILE OR BY ITS OPEN DATABASE (the row eye's carry - CarryKeptRowsByDocument; Search Text in These
+// Objects' chapters found in their book's list - RunSearch): a book's chapters have files - compared as files
+// (FileUtils::IsEqual, as KFCBookScope compares them); a document of All Documents or of Search: Document has none - the
+// same open database. A chapter emptied by a close is unbound, so it matches nothing.
 bool SameDocument(const UIDRef& docRef, const IDFile& file, const KFCBookScope::ChapterDoc& target)
 {
 	const bool hasFile = KFCBookScope::ChapterHasFile(file);
@@ -2637,6 +2632,31 @@ void ReadStoryVersions(const UIDRef& docRef, const std::vector<KFCResultModel::H
 	}
 }
 
+// WHAT A WALK THAT DID NOT END CLEANLY OWES THE SUMMARY, named for what was walked - the search's walks (CollectTargets:
+// the Book Scope OFF walks' and a book's chapters') and Search Text in These Objects' (CollectObjectTexts), into the tally's
+// lists (KFCSearchEngine.h). One that broke off keeps its hits: they are real and are filed like any other, and what the
+// summary owes is the other half - the rest was never looked at. One that never ran is named with its reason, since a
+// skipped document is otherwise indistinguishable from one with no matches; the colon goes with the reason, so an ending
+// with none of its own (ChapterWalkResultText) leaves the name standing alone. A cancelled walk says nothing: the run is
+// thrown away.
+void NoteWalkEnd(KFCSearchEngine::CollectTally& out, const PMString& walkName, ChapterWalkResult walkResult)
+{
+	PMString name(walkName);
+	name.SetTranslatable(kFalse);
+	if (walkResult == kChapterWalkFailed)
+		out.brokeOff.push_back(name);
+	else if (walkResult != kChapterWalked && walkResult != kChapterCancelled)
+	{
+		const PMString why(ChapterWalkResultText(walkResult));
+		if (!why.IsEmpty())
+		{
+			name.Append(": ");
+			name.Append(why);
+		}
+		out.unsearchable.push_back(name);
+	}
+}
+
 // SEARCHBOOK'S WALK OVER ITS TARGETS. Every target walked and its hits appended to the model chapter by chapter,
 // under one bar. (A query run does not come here: it is Change All only - KFCQuerySequence.)
 void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBook, bool allDocuments,
@@ -2699,29 +2719,6 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 	int32 progressBase = 0;
 	int32 progressReported = 0;
 
-	// WHAT A WALK THAT DID NOT END CLEANLY OWES THE SUMMARY, named for what was walked - in both loops below, the
-	// Book Scope OFF walks' and a book's chapters' (the tally's lists, KFCSearchEngine.h). One that broke off keeps its
-	// hits: they are real and are filed like any other, and what the summary owes is the other half - the rest was
-	// never looked at. One that never ran is named with its reason, since a skipped document is otherwise
-	// indistinguishable from one with no matches; the colon goes with the reason, so an ending with none of its own
-	// (ChapterWalkResultText) leaves the name standing alone. A cancelled walk says nothing: the run is thrown away.
-	auto noteWalk = [&](const PMString& walkName, ChapterWalkResult walkResult)
-	{
-		PMString name(walkName);
-		name.SetTranslatable(kFalse);
-		if (walkResult == kChapterWalkFailed)
-			out.brokeOff.push_back(name);
-		else if (walkResult != kChapterWalked && walkResult != kChapterCancelled)
-		{
-			const PMString why(ChapterWalkResultText(walkResult));
-			if (!why.IsEmpty())
-			{
-				name.Append(": ");
-				name.Append(why);
-			}
-			out.unsearchable.push_back(name);
-		}
-	};
 
 	// BOOK SCOPE OFF: THE RANGE IS THE DIALOG'S, THE ORDER IS FROM THE TOP.
 	// The RANGE is whatever Search: says - Document, All Documents, Story, To End of Story, Selection - the way
@@ -2797,7 +2794,7 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 					out.cancelled = true;
 					break;
 				}
-				noteWalk(targets[t].shortName, walkResult);
+				NoteWalkEnd(out, targets[t].shortName, walkResult);
 				if (capped)
 				{
 					out.truncated = true;		// the list is full: the documents after this one are not walked
@@ -2846,7 +2843,7 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 			if (walkResult == kChapterCancelled)
 				out.cancelled = true;
 			else
-				noteWalk(targets[0].shortName, walkResult);
+				NoteWalkEnd(out, targets[0].shortName, walkResult);
 		}
 		KFCAdvanceProgress(&progressBar, progressReported, progressTotal, true /*force*/);
 
@@ -2987,8 +2984,8 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 
 		if (docCapped)
 			out.truncated = true;
-		// A walk that broke off keeps its hits and is filed below; one that never ran has none (noteWalk).
-		noteWalk(targets[i].shortName, walkResult);
+		// A walk that broke off keeps its hits and is filed below; one that never ran has none (NoteWalkEnd).
+		NoteWalkEnd(out, targets[i].shortName, walkResult);
 		if (hits.empty())
 			continue;
 
@@ -3316,14 +3313,42 @@ namespace KFCSearchEngine
 
 namespace
 {
+// SEARCH TEXT IN THESE OBJECTS' STRETCHES WALKED (CollectObjectTexts - a document's all; SearchStoryAgain - one story's,
+// onlyStory): each by its own scope, the way InDesign walks its Search: Selection (QueryPartScope - measured the same: the
+// spec's M1), its rows asked of the frames whose text was taken (ObjectTextScope), into `hits` - until the list's limit
+// (capped) or a walk that did not end cleanly (result).
+void WalkStretches(const UIDRef& docRef, const KFCObjectText::Ranges& ranges, UID onlyStory, size_t limit,
+	const WalkerScopeOptions& scopeOptions, const WalkBar& bar, std::vector<KFCResultModel::Hit>& hits, bool& capped,
+	ChapterWalkResult& result)
+{
+	IDataBase* const db = docRef.GetDataBase();
+	const ObjectTextScope objectText(ranges);
+	for (size_t s = 0; s < ranges.stretches.size() && result == kChapterWalked && !capped; ++s)
+	{
+		const KFCObjectText::Stretch& one = ranges.stretches[s];
+		if (onlyStory != kInvalidUID && one.story != onlyStory)
+			continue;
+		KFC_DIAG_LOG("TIOSTRETCH story=%u [%d,%d) overset=%d", one.story.Get(), (int)one.start, (int)one.end,
+			one.overset ? 1 : 0);
+		TempFocus focus;
+		InterfacePtr<ITextWalkerScope> scope(QueryPartScope(UIDRef(db, one.story), KFCResultModel::kScopeSelection,
+			one.start, one.end, scopeOptions, focus));
+		if (scope == nil)
+		{
+			result = kChapterNoScope;
+			break;
+		}
+		CollectHitsInDoc(docRef, limit, scopeOptions, kHitEverything, hits, capped, result, bar, UIDRef(db, one.story),
+			IWalkerScopeFactoryUtils::kEmptyScope, nil, nil, scope);
+	}
+}
+
 // SEARCH TEXT IN THESE OBJECTS' WALK (RunSearch over AgainTarget::inObjects - the spec's T3, T7): each document's objects'
-// text as stretches (KFCObjectText::Collect, under the document's dirty guard: it may compose), each walked by its own
-// scope the way InDesign walks its Search: Selection (QueryPartScope - measured the same: the spec's M1) with its rows
-// asked of the frames whose text was taken (ObjectTextScope); then filed as the document's chapter with its objects - one
-// with no row shown empty (FileChapter), so its search again knows them. Under one bar with Cancel, as the search's walk
-// (CollectTargets): a book's chapter not open is opened windowless and handed back after its walk; a document of any other
-// list was found open (SearchTextInObjects).
-void CollectObjectTexts(std::vector<KFCSearchEngine::AgainTarget::ObjectsInChapter>& chapters, bool fromBook,
+// text as stretches (KFCObjectText::Collect, under the document's dirty guard: it may compose), walked (WalkStretches);
+// then filed as the document's chapter with its objects - one with no row shown empty (FileChapter), so its search again
+// knows them. Under one bar with Cancel, as the search's walk (CollectTargets): a book's chapter not open is opened
+// windowless and handed back after its walk; a document of any other list was found open (RunOverObjects).
+void CollectObjectTexts(const std::vector<KFCSearchEngine::AgainTarget::ObjectsInChapter>& chapters, bool fromBook,
 	std::vector<KFCBookScope::SkippedChapter>& unopenable, KFCSearchEngine::CollectTally& out,
 	int32 reserved)		// rows the list holds before anything is walked - a search again's kept rows (the row eye), as
 						// CollectTargets takes them; 0 for a new list
@@ -3380,26 +3405,8 @@ void CollectObjectTexts(std::vector<KFCSearchEngine::AgainTarget::ObjectsInChapt
 		std::vector<KFCResultModel::Hit> hits;
 		bool capped = false;
 		ChapterWalkResult walkResult = kChapterWalked;
-		{
-			const ObjectTextScope objectText(ranges);
-			for (size_t s = 0; s < ranges.stretches.size() && walkResult == kChapterWalked && !capped; ++s)
-			{
-				const KFCObjectText::Stretch& one = ranges.stretches[s];
-				KFC_DIAG_LOG("TIOSTRETCH story=%u [%d,%d) overset=%d", one.story.Get(), (int)one.start, (int)one.end,
-					one.overset ? 1 : 0);
-				TempFocus focus;
-				InterfacePtr<ITextWalkerScope> scope(QueryPartScope(UIDRef(db, one.story), KFCResultModel::kScopeSelection,
-					one.start, one.end, scopeOptions, focus));
-				if (scope == nil)
-				{
-					walkResult = kChapterNoScope;
-					break;
-				}
-				CollectHitsInDoc(docRef, static_cast<size_t>(remaining), scopeOptions, kHitEverything, hits, capped, walkResult,
-					WalkBar(bar, shares[k], shares[k + 1] - shares[k], docRef, reported), UIDRef(db, one.story),
-					IWalkerScopeFactoryUtils::kEmptyScope, nil, nil, scope);
-			}
-		}
+		WalkStretches(docRef, ranges, kInvalidUID, static_cast<size_t>(remaining), scopeOptions,
+			WalkBar(bar, shares[k], shares[k + 1] - shares[k], docRef, reported), hits, capped, walkResult);
 		KFCAdvanceProgress(&bar, reported, shares[k + 1], true /*force*/);
 		// The stories' versions while the document is open; then a chapter this walk opened handed back, on the spot (the
 		// search's book loop says why).
@@ -3414,17 +3421,7 @@ void CollectObjectTexts(std::vector<KFCSearchEngine::AgainTarget::ObjectsInChapt
 		}
 		if (capped)
 			out.truncated = true;
-		// A walk that broke off keeps its rows; one that never ran is named with its reason (CollectTargets' noteWalk).
-		if (walkResult == kChapterWalkFailed)
-			out.brokeOff.push_back(target.shortName);
-		else if (walkResult != kChapterWalked)
-		{
-			PMString name(target.shortName);
-			name.SetTranslatable(kFalse);
-			name.Append(": ");
-			name.Append(ChapterWalkResultText(walkResult));
-			out.unsearchable.push_back(name);
-		}
+		NoteWalkEnd(out, target.shortName, walkResult);		// a walk that broke off keeps its rows - filed below
 		KFCSearchEngine::FileChapter(target, hits, out, &storyVersions, nil, kInvalidUID, &chapters[k].items);
 	}
 	// Asked once more: a Cancel pressed while the last document was walked (CollectTargets says why).
@@ -3684,8 +3681,7 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 				return refusePastCommit(kBookHasNoChapters);
 			for (size_t k = 0; k < objectChapters.size(); ++k)
 				for (size_t b = 0; b < listed.size(); ++b)
-					if (KFCBookScope::ChapterHasFile(listed[b].file)
-						&& FileUtils::IsEqual(listed[b].file, objectChapters[k].doc.file) != kFalse)
+					if (SameDocument(objectChapters[k].doc.docRef, objectChapters[k].doc.file, listed[b]))
 					{
 						objectChapters[k].doc.contentUID = listed[b].contentUID;
 						break;
@@ -5181,29 +5177,9 @@ bool KFCSearchEngine::SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMStrin
 		WalkerScopeOptions scopeOptions;
 		KFCSearchEngine::GetKFCWalkerScopeOptions(scopeOptions);
 		const WalkFilterScope walkFilter(narrowFilter);
-		if (inObjects)
-		{
-			// The story's stretches alone, each walked as Search Text in These Objects walks one (CollectObjectTexts), its
-			// rows asked of the frames whose text was taken.
-			const ObjectTextScope objectText(objectRanges);
-			for (size_t s = 0; s < objectRanges.stretches.size() && walked == kChapterWalked && !capped; ++s)
-			{
-				const KFCObjectText::Stretch& one = objectRanges.stretches[s];
-				if (one.story != story)
-					continue;
-				TempFocus stretchFocus;
-				InterfacePtr<ITextWalkerScope> stretchScope(QueryPartScope(UIDRef(db, story), KFCResultModel::kScopeSelection,
-					one.start, one.end, scopeOptions, stretchFocus));
-				if (stretchScope == nil)
-				{
-					walked = kChapterNoScope;
-					break;
-				}
-				CollectHitsInDoc(UIDRef(db, db->GetRootUID()), static_cast<size_t>(room > 0 ? room : 0), scopeOptions,
-					kHitEverything, hits, capped, walked, WalkBar(), UIDRef(db, story),
-					IWalkerScopeFactoryUtils::kEmptyScope, nil, nil, stretchScope);
-			}
-		}
+		if (inObjects)		// the story's stretches alone, walked as Search Text in These Objects walks them
+			WalkStretches(UIDRef(db, db->GetRootUID()), objectRanges, story, static_cast<size_t>(room > 0 ? room : 0),
+				scopeOptions, WalkBar(), hits, capped, walked);
 		else
 		{
 			// A searched part's own scope - nil for a whole story, which CollectHitsInDoc walks by the story form.
@@ -5399,6 +5375,9 @@ bool AskListDocuments(const std::function<bool(const UIDRef&)>& ask, bool& outAs
 	return false;
 }
 
+// Search Text in These Objects' refusal when no document of its objects is open (RunOverObjects).
+const char* const kObjectDocumentsNotOpen = "the documents of these results are not open - open them, then search again.";
+
 // A CHAPTER A CLOSE EMPTIED (KFCResultModel::EmptyChapter - its rows gone with its document, its name and the file it was
 // closed from kept) whose document is still not open: Search Text in These Objects names it as not open where its objects
 // would have been searched (the text-in-objects spec's T7). false for any other chapter - one opened again since has
@@ -5417,25 +5396,30 @@ bool ClosedChapterName(int32 chapterIdx, PMString& outName)
 	return !outName.IsEmpty();
 }
 
-// SEARCH TEXT IN THESE OBJECTS' DOCUMENTS - its first search's (KFCSearchEngine::SearchTextInObjects) and its searches
-// again's (SearchListOnceMore), one reading: each of again.objects (the list's chapter chapterOf[k]) found as Search These
-// Results Again finds a document - a book's list: its book open, each chapter by its file (one not open is opened for the
-// walk, CollectObjectTexts); any other list's: its document found open, never reopened (LIFE-01), one not open named in the
-// summary (AgainTarget::notOpen). false = refused (outStatus, after `lead`): the book not open, or no document open.
-bool ReachObjectDocuments(KFCSearchEngine::AgainTarget& again, const std::vector<int32>& chapterOf, const PMString& lead,
-	PMString& outStatus)
+// SEARCH TEXT IN THESE OBJECTS' ONE ROAD FROM A LIST'S OBJECTS TO THE SEARCH - its first search's
+// (KFCSearchEngine::SearchTextInObjects) and its searches again's (SearchListOnceMore): each chapter's objects (itemsOf); a
+// chapter with none whose document a close took away named as not open (ClosedChapterName - the text-in-objects spec's T7);
+// each document found as Search These Results Again finds one - a book's list: its book open, each chapter by its file (one
+// not open is opened for the walk, CollectObjectTexts); any other list's: its document found open, never reopened (LIFE-01),
+// one not open named in the summary (AgainTarget::notOpen); then the search's one body (RunSearch). The refusals in the
+// spec's order (T8), each after `lead`: no object (`noObjects` - or, when only closed documents had them, that they are not
+// open), the book not open, no document open. true = searched (a new list, or the list searched again in place).
+bool RunOverObjects(KFCSearchEngine::AgainTarget& again, const std::function<void(int32, std::vector<UID>&)>& itemsOf,
+	const char* noObjects, const PMString& lead, PMString& outStatus)
 {
-	if (again.fromBook && (!KFCBookScope::GetSearchedBookPath(again.bookPath) || !KFCBookScope::IsBookStillOpen(again.bookPath)))
+	bool anyObject = false;
+	for (int32 c = 0; c < KFCResultModel::GetChapterCount(); ++c)
 	{
-		outStatus.Append(lead);
-		outStatus.Append("the book these results were searched in is not open - open it, then search again.");
-		return false;
-	}
-	std::vector<KFCSearchEngine::AgainTarget::ObjectsInChapter> reached;
-	for (size_t k = 0; k < again.objects.size() && k < chapterOf.size(); ++k)
-	{
-		const int32 c = chapterOf[k];
-		KFCSearchEngine::AgainTarget::ObjectsInChapter& one = again.objects[k];
+		KFCSearchEngine::AgainTarget::ObjectsInChapter one;
+		itemsOf(c, one.items);
+		if (one.items.empty())
+		{
+			PMString closedName;
+			if (ClosedChapterName(c, closedName))
+				again.notOpen.push_back(closedName);
+			continue;
+		}
+		anyObject = true;
 		UIDRef bound;
 		int32 rows = 0;
 		(void)KFCResultModel::GetChapterLocation(c, bound, one.doc.file);
@@ -5447,16 +5431,25 @@ bool ReachObjectDocuments(KFCSearchEngine::AgainTarget& again, const std::vector
 			again.notOpen.push_back(one.doc.shortName);
 			continue;
 		}
-		reached.push_back(one);
+		again.objects.push_back(one);
 	}
-	again.objects.swap(reached);
-	if (again.objects.empty())
+	const char* refusal = nil;
+	if (!anyObject)
+		refusal = again.notOpen.empty() ? noObjects : kObjectDocumentsNotOpen;
+	else if (again.fromBook
+		&& (!KFCBookScope::GetSearchedBookPath(again.bookPath) || !KFCBookScope::IsBookStillOpen(again.bookPath)))
+		refusal = "the book these results were searched in is not open - open it, then search again.";
+	else if (again.objects.empty())
+		refusal = kObjectDocumentsNotOpen;
+	if (refusal != nil)
 	{
 		outStatus.Append(lead);
-		outStatus.Append("the documents of these results are not open - open them, then search again.");
+		outStatus.Append(refusal);
 		return false;
 	}
-	return true;
+	bool committed = false;
+	(void)KFCSearchEngine::RunSearch(&again, outStatus, committed);
+	return committed;
 }
 
 // SEARCH THESE RESULTS AGAIN AND NARROW DOWN, ONE BODY (KFCSearchEngine::SearchListAgain / NarrowList): the live list's
@@ -5574,39 +5567,15 @@ bool SearchListOnceMore(const KFCNarrowStep* step, PMString& outStatus)
 	again.allDocuments = (listScope == KFCResultModel::kScopeAllDocuments);
 	// A LIST SEARCH TEXT IN THESE OBJECTS MADE: searched again in the same objects (Chapter::searchedObjects - their text as it
 	// stands now: the text-in-objects spec's T6), its book or documents found as its first search found them
-	// (ReachObjectDocuments); in place, or narrowed into a new list - with its own query (the door states it).
+	// (RunOverObjects); in place, or narrowed into a new list - with its own query (the door states it).
 	if (listScope == KFCResultModel::kScopeInObjects)
 	{
 		again.inObjects = true;
 		again.fromBook = KFCResultModel::IsFromBook();
-		std::vector<int32> chapterOf;
-		for (int32 c = 0; c < KFCResultModel::GetChapterCount(); ++c)
-		{
-			KFCSearchEngine::AgainTarget::ObjectsInChapter one;
-			if (!KFCResultModel::GetChapterSearchedObjects(c, one.items) || one.items.empty())
-			{
-				// a chapter a close emptied (EmptyChapter): nothing of it is known now - named while its document stays closed
-				PMString closedName;
-				if (ClosedChapterName(c, closedName))
-					again.notOpen.push_back(closedName);
-				continue;
-			}
-			again.objects.push_back(one);
-			chapterOf.push_back(c);
-		}
-		if (again.objects.empty())
-		{
-			outStatus.Append(lead);
-			outStatus.Append(again.notOpen.empty()
-				? "what these results searched is no longer known (its document was closed) - search again with Find."
-				: "the documents of these results are not open - open them, then search again.");
-			return false;
-		}
-		if (!ReachObjectDocuments(again, chapterOf, lead, outStatus))
-			return false;
-		bool committed = false;
-		(void)KFCSearchEngine::RunSearch(&again, outStatus, committed);
-		return committed;
+		return RunOverObjects(again,
+			[](int32 c, std::vector<UID>& items) { (void)KFCResultModel::GetChapterSearchedObjects(c, items); },
+			"what these results searched is no longer known (its document was closed) - search again with Find.", lead,
+			outStatus);
 	}
 	// A SEARCH OVER PART OF A DOCUMENT (Search: Story, To End of Story, Selection): searched again as it was searched -
 	// its story alone, its parts alone (SearchPartsAgain - the author: "the same conditions as the first search; a
@@ -5723,8 +5692,9 @@ bool KFCSearchEngine::SearchTextInObjects(PMString& outStatus)
 		AppendNothingToFind(outStatus, tab);
 		return false;
 	}
-	// ITS OBJECTS, DOCUMENT BY DOCUMENT: the object rows not cleared from the list (Hit::cleared), their items not gone with a
-	// close (Hit::itemGone - the UID may name another object by now: counted gone, said with the walk's); an item once.
+	// ITS OBJECTS: the object rows not cleared from the list (Hit::cleared), their items not gone with a close (Hit::itemGone -
+	// the UID may name another object by now: counted gone, said with the walk's); an item once. Then the road to the search
+	// (RunOverObjects).
 	AgainTarget again;
 	again.inObjects = true;
 	again.freshQuery = true;
@@ -5733,47 +5703,19 @@ bool KFCSearchEngine::SearchTextInObjects(PMString& outStatus)
 	const KFCResultModel::SearchScopeKind listScope = KFCResultModel::GetSearchScope();
 	again.fromBook = (listScope == KFCResultModel::kScopeBook);
 	again.allDocuments = (listScope == KFCResultModel::kScopeAllDocuments);
-	std::vector<int32> chapterOf;		// each of again.objects' chapter in the list
-	for (int32 c = 0; c < KFCResultModel::GetChapterCount(); ++c)
-	{
-		AgainTarget::ObjectsInChapter one;
-		for (int32 h = 0; h < KFCResultModel::GetHitCount(c); ++h)
+	return RunOverObjects(again, [&again](int32 c, std::vector<UID>& items)
 		{
-			const UID item = KFCResultModel::GetHitItem(c, h);
-			if (item == kInvalidUID || KFCResultModel::IsHitCleared(c, h))
-				continue;
-			if (KFCResultModel::IsHitItemGone(c, h))
+			for (int32 h = 0; h < KFCResultModel::GetHitCount(c); ++h)
 			{
-				++again.gone;
-				continue;
+				const UID item = KFCResultModel::GetHitItem(c, h);
+				if (item == kInvalidUID || KFCResultModel::IsHitCleared(c, h))
+					continue;
+				if (KFCResultModel::IsHitItemGone(c, h))
+					++again.gone;
+				else if (std::find(items.begin(), items.end(), item) == items.end())
+					items.push_back(item);
 			}
-			if (std::find(one.items.begin(), one.items.end(), item) == one.items.end())
-				one.items.push_back(item);
-		}
-		if (one.items.empty())
-		{
-			// a document closed since the object search (its chapter emptied by the close): named, as not open (T7)
-			PMString closedName;
-			if (ClosedChapterName(c, closedName))
-				again.notOpen.push_back(closedName);
-			continue;
-		}
-		again.objects.push_back(one);
-		chapterOf.push_back(c);
-	}
-	if (again.objects.empty())
-	{
-		outStatus.Append(lead);
-		outStatus.Append(again.notOpen.empty() ? "no objects are left in these results."
-			: "the documents of these results are not open - open them, then search again.");
-		return false;
-	}
-	// THEIR DOCUMENTS, as Search These Results Again finds them (ReachObjectDocuments).
-	if (!ReachObjectDocuments(again, chapterOf, lead, outStatus))
-		return false;
-	bool committed = false;
-	(void)RunSearch(&again, outStatus, committed);
-	return committed;
+		}, "no objects are left in these results.", lead, outStatus);
 }
 
 void KFCSearchEngine::RestoreSearchScope(int32 mode, int32 scope)
