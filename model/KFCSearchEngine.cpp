@@ -3319,14 +3319,15 @@ namespace
 // SEARCH TEXT IN THESE OBJECTS' STRETCHES WALKED (CollectObjectTexts - a document's all; SearchStoryAgain - one story's,
 // onlyStory): each by its own scope, the way InDesign walks its Search: Selection (QueryPartScope - measured the same: the
 // spec's M1), its rows asked of the frames whose text was taken (ObjectTextScope), into `hits` - until the list's limit
-// (capped) or a walk that did not end cleanly (result).
+// (capped), a walk that did not end cleanly (result), or a Cancel (result kChapterCancelled).
 void WalkStretches(const UIDRef& docRef, const KFCObjectText::Ranges& ranges, UID onlyStory, size_t limit,
 	const WalkerScopeOptions& scopeOptions, const WalkBar& bar, std::vector<KFCResultModel::Hit>& hits, bool& capped,
 	ChapterWalkResult& result)
 {
 	IDataBase* const db = docRef.GetDataBase();
 	const ObjectTextScope objectText(ranges);
-	for (size_t s = 0; s < ranges.stretches.size() && result == kChapterWalked && !capped; ++s)
+	const size_t count = ranges.stretches.size();
+	for (size_t s = 0; s < count && result == kChapterWalked && !capped; ++s)
 	{
 		const KFCObjectText::Stretch& one = ranges.stretches[s];
 		if (onlyStory != kInvalidUID && one.story != onlyStory)
@@ -3343,6 +3344,17 @@ void WalkStretches(const UIDRef& docRef, const KFCObjectText::Ranges& ranges, UI
 		}
 		CollectHitsInDoc(docRef, limit, scopeOptions, kHitEverything, hits, capped, result, bar, UIDRef(db, one.story),
 			IWalkerScopeFactoryUtils::kEmptyScope, nil, nil, scope);
+		// BETWEEN STRETCHES, OUTSIDE THE WALK (the defect re-check's C-1 - regression tio-cancel-in-doc): the bar moved on by
+		// the stretches walked, and Cancel asked - both calls, as textexportfilter makes them a chunk at a time
+		// (TxtExpSuiteTextCSB.cpp: which of them takes the click is not measured - KFCAdvanceProgress), and as the search
+		// again over parts of documents asks after each part (SearchPartsAgain). A stretch is a walk of its own, and a walk
+		// asks only when it moves on to another story: a document's thousand stretches were walked to its end first.
+		if (bar.bar != nil && result == kChapterWalked)
+		{
+			KFCAdvanceProgress(bar.bar, *bar.reported, bar.base + static_cast<int32>(bar.span * (s + 1) / count));
+			if (bar.bar->WasCancelled(kFalse))
+				result = kChapterCancelled;
+		}
 	}
 }
 
