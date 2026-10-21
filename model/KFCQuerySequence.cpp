@@ -375,10 +375,13 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 				}
 
 				// A DOCUMENT GONE SINCE THE RUN TOOK IT IS NOT WRITTEN: its docRef would be followed into a database that is no
-				// longer there. InDesign closes one of the run's documents by itself - the document a placed .indd keeps open
-				// behind its frame, which All Documents takes as one of the user's (memory placed-indd-headless-document), goes
-				// about a quarter of a second after anything is written into it, and the run's bar lets idle work through
-				// (KFCRunGuard.h). Asked by comparing alone (KFCBookScope::IsDocStillOpen - nothing is read through the address).
+				// longer there. InDesign can close one of the run's documents by itself - the document a placed .indd
+				// keeps open behind its frame, which All Documents takes as one of the user's: seen to go a quarter of
+				// a second after some writes into it (memory placed-indd-headless-document), though not after this
+				// run's own - two queries' Change All with idle between left it open
+				// (docs/ai-notes/kfc-fatal-recheck-2026-10-12.md); what closes it is not known, and the run's bar lets
+				// idle work through (KFCRunGuard.h). Asked by comparing alone (KFCBookScope::IsDocStillOpen - nothing
+				// is read through the address).
 				if (!KFCBookScope::IsDocStillOpen(targets[d].docRef))
 				{
 					KFC_DIAG_LOG("QUERYRUN step %d: %s is no longer open - not written", unit, targets[d].shortName.GetUTF8String().c_str());
