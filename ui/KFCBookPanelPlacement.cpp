@@ -135,44 +135,38 @@ namespace
 struct Placement
 {
 	// Floating.
-	bool	haveFloat;
-	int32	left;			// the floating dock's top-left, global coordinates
-	int32	top;
-	int32	width;			// the book PANEL's size (not the dock's, which adds the title band)
-	int32	height;
+	bool	haveFloat = false;
+	int32	left = 0;		// the floating dock's top-left, global coordinates
+	int32	top = 0;
+	int32	width = 0;		// the book PANEL's size (not the dock's, which adds the title band)
+	int32	height = 0;
 
 	// Floating in a palette SHARED with other panels: WidgetIDs of the nearest non-book panels in
 	// that palette, 0 = none (alone in its palette). Measured with the floating half, and tried before
 	// the place when it is put back (see the file header).
-	int32	floatMate;		// a panel in the same tab group ...
-	int32	floatTabIndex;	// ... and the book panel's tab position in that group
-	int32	floatNextGroup;	// the nearest panel in a tab group below, in the same palette
-	int32	floatPrevGroup;	// ... and above
+	int32	floatMate = 0;		// a panel in the same tab group ...
+	int32	floatTabIndex = 0;	// ... and the book panel's tab position in that group
+	int32	floatNextGroup = 0;	// the nearest panel in a tab group below, in the same palette
+	int32	floatPrevGroup = 0;	// ... and above
 
 	// Docked: WidgetIDs of the nearest non-book panels, 0 = none.
-	bool	docked;
-	int32	mate;			// a panel in the same tab group ...
-	int32	tabIndex;		// ... and the book panel's tab position in that group
-	int32	nextGroup;		// the nearest panel in a tab group below, in the same column
-	int32	prevGroup;		// ... and above
-	int32	nextColumn;		// the nearest panel in a column after, in the same dock
-	int32	prevColumn;		// ... and before
+	bool	docked = false;
+	int32	mate = 0;		// a panel in the same tab group ...
+	int32	tabIndex = 0;	// ... and the book panel's tab position in that group
+	int32	nextGroup = 0;	// the nearest panel in a tab group below, in the same column
+	int32	prevGroup = 0;	// ... and above
+	int32	nextColumn = 0;	// the nearest panel in a column after, in the same dock
+	int32	prevColumn = 0;	// ... and before
 	// AND THE DOCK ITSELF. A book panel alone in its column has no neighbour at
 	// all - and its column goes with the book when it closes - so neighbours alone cannot find the place
 	// again (the user: "alone in the dock, it comes back undocked"). Which dock (PaletteRefUtils::
 	// DockLocation, 0 = not known) and which column in it, counted from the dock's first.
-	int32	dockSide;
-	int32	columnIndex;
+	int32	dockSide = 0;
+	int32	columnIndex = 0;
 
 	// Both: the tab pane's (floating palette's, or dock column's) icon state and icon-strip width.
-	bool	iconic;
-	int32	iconicWidth;	// 0 = not known
-
-	Placement() : haveFloat(false), left(0), top(0), width(0), height(0),
-		floatMate(0), floatTabIndex(0), floatNextGroup(0), floatPrevGroup(0),
-		docked(false), mate(0), tabIndex(0), nextGroup(0), prevGroup(0), nextColumn(0), prevColumn(0),
-		dockSide(0), columnIndex(0),
-		iconic(false), iconicWidth(0) {}
+	bool	iconic = false;
+	int32	iconicWidth = 0;	// 0 = not known
 
 	bool IsUsable() const { return docked || haveFloat; }
 };
@@ -192,7 +186,7 @@ Placement gRemembered;
 int32 gBookPanelCount = 0;
 
 /** The deferred restore. ONE object for the life of the plug-in, released only by
-    DisarmRestoreTimer - never from inside its own callback (KFCBookWatch.cpp explains why). */
+    GiveBackTimers - never from inside its own callback (KFCBookWatch.cpp explains why). */
 ICallbackTimer* gRestoreTimer = nil;
 
 /** How long after the book panel appears the placement is put back. A beat, so OWL's own layout of
@@ -242,27 +236,54 @@ bool gHomeWindowOver = false;	// past launch: the window has run out, or a docum
     to take hold of it and drag it back. */
 const SysCoord kKFCBookPanelMinOnScreen = 40;
 
-/** Every key this feature writes. Named here and nowhere else (KFCPanelState asks this file). */
+/** Every key this feature writes. Named here and nowhere else (KFCPanelState asks this file): the four
+    written and read one by one, and each half's whole numbers in the lists below them. */
 const char* const kKeyToggle      = "rememberBookPanelPlacement";
-const char* const kKeyLeft        = "bookPanelLeft";
-const char* const kKeyTop         = "bookPanelTop";
-const char* const kKeyWidth       = "bookPanelWidth";
-const char* const kKeyHeight      = "bookPanelHeight";
-const char* const kKeyFloatMate      = "bookPanelFloatMate";
-const char* const kKeyFloatTabIndex  = "bookPanelFloatTabIndex";
-const char* const kKeyFloatNextGroup = "bookPanelFloatNextGroup";
-const char* const kKeyFloatPrevGroup = "bookPanelFloatPrevGroup";
+const char* const kKeyDocked      = "bookPanelDocked";
 const char* const kKeyIconic      = "bookPanelIconic";
 const char* const kKeyIconicWidth = "bookPanelIconicWidth";
-const char* const kKeyDocked      = "bookPanelDocked";
-const char* const kKeyMate        = "bookPanelMate";
-const char* const kKeyTabIndex    = "bookPanelTabIndex";
-const char* const kKeyNextGroup   = "bookPanelNextGroup";
-const char* const kKeyPrevGroup   = "bookPanelPrevGroup";
-const char* const kKeyNextColumn  = "bookPanelNextColumn";
-const char* const kKeyPrevColumn  = "bookPanelPrevColumn";
-const char* const kKeyDockSide    = "bookPanelDockSide";
-const char* const kKeyColumnIndex = "bookPanelColumnIndex";
+
+/** Each half's whole numbers, each with the field it is kept in - listed ONCE, and walked by the write
+    (AppendPlacementKeys) and the read (LoadFromSettings) alike. A key is added to a half here and nowhere
+    else (the docked half, the floating neighbours and the dock itself all came after the first version):
+    with a list in each of the two, a key can reach one side only - written and never read back, or the
+    other way round. Templates over the placement, so the write walks a const one and the read the one it
+    fills.
+    The floating half's place and size - read back all four or none (LoadFromSettings): */
+template <class P, class Visit>
+void ForEachFloatPlaceKey(P& p, Visit visit)
+{
+	visit("bookPanelLeft",   p.left);
+	visit("bookPanelTop",    p.top);
+	visit("bookPanelWidth",  p.width);
+	visit("bookPanelHeight", p.height);
+}
+
+/** ...its neighbours in a shared palette - written as zeros too, so a palette of its own CLEARS a
+    neighbour an earlier close left, and read as 0 when missing (a file from before they were kept): */
+template <class P, class Visit>
+void ForEachFloatNeighbourKey(P& p, Visit visit)
+{
+	visit("bookPanelFloatMate",      p.floatMate);
+	visit("bookPanelFloatTabIndex",  p.floatTabIndex);
+	visit("bookPanelFloatNextGroup", p.floatNextGroup);
+	visit("bookPanelFloatPrevGroup", p.floatPrevGroup);
+}
+
+/** ...and the docked half - a missing one reads as 0 = none (the dock's side is 0 in a file from an older
+    build, which did not say which dock). */
+template <class P, class Visit>
+void ForEachDockKey(P& p, Visit visit)
+{
+	visit("bookPanelMate",        p.mate);
+	visit("bookPanelTabIndex",    p.tabIndex);
+	visit("bookPanelNextGroup",   p.nextGroup);
+	visit("bookPanelPrevGroup",   p.prevGroup);
+	visit("bookPanelNextColumn",  p.nextColumn);
+	visit("bookPanelPrevColumn",  p.prevColumn);
+	visit("bookPanelDockSide",    p.dockSide);
+	visit("bookPanelColumnIndex", p.columnIndex);
+}
 
 /** The installed command interceptor, or nil. Held because the processor keeps a RAW pointer:
     releasing it while installed would leave InDesign calling into freed memory (KIDMCPCmdWatch.cpp
@@ -352,6 +373,18 @@ PaletteRef FindAncestor(const PaletteRef& from, bool16 (*test)(const PaletteRef&
 PaletteRef FindFloatingDock(const PaletteRef& container)
 {
 	return FindAncestor(container, &PaletteRefUtils::IsFloatingTabbedPaletteDock);
+}
+
+/** Is the book panel where InDesign leaves it when it throws it out of the dock (see
+    kKFCBookPanelReRestoreDelayMs) - floating, in a floating dock that is not on show? One question for its
+    three askers: Measure records no placement there, MaybeRestoreAgain arms a restore on it, and RestoreNow
+    counts that restore on it - the cap on re-restores holds only while those two ask the same thing. */
+bool ThrownOutOfTheDock(const PaletteRef& container)
+{
+	if (!container.IsValid() || !PaletteRefUtils::IsPaletteFloating(container))
+		return false;
+	const PaletteRef dock = FindFloatingDock(container);
+	return dock.IsValid() && !PaletteRefUtils::IsPaletteVisible(dock);
 }
 
 /** This child's place among its parent's children, or -1. */
@@ -589,10 +622,10 @@ bool Measure(IPanelMgr* panelMgr, IControlView* bookPanel, Placement& out)
 		static_cast<int32>(PaletteRefUtils::GetDockLocation(dock)));
 
 	// A floating palette that is not on show is not a place to come back to: it is where InDesign leaves
-	// the book panel when it throws it out of the dock (see kKFCBookPanelReRestoreDelayMs) - recorded,
-	// it read "floating at 0,0" and the next opening put the panel there. The last good placement is
-	// kept. (A floating dock holding only hidden panels answers false - measured.)
-	if (!PaletteRefUtils::IsPaletteVisible(dock))
+	// the book panel when it throws it out of the dock (ThrownOutOfTheDock) - recorded, it read "floating
+	// at 0,0" and the next opening put the panel there. The last good placement is kept. (A floating dock
+	// holding only hidden panels answers false - measured.)
+	if (ThrownOutOfTheDock(container))
 	{
 		KFC_DIAG_LOG("BOOKPANEL MEASURE floating: the floating dock is not on show - kept the last");
 		return false;
@@ -645,36 +678,25 @@ bool MeasureOpenBookPanel(Placement& out)
 std::string BoolValue(bool b) { return b ? "true" : "false"; }
 
 /** The placement as keys and raw values - the half in force, and the other half as it was (so a
-    panel that went from floating to docked still has a floating place to return to). */
+    panel that went from floating to docked still has a floating place to return to). The whole numbers
+    go through the lists by the keys (ForEachFloatPlaceKey and the two after it), in their order. */
 void AppendPlacementKeys(const Placement& p, std::vector<std::pair<std::string, std::string> >& keys)
 {
+	const auto number = [&keys](const char* key, int32 value)
+	{
+		keys.push_back(std::make_pair(std::string(key), std::to_string(value)));
+	};
 	keys.push_back(std::make_pair(std::string(kKeyDocked), BoolValue(p.docked)));
 	if (p.haveFloat)
 	{
-		keys.push_back(std::make_pair(std::string(kKeyLeft),   std::to_string(p.left)));
-		keys.push_back(std::make_pair(std::string(kKeyTop),    std::to_string(p.top)));
-		keys.push_back(std::make_pair(std::string(kKeyWidth),  std::to_string(p.width)));
-		keys.push_back(std::make_pair(std::string(kKeyHeight), std::to_string(p.height)));
-		// Written as zeros too: a palette of its own has to CLEAR a neighbour an earlier close left.
-		keys.push_back(std::make_pair(std::string(kKeyFloatMate),      std::to_string(p.floatMate)));
-		keys.push_back(std::make_pair(std::string(kKeyFloatTabIndex),  std::to_string(p.floatTabIndex)));
-		keys.push_back(std::make_pair(std::string(kKeyFloatNextGroup), std::to_string(p.floatNextGroup)));
-		keys.push_back(std::make_pair(std::string(kKeyFloatPrevGroup), std::to_string(p.floatPrevGroup)));
+		ForEachFloatPlaceKey(p, number);
+		ForEachFloatNeighbourKey(p, number);
 	}
 	if (p.docked)
-	{
-		keys.push_back(std::make_pair(std::string(kKeyMate),       std::to_string(p.mate)));
-		keys.push_back(std::make_pair(std::string(kKeyTabIndex),   std::to_string(p.tabIndex)));
-		keys.push_back(std::make_pair(std::string(kKeyNextGroup),  std::to_string(p.nextGroup)));
-		keys.push_back(std::make_pair(std::string(kKeyPrevGroup),  std::to_string(p.prevGroup)));
-		keys.push_back(std::make_pair(std::string(kKeyNextColumn), std::to_string(p.nextColumn)));
-		keys.push_back(std::make_pair(std::string(kKeyPrevColumn), std::to_string(p.prevColumn)));
-		keys.push_back(std::make_pair(std::string(kKeyDockSide),    std::to_string(p.dockSide)));
-		keys.push_back(std::make_pair(std::string(kKeyColumnIndex), std::to_string(p.columnIndex)));
-	}
+		ForEachDockKey(p, number);
 	keys.push_back(std::make_pair(std::string(kKeyIconic), BoolValue(p.iconic)));
 	if (p.iconicWidth > 0)
-		keys.push_back(std::make_pair(std::string(kKeyIconicWidth), std::to_string(p.iconicWidth)));
+		number(kKeyIconicWidth, p.iconicWidth);
 }
 
 /** Say on the panel's status line that a write went wrong. Only failures are said: a write at every
@@ -875,7 +897,9 @@ bool NeighbourPaletteIsOpen(IPanelMgr* panelMgr, int32 widgetID)
     tab group at the old tab place, else just above the group below, else just below the group above.
     The book panel arrives in a floating palette of its own; what is moved is its TAB (into a mate's
     group) or its TAB GROUP (into a column), which is the level each neighbour describes. One walk for
-    a dock and for a shared floating palette - the tree has the same shape in both.
+    a dock and for a shared floating palette - the tree has the same shape in both. Each step works out
+    where it puts the panel once, and the test build's trace reports that same place (it is what the
+    trace is read for - ReparentUnlessThere's beforeIsSelf).
     @param askOpen IN whether a neighbour's palette has to be open to be used (NeighbourPaletteIsOpen).
     @return true when the book panel was moved. */
 bool JoinNeighbours(IPanelMgr* panelMgr, const PaletteRef& container, int32 mate, int32 tabIndex,
@@ -892,10 +916,11 @@ bool JoinNeighbours(IPanelMgr* panelMgr, const PaletteRef& container, int32 mate
 		const PaletteRef mateGroup = ParentOf(ContainerOfPanel(panelMgr, mate));
 		if (Is(mateGroup, &PaletteRefUtils::IsTabGroup))
 		{
+			const PaletteRef before = ChildAtOrEnd(mateGroup, tabIndex);
 			KFC_DIAG_LOG("BOOKPANEL JOIN mate=%d tab=%d ownGroup=%d beforeIsSelf=%d standsThere=%d", mate, tabIndex,
-				mateGroup == ownGroup ? 1 : 0, ChildAtOrEnd(mateGroup, tabIndex) == container ? 1 : 0,
-				StandsThere(container, mateGroup, ChildAtOrEnd(mateGroup, tabIndex)) ? 1 : 0);
-			ReparentUnlessThere(container, mateGroup, ChildAtOrEnd(mateGroup, tabIndex));
+				mateGroup == ownGroup ? 1 : 0, before == container ? 1 : 0,
+				StandsThere(container, mateGroup, before) ? 1 : 0);
+			ReparentUnlessThere(container, mateGroup, before);
 			return true;
 		}
 	}
@@ -921,10 +946,10 @@ bool JoinNeighbours(IPanelMgr* panelMgr, const PaletteRef& container, int32 mate
 		const PaletteRef column = Is(prevGroup, &PaletteRefUtils::IsTabGroup) ? ParentOf(prevGroup) : PaletteRef();
 		if (Is(column, &PaletteRefUtils::IsTabPane))
 		{
+			const PaletteRef before = ChildAtOrEnd(column, IndexOfChild(column, prevGroup) + 1);
 			KFC_DIAG_LOG("BOOKPANEL JOIN prevGroup=%d beforeIsSelf=%d standsThere=%d", prevGroupPanel,
-				ChildAtOrEnd(column, IndexOfChild(column, prevGroup) + 1) == ownGroup ? 1 : 0,
-				StandsThere(ownGroup, column, ChildAtOrEnd(column, IndexOfChild(column, prevGroup) + 1)) ? 1 : 0);
-			ReparentUnlessThere(ownGroup, column, ChildAtOrEnd(column, IndexOfChild(column, prevGroup) + 1));
+				before == ownGroup ? 1 : 0, StandsThere(ownGroup, column, before) ? 1 : 0);
+			ReparentUnlessThere(ownGroup, column, before);
 			return true;
 		}
 	}
@@ -1023,9 +1048,8 @@ void RestoreNow()
 	}
 
 	// Put back from a hidden palette = InDesign threw it out of the dock again: counted, so it is only
-	// done a few times per opening (MaybeRestoreAgain).
-	const PaletteRef ownDock = FindFloatingDock(container);
-	if (ownDock.IsValid() && !PaletteRefUtils::IsPaletteVisible(ownDock))
+	// done a few times per opening (MaybeRestoreAgain arms it on the same question).
+	if (ThrownOutOfTheDock(container))
 		++gReRestores;
 	KFC_DIAG_LOG("BOOKPANEL RESTORE remembered docked=%d floatMate=%d reRestores=%d",
 		gRemembered.docked ? 1 : 0, gRemembered.floatMate, gReRestores);
@@ -1047,6 +1071,33 @@ void RestoreNow()
 #endif
 }
 
+/** Book one of this file's two one-shot timers (gRestoreTimer, gHomeTimer): made on first use and kept for
+    the life of the plug-in, and a booking still pending dropped before the new one - never a StartTimer on
+    top of a live booking (memory icallbacktimer). false when no timer could be had. The one place a timer
+    here is booked, as GiveBackTimer is the one place one is let go: the two timers cannot come to follow
+    different rules. */
+bool BookTimer(ICallbackTimer*& timer, TimerCallback callback, uint32 delayMs)
+{
+	if (timer == nil)
+		timer = ::CreateObject2<ICallbackTimer>(kCallbackTimerBoss, IID_ICALLBACKTIMER);
+	if (timer == nil)
+		return false;
+	timer->StopTimer();
+	timer->StartTimer(callback, delayMs, nil);
+	return true;
+}
+
+/** Drop a timer's pending booking and let it go. Never from inside its own callback (KFCBookWatch.cpp
+    explains why) - GiveBackTimers, at the end of the feature, is its caller. */
+void GiveBackTimer(ICallbackTimer*& timer)
+{
+	if (timer == nil)
+		return;
+	timer->StopTimer();
+	timer->Release();
+	timer = nil;
+}
+
 /** Timer callback. A raw function pointer, so it must never outlive this plug-in (see
     ShutdownCleanup). NOTHING is released in here - the same rule and the same reason as
     KFCBookWatch's RetireTimerCallback. */
@@ -1064,18 +1115,8 @@ void ArmRestoreTimer(uint32 delayMs = kKFCBookPanelRestoreDelayMs)
 	if (gShutDown)
 		return;		// past the clean-up (see gShutDown) - not even the restore done at once below
 
-	if (gRestoreTimer == nil)
-		gRestoreTimer = ::CreateObject2<ICallbackTimer>(kCallbackTimerBoss, IID_ICALLBACKTIMER);
-
-	if (gRestoreTimer == nil)
-	{
-		// No timer to be had - do it now rather than not at all.
-		RestoreNow();
-		return;
-	}
-
-	gRestoreTimer->StopTimer();
-	gRestoreTimer->StartTimer(RestoreTimerCallback, delayMs, nil);
+	if (!BookTimer(gRestoreTimer, RestoreTimerCallback, delayMs))
+		RestoreNow();		// no timer to be had - do it now rather than not at all
 }
 
 /** How many documents are open. */
@@ -1162,14 +1203,10 @@ void MaybeCheckHomeScreen()
 	}
 	if (!gRemembered.IsUsable() || !gRemembered.docked || gBookPanelCount == 0 || gHomeChecks >= kKFCMaxHomeChecks)
 		return;
-	if (gHomeTimer == nil)
-		gHomeTimer = ::CreateObject2<ICallbackTimer>(kCallbackTimerBoss, IID_ICALLBACKTIMER);
-	if (gHomeTimer == nil)
+	if (!BookTimer(gHomeTimer, HomeTimerCallback, kKFCHomeCheckDelayMs))
 		return;
-	++gHomeChecks;
+	++gHomeChecks;		// counted and traced once it is booked (the check runs later, from the idle task)
 	KFC_DIAG_LOG("BOOKPANEL HOME check %d armed", gHomeChecks);
-	gHomeTimer->StopTimer();
-	gHomeTimer->StartTimer(HomeTimerCallback, kKFCHomeCheckDelayMs, nil);
 }
 
 /** The book panel thrown out of the dock by InDesign (see kKFCBookPanelReRestoreDelayMs): remembered
@@ -1183,12 +1220,8 @@ void MaybeRestoreAgain()
 	InterfacePtr<IControlView> bookPanel(QueryFirstBookPanel(panelMgr));
 	if (bookPanel == nil)
 		return;
-	const PaletteRef container = panelMgr->GetPaletteRefContainingPanel(bookPanel);
-	if (!container.IsValid() || !PaletteRefUtils::IsPaletteFloating(container))
-		return;
-	const PaletteRef dock = FindFloatingDock(container);
-	if (!dock.IsValid() || PaletteRefUtils::IsPaletteVisible(dock))
-		return;		// floating and on show: the user's, or the first restore still to come
+	if (!ThrownOutOfTheDock(panelMgr->GetPaletteRefContainingPanel(bookPanel)))
+		return;		// docked, or floating and on show: the user's, or the first restore still to come
 	KFC_DIAG_LOG("BOOKPANEL RESTORE-AGAIN armed: remembered docked, the panel in a hidden floating dock (done %d)", gReRestores);
 	ArmRestoreTimer(kKFCBookPanelReRestoreDelayMs);
 }
@@ -1242,21 +1275,12 @@ void AttachObserver(bool attach)
 		subject->DetachObserver(ISubject::kRegularAttachment, obs, IID_IPANELMGR, IID_IKFCBOOKPANELOBSERVER);
 }
 
-/** Drop a pending restore and give the timers back - the restore's and the Home screen's. The ONE
-    place either is released. */
-void DisarmRestoreTimer()
+/** Drop the pending bookings and give both timers back - the Home screen's and the restore's. The ONE
+    place either is released (through GiveBackTimer). */
+void GiveBackTimers()
 {
-	if (gHomeTimer != nil)
-	{
-		gHomeTimer->StopTimer();
-		gHomeTimer->Release();
-		gHomeTimer = nil;
-	}
-	if (gRestoreTimer == nil)
-		return;
-	gRestoreTimer->StopTimer();
-	gRestoreTimer->Release();
-	gRestoreTimer = nil;
+	GiveBackTimer(gHomeTimer);
+	GiveBackTimer(gRestoreTimer);
 }
 
 ICommandProcessor* QueryCommandProcessor()
@@ -1346,7 +1370,7 @@ void LetGoOfEverything()
 {
 	AttachObserver(false);
 	UninstallCmdWatch();
-	DisarmRestoreTimer();
+	GiveBackTimers();
 }
 
 /** The palette manager has laid its palettes out (IPaletteMgrService::PaletteMgrStarted - the service at the foot
@@ -1477,45 +1501,38 @@ void KFCBookPanelPlacement::LoadFromSettings(const std::string& text)
 {
 	gOn = KFCPanelStateReadBool(text, kKeyToggle, gOn);
 
+	// A whole number into its field when its key is there (KFCPanelStateReadInt leaves the field alone when it
+	// is not) - through the same lists the write walks (ForEachFloatPlaceKey and the two after it).
+	const auto number = [&text](const char* key, int32& field) { KFCPanelStateReadInt(text, key, field); };
+
 	Placement p;
 
 	// Floating: all four numbers, or none - a placement with its height missing is not a place to put
-	// anything back to.
-	int32 left = 0, top = 0, width = 0, height = 0;
-	if (KFCPanelStateReadInt(text, kKeyLeft, left) && KFCPanelStateReadInt(text, kKeyTop, top) &&
-		KFCPanelStateReadInt(text, kKeyWidth, width) && KFCPanelStateReadInt(text, kKeyHeight, height) &&
-		width > 0 && height > 0)
+	// anything back to. So they are read into a placement of their own, taken only when all four came.
+	Placement place;
+	bool allFour = true;
+	ForEachFloatPlaceKey(place, [&text, &allFour](const char* key, int32& field)
 	{
+		if (!KFCPanelStateReadInt(text, key, field))
+			allFour = false;
+	});
+	if (allFour && place.width > 0 && place.height > 0)
+	{
+		p = place;			// p holds nothing else yet: just the place and the size
 		p.haveFloat = true;
-		p.left = left;
-		p.top = top;
-		p.width = width;
-		p.height = height;
 
 		// Its neighbours in a shared palette; a file written before they were kept has none (0).
-		KFCPanelStateReadInt(text, kKeyFloatMate,      p.floatMate);
-		KFCPanelStateReadInt(text, kKeyFloatTabIndex,  p.floatTabIndex);
-		KFCPanelStateReadInt(text, kKeyFloatNextGroup, p.floatNextGroup);
-		KFCPanelStateReadInt(text, kKeyFloatPrevGroup, p.floatPrevGroup);
+		ForEachFloatNeighbourKey(p, number);
 	}
 
 	// Docked: the neighbours (a missing one reads as 0 = none). A file written before docking was
 	// remembered has no "bookPanelDocked" and is floating.
 	p.docked = KFCPanelStateReadBool(text, kKeyDocked, false);
 	if (p.docked)
-	{
-		KFCPanelStateReadInt(text, kKeyMate,       p.mate);
-		KFCPanelStateReadInt(text, kKeyTabIndex,   p.tabIndex);
-		KFCPanelStateReadInt(text, kKeyNextGroup,  p.nextGroup);
-		KFCPanelStateReadInt(text, kKeyPrevGroup,  p.prevGroup);
-		KFCPanelStateReadInt(text, kKeyNextColumn, p.nextColumn);
-		KFCPanelStateReadInt(text, kKeyPrevColumn, p.prevColumn);
-		KFCPanelStateReadInt(text, kKeyDockSide,    p.dockSide);		// 0 in a file from an older build
-		KFCPanelStateReadInt(text, kKeyColumnIndex, p.columnIndex);
-	}
+		ForEachDockKey(p, number);
 
 	p.iconic = KFCPanelStateReadBool(text, kKeyIconic, false);
-	KFCPanelStateReadInt(text, kKeyIconicWidth, p.iconicWidth);
+	number(kKeyIconicWidth, p.iconicWidth);
 
 	if (p.IsUsable())
 		gRemembered = p;
