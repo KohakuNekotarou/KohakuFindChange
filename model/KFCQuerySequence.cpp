@@ -199,8 +199,7 @@ int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 
 	// ===== THE RUN'S DOCUMENTS, OPENED AND HELD FOR THE WHOLE RUN: nothing is opened or closed inside the sequence.
 	std::vector<KFCBookScope::ChapterDoc> targets;
-	PMString bookName;
-	bookName.SetTranslatable(kFalse);
+	PMString bookName;		// ListBookChapters' to fill (it marks the name itself) - this run's words do not name it
 	std::vector<KFCBookScope::SkippedChapter> unopenable;
 	KFCBookScope::BookSelection selection;		// selected 0 = the whole book (Find/Change Selected Documents (Book))
 	if (scope.fromBook)
@@ -481,8 +480,12 @@ int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 			outSummary.Append("Cancelled - nothing was changed.");
 		else
 		{
-			outSummary.Append("Stopped - nothing was changed: ");
-			outSummary.Append(why);
+			outSummary.Append("Stopped - nothing was changed");
+			if (!why.IsEmpty())		// the reason only when it has words (Change All in Book's rule, KFCChangeAll.cpp)
+			{
+				outSummary.Append(": ");
+				outSummary.Append(why);
+			}
 			outSummary.Append(".");
 		}
 		return 0;

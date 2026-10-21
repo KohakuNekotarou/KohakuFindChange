@@ -364,8 +364,7 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 	// ===== THE CHAPTERS, OPENED AND HELD FOR THE WHOLE RUN, as the query run holds them: an open inside the sequence
 	// throws the undo history of what was written away (KFCQuerySequence.h).
 	std::vector<KFCBookScope::ChapterDoc> targets;
-	PMString bookName;
-	bookName.SetTranslatable(kFalse);
+	PMString bookName;		// ListBookChapters' to fill (it marks the name itself) - this run's words do not name it
 	std::vector<KFCBookScope::SkippedChapter> unopenable;
 	std::vector<KFCBookScope::ChapterDoc> listed;
 	KFCBookScope::BookSelection selection;		// selected 0 = the whole book (Find/Change Selected Documents (Book))
@@ -491,8 +490,16 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 			outSummary.Append("Cancelled - nothing was changed.");
 		else
 		{
-			outSummary.Append("Stopped - nothing was changed: ");
-			outSummary.Append(why);
+			// THE REASON ONLY WHEN IT HAS WORDS: an error left standing need not have any (ErrorUtils.h - its string
+			// "may be empty" when none was given as it was raised and none is registered for its code; kFailure has
+			// none), and InDesign's own code says the global error's string only when it is not empty
+			// (incopyfileactions/utils/InCopyDocUtils.cpp). The query run and a tier's query say theirs the same way.
+			outSummary.Append("Stopped - nothing was changed");
+			if (!why.IsEmpty())
+			{
+				outSummary.Append(": ");
+				outSummary.Append(why);
+			}
 			outSummary.Append(".");
 		}
 		return 0;

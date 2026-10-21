@@ -185,13 +185,18 @@ KFCQueryScope::KFCQueryScope()
 	PMString whatBack;
 	const bool back = PutBack(whatBack);
 	fRefused = true;
-	Say(fWhy, "Nothing was done: this tier's query could not be put into Find/Change (");
-	fWhy.Append(what);
+	Say(fWhy, "Nothing was done: this tier's query could not be put into Find/Change");
+	if (!what.IsEmpty())		// what failed, when it has words (Change All in Book's rule, KFCChangeAll.cpp)
+	{
+		fWhy.Append(" (");
+		fWhy.Append(what);
+		fWhy.Append(")");
+	}
 	if (back)
-		fWhy.Append(") - Find/Change is as you left it.");
+		fWhy.Append(" - Find/Change is as you left it.");
 	else
 	{
-		fWhy.Append("). ");
+		fWhy.Append(". ");
 		fWhy.Append(KFCFindChangeNotPutBack(whatBack));
 		// Said on the panel's line too: an operation with no words of its own (a GREP row's after-text) drops Ready's.
 		KFCNotifyStatus(fWhy);
