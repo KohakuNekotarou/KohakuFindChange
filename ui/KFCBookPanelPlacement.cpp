@@ -105,7 +105,7 @@
 #include "DocumentID.h"			// kOpenDocCmdBoss, kNewDocCmdBoss - a document opening ends the launch
 #include "CObserver.h"
 #include "CPMUnknown.h"
-#include "CreateObject.h"		// ::CreateObject / ::CreateObject2
+#include "CreateObject.h"		// ::CreateObject2
 #include "CServiceProvider.h"
 #include "IDThreadingPrimitives.h"	// IsMainThreadDomain - the interceptor's gate (see KFCBookPanelCmdWatch)
 #include "IDocumentList.h"		// GetDocCount - the Home screen only matters while no document is open
@@ -1283,8 +1283,7 @@ void InstallCmdWatch()
 	if (processor == nil)
 		return;
 
-	InterfacePtr<ICommandInterceptor> watch(
-		static_cast<ICommandInterceptor*>(::CreateObject(kKFCBookPanelCmdWatchBoss, IID_ICOMMANDINTERCEPTOR)));
+	InterfacePtr<ICommandInterceptor> watch(::CreateObject2<ICommandInterceptor>(kKFCBookPanelCmdWatchBoss));
 	if (watch == nil)
 		return;
 
@@ -1610,6 +1609,11 @@ public:
 			// A document opened or made: the session is past its launch, and the Home screen is looked at
 			// no more (see gHomeTimer - measured, no visibility message comes while a document
 			// is open, so this is the place that sees one). Three more comparisons, and only until then.
+			// *Named, not asked of IDocumentCommands::IsOpenCommand (the framework's own question for code acting
+			//  on a document command's type, IDocumentCommands.h:118-124): that says yes to
+			//  kOpenFileWithWindowCmdBoss too - the open of ANY file with a window, a book's among them - and a
+			//  launch with a .indb then ended this window before a single document (measured: the Home screen
+			//  stayed over the docks).
 			else if (!gHomeWindowOver && (cls == kOpenDocCmdBoss || cls == kNewDocCmdBoss || cls == kOpenDocFromBookCmdBoss)
 				&& IDThreading::IsMainThreadDomain())
 			{
@@ -1656,10 +1660,10 @@ public:
 	// thread is the base class's answer for a provider in a UI plug-in (CServiceProvider.h:54-56), so
 	// GetThreadingPolicy is not overridden.
 	virtual InstancePerX GetInstantiationPolicy() { return IK2ServiceProvider::kInstancePerSession; }
-	// The one-argument SetCString IS SetKey (PMString.h:1009-1021: "This is the same as SetKey" - translatable,
-	// not translated). Harmless here: an internal name that never reaches the UI, so nothing looks it up. (The
-	// header's recipe for a string that is no key is SetCString with an encoding.)
-	virtual void GetName(PMString* pName) { pName->SetCString("KFCBookPanelService\0"); }
+	// An internal name, no string-table key: SetCString with an encoding, the form the header gives for a string
+	// that is no key (PMString.h:819-826 - Translate does nothing on it). Not the one-argument SetCString: that is
+	// SetKey under another name, among the APIs the header says not to use (PMString.h:952-1021).
+	virtual void GetName(PMString* pName) { pName->SetCString("KFCBookPanelService", PMString::kEncodingASCII); }
 };
 
 CREATE_PMINTERFACE(KFCBookPanelServiceProvider, kKFCBookPanelServiceProviderImpl)

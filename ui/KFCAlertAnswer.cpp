@@ -98,8 +98,8 @@ public:
 	virtual ServiceID GetServiceID() { return kAlertHandlerService; }
 	virtual bool16 IsDefaultServiceProvider() { return kFalse; }
 	virtual InstancePerX GetInstantiationPolicy() { return IK2ServiceProvider::kInstancePerSession; }
-	// (An internal name that never reaches the UI - KFCBookPanelServiceProvider says why SetCString is harmless here.)
-	virtual void GetName(PMString* pName) { pName->SetCString("KFCAlertAnswerService\0"); }
+	// (An internal name, no string-table key - the encoding form, as KFCBookPanelServiceProvider says.)
+	virtual void GetName(PMString* pName) { pName->SetCString("KFCAlertAnswerService", PMString::kEncodingASCII); }
 	// (No GetThreadingPolicy: CServiceProvider answers by the plug-in's kind - kMainThreadOnly for this UI half.)
 };
 
