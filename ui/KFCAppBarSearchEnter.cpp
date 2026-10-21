@@ -96,10 +96,27 @@ static bool            sShutdown = false;
 //      it). A back-and-forth can only start from a write-back.
 static HHOOK           sCallWndRetHook = nullptr;
 static ICallbackTimer* sRemirrorTimer  = nil;
-static bool            sOwnWrite       = false;		// our own WM_SETTEXT is going through the field right now
-static DWORD           sWriteBackTick  = 0;			// when we last wrote BACK over InDesign's text (GetTickCount); 0 = not yet
-static bool            sRemirrorHeld   = false;		// InDesign answered a write-back of ours: hands off until the dialog changes
 static const DWORD     kKFCAppBarRewriteGuardMs = 500;
+
+// The write-back's state, one value: the mark on our own write while it goes through, and the second guard's -
+// when we last wrote back, and whether InDesign answered it. A fresh one on ON (KFCSetAppBarSearchEnter), so
+// nothing of it is left from before an OFF.
+struct KFCWriteBackGuard
+{
+	bool  ownWrite = false;		// our own WM_SETTEXT is going through the field right now
+	DWORD writtenBack = 0;		// when we last wrote BACK over InDesign's text (GetTickCount); 0 = not yet
+	bool  held = false;			// InDesign answered a write-back of ours: hands off until the dialog changes
+
+	// InDesign wrote into the field: when that is within kKFCAppBarRewriteGuardMs of a write-back of ours it is its
+	// answer, and the field is left to it (held). True = held now: book nothing.
+	bool HoldIfItAnswers()
+	{
+		if (writtenBack != 0 && ::GetTickCount() - writtenBack < kKFCAppBarRewriteGuardMs)
+			held = true;
+		return held;
+	}
+};
+static KFCWriteBackGuard sGuard;
 
 // Both bookings - the search after a Return, the write-back after InDesign's own text - for the next idle, each on
 // its own timer, made on first use. A booking still live is taken off before the new one is started: the official
@@ -331,9 +348,9 @@ static bool MirrorFindChangeIntoField()
 	if (field == nullptr || FieldText(field) == text)
 		return false;
 	// Marked as ours while it goes through, so the WH_CALLWNDPROCRET hook does not take it for InDesign's.
-	sOwnWrite = true;
+	sGuard.ownWrite = true;
 	::SendMessageW(field, WM_SETTEXT, 0, reinterpret_cast<LPARAM>(text.c_str()));
-	sOwnWrite = false;
+	sGuard.ownWrite = false;
 	return true;
 }
 
@@ -341,13 +358,13 @@ static bool MirrorFindChangeIntoField()
 // wrote, so it has finished whatever it was doing with the field. Never while the person is in the field.
 static uint32 RemirrorAfterInDesign(void* /*refPtr*/)
 {
-	if (sShutdown || !sAppBarSearchEnter || sRemirrorHeld)
+	if (sShutdown || !sAppBarSearchEnter || sGuard.held)
 		return IIdleTask::kEndOfTime;
 	const HWND field = AppBarField();
 	if (field != nullptr && ::GetFocus() == field)
 		return IIdleTask::kEndOfTime;
 	if (MirrorFindChangeIntoField())
-		sWriteBackTick = ::GetTickCount();		// the one kind of write InDesign could be answering (see the statics)
+		sGuard.writtenBack = ::GetTickCount();	// the one kind of write InDesign could be answering (see the statics)
 	return IIdleTask::kEndOfTime;
 }
 
@@ -358,16 +375,14 @@ static uint32 RemirrorAfterInDesign(void* /*refPtr*/)
 // still exist, and writing to it would leave the new one saying "Adobe Stock".
 static LRESULT CALLBACK AppBarCallWndRetProc(int code, WPARAM wParam, LPARAM lParam)
 {
-	if (code == HC_ACTION && sAppBarSearchEnter && !sShutdown && !sOwnWrite && !sRemirrorHeld)
+	if (code == HC_ACTION && sAppBarSearchEnter && !sShutdown && !sGuard.ownWrite && !sGuard.held)
 	{
 		const CWPRETSTRUCT* const m = reinterpret_cast<const CWPRETSTRUCT*>(lParam);
 		if ((m->message == WM_SETTEXT || m->message == WM_CREATE) && IsAppBarSearchField(m->hwnd))
 		{
 			if (m->message == WM_CREATE)
 				sField = m->hwnd;
-			if (sWriteBackTick != 0 && ::GetTickCount() - sWriteBackTick < kKFCAppBarRewriteGuardMs)
-				sRemirrorHeld = true;	// InDesign answered a write-back of ours: stop here (see the statics)
-			else
+			if (!sGuard.HoldIfItAnswers())
 				BookAtNextIdle(sRemirrorTimer, RemirrorAfterInDesign);
 		}
 	}
@@ -461,18 +476,41 @@ static LRESULT CALLBACK AppBarGetMsgProc(int code, WPARAM wParam, LPARAM lParam)
 	return ::CallNextHookEx(sGetMsgHook, code, wParam, lParam);
 }
 
-// Both hooks off. (The two always go on and off together: KFCSetAppBarSearchEnter, KFCShutdownAppBarSearchEnter.)
+// THE TWO HOOKS, ONE LIST that putting them on and taking them off both walk: a hook on one side only would be put
+// on and never taken off - a raw pointer into this .pln left in the system's chain - or never put on.
+struct KFCAppBarHook
+{
+	HHOOK*   hook;
+	int      kind;
+	HOOKPROC proc;
+};
+static const KFCAppBarHook kKFCAppBarHooks[] =
+{
+	{ &sGetMsgHook,     WH_GETMESSAGE,     AppBarGetMsgProc },		// Return in the field
+	{ &sCallWndRetHook, WH_CALLWNDPROCRET, AppBarCallWndRetProc },	// InDesign's own writes (the write-back)
+};
+
+// Both hooks on, each for the thread that calls this - the main thread (the flyout, and the settings read back at
+// startup). One already on is left as it is.
+static void HookAppBar()
+{
+	for (const KFCAppBarHook& h : kKFCAppBarHooks)
+	{
+		if (*h.hook == nullptr)
+			*h.hook = ::SetWindowsHookExW(h.kind, h.proc, nullptr, ::GetCurrentThreadId());
+	}
+}
+
+// Both hooks off (the toggle's OFF and the shutdown).
 static void UnhookAppBar()
 {
-	if (sGetMsgHook != nullptr)
+	for (const KFCAppBarHook& h : kKFCAppBarHooks)
 	{
-		::UnhookWindowsHookEx(sGetMsgHook);
-		sGetMsgHook = nullptr;
-	}
-	if (sCallWndRetHook != nullptr)
-	{
-		::UnhookWindowsHookEx(sCallWndRetHook);
-		sCallWndRetHook = nullptr;
+		if (*h.hook != nullptr)
+		{
+			::UnhookWindowsHookEx(*h.hook);
+			*h.hook = nullptr;
+		}
 	}
 }
 
@@ -539,7 +577,7 @@ public:
 #ifdef KFC_DIAG
 			++KFCDiagCounter(kKFCDiagFieldMirrors);	// how often this runs during a search (UIOBS, KFCResultHistory::Find)
 #endif
-			sRemirrorHeld = false;		// the dialog changed: writing back over InDesign's own text is allowed again
+			sGuard.held = false;		// the dialog changed: writing back over InDesign's own text is allowed again
 			MirrorFindChangeIntoField();
 		}
 #else
@@ -582,15 +620,10 @@ void KFCSetAppBarSearchEnter(bool16 on)
 #ifdef WINDOWS
 	if (on && !sShutdown)
 	{
-		// Both on the main thread, the thread that sets them (the flyout, and the settings read back at startup).
-		if (sGetMsgHook == nullptr)
-			sGetMsgHook = ::SetWindowsHookExW(WH_GETMESSAGE, AppBarGetMsgProc, nullptr, ::GetCurrentThreadId());
-		if (sCallWndRetHook == nullptr)
-			sCallWndRetHook = ::SetWindowsHookExW(WH_CALLWNDPROCRET, AppBarCallWndRetProc, nullptr, ::GetCurrentThreadId());
-		// A fresh start for the guard: a write-back made before an OFF must not make an
-		// InDesign write just after this ON look like an answer.
-		sRemirrorHeld = false;
-		sWriteBackTick = 0;
+		HookAppBar();
+		// A fresh guard: a write-back made before an OFF must not make an InDesign write just after this ON look like
+		// an answer.
+		sGuard = KFCWriteBackGuard();
 	}
 	else if (!on)
 	{
