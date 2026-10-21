@@ -63,8 +63,9 @@ DECLARE_PMID(kClassIDSpace, kKFCIconWidgetBoss, kKFCUIPrefix + 14)
 // palettes have been laid out and when they are about to close (KFCBookPanelPlacement.cpp).
 DECLARE_PMID(kClassIDSpace, kKFCBookPanelServiceBoss, kKFCUIPrefix + 15)
 // ...and its command interceptor: a book closing destroys its Book panel WITHOUT a word to the panel
-// manager's subject (measured - neither kAboutToClosePaletteMsg nor a visibility message arrives), so
-// the only moment the panel can still be measured is just BEFORE kCloseBookCmdBoss runs.
+// manager's subject while it still stands (measured - no kAboutToClosePaletteMsg, and a visibility
+// message at most once the panel is out of its palette: KFCBookPanelPlacement.cpp's header), so the
+// only moment the panel can still be measured is just BEFORE kCloseBookCmdBoss runs.
 DECLARE_PMID(kClassIDSpace, kKFCBookPanelCmdWatchBoss, kKFCUIPrefix + 16)
 // The panel's message area, drawn by hand (KFCStatusTextView.cpp): a generic panel with our
 // IControlView and IKFCStatusTextData - the shape of the hit row's cell (+4) and of KCM's message area.

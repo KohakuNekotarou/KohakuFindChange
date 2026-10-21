@@ -14,8 +14,8 @@
 //    * the moment a book is about to close - by the Book panel, by a script, or by InDesign quitting
 //      (a quit closes the books first) - where the Book panel is, is measured and written to the
 //      settings file - the Book panel's keys and nothing else. Caught with a command interceptor on
-//      kCloseBookCmdBoss: a closing book says nothing to the panel manager (measured - the .cpp's
-//      header has the story). "Where" is one of two things:
+//      kCloseBookCmdBoss: a closing book says nothing to the panel manager while its panel still
+//      stands (measured - the .cpp's header has the story). "Where" is one of two things:
 //        FLOATING  the floating dock's top-left, the panel's size, and whether it is collapsed to
 //                  icons - and, when the floating palette is SHARED with other panels, the same
 //                  kind of neighbours as a dock keeps (a panel in its tab group and its tab's

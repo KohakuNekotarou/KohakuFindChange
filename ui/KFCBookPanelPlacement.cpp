@@ -7,13 +7,16 @@
 //  "Remember Book Panel Placement". What it does and what it leaves alone is in
 //  KFCBookPanelPlacement.h. This file holds the four pieces that make it run:
 //
-//    1. a COMMAND INTERCEPTOR that sees kCloseBookCmdBoss BEFORE it runs, and measures the Book
-//       panel while it still stands. It is the only moment there is. Measured on 21.0.2 (a temporary
+//    1. a COMMAND INTERCEPTOR that sees kCloseBookCmdBoss BEFORE it runs, and measures the
+//       Book panel while it still stands. It is the only moment there is. Measured on 21.0.2 (a temporary
 //       log): closing a book - by script, by the Book panel's own "Close Book", and by quitting
 //       InDesign alike - destroys its panel (kDestroyPanelCmdBoss, which runs AFTER kCloseBookCmdBoss)
 //       without one notification on the panel manager's subject: neither kAboutToClosePaletteMsg nor
-//       kPaletteVisibilityChangedMessage arrives. And a quit closes the books BEFORE
-//       IPaletteMgrService::PaletteMgrAboutToShutdown - by then there is no Book panel left to measure.
+//       kPaletteVisibilityChangedMessage arrives. (One does when the Book panel was the front tab of a
+//       group it shared - the tab behind it coming forward - with the panel already out of its palette:
+//       nothing left to measure, and not a new panel either - CountPlacedBookPanels.) And a quit closes
+//       the books BEFORE IPaletteMgrService::PaletteMgrAboutToShutdown - by then there is no Book panel
+//       left to measure.
 //       Listening for kAboutToClosePaletteMsg and measuring at PaletteMgrAboutToShutdown records
 //       nothing (the user's own test of that shape: "closed and reopened InDesign, it did not come
 //       back").
@@ -55,8 +58,8 @@
 //    Collapsed to icons = the TAB PANE's mode, and the width of the icon strip is the tab pane's
 //      "preferred iconic width" (PaletteRefUtils.h:300-312) - both put back last, on a panel that has
 //      already been moved and sized expanded. (Confirmed working by the user.)
-//    A FLOATING PALETTE CAN BE SHARED, AND THEN THE PLACE IS NOT THE ANSWER. The user tabbed the Book
-//      panel into the floating KFC panel, closed InDesign and opened a book: with only the dock's
+//    A FLOATING PALETTE CAN BE SHARED, AND THEN THE PLACE IS NOT THE ANSWER. The user tabbed the
+//      Book panel into the floating KFC panel, closed InDesign and opened a book: with only the dock's
 //      position kept, the Book panel came back as a palette of its own, laid exactly on top of KFC's
 //      (KIDMCP's panels listing showed the two in different floating docks at one rectangle). The
 //      dock's position alone is not enough, and a new book panel always arrives in a palette of its own. So a
@@ -178,11 +181,12 @@ bool gOn = false;
 Placement gRemembered;
 
 /** How many book panels there were at the last look. A restore is due when this goes from zero to
-    anything, and ONLY then - a book opened beside another joins that palette as a tab.
-    Nothing announces the drop to zero. A closing book says nothing to the panel manager
-    (see the file header), so OnBookAboutToClose puts this to zero itself when the book about to
-    close is the last one. Counted only while the toggle is ON; switching it on and Start() take a
-    fresh count, so a stale number cannot make an already-open panel look new. */
+    anything - from zero, to a book panel standing in a palette (CountPlacedBookPanels) - and ONLY then:
+    a book opened beside another joins that palette as a tab.
+    Nothing announces the drop to zero while the panel can still be counted (see the file header), so
+    OnBookAboutToClose puts this to zero itself when the book about to close is the last one. Counted
+    only while the toggle is ON; switching it on and Start() take a fresh count, so a stale number
+    cannot make an already-open panel look new. */
 int32 gBookPanelCount = 0;
 
 /** The deferred restore. ONE object for the life of the plug-in, released only by
@@ -1034,12 +1038,12 @@ bool DockOnShow(const PaletteRef& dock)
 /** IS A NEIGHBOUR STILL OPEN - asked before the book panel is put beside it, docked or floating
     (JoinNeighbours)? A panel the user has closed keeps its container where it was, and a book panel put beside
     it stands in what was closed, nowhere on screen. Measured, each palette from the neighbour's container up to
-    its dock (block 16's defect re-check, work/note-scripts/2026-10-21-kfc-block16-defect/live_b16d.ps1):
+    its dock (work/note-scripts/2026-10-21-kfc-block16-defect/live_b16d.ps1):
       closed from the Window menu, alone in the right dock (scene K) - its TAB GROUP marked closed
         (GetIsClosed), the column and the dock hidden by their own flags, the container still shown by its own;
         the book panel put into that group stood in the hidden dock with the book open.
       open in a column folded into icons (scene I) - its tab group hidden by its own flag, not closed, the
-        column and the dock on show (its container's own flag read 0 once too: KBSBookPanelDiag.log, 2026-09-25).
+        column and the dock on show (its container's own flag read 0 once too - memory book-panel-placement-findings).
       open, every palette hidden with the Tab key (scene T) - the dock CONCEALED and still on show, its column
         and tab group hidden by their own flags, nothing closed.
     So an own flag below the dock does not say closed - a column of icons and the Tab key clear them too. What
@@ -1788,8 +1792,8 @@ void KFCBookPanelPlacement::ShutdownCleanup()
 //----------------------------------------------------------------------------------------
 
 /** Follows the panel manager, and puts the placement back when a book panel appears where there was
-    none. (It also listened for kAboutToClosePaletteMsg at first, to measure a closing book panel;
-    that message never came for one - see the file header - and the interceptor does that job.) */
+    none. (Not kAboutToClosePaletteMsg, to measure a closing book panel: that message never comes for
+    one - see the file header - and the interceptor does that job.) */
 class KFCBookPanelObserver : public CObserver
 {
 public:
@@ -1806,9 +1810,9 @@ void KFCBookPanelObserver::Update(const ClassID& theChange, ISubject* /*theSubje
 	if (protocol != IID_IPANELMGR || theChange != kPaletteVisibilityChangedMessage)
 		return;
 
-	// Nothing while OFF: the visibility message arrives several times over merely opening a document
-	// (measured - five times while one book opened), and people not using this should not pay for a
-	// walk of the panel list each time.
+	// Nothing while OFF: the visibility message arrives several times over merely opening a book
+	// (measured - five times for one), and people not using this should not pay for a walk of the
+	// panel list each time.
 	if (!gOn)
 		return;
 
@@ -1830,9 +1834,9 @@ void KFCBookPanelObserver::Update(const ClassID& theChange, ISubject* /*theSubje
     and never does: kCmdNotHandled is "pass it on", which is what an interceptor that is not there
     would produce. Everything is inside try/catch - an exception leaving here lands in the middle of
     InDesign's command processing. And the test that runs for every command is a class comparison -
-    three more, and only until the session is past its launch, for the Home screen's window (see
-    gHomeTimer). At file scope, not in the anonymous namespace, for the reason the other
-    implementations here are.
+    with the document commands below added only until the session is past its launch, for the Home
+    screen's window (see gHomeTimer). At file scope, not in the anonymous namespace, for the reason the
+    other implementations here are.
 
     WHY NOT THE OBSERVER KFC ALREADY HAS (measured). KFCBookWatch
     hears the same close as kCloseBookCmdBoss @ kSessionBoss (IID_IBOOKCONTENT), and the official way
@@ -1867,7 +1871,7 @@ public:
 			}
 			// A document opened or made: the session is past its launch, and the Home screen is looked at
 			// no more (see gHomeTimer - measured, no visibility message comes while a document
-			// is open, so this is the place that sees one). Three more comparisons, and only until then.
+			// is open, so this is the place that sees one). These comparisons only until then.
 			// *Named, not asked of IDocumentCommands::IsOpenCommand (the framework's own question for code acting
 			//  on a document command's type, IDocumentCommands.h:118-124): that says yes to
 			//  kOpenFileWithWindowCmdBoss too - the open of ANY file with a window, a book's among them - and a
