@@ -430,6 +430,12 @@ namespace KFCSearchEngine
 	UID EditableFrameForMatch(const UIDRef& storyRef, TextIndex pos);
 	bool IsFrameEditable(const UIDRef& storyRef, UID frameUID);
 
+	/** THE FRAME A TEXT POSITION IS COMPOSED INTO - the parcel's frame, its parcel list composed through the position first
+	    (a table cell's and a footnote's positions too); kInvalidUID for an overset position. The one reading a row's frame
+	    is taken by (BuildHit's Hit::matchFrame); Search Text in These Objects asks it of an anchored frame's anchor
+	    (KFCObjectText). Composing dirties a document: asked under its SaveRestoreModifiedState. */
+	UID FrameAt(const UIDRef& storyRef, TextIndex pos);
+
 	/** Is the text at this position OVERSET - composed, but placed in no frame?
 
 	    The official answer, and the reason this lives here rather than beside the jump that asks it:

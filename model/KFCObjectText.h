@@ -51,7 +51,10 @@ namespace KFCObjectText
 	    form (SnpManipulateTextFrame::GetTextFrameTextRange: its frame list composed through it first when the list has
 	    damage - IMultiColumnTextFrame::RecomposeThru, never RecomposeFully, which adds frames - then TextStart for
 	    TextSpan characters, the story's last character left out); and, when it is its story's last frame, the overset after
-	    it. Composing dirties a document: called under its SaveRestoreModifiedState. */
+	    it. The text on an item's path (IMainItemTOPData), the same way. And the frames anchored in the text taken - inline
+	    or anchored, in its tables and footnotes too - their anchors drawn in the item's frame, by the same rules. (No rule
+	    for a group: an object row is never one - InDesign's object search lists the frames inside it; an item that gives
+	    no text is counted in noText.) Composing dirties a document: called under its SaveRestoreModifiedState. */
 	void Collect(IDataBase* db, const std::vector<UID>& items, Ranges& out);
 
 	/** Is this row - one the walk of r.stretches built - drawn in a frame whose text was taken? Its match's frame's item

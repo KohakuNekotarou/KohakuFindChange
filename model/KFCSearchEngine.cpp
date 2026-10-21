@@ -2245,6 +2245,11 @@ void KFCSearchEngine::GetKFCWalkerScopeOptions(WalkerScopeOptions& outOptions)
 	outOptions.SetIncludeFootnotes(opts->GetIncludeFootnotes(mode));
 }
 
+UID KFCSearchEngine::FrameAt(const UIDRef& storyRef, TextIndex pos)
+{
+	return FrameUIDForPosition(storyRef, pos);
+}
+
 // The frame is resolved exactly as BuildHit resolves it: the frame the match is composed into, or -
 // for an overset match, composed but placed nowhere - the frame carrying the "+" indicator, which is
 // the frame the hit's own locator already names. Resolving it the same way on both sides is what
