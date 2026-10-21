@@ -72,7 +72,7 @@
 void	KFCSavePanelState();
 
 // Reads the JSON file if it is there and applies it (does nothing when there is none).
-// *Called from KFCUIStartupShutdown::Startup and from KFCBookPanelPlacement::Start, whichever comes first
+// *Called from KFCUIStartupShutdown::Startup and from KFCBookPanelPlacement.cpp's Start, whichever comes first
 //  (the latter is the palette manager's PaletteMgrStarted - the startup service is a
 //  LAZY one, and nothing promises it runs before the Book panel needs the placement). Every setting
 //  restored here lives in a module flag, not on a widget, so there is no need to wait for the panel.

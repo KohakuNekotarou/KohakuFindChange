@@ -50,7 +50,7 @@ public:
 		// The saved settings first: restoring "Translucent Panel = ON" is what puts up the Win32
 		// event hook, and doing it before the subscription below keeps the order the same as a
 		// session where the user switches it on by hand.
-		// *Not the only caller: KFCBookPanelPlacement::Start reads it too, and whichever comes first
+		// *Not the only caller: KFCBookPanelPlacement.cpp's Start reads it too, and whichever comes first
 		//  does the read (it is guarded to run once). The order above holds either way - the read
 		//  still comes before the subscription below.
 		KFCLoadPanelStateIfPresent();

@@ -84,20 +84,10 @@ namespace KFCBookPanelPlacement
 	    moved here - what puts the placement on a book panel is this file, when one appears. */
 	void LoadFromSettings(const std::string& text);
 
-	/** The palette manager has laid its palettes out (IPaletteMgrService::PaletteMgrStarted): start
-	    following the panel manager, put the interceptor in if the toggle is ON (ToggleAndSave puts it in
-	    and takes it out after that - it sees every command, so it is only there while it is needed), and
-	    treat any book panel already open as "just appeared". */
-	void Start();
-
-	/** The palette manager is about to close its palettes (PaletteMgrAboutToShutdown): stop following.
-	    It also measures an open book panel if the toggle is ON - a backstop only: on 21.0.2 a quit
-	    closes the books BEFORE this, and the interceptor has already written the placement. */
-	void Stop();
-
 	/** Application shutdown (KFCUIStartupShutdown::Shutdown): stop following and give the timers and the
-	    interceptor back, in case Stop was never reached - and install or book none of them again after it,
-	    whatever still comes (the toggle, a notification). Safe to call twice. */
+	    interceptor back, in case the palette manager's close (PaletteMgrAboutToShutdown) never came - and
+	    install or book none of them again after it, whatever still comes (the toggle, a notification). Safe to
+	    call twice. (The palette manager's start and close are followed in KFCBookPanelPlacement.cpp itself.) */
 	void ShutdownCleanup();
 }
 

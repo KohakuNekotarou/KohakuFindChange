@@ -110,7 +110,6 @@
 #include "IDThreadingPrimitives.h"	// IsMainThreadDomain - the interceptor's gate (see KFCBookPanelCmdWatch)
 #include "IDocumentList.h"		// GetDocCount - the Home screen only matters while no document is open
 #include "IExtendScriptUtils.h"	// RunScriptInEngine - app.homeScreenVisible has no C++ door
-#include "ErrorUtils.h"				// a declined script must not leave the error state standing
 #include "PaletteRef.h"
 #include "PaletteRefUtils.h"	// the palette tree: walk it, measure it, move things about in it
 #include "ShuksanID.h"			// kCallbackTimerBoss, IID_ICALLBACKTIMER
@@ -309,6 +308,14 @@ int32 WalkBookPanels(IPanelMgr* panelMgr, IControlView** outFirst)
 		return false;
 	});
 	return count;
+}
+
+/** The first book panel, AddRef'd (the caller takes the reference over) - or nil when there is none. */
+IControlView* QueryFirstBookPanel(IPanelMgr* panelMgr)
+{
+	IControlView* first = nil;
+	WalkBookPanels(panelMgr, &first);
+	return first;
 }
 
 /** Never hand PaletteRefUtils an invalid PaletteRef. Nothing in PaletteRefUtils.h says
@@ -627,9 +634,7 @@ bool Measure(IPanelMgr* panelMgr, IControlView* bookPanel, Placement& out)
 bool MeasureOpenBookPanel(Placement& out)
 {
 	InterfacePtr<IPanelMgr> panelMgr(KFCBookPanelLookup::QueryPanelManager());
-	IControlView* first = nil;
-	WalkBookPanels(panelMgr, &first);
-	InterfacePtr<IControlView> bookPanel(first);	// takes over the reference WalkBookPanels added
+	InterfacePtr<IControlView> bookPanel(QueryFirstBookPanel(panelMgr));
 	return Measure(panelMgr, bookPanel, out);
 }
 
@@ -1002,9 +1007,7 @@ void RestoreNow()
 		return;
 
 	InterfacePtr<IPanelMgr> panelMgr(KFCBookPanelLookup::QueryPanelManager());
-	IControlView* first = nil;
-	WalkBookPanels(panelMgr, &first);
-	InterfacePtr<IControlView> bookPanel(first);	// takes over the reference WalkBookPanels added
+	InterfacePtr<IControlView> bookPanel(QueryFirstBookPanel(panelMgr));
 	if (bookPanel == nil)
 		return;		// closed again in the meantime
 
@@ -1114,9 +1117,11 @@ void LeaveHomeScreen()
 		" for (var j = app.books.length - 1; j >= 0; j--) app.books[j].close(SaveOptions.NO);"
 		" for (var k = 0; k < files.length; k++) app.open(files[k]);"
 		"})();"));
+	// No clear of the error state after it: a run leaves no error of its own, declined or not - the failure is the
+	// return value (measured with KT's scripterr - kfc-block13-inspections-2026-10-20.md); a clear here could only
+	// wipe an error somebody else had left standing.
 	const ErrorCode ran = utils->RunScriptInEngine(engine, text, kFalse /*showErrorAlert*/, kFalse /*invokeDebugger*/);
 	KFC_DIAG_LOG("BOOKPANEL HOME script %s (check %d)", ran == kSuccess ? "REOPENED THE BOOKS" : "declined", gHomeChecks);
-	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 	if (ran == kSuccess)
 		gLeftHomeScreen = true;		// the reopening itself puts the book panel back (0 -> 1)
 }
@@ -1175,9 +1180,7 @@ void MaybeRestoreAgain()
 	if (!gRemembered.IsUsable() || !gRemembered.docked || gReRestores >= kKFCBookPanelMaxReRestores)
 		return;
 	InterfacePtr<IPanelMgr> panelMgr(KFCBookPanelLookup::QueryPanelManager());
-	IControlView* first = nil;
-	WalkBookPanels(panelMgr, &first);
-	InterfacePtr<IControlView> bookPanel(first);	// takes over the reference WalkBookPanels added
+	InterfacePtr<IControlView> bookPanel(QueryFirstBookPanel(panelMgr));
 	if (bookPanel == nil)
 		return;
 	const PaletteRef container = panelMgr->GetPaletteRefContainingPanel(bookPanel);
@@ -1336,6 +1339,66 @@ void OnBookAboutToClose()
 	KFC_DIAG_LOG("BOOKPANEL CLOSE books=%d count now %d", bookMgr != nil ? bookMgr->GetBookCount() : -1, gBookPanelCount);
 }
 
+/** Stop following, and give back everything that holds a pointer into this .pln: the observer off the panel
+    manager, the interceptor out of the command processor (above all - the processor holds a raw pointer into this
+    .pln), the timers stopped and released. Both ends of the feature end with it - Stop at the palette manager's
+    close, and ShutdownCleanup in case that never came. Safe to call twice. */
+void LetGoOfEverything()
+{
+	AttachObserver(false);
+	UninstallCmdWatch();
+	DisarmRestoreTimer();
+}
+
+/** The palette manager has laid its palettes out (IPaletteMgrService::PaletteMgrStarted - the service at the foot
+    of this file): start following the panel manager, put the interceptor in if the toggle is ON (ToggleAndSave puts
+    it in and takes it out after that - it sees every command, so it is only there while it is needed), and treat
+    any book panel already open as "just appeared". */
+void Start()
+{
+	// The saved settings are read by the startup service - but that one is LAZY
+	// (kLazyStartupShutdownProviderImpl), and nothing promises it runs before the palette manager
+	// has laid out. Reading here as well costs nothing: the read is guarded to happen once.
+	KFCLoadPanelStateIfPresent();
+
+	// The Home screen is looked at only for a while from here (see gHomeTimer).
+	gStartedAt = std::chrono::steady_clock::now();
+	gHomeWindowOver = false;
+	KFC_DIAG_LOG("BOOKPANEL START on=%d remembered docked=%d", gOn ? 1 : 0, gRemembered.docked ? 1 : 0);
+
+	AttachObserver(true);
+	// Only while ON (see InstallCmdWatch) - ToggleAndSave puts it in when the box is ticked later.
+	if (gOn)
+		InstallCmdWatch();
+
+	// Whatever book panel is open by now has "just appeared" as far as this feature is concerned -
+	// before this call nothing was following - so the count starts from zero. (Measured on 21.0.2:
+	// InDesign does NOT reopen books at launch, so in practice there is none; counting from zero is
+	// right either way.)
+	gBookPanelCount = 0;
+	if (gOn)
+		RecountAndMaybeRestore();
+}
+
+/** The palette manager is about to close its palettes (PaletteMgrAboutToShutdown, the same service): stop
+    following. It also measures an open book panel if the toggle is ON - a backstop only: on 21.0.2 a quit closes
+    the books BEFORE this, and the interceptor has already written the placement. */
+void Stop()
+{
+	// NOT where a quit's placement is written. Measured on 21.0.2: a quit closes the books
+	// BEFORE this is called, so the interceptor has already measured the Book panel and this finds
+	// none. Kept as a backstop for a build that closes them later - it does nothing when there is no
+	// Book panel. Nothing is said on failure: InDesign is quitting.
+	if (gOn)
+	{
+		Placement now;
+		if (MeasureOpenBookPanel(now))
+			RememberAndWrite(now, false);
+	}
+
+	LetGoOfEverything();
+}
+
 }	// anonymous namespace
 
 //----------------------------------------------------------------------------------------
@@ -1459,57 +1522,10 @@ void KFCBookPanelPlacement::LoadFromSettings(const std::string& text)
 		gRemembered = p;
 }
 
-void KFCBookPanelPlacement::Start()
-{
-	// The saved settings are read by the startup service - but that one is LAZY
-	// (kLazyStartupShutdownProviderImpl), and nothing promises it runs before the palette manager
-	// has laid out. Reading here as well costs nothing: the read is guarded to happen once.
-	KFCLoadPanelStateIfPresent();
-
-	// The Home screen is looked at only for a while from here (see gHomeTimer).
-	gStartedAt = std::chrono::steady_clock::now();
-	gHomeWindowOver = false;
-	KFC_DIAG_LOG("BOOKPANEL START on=%d remembered docked=%d", gOn ? 1 : 0, gRemembered.docked ? 1 : 0);
-
-	AttachObserver(true);
-	// Only while ON (see InstallCmdWatch) - ToggleAndSave puts it in when the box is ticked later.
-	if (gOn)
-		InstallCmdWatch();
-
-	// Whatever book panel is open by now has "just appeared" as far as this feature is concerned -
-	// before this call nothing was following - so the count starts from zero. (Measured on 21.0.2:
-	// InDesign does NOT reopen books at launch, so in practice there is none; counting from zero is
-	// right either way.)
-	gBookPanelCount = 0;
-	if (gOn)
-		RecountAndMaybeRestore();
-}
-
-void KFCBookPanelPlacement::Stop()
-{
-	// NOT where a quit's placement is written. Measured on 21.0.2: a quit closes the books
-	// BEFORE this is called, so the interceptor has already measured the Book panel and this finds
-	// none. Kept as a backstop for a build that closes them later - it does nothing when there is no
-	// Book panel. Nothing is said on failure: InDesign is quitting.
-	if (gOn)
-	{
-		Placement now;
-		if (MeasureOpenBookPanel(now))
-			RememberAndWrite(now, false);
-	}
-
-	AttachObserver(false);
-	UninstallCmdWatch();
-	DisarmRestoreTimer();
-}
-
 void KFCBookPanelPlacement::ShutdownCleanup()
 {
 	gShutDown = true;		// **first: from here nothing is installed or booked again (see gShutDown)
-	AttachObserver(false);
-	// The interceptor above all: the command processor holds a raw pointer into this .pln.
-	UninstallCmdWatch();
-	DisarmRestoreTimer();
+	LetGoOfEverything();
 }
 
 //----------------------------------------------------------------------------------------
@@ -1657,10 +1673,10 @@ public:
 	KFCBookPanelPaletteMgrService(IPMUnknown* boss) : CPMUnknown<IPaletteMgrService>(boss) {}
 	virtual ~KFCBookPanelPaletteMgrService() {}
 
-	virtual void PaletteMgrStarted()		{ KFCBookPanelPlacement::Start(); }
+	virtual void PaletteMgrStarted()		{ Start(); }
 	virtual void PaletteMgrAboutToShutdown()
 	{
-		KFCBookPanelPlacement::Stop();
+		Stop();
 		KFCDetachPanelVisibilityObserver();
 	}
 };

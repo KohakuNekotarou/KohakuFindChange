@@ -609,7 +609,7 @@ void KFCSavePanelState()
 }
 
 //----------------------------------------------------------------------------------------
-// Restore (once per session - from KFCUIStartupShutdown::Startup or KFCBookPanelPlacement::Start,
+// Restore (once per session - from KFCUIStartupShutdown::Startup or KFCBookPanelPlacement.cpp's Start,
 // whichever comes first; see KFCPanelState.h)
 //----------------------------------------------------------------------------------------
 
