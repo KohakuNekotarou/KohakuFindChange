@@ -381,10 +381,18 @@ namespace KFCResultModel
 	void SetFromBook(bool fromBook);
 	bool IsFromBook();
 
+	/** Did these results come from an ALL DOCUMENTS search? Recorded on the results as IsFromBook is, beside the scope
+	    (SetSearchScope) - which says All Documents for a list of its own (kScopeAllDocuments) but not for a list Search Text
+	    in These Objects made from one (kScopeInObjects - W-TIO-a): the documents a list was searched over, whatever its scope
+	    says. The tree draws such a list's document rows CLOSED and says which document has no window; its searches again
+	    say its documents' count. Cleared by Clear(), set beside SetFromBook. */
+	void SetFromAllDocuments(bool fromAllDocuments);
+	bool IsFromAllDocuments();
+
 	/** WHICH Search: THESE RESULTS WERE SEARCHED WITH. KFC follows Edit > Find/Change's Search:
 	    (KFCSearchEngine::CurrentSearchScope). The list records which one it came from,
 	    the way it records IsFromBook, so a Search: changed afterwards does not change how the rows already on
-	    screen are shown: All Documents draws its document rows CLOSED and says which document has no window;
+	    screen are shown: All Documents is drawn as IsFromAllDocuments says;
 	    Story / To End of Story / Selection search one document and are drawn as Document is. kScopeBook =
 	    Book Scope was on (Search: is then Document - any other is refused before the search).
 	    Recorded beside SetFromBook, after the commit point; Clear() puts it back to kScopeDocument. */
@@ -1060,6 +1068,7 @@ namespace KFCResultModel
 	struct ListHeader
 	{
 		bool			fromBook;		// SetFromBook
+		bool			fromAllDocuments;	// SetFromAllDocuments
 		SearchScopeKind	searchScope;	// SetSearchScope
 		std::vector<KFCNarrowStep>	narrow;	// SetNarrowSteps - a Narrow Down's conditions, in order (empty for any other list)
 		PMString		bookName;		// SetBookName
@@ -1068,7 +1077,7 @@ namespace KFCResultModel
 		bool			hasRun;			// NoteRun
 		bool			changeAllWrote;	// NoteChangeAllWrote
 		std::shared_ptr<const KFCQueryCopy>	query;	// SetQueryCopy - the search's query, copied (null = not a search's list)
-		ListHeader() : fromBook(false), searchScope(kScopeDocument), searchMode(-1), hasRun(false),
+		ListHeader() : fromBook(false), fromAllDocuments(false), searchScope(kScopeDocument), searchMode(-1), hasRun(false),
 			changeAllWrote(false) {}
 	};
 

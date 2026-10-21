@@ -353,6 +353,16 @@ bool KFCResultModel::IsFromBook()
 	return gHeader.fromBook;
 }
 
+void KFCResultModel::SetFromAllDocuments(bool fromAllDocuments)
+{
+	gHeader.fromAllDocuments = fromAllDocuments;
+}
+
+bool KFCResultModel::IsFromAllDocuments()
+{
+	return gHeader.fromAllDocuments;
+}
+
 void KFCResultModel::SetSearchScope(SearchScopeKind scope)
 {
 	gHeader.searchScope = scope;

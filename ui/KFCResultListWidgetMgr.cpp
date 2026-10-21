@@ -183,10 +183,11 @@ namespace
 	}
 
 	// A DOCUMENT ROW COMES UP OPEN when the results came from neither a book nor All Documents: one document, its rows at
-	// once (Rebuild says why each). Asked by Rebuild and by OpensWhenDrawn - one rule.
+	// once (Rebuild says why each). Asked by Rebuild and by OpensWhenDrawn - one rule. (Both as the list recorded them, not
+	// its scope: a text list Search Text in These Objects made from an All Documents one is kScopeInObjects - W-TIO-a.)
 	bool DocumentRowsOpen()
 	{
-		return !KFCResults()->IsFromBook() && KFCResults()->GetSearchScope() != KFCResultModel::kScopeAllDocuments;
+		return !KFCResults()->IsFromBook() && !KFCResults()->IsFromAllDocuments();
 	}
 
 	// A ROW DRAWN IN THE COLOUR CELL: a live hit row, or a kept tier's copy of one (KFCResultHistory).
@@ -572,8 +573,9 @@ bool KFCResultTree::GetRowLook(const NodeID& node, RowLook& out)
 	// A DOCUMENT WITH NO WINDOW. Search: = All Documents searches those too, as
 	// InDesign's own does; a replace there leaves it hidden (the user may hide a heavy one on purpose) and
 	// only a jump opens a window - so its row says so. Asked as the row is drawn: a jump that opens one
-	// takes the note away at the next repaint. (A kept tier's copy keeps the note as it was then.)
-	if (KFCResults()->GetSearchScope() == KFCResultModel::kScopeAllDocuments && ChapterHasNoWindow(nodeID->GetChapter()))
+	// takes the note away at the next repaint. (A kept tier's copy keeps the note as it was then.) All Documents as the
+	// list recorded it (IsFromAllDocuments - a text list Search Text in These Objects made from one too).
+	if (KFCResults()->IsFromAllDocuments() && ChapterHasNoWindow(nodeID->GetChapter()))
 		out.label.Append(" (no window)");
 	AppendCounts(out.label, KFCResults()->GetChapterReplacedCount(nodeID->GetChapter()), fullCount);
 	out.shift = LevelShift();

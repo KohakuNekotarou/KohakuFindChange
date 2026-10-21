@@ -3013,7 +3013,9 @@ const char* const kNoDocumentToSearch = "No open document to search.";
 //  - The scope ON THE RESULTS: the tree reads it to decide whether the chapter rows come up collapsed, and reading it
 //    from here rather than from the toggle keeps an existing result set's display stable if the user flips Book Scope
 //    afterwards. The Search: beside it, for the same reason: All Documents draws its document rows closed and says
-//    which has no window; a Search: changed afterwards changes nothing on screen.
+//    which has no window; a Search: changed afterwards changes nothing on screen. And whether the list was searched over
+//    All Documents (`allDocuments`), recorded as the book is: a list Search Text in These Objects made from one has its
+//    own scope (kScopeInObjects), and it is this its searches again and its rows read (W-TIO-a).
 //  - A narrowed list's conditions (Narrow Down - the narrow-down spec's N4: its searches again search with them, its
 //    tier's heading names them) - empty for every other search.
 //  - That a search HAPPENED, which the panel's illustration follows: it survives finding nothing - a search that
@@ -3037,10 +3039,11 @@ const char* const kNoDocumentToSearch = "No open document to search.";
 //  - The QUERY ITSELF, copied in memory (the tier switch - KFCQueryCopy): what is stated back into Find/Change when
 //    this list, kept as a tier by a later search, is switched to. nil = none: a copy that could not be read is not put
 //    on - that tier then refuses a switch.
-void WriteListHeader(bool fromBook, KFCResultModel::SearchScopeKind scope, const std::vector<KFCNarrowStep>& narrow,
-	const PMString& bookName, const std::shared_ptr<const KFCQueryCopy>& copy)
+void WriteListHeader(bool fromBook, bool allDocuments, KFCResultModel::SearchScopeKind scope,
+	const std::vector<KFCNarrowStep>& narrow, const PMString& bookName, const std::shared_ptr<const KFCQueryCopy>& copy)
 {
 	KFCResultModel::SetFromBook(fromBook);
+	KFCResultModel::SetFromAllDocuments(allDocuments);
 	KFCResultModel::SetSearchScope(scope);
 	KFCResultModel::SetNarrowSteps(narrow);
 	KFCResultModel::NoteRun();
@@ -3767,8 +3770,8 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 		: (selectionScope == IWalkerScopeFactoryUtils::kToEndOfStoryScope) ? KFCResultModel::kScopeToEndOfStory
 		: (selectionScope == IWalkerScopeFactoryUtils::kSelectionScope) ? KFCResultModel::kScopeSelection
 		: KFCResultModel::kScopeDocument;
-	WriteListHeader(fromBook, scopeKind, (again != nil) ? again->narrow : std::vector<KFCNarrowStep>(), bookName,
-		listCopy);
+	WriteListHeader(fromBook, allDocuments, scopeKind, (again != nil) ? again->narrow : std::vector<KFCNarrowStep>(),
+		bookName, listCopy);
 
 	CollectTally tally;
 	// A NARROWED LIST'S CONDITIONS, asked of every row the walk builds (KFCNarrow::Filter - empty, and asked nothing, for any
@@ -5013,7 +5016,7 @@ bool SearchPartsAgain(const PMString& lead, PMString& outStatus, const KFCSearch
 		KFCTierStore::ParkCurrent();
 		KFCBookScope::ReleaseHeldDocs(true /*close now*/);
 		KFCSearchEngine::DropResults();
-		WriteListHeader(false, scope, again.narrow, PMString(), copy);
+		WriteListHeader(false, false, scope, again.narrow, PMString(), copy);		// one document's part - no book, not All Documents
 		KFCSearchEngine::CollectTally tally;
 		for (size_t k = 0; k < chapters.size(); ++k)
 			if (!chapters[k].hits.empty())
@@ -5562,16 +5565,17 @@ bool SearchListOnceMore(const KFCNarrowStep* step, PMString& outStatus)
 		again.narrow.push_back(*step);		// ...and a Narrow Down's new one after them, into a new list
 		again.newTier = true;
 	}
+	// The documents the list was searched over, as it recorded them (WriteListHeader) - not read off its scope, which a
+	// list Search Text in These Objects made has of its own (kScopeInObjects - W-TIO-a).
 	const KFCResultModel::SearchScopeKind listScope = KFCResultModel::GetSearchScope();
-	again.fromBook = (listScope == KFCResultModel::kScopeBook);
-	again.allDocuments = (listScope == KFCResultModel::kScopeAllDocuments);
+	again.fromBook = KFCResultModel::IsFromBook();
+	again.allDocuments = KFCResultModel::IsFromAllDocuments();
 	// A LIST SEARCH TEXT IN THESE OBJECTS MADE: searched again in the same objects (Chapter::searchedObjects - their text as it
 	// stands now: the text-in-objects spec's T6), its book or documents found as its first search found them
 	// (RunOverObjects); in place, or narrowed into a new list - with its own query (the door states it).
 	if (listScope == KFCResultModel::kScopeInObjects)
 	{
 		again.inObjects = true;
-		again.fromBook = KFCResultModel::IsFromBook();
 		return RunOverObjects(again,
 			[](int32 c, std::vector<UID>& items) { (void)KFCResultModel::GetChapterSearchedObjects(c, items); },
 			"what these results searched is no longer known (its document was closed) - search again with Find.", lead,
@@ -5694,15 +5698,15 @@ bool KFCSearchEngine::SearchTextInObjects(PMString& outStatus)
 	}
 	// ITS OBJECTS: the object rows not cleared from the list (Hit::cleared), their items not gone with a close (Hit::itemGone -
 	// the UID may name another object by now: counted gone, said with the walk's); an item once. Then the road to the search
-	// (RunOverObjects).
+	// (RunOverObjects). Its book and its All Documents as the list recorded them - not read off its scope: a Frames of These
+	// Matches list of a text list this made has the scope kScopeInObjects, a book's or All Documents' (W-TIO-a).
 	AgainTarget again;
 	again.inObjects = true;
 	again.freshQuery = true;
 	again.newTier = true;
 	again.set = KFCResultModel::GetResultSetId();
-	const KFCResultModel::SearchScopeKind listScope = KFCResultModel::GetSearchScope();
-	again.fromBook = (listScope == KFCResultModel::kScopeBook);
-	again.allDocuments = (listScope == KFCResultModel::kScopeAllDocuments);
+	again.fromBook = KFCResultModel::IsFromBook();
+	again.allDocuments = KFCResultModel::IsFromAllDocuments();
 	return RunOverObjects(again, [&again](int32 c, std::vector<UID>& items)
 		{
 			for (int32 h = 0; h < KFCResultModel::GetHitCount(c); ++h)

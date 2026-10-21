@@ -124,6 +124,10 @@ public:
 	/** = KFCResultModel::IsHitItemGone (appended) - an object row whose item its document came back without: its UID
 	    may name another object by now, so the row's click and its Replace's selection take it for gone. */
 	virtual bool IsHitItemGone(int32 chapterIdx, int32 hitIdx) = 0;
+	/** = KFCResultModel::IsFromAllDocuments (appended) - the list was searched over All Documents, whatever its scope says
+	    (a text list Search Text in These Objects made from one is kScopeInObjects): its document rows come up closed and a
+	    document with no window says so. */
+	virtual bool IsFromAllDocuments() = 0;
 };
 
 #endif // __IKFCResults_h__

@@ -85,6 +85,7 @@ public:
 	{
 		return KFCResultModel::IsHitItemGone(chapterIdx, hitIdx);
 	}
+	virtual bool IsFromAllDocuments() { return KFCResultModel::IsFromAllDocuments(); }
 };
 
 CREATE_PMINTERFACE(KFCResultsSession, kKFCResultsImpl)
