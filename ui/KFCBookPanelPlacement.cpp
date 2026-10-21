@@ -1967,7 +1967,8 @@ CREATE_PMINTERFACE(KFCBookPanelServiceProvider, kKFCBookPanelServiceProviderImpl
 
 /** The two moments: the palettes are laid out, and the palettes are about to close. The second is also
     where the Translucent Panel observer stops listening (KFCPanelAlpha.cpp): the session and the panel
-    manager are still up there, and by the plug-in's shutdown that observer can no longer be reached. */
+    manager are still up there, and by the plug-in's shutdown the application, which that observer's
+    subjects hang off, can no longer be had. */
 class KFCBookPanelPaletteMgrService : public CPMUnknown<IPaletteMgrService>
 {
 public:

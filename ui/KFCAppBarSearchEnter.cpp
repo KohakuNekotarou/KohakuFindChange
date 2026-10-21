@@ -102,6 +102,20 @@ static DWORD           sWriteBackTick  = 0;			// when we last wrote BACK over In
 static bool            sRemirrorHeld   = false;		// InDesign answered a write-back of ours: hands off until the dialog changes
 static const DWORD     kKFCAppBarRewriteGuardMs = 500;
 
+// Both bookings - the search after a Return, the write-back after InDesign's own text - for the next idle, each on
+// its own timer, made on first use. A booking still live is taken off before the new one is started: the official
+// re-arm stops the running timer before it starts one (HTTPAssetLinkResourceHandler.cpp), and ICallbackTimer.h
+// promises nothing for a StartTimer over a live booking.
+static void BookAtNextIdle(ICallbackTimer*& timer, TimerCallback callback)
+{
+	if (timer == nil)
+		timer = ::CreateObject2<ICallbackTimer>(kCallbackTimerBoss, IID_ICALLBACKTIMER);
+	if (timer == nil)
+		return;
+	timer->StopTimer();
+	timer->StartTimer(callback, 1, nil);
+}
+
 static std::wstring ClassOf(HWND w)
 {
 	wchar_t name[128] = { 0 };
@@ -344,12 +358,7 @@ static LRESULT CALLBACK AppBarCallWndRetProc(int code, WPARAM wParam, LPARAM lPa
 			if (sWriteBackTick != 0 && ::GetTickCount() - sWriteBackTick < kKFCAppBarRewriteGuardMs)
 				sRemirrorHeld = true;	// InDesign answered a write-back of ours: stop here (see the statics)
 			else
-			{
-				if (sRemirrorTimer == nil)
-					sRemirrorTimer = ::CreateObject2<ICallbackTimer>(kCallbackTimerBoss, IID_ICALLBACKTIMER);
-				if (sRemirrorTimer != nil)
-					sRemirrorTimer->StartTimer(RemirrorAfterInDesign, 1, nil);
-			}
+				BookAtNextIdle(sRemirrorTimer, RemirrorAfterInDesign);
 		}
 	}
 	return ::CallNextHookEx(sCallWndRetHook, code, wParam, lParam);
@@ -433,10 +442,7 @@ static LRESULT CALLBACK AppBarGetMsgProc(int code, WPARAM wParam, LPARAM lParam)
 				if (!repeat)
 				{
 					sPendingText = text;
-					if (sRunTimer == nil)
-						sRunTimer = ::CreateObject2<ICallbackTimer>(kCallbackTimerBoss, IID_ICALLBACKTIMER);
-					if (sRunTimer != nil)
-						sRunTimer->StartTimer(RunPendingSearch, 1, nil);
+					BookAtNextIdle(sRunTimer, RunPendingSearch);
 				}
 			}
 		}

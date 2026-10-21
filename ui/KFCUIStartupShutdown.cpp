@@ -70,9 +70,10 @@ public:
 		KFCModelObserverDetach();
 		// The Translucent Panel observer: while attached, the panel manager and the application each hold
 		// a pointer to an observer whose code is in this .pln (KFCPanelAlpha.cpp). Normally already
-		// detached at the palette manager's PaletteMgrAboutToShutdown - by this point the observer can
-		// no longer be reached (measured on a quit); this is the backstop for a shutdown that never went
-		// through the palette manager. Safe to run twice.
+		// detached at the palette manager's PaletteMgrAboutToShutdown - by this point the application, and
+		// with it the panel manager, can no longer be had (measured on a quit: the session answered nil for
+		// it, while the active context and the observer were still there); this is the backstop for a
+		// shutdown that never went through the palette manager. Safe to run twice.
 		KFCDetachPanelVisibilityObserver();
 		// "Remember Book Panel Placement" - the same subject, and the same reason, plus its timers (the
 		// restore's and the Home screen's) and its command interceptor, all holding raw pointers into

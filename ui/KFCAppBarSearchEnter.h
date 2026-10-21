@@ -55,9 +55,10 @@ bool16	KFCGetAppBarSearchEnter();
 void	KFCSetAppBarSearchEnter(bool16 on);
 
 // For the flyout's status line: kTrue when the field is on screen now (or the toggle is OFF); kFalse when
-// it is ON and the field cannot be seen - the application bar hides it when its menus need a second row
-// (measured), and a person can only type into a field that is shown. (The hooks themselves work on the hidden
-// field too - a Return posted to it was caught, measured with KIDMCP's win32_controls.)
+// it is ON and the field cannot be seen - InDesign hides it while its Home screen is up (measured: a launch with a
+// book leaves the Home screen standing and the field hidden; opening a document takes both away - the menus' second
+// row, the first reading, was not it), and a person can only type into a field that is shown. (The hooks themselves
+// work on the hidden field too - a Return posted to it was caught, measured with KIDMCP's win32_controls.)
 bool16	KFCApplyAppBarSearchEnter();
 
 // Take the observer and both hooks off, stop a search and a write-back not yet started, and release both timers.

@@ -1279,11 +1279,12 @@ void        KFCShutdownPanelAlpha() {}
 //   **It IS detached (KFCDetachPanelVisibilityObserver) - as the palette manager is about to close the
 //     palettes, the moment KFCBookPanelPlacement's observer of the same subject stops at, while the
 //     session, the active context and the panel manager are all up. NOT at the plug-in's shutdown: by
-//     then the observer can no longer be reached (measured on a quit), so a detach left to it never
-//     happens. The subjects outliving the observer is the whole problem: what they keep is a pointer
-//     into code that is going away, and leaving it there is what makes a late notification reach freed
-//     code. The three subscriptions are one list the attach and the detach both walk
-//     (KFCForEachVisibilitySubscription), and nothing attaches while the application is going down.
+//     then the application - and with it both subjects - can no longer be had (measured on a quit: the
+//     session answered nil for it, while the active context and the observer were still there), so a
+//     detach left to it never happens. The subjects outliving the observer is the whole problem: what
+//     they keep is a pointer into code that is going away, and leaving it there is what makes a late
+//     notification reach freed code. The three subscriptions are one list the attach and the detach both
+//     walk (KFCForEachVisibilitySubscription), and nothing attaches while the application is going down.
 //========================================================================================
 
 //========================================================================================
@@ -1582,10 +1583,10 @@ void KFCAttachPanelVisibilityObserver()
 		return;
 
 	// **NEVER WHILE THE APPLICATION IS GOING DOWN. Nothing after the detach below could take an attachment back off -
-	//   the plug-in's shutdown can no longer reach the observer - so one made then would outlive the observer. The
-	//   detach's moment is the quit's own (measured: the palette manager's close comes at kShuttingDown), so asking
-	//   the application covers it exactly, and leaves the observer free to come back if the palettes ever closed
-	//   while the application ran on (a "detached for good" flag would not).
+	//   the plug-in's shutdown can no longer have the application the subjects hang off - so one made then would
+	//   outlive the observer. The detach's moment is the quit's own (measured: the palette manager's close comes at
+	//   kShuttingDown), so asking the application covers it exactly, and leaves the observer free to come back if
+	//   the palettes ever closed while the application ran on (a "detached for good" flag would not).
 	if (app->GetApplicationState() >= IApplication::kQuitting)
 		return;
 
@@ -1610,9 +1611,9 @@ void KFCAttachPanelVisibilityObserver()
 //     PaletteMgrAboutToShutdown, from KFC's palette-manager service (KFCBookPanelPlacement.cpp), the
 //     official moment and the one KFCBookPanelPlacement's own observer of the panel manager stops at.
 //     The session, the active context and the panel manager are all up then. The plug-in's shutdown
-//     calls this again as the backstop, but by then the observer cannot be reached (measured on a quit:
-//     KFCQueryVisibilityObserver came back empty there) - the palette manager's moment is the one that
-//     counts.
+//     calls this again as the backstop, but by then the application cannot be had (measured on a quit:
+//     the session answered nil for it - the active context and the observer were still there - so
+//     KFCQueryVisibilityObserver came back empty) - the palette manager's moment is the one that counts.
 //   *Why it exists: while attached, the application and the panel manager hold a pointer to an observer
 //     whose code is in this .pln, and the application outlives the session the observer lives in. Same
 //     reasoning, same shape as KFCBookWatchDetach.
@@ -1627,7 +1628,7 @@ void KFCDetachPanelVisibilityObserver()
 	InterfacePtr<IApplication> app;
 	if (!KFCQueryVisibilityObserver(obs, app))
 	{
-		KFC_DIAG_LOG("PANELVIS detach: the observer cannot be reached");
+		KFC_DIAG_LOG("PANELVIS detach: the observer or the application cannot be had");
 		return;
 	}
 

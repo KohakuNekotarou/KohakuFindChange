@@ -172,8 +172,9 @@ void	KFCAttachPanelVisibilityObserver();
 // Undo every attachment the above makes. Called as the palette
 // manager is about to close the palettes (KFC's palette-manager service, KFCBookPanelPlacement.cpp) -
 // the session, the active context and the panel manager are all up then - and again from the plug-in's
-// shutdown as the backstop, where the observer can no longer be reached (measured). Either way before
-// KFCShutdownPanelAlpha, so that notifications stop before the timer and the hook are torn down.
+// shutdown as the backstop, where the application - and with it both subjects - can no longer be had
+// (measured: the session answers nil for it there). Either way before KFCShutdownPanelAlpha, so that
+// notifications stop before the timer and the hook are torn down.
 // *Why it exists: while attached, the application and the panel manager hold a pointer to an observer
 //   whose code is in this .pln, and a notification arriving during teardown would run it in code that
 //   is going away - the same reasoning, and the same shape, as KFCBookWatchDetach.
