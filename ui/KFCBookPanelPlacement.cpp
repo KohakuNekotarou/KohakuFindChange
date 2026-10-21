@@ -205,6 +205,15 @@ const uint32 kKFCBookPanelReRestoreDelayMs = 1500;
 const int32 kKFCBookPanelMaxReRestores = 3;
 int32 gReRestores = 0;		// done since the book panel last appeared (RecountAndMaybeRestore resets it)
 
+/** Has this opening's first restore run (RecountAndMaybeRestore puts it back to false)? Every restore after it is a
+    RE-restore, armed because the panel looked thrown out of the dock, and it puts the panel back only when it still is
+    (RestoreNow). The visibility messages come BEFORE OWL's asynchronous layout has done what they announce, so a panel
+    the user floated reads "in a hidden floating dock" for a moment while the palettes come back on show after
+    Show/Hide All Palettes - the Tab key (measured: armed three times as they came back, and the floated panel put back
+    in the dock - work/note-scripts/2026-10-21-kfc-block16-defect/live_b16d.ps1, scene V). Only the look when the timer
+    runs tells that moment from InDesign's throw-out, which stays. */
+bool gRestoredThisOpening = false;
+
 /** THE HOME SCREEN HIDES THE DOCKS (measured). A book opened with InDesign
     itself (a .indb double-clicked while InDesign is not running) opens BEFORE InDesign puts up its
     Home screen, and the Home screen then stays - with every dock hidden under it, the book panel put
@@ -476,8 +485,8 @@ int32 FirstNonBookPanelInColumn(IPanelMgr* panelMgr, const PaletteRef& column)
 }
 
 /** The container of the panel with this WidgetID - or an invalid PaletteRef when there is no such
-    panel or it is in no palette. (GetPanelFromWidgetID hands back hidden panels too; what the
-    container of a panel the user has CLOSED is, is not measured.) */
+    panel or it is in no palette. (GetPanelFromWidgetID hands back hidden panels too, and a panel the user
+    has CLOSED keeps its container where it was - NeighbourIsOpen.) */
 PaletteRef ContainerOfPanel(IPanelMgr* panelMgr, int32 widgetID)
 {
 	if (widgetID == 0)
@@ -487,6 +496,41 @@ PaletteRef ContainerOfPanel(IPanelMgr* panelMgr, int32 widgetID)
 		return PaletteRef();
 	return panelMgr->GetPaletteRefContainingPanel(panel);
 }
+
+#ifdef KFC_DIAG
+/** A test build's look at a neighbour before the book panel is put beside it (JoinNeighbours): its container's own
+    visible flag (GetVisibleState), its effective visibility (IsPaletteVisible), the close box's mark (GetIsClosed), and
+    its tab group's two visibilities - what a neighbour the user closed looks like there. */
+void LogNeighbour(IPanelMgr* panelMgr, const char* role, int32 widgetID)
+{
+	const PaletteRef c = ContainerOfPanel(panelMgr, widgetID);
+	const PaletteRef group = ParentOf(c);
+	KFC_DIAG_LOG("BOOKPANEL NEIGHBOUR %s=%d valid=%d own=%d effective=%d closed=%d groupOwn=%d groupEffective=%d", role,
+		widgetID, c.IsValid() ? 1 : 0, Is(c, &PaletteRefUtils::GetVisibleState) ? 1 : 0,
+		Is(c, &PaletteRefUtils::IsPaletteVisible) ? 1 : 0, Is(c, &PaletteRefUtils::GetIsClosed) ? 1 : 0,
+		Is(group, &PaletteRefUtils::GetVisibleState) ? 1 : 0, Is(group, &PaletteRefUtils::IsPaletteVisible) ? 1 : 0);
+}
+
+/** A test build's look at the book panel on each visibility message: floating or docked, its dock's effective and own
+    visibility, its container's own flag, and whether the whole palette system is hidden (IsEntirePaletteSystemHidden) -
+    what tells Show/Hide All Palettes from InDesign's throw-out. */
+void LogBookPanelVisibility()
+{
+	InterfacePtr<IPanelMgr> panelMgr(KFCBookPanelLookup::QueryPanelManager());
+	InterfacePtr<IControlView> bookPanel(QueryFirstBookPanel(panelMgr));
+	if (bookPanel == nil)
+		return;
+	const PaletteRef container = panelMgr->GetPaletteRefContainingPanel(bookPanel);
+	if (!container.IsValid())
+		return;
+	const bool floating = PaletteRefUtils::IsPaletteFloating(container) != kFalse;
+	const PaletteRef dock = floating ? FindFloatingDock(container) : FindAncestor(container, &PaletteRefUtils::IsDock);
+	KFC_DIAG_LOG("BOOKPANEL VIS floating=%d dockEffective=%d dockOwn=%d containerOwn=%d systemHidden=%d",
+		floating ? 1 : 0, Is(dock, &PaletteRefUtils::IsPaletteVisible) ? 1 : 0,
+		Is(dock, &PaletteRefUtils::GetVisibleState) ? 1 : 0, PaletteRefUtils::GetVisibleState(container) ? 1 : 0,
+		PaletteRefUtils::IsEntirePaletteSystemHidden() ? 1 : 0);
+}
+#endif
 
 //----------------------------------------------------------------------------------------
 // Measuring
@@ -877,20 +921,35 @@ void RestoreFloating(IControlView* bookPanel, const PaletteRef& container, const
 	ApplyIconState(FindAncestor(container, &PaletteRefUtils::IsTabPane), p);
 }
 
-/** Is the palette a neighbour's panel sits in open - its dock, docked or floating, on show? Asked of
-    a FLOATING neighbour before the book panel is put into its palette: a panel the user has closed
-    can still hand back a container (ContainerOfPanel's own note), and a book panel put there would
-    disappear with it. A docked neighbour is not asked this (the dock half stands as it was
-    measured). */
-bool NeighbourPaletteIsOpen(IPanelMgr* panelMgr, int32 widgetID)
+/** Is this palette, and every palette above it up to the first dock or floating dock, shown by its own flag
+    (GetVisibleState) and not closed (GetIsClosed)? false for an invalid one. NeighbourIsOpen says why. */
+bool OpenToTheDock(const PaletteRef& from)
 {
-	const PaletteRef container = ContainerOfPanel(panelMgr, widgetID);
-	if (!container.IsValid())
-		return false;
-	PaletteRef dock = FindFloatingDock(container);
-	if (!dock.IsValid())
-		dock = FindAncestor(container, &PaletteRefUtils::IsDock);
-	return dock.IsValid() && PaletteRefUtils::IsPaletteVisible(dock) != kFalse;
+	PaletteRef pal = from;
+	for (int32 guard = 0; guard < 16 && pal.IsValid(); ++guard)
+	{
+		if (!PaletteRefUtils::GetVisibleState(pal) || PaletteRefUtils::GetIsClosed(pal))
+			return false;
+		if (PaletteRefUtils::IsDock(pal) || PaletteRefUtils::IsFloatingTabbedPaletteDock(pal))
+			return true;
+		pal = PaletteRefUtils::GetParentOfPalette(pal);
+	}
+	return from.IsValid();
+}
+
+/** IS A NEIGHBOUR STILL OPEN - asked before the book panel is put beside it, docked or floating
+    (JoinNeighbours)? A panel the user has closed keeps its container where it was, and a book panel put
+    beside it stands in what was closed, nowhere on screen. Measured (block 16's defect re-check,
+    work/note-scripts/2026-10-21-kfc-block16-defect/live_b16d.ps1, scene K): the Pages panel, alone in the
+    right dock, closed from the Window menu kept its container and its tab group shown by their own flags and
+    hid the DOCK above them - and the book panel the restore put into its group stood in that hidden dock with
+    the book open. So every level up to the dock is asked (OpenToTheDock), not the container alone; and by its
+    own flag, which is what a close clears, rather than by IsPaletteVisible - what that says of a panel in a
+    column collapsed to icons is not measured. (Asked of a floating neighbour's floating dock only, before:
+    a closed panel in a palette still on show passed.) */
+bool NeighbourIsOpen(IPanelMgr* panelMgr, int32 widgetID)
+{
+	return OpenToTheDock(ContainerOfPanel(panelMgr, widgetID));
 }
 
 /** Back beside the same neighbours, the closest one that can still be found first: into a mate's
@@ -899,19 +958,27 @@ bool NeighbourPaletteIsOpen(IPanelMgr* panelMgr, int32 widgetID)
     group) or its TAB GROUP (into a column), which is the level each neighbour describes. One walk for
     a dock and for a shared floating palette - the tree has the same shape in both. Each step works out
     where it puts the panel once, and the test build's trace reports that same place (it is what the
-    trace is read for - ReparentUnlessThere's beforeIsSelf).
-    @param askOpen IN whether a neighbour's palette has to be open to be used (NeighbourPaletteIsOpen).
+    trace is read for - ReparentUnlessThere's beforeIsSelf). A neighbour the user has closed is passed
+    over (NeighbourIsOpen).
     @return true when the book panel was moved. */
 bool JoinNeighbours(IPanelMgr* panelMgr, const PaletteRef& container, int32 mate, int32 tabIndex,
-	int32 nextGroupPanel, int32 prevGroupPanel, bool askOpen)
+	int32 nextGroupPanel, int32 prevGroupPanel)
 {
 	const PaletteRef ownGroup = ParentOf(container);
 	if (!Is(ownGroup, &PaletteRefUtils::IsTabGroup))
 		return false;
+#ifdef KFC_DIAG
+	if (mate != 0)
+		LogNeighbour(panelMgr, "mate", mate);
+	if (nextGroupPanel != 0)
+		LogNeighbour(panelMgr, "nextGroup", nextGroupPanel);
+	if (prevGroupPanel != 0)
+		LogNeighbour(panelMgr, "prevGroup", prevGroupPanel);
+#endif
 
 	// 1. A panel it shared a tab group with: back into that group, at its tab's old place.
 	//    (Measured: Pages as the mate, the tab back at 0 and at 1.)
-	if (mate != 0 && (!askOpen || NeighbourPaletteIsOpen(panelMgr, mate)))
+	if (mate != 0 && NeighbourIsOpen(panelMgr, mate))
 	{
 		const PaletteRef mateGroup = ParentOf(ContainerOfPanel(panelMgr, mate));
 		if (Is(mateGroup, &PaletteRefUtils::IsTabGroup))
@@ -926,7 +993,7 @@ bool JoinNeighbours(IPanelMgr* panelMgr, const PaletteRef& container, int32 mate
 	}
 
 	// 2. The group below it: its own group goes back in just above that one. (Measured.)
-	if (nextGroupPanel != 0 && (!askOpen || NeighbourPaletteIsOpen(panelMgr, nextGroupPanel)))
+	if (nextGroupPanel != 0 && NeighbourIsOpen(panelMgr, nextGroupPanel))
 	{
 		const PaletteRef nextGroup = ParentOf(ContainerOfPanel(panelMgr, nextGroupPanel));
 		const PaletteRef column = Is(nextGroup, &PaletteRefUtils::IsTabGroup) ? ParentOf(nextGroup) : PaletteRef();
@@ -940,7 +1007,7 @@ bool JoinNeighbours(IPanelMgr* panelMgr, const PaletteRef& container, int32 mate
 	}
 
 	// 3. The group above it: just below that one. (Measured.)
-	if (prevGroupPanel != 0 && (!askOpen || NeighbourPaletteIsOpen(panelMgr, prevGroupPanel)))
+	if (prevGroupPanel != 0 && NeighbourIsOpen(panelMgr, prevGroupPanel))
 	{
 		const PaletteRef prevGroup = ParentOf(ContainerOfPanel(panelMgr, prevGroupPanel));
 		const PaletteRef column = Is(prevGroup, &PaletteRefUtils::IsTabGroup) ? ParentOf(prevGroup) : PaletteRef();
@@ -966,7 +1033,7 @@ void RestoreDocked(IPanelMgr* panelMgr, const PaletteRef& container, const Place
 		return;
 
 	// 1-3. Beside the same neighbours - see JoinNeighbours (a 0 there = none).
-	if (JoinNeighbours(panelMgr, container, p.mate, p.tabIndex, p.nextGroup, p.prevGroup, false))
+	if (JoinNeighbours(panelMgr, container, p.mate, p.tabIndex, p.nextGroup, p.prevGroup))
 		return;
 
 	// 4. It had a column to itself, so there is no column left to go back into: a new one, beside
@@ -997,6 +1064,13 @@ void RestoreDocked(IPanelMgr* panelMgr, const PaletteRef& container, const Place
 		dock = PaletteRefUtils::FindDockByLocation(static_cast<PaletteRefUtils::DockLocation>(p.dockSide));
 		if (Is(dock, &PaletteRefUtils::IsDock))
 			before = ChildAtOrEnd(dock, p.columnIndex);
+	}
+	// ...and only into a dock still open: one the user emptied by closing its panels is hidden by its own flag
+	// (measured - NeighbourIsOpen), and a new column in it would stand hidden with the book panel in it.
+	if (Is(dock, &PaletteRefUtils::IsDock) && !OpenToTheDock(dock))
+	{
+		KFC_DIAG_LOG("BOOKPANEL RESTORE docked: the dock is closed - left where InDesign put it");
+		return;
 	}
 	if (!Is(dock, &PaletteRefUtils::IsDock))
 	{
@@ -1040,6 +1114,10 @@ void RestoreNow()
 	if (!container.IsValid())
 		return;
 
+	// This opening's first restore, or a re-restore (see gRestoredThisOpening)?
+	const bool reRestore = gRestoredThisOpening;
+	gRestoredThisOpening = true;
+
 	// InDesign put it in a dock itself: that is InDesign's own memory at work - leave it.
 	if (!PaletteRefUtils::IsPaletteFloating(container))
 	{
@@ -1048,8 +1126,15 @@ void RestoreNow()
 	}
 
 	// Put back from a hidden palette = InDesign threw it out of the dock again: counted, so it is only
-	// done a few times per opening (MaybeRestoreAgain arms it on the same question).
-	if (ThrownOutOfTheDock(container))
+	// done a few times per opening (MaybeRestoreAgain arms it on the same question). A re-restore that
+	// finds the panel on show leaves it: the user's floating place (see gRestoredThisOpening).
+	const bool thrownOut = ThrownOutOfTheDock(container);
+	if (reRestore && !thrownOut)
+	{
+		KFC_DIAG_LOG("BOOKPANEL RESTORE-AGAIN dropped: the panel is floating on show now - left where it is");
+		return;
+	}
+	if (thrownOut)
 		++gReRestores;
 	KFC_DIAG_LOG("BOOKPANEL RESTORE remembered docked=%d floatMate=%d reRestores=%d",
 		gRemembered.docked ? 1 : 0, gRemembered.floatMate, gReRestores);
@@ -1057,7 +1142,7 @@ void RestoreNow()
 	if (gRemembered.docked)
 		RestoreDocked(panelMgr, container, gRemembered);
 	else if (!JoinNeighbours(panelMgr, container, gRemembered.floatMate, gRemembered.floatTabIndex,
-				gRemembered.floatNextGroup, gRemembered.floatPrevGroup, true))
+				gRemembered.floatNextGroup, gRemembered.floatPrevGroup))
 		// Floating: back into the palette it shared, when that palette is open (see the file header);
 		// its own place and size otherwise. Joined, the place and size are the palette's - nothing
 		// more is put on it.
@@ -1238,6 +1323,7 @@ void RecountAndMaybeRestore()
 	{
 		KFC_DIAG_LOG("BOOKPANEL RECOUNT 0->%d: restore armed", gBookPanelCount);
 		gReRestores = 0;
+		gRestoredThisOpening = false;
 		gHomeChecks = 0;
 		ArmRestoreTimer();
 	}
@@ -1573,6 +1659,9 @@ void KFCBookPanelObserver::Update(const ClassID& theChange, ISubject* /*theSubje
 	if (!gOn)
 		return;
 
+#ifdef KFC_DIAG
+	LogBookPanelVisibility();
+#endif
 	RecountAndMaybeRestore();
 	MaybeRestoreAgain();
 	MaybeCheckHomeScreen();
