@@ -31,10 +31,11 @@
 //    * the moment a book panel appears where there was none (kPaletteVisibilityChangedMessage, zero
 //      book panels before, one or more now), it is put back: moved into its dock next to the same
 //      neighbours (PaletteRefUtils::ReparentPalette); floating, back into the palette of a neighbour
-//      it shared one with if that palette is open, and otherwise moved and sized. Docked, it is put back
-//      AGAIN when InDesign throws it out of the dock into a hidden palette - and only while it stays
-//      there: palettes hidden and shown again (Show/Hide All Palettes, the Tab key) leave a book panel
-//      the user floated where it is.
+//      it shared one with if that palette is open, and otherwise moved and sized. Into a neighbour's tab
+//      group, it is brought to the front of it (a column folded into icons is left as icons). Docked, it
+//      is put back AGAIN when InDesign throws it out of the dock into a hidden palette - and only while
+//      it stays there: palettes hidden and shown again (Show/Hide All Palettes, the Tab key) leave a
+//      book panel the user floated where it is.
 //
 //  What it deliberately leaves alone:
 //    * a book panel appearing BESIDE another one. It joins that palette as a tab, and moving the
@@ -47,7 +48,10 @@
 //    * a neighbour the user has closed, docked or floating, and a dock the user has emptied by closing
 //      its panels: the Book panel is not put where it cannot be seen - the next neighbour is tried, then
 //      a column of its own or its own place and size, and else it stays where InDesign put it. (A
-//      neighbour in a column folded into icons, or hidden with the rest by the Tab key, is not closed.)
+//      neighbour in a column folded into icons, or hidden with the rest by the Tab key, is not closed.);
+//    * the close of an opening it could not put back (the two above): while the Book panel still stands
+//      where InDesign put it, nothing is written and the placement remembered is kept - moved by the
+//      user since, the new place is recorded (the author's call).
 //
 //  The file: KBSPanelState.json, the one "Save Panel Settings" writes. The toggle itself is written
 //  to it the moment it is flipped (one key), and "Save Panel Settings" writes all of it. EVERY key of

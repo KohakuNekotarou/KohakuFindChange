@@ -214,6 +214,16 @@ int32 gReRestores = 0;		// done since the book panel last appeared (RecountAndMa
     runs tells that moment from InDesign's throw-out, which stays. */
 bool gRestoredThisOpening = false;
 
+/** AN OPENING THAT COULD NOT PUT THE PANEL BACK RECORDS NOTHING while the panel still stands where InDesign put it
+    (the author's call). The restore can leave it there - a dock the user has emptied by closing its panels
+    (RestoreDocked), a remembered place whose title band would land off every screen (RestoreFloating) - and the close
+    then measured InDesign's default floating place and wrote it over the placement remembered, which the next opening
+    could no longer try. So the place is measured as the restore leaves it (RestoreNow), and the close keeps the
+    remembered placement while the panel is still there (RecordPlacement); moved by the user since, the new place is
+    recorded as ever. Put back to false at each opening (RecountAndMaybeRestore). */
+bool gLeftUnplaced = false;
+Placement gWhereInDesignPutIt;
+
 /** THE HOME SCREEN HIDES THE DOCKS (measured). A book opened with InDesign
     itself (a .indb double-clicked while InDesign is not running) opens BEFORE InDesign puts up its
     Home screen, and the Home screen then stays - with every dock hidden under it, the book panel put
@@ -253,11 +263,11 @@ const char* const kKeyIconic      = "bookPanelIconic";
 const char* const kKeyIconicWidth = "bookPanelIconicWidth";
 
 /** Each half's whole numbers, each with the field it is kept in - listed ONCE, and walked by the write
-    (AppendPlacementKeys) and the read (LoadFromSettings) alike. A key is added to a half here and nowhere
-    else (the docked half, the floating neighbours and the dock itself all came after the first version):
-    with a list in each of the two, a key can reach one side only - written and never read back, or the
-    other way round. Templates over the placement, so the write walks a const one and the read the one it
-    fills.
+    (AppendPlacementKeys), the read (LoadFromSettings) and the comparison (SamePlace) alike. A key is added
+    to a half here and nowhere else (the docked half, the floating neighbours and the dock itself all came
+    after the first version): with a list in each of them, a key can reach one side only - written and never
+    read back, or the other way round. Templates over the placement, so the write walks a const one and the
+    read the one it fills.
     The floating half's place and size - read back all four or none (LoadFromSettings): */
 template <class P, class Visit>
 void ForEachFloatPlaceKey(P& p, Visit visit)
@@ -322,9 +332,9 @@ int32 WalkBookPanels(IPanelMgr* panelMgr, IControlView** outFirst)
 	int32 count = 0;
 	KFCBookPanelLookup::ForEachBookPanel(panelMgr, [&](IControlView* panelView, const WidgetID&) -> bool
 	{
-		// Only a panel that is in a palette counts. Measured: a closed book's panel is off
-		// the list by the next look, so this has never had to act - it is here because nothing
-		// PROMISES the list is pruned, and a stale entry would keep the count at one.
+		// Only a panel that has a palette counts: nothing PROMISES the list is pruned, and a stale entry would
+		// keep the count at one. (Measured: a closed book's panel is off the list by the next look - but still on
+		// it while the close runs, out of its palette: CountPlacedBookPanels.)
 		const PaletteRef container = panelMgr->GetPaletteRefContainingPanel(panelView);
 		if (!container.IsValid())
 			return false;
@@ -382,6 +392,28 @@ PaletteRef FindAncestor(const PaletteRef& from, bool16 (*test)(const PaletteRef&
 PaletteRef FindFloatingDock(const PaletteRef& container)
 {
 	return FindAncestor(container, &PaletteRefUtils::IsFloatingTabbedPaletteDock);
+}
+
+/** HOW MANY BOOK PANELS STAND IN A DOCK OR A FLOATING PALETTE - what a book panel APPEARS by, from none
+    (RecountAndMaybeRestore). A dying one is still on the list (measured - live_b16d.ps1, scene J2): the book panel was
+    the front tab of Pages' tab group when its book closed, and the close raised a visibility message (Pages coming to
+    the front) with that panel still listed, its container already out of every palette - no parent above it. Counted,
+    it read "none, then one" with no book open: the count stood at one, the next opening was never put back, and its
+    close wrote InDesign's default place over the one remembered. Only "from none" asks this. A panel KFC moves is out
+    of every palette for a moment too (the message comes inside ReparentPalette): counted out there, the count would go
+    to none and back, and arm a restore in the middle of one - so once a panel is there, the count is
+    WalkBookPanels'. */
+int32 CountPlacedBookPanels(IPanelMgr* panelMgr)
+{
+	int32 placed = 0;
+	KFCBookPanelLookup::ForEachBookPanel(panelMgr, [&](IControlView* panelView, const WidgetID&) -> bool
+	{
+		const PaletteRef container = panelMgr->GetPaletteRefContainingPanel(panelView);
+		if (FindAncestor(container, &PaletteRefUtils::IsDock).IsValid() || FindFloatingDock(container).IsValid())
+			++placed;
+		return false;
+	});
+	return placed;
 }
 
 /** Is the book panel where InDesign leaves it when it throws it out of the dock (see
@@ -514,13 +546,12 @@ std::string DescribePalette(const PaletteRef& pal)
 	return one;
 }
 
-/** A test build's look at a neighbour before the book panel is put beside it (JoinNeighbours): every palette from its
-    container up to its dock or floating dock (DescribePalette) - what a neighbour the user closed, or one in a column
-    folded into icons, looks like at each level. */
-void LogNeighbour(IPanelMgr* panelMgr, const char* role, int32 widgetID)
+/** A test build's look at every palette from a container up to its dock or floating dock (DescribePalette), or
+    " (no container)". */
+std::string DescribeLevels(const PaletteRef& from)
 {
 	std::string levels;
-	PaletteRef pal = ContainerOfPanel(panelMgr, widgetID);
+	PaletteRef pal = from;
 	for (int32 guard = 0; guard < 16 && pal.IsValid(); ++guard)
 	{
 		levels += DescribePalette(pal);
@@ -528,7 +559,15 @@ void LogNeighbour(IPanelMgr* panelMgr, const char* role, int32 widgetID)
 			break;
 		pal = PaletteRefUtils::GetParentOfPalette(pal);
 	}
-	KFC_DIAG_LOG("BOOKPANEL NEIGHBOUR %s=%d%s", role, widgetID, levels.empty() ? " (no container)" : levels.c_str());
+	return levels.empty() ? std::string(" (no container)") : levels;
+}
+
+/** A test build's look at a neighbour before the book panel is put beside it (JoinNeighbours): each level up to its
+    dock - what a neighbour the user closed, or one in a column folded into icons, looks like there. */
+void LogNeighbour(IPanelMgr* panelMgr, const char* role, int32 widgetID)
+{
+	KFC_DIAG_LOG("BOOKPANEL NEIGHBOUR %s=%d%s", role, widgetID,
+		DescribeLevels(ContainerOfPanel(panelMgr, widgetID)).c_str());
 }
 
 /** A test build's look at the book panel on each visibility message: floating or docked, its dock's effective and own
@@ -545,10 +584,10 @@ void LogBookPanelVisibility()
 		return;
 	const bool floating = PaletteRefUtils::IsPaletteFloating(container) != kFalse;
 	const PaletteRef dock = floating ? FindFloatingDock(container) : FindAncestor(container, &PaletteRefUtils::IsDock);
-	KFC_DIAG_LOG("BOOKPANEL VIS floating=%d dockEffective=%d dockOwn=%d containerOwn=%d systemHidden=%d",
+	KFC_DIAG_LOG("BOOKPANEL VIS floating=%d dockEffective=%d dockOwn=%d containerOwn=%d systemHidden=%d levels:%s",
 		floating ? 1 : 0, Is(dock, &PaletteRefUtils::IsPaletteVisible) ? 1 : 0,
 		Is(dock, &PaletteRefUtils::GetVisibleState) ? 1 : 0, PaletteRefUtils::GetVisibleState(container) ? 1 : 0,
-		PaletteRefUtils::IsEntirePaletteSystemHidden() ? 1 : 0);
+		PaletteRefUtils::IsEntirePaletteSystemHidden() ? 1 : 0, DescribeLevels(container).c_str());
 }
 #endif
 
@@ -799,6 +838,47 @@ void RememberAndWrite(const Placement& p, bool sayFailure)
 	}
 }
 
+/** The same place - the half in force, its whole numbers walked through the lists by the keys (so a key added to a
+    half is compared as soon as it is written), and the icon state. */
+bool SamePlace(const Placement& a, const Placement& b)
+{
+	if (a.docked != b.docked || a.iconic != b.iconic)
+		return false;
+	std::vector<int32> numbersA;
+	std::vector<int32> numbersB;
+	const auto intoA = [&numbersA](const char* /*key*/, int32 value) { numbersA.push_back(value); };
+	const auto intoB = [&numbersB](const char* /*key*/, int32 value) { numbersB.push_back(value); };
+	if (a.docked)
+	{
+		ForEachDockKey(a, intoA);
+		ForEachDockKey(b, intoB);
+	}
+	else
+	{
+		ForEachFloatPlaceKey(a, intoA);
+		ForEachFloatNeighbourKey(a, intoA);
+		ForEachFloatPlaceKey(b, intoB);
+		ForEachFloatNeighbourKey(b, intoB);
+	}
+	return numbersA == numbersB;
+}
+
+/** Measure the book panel open now and keep its placement (RememberAndWrite) - the one way a close records one: the
+    interceptor's (OnBookAboutToClose) and Stop's backstop. Not while this opening's restore has left the panel where
+    InDesign put it and it still stands there (gLeftUnplaced): the remembered placement is kept. */
+void RecordPlacement(bool sayFailure)
+{
+	Placement now;
+	if (!MeasureOpenBookPanel(now))
+		return;
+	if (gLeftUnplaced && SamePlace(now, gWhereInDesignPutIt))
+	{
+		KFC_DIAG_LOG("BOOKPANEL MEASURE not recorded: still where InDesign put it - the remembered placement is kept");
+		return;
+	}
+	RememberAndWrite(now, sayFailure);
+}
+
 //----------------------------------------------------------------------------------------
 // Putting it back
 //----------------------------------------------------------------------------------------
@@ -900,18 +980,20 @@ void ApplyIconState(const PaletteRef& tabPane, const Placement& p)
 		PaletteRefUtils::SetTabPaneMode(tabPane, want);
 }
 
-/** Floating: where, how big, and collapsed or not. */
-void RestoreFloating(IControlView* bookPanel, const PaletteRef& container, const Placement& p)
+/** Floating: where, how big, and collapsed or not.
+    @return false - nothing done, the panel left where InDesign put it - when no floating place is remembered, there is
+    no floating dock to move, or the place's title band would land off every screen. */
+bool RestoreFloating(IControlView* bookPanel, const PaletteRef& container, const Placement& p)
 {
 	if (!p.haveFloat)
-		return;
+		return false;
 
 	const PaletteRef dock = FindFloatingDock(container);
 	if (!dock.IsValid())
-		return;
+		return false;
 
 	if (!TitleBandIsOnScreen(p))
-		return;
+		return false;
 
 	// Where the panel sits inside its floating dock (the title band above it), read BEFORE anything
 	// moves: the dock's position and the panel's global bounds then describe the same settled layout.
@@ -939,6 +1021,7 @@ void RestoreFloating(IControlView* bookPanel, const PaletteRef& container, const
 	// And last, collapsed to icons or not (the user's request). Last because the size is
 	// what the panel expands to, and it is set on the expanded panel.
 	ApplyIconState(FindAncestor(container, &PaletteRefUtils::IsTabPane), p);
+	return true;
 }
 
 /** Is this dock or floating dock on show (IsPaletteVisible) and not closed (GetIsClosed)? false for an invalid
@@ -1049,16 +1132,17 @@ bool JoinNeighbours(IPanelMgr* panelMgr, const PaletteRef& container, int32 mate
 }
 
 /** Docked: into the dock next to the same neighbours (JoinNeighbours), and when none can be found, a
-    new column beside the column that was next to it. */
-void RestoreDocked(IPanelMgr* panelMgr, const PaletteRef& container, const Placement& p)
+    new column beside the column that was next to it.
+    @return false when the panel is left where InDesign put it. */
+bool RestoreDocked(IPanelMgr* panelMgr, const PaletteRef& container, const Placement& p)
 {
 	const PaletteRef ownGroup = ParentOf(container);
 	if (!Is(ownGroup, &PaletteRefUtils::IsTabGroup))
-		return;
+		return false;
 
 	// 1-3. Beside the same neighbours - see JoinNeighbours (a 0 there = none).
 	if (JoinNeighbours(panelMgr, container, p.mate, p.tabIndex, p.nextGroup, p.prevGroup))
-		return;
+		return true;
 
 	// 4. It had a column to itself, so there is no column left to go back into: a new one, beside
 	//    the column that was after it (or before it), in the same icon state and width.
@@ -1095,12 +1179,12 @@ void RestoreDocked(IPanelMgr* panelMgr, const PaletteRef& container, const Place
 	{
 		KFC_DIAG_LOG("BOOKPANEL RESTORE docked: the dock is not on show (%s) - left where InDesign put it",
 			DescribePalette(dock).c_str());
-		return;
+		return false;
 	}
 	if (!Is(dock, &PaletteRefUtils::IsDock))
 	{
 		KFC_DIAG_LOG("BOOKPANEL RESTORE docked: no neighbour and no dock found - left where InDesign put it");
-		return;		// no neighbour left to find the place by - it stays where InDesign put it
+		return false;		// no neighbour left to find the place by - it stays where InDesign put it
 	}
 
 	const PaletteRef newColumn = PaletteRefUtils::NewTabPaneInDock(dock,
@@ -1110,7 +1194,7 @@ void RestoreDocked(IPanelMgr* panelMgr, const PaletteRef& container, const Place
 		PaletteRefUtils::IsFloatingTabbedPaletteDock(dock) ? 1 : 0, before.IsValid() ? "sibling" : "nothing (the end)",
 		Is(newColumn, &PaletteRefUtils::IsTabPane) ? 1 : 0);
 	if (!Is(newColumn, &PaletteRefUtils::IsTabPane))
-		return;
+		return false;
 	// NewTabPaneInDock DOES NOT TAKE THE TOOLBOX AS "BEFORE" (measured). A
 	// column that sat between the document and the docked toolbox (the toolbox is a dock child too -
 	// IsToolbar, not IsTabPane) was recorded as column 0 of 2; with the column gone, the child at 0 is
@@ -1122,6 +1206,31 @@ void RestoreDocked(IPanelMgr* panelMgr, const PaletteRef& container, const Place
 		PaletteRefUtils::ReparentPalette(newColumn, dock, before);
 	PaletteRefUtils::ReparentPalette(ownGroup, newColumn, PaletteRef());
 	ApplyIconState(newColumn, p);
+	return true;
+}
+
+/** A BOOK PANEL PUT INTO A NEIGHBOUR'S TAB GROUP STAYS BEHIND the tab that was in front (measured: Pages, and the
+    floating KFC panel, kept the front - live_b16d.ps1 scenes J and M), so the book just opened shows no panel. It is
+    brought forward the way InDesign shows a panel - IPanelMgr::ShowPanelByWidgetID, what a panel's Window-menu item
+    does (SnpShowPalette.cpp's ShowHideByWidget) - and without the keyboard. (The author's call: forward, as InDesign
+    shows the panel of a book it opens.) Only when the restore moved it into another group (groupBefore): left in its
+    own, it is in front already, and one put back where it already stood - after a cancelled close - is not moved. Not
+    in a column folded into icons either: every panel there is on show as its icon, and showing one opens its drawer
+    over the document. (Shown, the book panel widened the narrower Pages column to its own width, and InDesign kept that
+    width after the book closed - measured 148 -> 240, scenes J and T. Not a fault of the restore, but a column grown
+    under a floating palette makes Pages' Window-menu item bring it forward instead of closing it - measured.) */
+void BringForwardIfJoined(IPanelMgr* panelMgr, IControlView* bookPanel, const PaletteRef& groupBefore)
+{
+	const PaletteRef container = panelMgr->GetPaletteRefContainingPanel(bookPanel);
+	const PaletteRef group = ParentOf(container);
+	if (group == groupBefore || !Is(group, &PaletteRefUtils::IsTabGroup)
+			|| PaletteRefUtils::GetChildCountOfPalette(group) < 2)
+		return;
+	const PaletteRef column = FindAncestor(container, &PaletteRefUtils::IsTabPane);
+	if (column.IsValid() && PaletteRefUtils::GetTabPaneMode(column) == PaletteRefUtils::kIcon_TabPaneMode)
+		return;
+	KFC_DIAG_LOG("BOOKPANEL RESTORE brought forward in the tab group it joined");
+	panelMgr->ShowPanelByWidgetID(bookPanel->GetWidgetID(), kFalse);
 }
 
 /** Put the remembered placement on the book panel that is open now. Runs from the timer. */
@@ -1164,14 +1273,31 @@ void RestoreNow()
 	KFC_DIAG_LOG("BOOKPANEL RESTORE remembered docked=%d floatMate=%d reRestores=%d",
 		gRemembered.docked ? 1 : 0, gRemembered.floatMate, gReRestores);
 
+	const PaletteRef groupBefore = ParentOf(container);
+	bool putBack = false;
 	if (gRemembered.docked)
-		RestoreDocked(panelMgr, container, gRemembered);
-	else if (!JoinNeighbours(panelMgr, container, gRemembered.floatMate, gRemembered.floatTabIndex,
-				gRemembered.floatNextGroup, gRemembered.floatPrevGroup))
+		putBack = RestoreDocked(panelMgr, container, gRemembered);
+	else
 		// Floating: back into the palette it shared, when that palette is open (see the file header);
 		// its own place and size otherwise. Joined, the place and size are the palette's - nothing
 		// more is put on it.
-		RestoreFloating(bookPanel, container, gRemembered);
+		putBack = JoinNeighbours(panelMgr, container, gRemembered.floatMate, gRemembered.floatTabIndex,
+				gRemembered.floatNextGroup, gRemembered.floatPrevGroup)
+			|| RestoreFloating(bookPanel, container, gRemembered);
+
+	// Put back: forward in a tab group it joined (BringForwardIfJoined). Left where InDesign put it: that place is
+	// measured, and the close keeps the remembered placement while the panel stays there (gLeftUnplaced).
+	if (putBack)
+	{
+		gLeftUnplaced = false;
+		BringForwardIfJoined(panelMgr, bookPanel, groupBefore);
+	}
+	else
+	{
+		gLeftUnplaced = Measure(panelMgr, bookPanel, gWhereInDesignPutIt);
+		KFC_DIAG_LOG("BOOKPANEL RESTORE left where InDesign put it - nothing recorded while it stays (measured=%d)",
+			gLeftUnplaced ? 1 : 0);
+	}
 
 #ifdef KFC_DIAG
 	const PaletteRef after = panelMgr->GetPaletteRefContainingPanel(bookPanel);
@@ -1344,11 +1470,19 @@ void RecountAndMaybeRestore()
 	const int32 previous = gBookPanelCount;
 	gBookPanelCount = WalkBookPanels(panelMgr, nil);
 
+	// From none, only a book panel standing in a palette has appeared - not a dying one (CountPlacedBookPanels).
+	if (previous == 0 && gBookPanelCount > 0 && CountPlacedBookPanels(panelMgr) == 0)
+	{
+		KFC_DIAG_LOG("BOOKPANEL RECOUNT 0->%d not taken: no book panel stands in a palette", gBookPanelCount);
+		gBookPanelCount = 0;
+	}
+
 	if (previous == 0 && gBookPanelCount > 0 && gRemembered.IsUsable())
 	{
 		KFC_DIAG_LOG("BOOKPANEL RECOUNT 0->%d: restore armed", gBookPanelCount);
 		gReRestores = 0;
 		gRestoredThisOpening = false;
+		gLeftUnplaced = false;
 		gHomeChecks = 0;
 		ArmRestoreTimer();
 	}
@@ -1462,9 +1596,7 @@ void OnBookAboutToClose()
 	if (!gOn)
 		return;
 
-	Placement now;
-	if (MeasureOpenBookPanel(now))
-		RememberAndWrite(now, true);
+	RecordPlacement(true);
 
 	// Still counted: the command has not run yet, so the closing book is one of these.
 	InterfacePtr<IBookManager> bookMgr(GetExecutionContextSession(), UseDefaultIID());
@@ -1524,11 +1656,7 @@ void Stop()
 	// none. Kept as a backstop for a build that closes them later - it does nothing when there is no
 	// Book panel. Nothing is said on failure: InDesign is quitting.
 	if (gOn)
-	{
-		Placement now;
-		if (MeasureOpenBookPanel(now))
-			RememberAndWrite(now, false);
-	}
+		RecordPlacement(false);
 
 	LetGoOfEverything();
 }
