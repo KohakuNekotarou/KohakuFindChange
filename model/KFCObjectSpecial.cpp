@@ -26,12 +26,14 @@
 #include "IPersistUIDData.h"				// IID_IPERSISTOBJECTSTYLEDATA - the object style applied to an item
 #include "ISpreadLayer.h"					// GetDocLayerUID - the layer an item at the top of a spread layer is on
 #include "ITransformFacade.h"				// Object > Transform
+#include "ITransformPanelPrefs.h"			// the Transform panel's settings InDesign's own transforms read
 #include "IWorkspace.h"
 
 // General includes:
 #include "ErrorUtils.h"
 #include "GenericID.h"						// IID_IPERSISTOBJECTSTYLEDATA
 #include "K2Vector.h"
+#include "PreferenceUtils.h"				// QuerySessionPreferences
 #include "TransformTypes.h"
 #include "UIDList.h"
 #include "Utils.h"
@@ -248,6 +250,31 @@ UID StyleOf(IDataBase* db, UID item)
 	return (style != nil) ? style->GetUID() : kInvalidUID;
 }
 
+// THE TRANSFORM PANEL'S SETTINGS, as InDesign's own transforms read them (the session's ITransformPanelPrefs, read as
+// publiclib's CPathCreationTracker reads it). Measured against InDesign's own: with Dimensions Include Stroke Weight
+// off, its Rotate 90 Degrees Clockwise turns an item about its path's centre, not its stroke's; with Transformations
+// are Totals off, its Clear Transformations clears an item in a group in the group's coordinates - its Move, Flip and
+// Shear stay in the pasteboard's either way.
+// The bounds an item's centre is taken from (TransformEach).
+Geometry::BoundsKind CentreBounds()
+{
+	Geometry::BoundsKind bounds = Geometry::PathBounds();
+	InterfacePtr<ITransformPanelPrefs> prefs(QuerySessionPreferences<ITransformPanelPrefs>());
+	if (prefs != nil)
+		bounds = prefs->GetShowStrokeBounds();
+	return bounds;
+}
+
+// The coordinates Clear Transformations clears in.
+Transform::CoordinateSpace ClearSpace()
+{
+	Transform::CoordinateSpace space = Transform::PasteboardCoordinates();
+	InterfacePtr<ITransformPanelPrefs> prefs(QuerySessionPreferences<ITransformPanelPrefs>());
+	if (prefs != nil)
+		space = prefs->GetCoordinateSpace();
+	return space;
+}
+
 // MOVE TO ACTIVE LAYER'S DOORS (E11): an item at the top of a spread layer - one in a group or in text goes with its group
 // or its story (InDesign's own moves the selection's outermost items - LayerSuiteLayoutCSB.cpp); its document's layer of
 // that name, not the one it is on. With no name (the menu's question - CanSpecialHit), the first door alone.
@@ -356,7 +383,7 @@ Refusal AskInDesign(const OpInfo& info, const KFCSpecialParams& params, const UI
 		case kKFCSpecialClearTransformations:
 		{
 			Utils<Facade::ITransformFacade> transform;
-			can = transform && transform->CanRemoveItemsTransformations(one, Transform::PasteboardCoordinates()) != kFalse;
+			can = transform && transform->CanRemoveItemsTransformations(one, ClearSpace()) != kFalse;
 			break;
 		}
 		case kKFCSpecialLock:
@@ -456,16 +483,18 @@ Transform::TransformValue ShearBy(const KFCSpecialParams& params)
 }
 
 // TRANSFORM EACH ITEM ABOUT ITS OWN CENTRE (E5) - the official shape (codesnippets/SnpTransformPageItems.cpp:
-// ITransformFacade::TransformItems), one item at a time, so each turns or flips where it stands. kSuccess, or the error.
+// ITransformFacade::TransformItems), one item at a time, so each turns or flips where it stands - about the centre of
+// the bounds InDesign's own transforms take (CentreBounds). kSuccess, or the error.
 ErrorCode TransformEach(const UIDList& items, const Transform::TransformValue& how)
 {
 	Utils<Facade::ITransformFacade> transform;
 	if (!transform)
 		return kFailure;
+	const Geometry::BoundsKind bounds = CentreBounds();
 	for (int32 i = 0; i < items.Length(); ++i)
 	{
 		const ErrorCode err = transform->TransformItems(UIDList(items.GetDataBase(), items[i]), Transform::PasteboardCoordinates(),
-			Transform::CenterLocation(Geometry::OuterStrokeBounds()), how);
+			Transform::CenterLocation(bounds), how);
 		if (err != kSuccess)
 			return err;
 		if (ErrorUtils::PMGetGlobalErrorCode() != kSuccess)
@@ -568,7 +597,7 @@ ErrorCode WriteDocument(const OpInfo& info, const KFCSpecialParams& params, cons
 		case kKFCSpecialClearTransformations:
 		{
 			Utils<Facade::ITransformFacade> transform;
-			return transform ? transform->RemoveItemsTransformations(items, Transform::PasteboardCoordinates()) : kFailure;
+			return transform ? transform->RemoveItemsTransformations(items, ClearSpace()) : kFailure;
 		}
 		case kKFCSpecialLock:
 		case kKFCSpecialUnlock:
