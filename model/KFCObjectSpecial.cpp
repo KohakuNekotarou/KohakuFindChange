@@ -16,6 +16,7 @@
 #include "IDocument.h"						// GetDocWorkSpace - Clear Object Style Overrides
 #include "IDocumentLayer.h"					// Move to Active Layer's layer
 #include "IFrameContentFacade.h"			// Object > Fitting
+#include "IGeometryFacade.h"				// GetItemBounds - an item's and its spread's bounds (BeyondPasteboard)
 #include "IHierarchy.h"
 #include "ILayerFacade.h"					// MoveToLayer - the Layers panel's own (layerpanel/LayerSuiteLayoutCSB.cpp)
 #include "IObjectStylesFacade.h"			// ApplyObjectStyleToUIDList - the Object Styles panel's Clear Overrides
@@ -39,6 +40,7 @@
 #include "Utils.h"
 
 #include <algorithm>		// std::remove_if - the rows written taken off the rows the write moves
+#include <cmath>			// std::isfinite - a transform's result measured (BeyondPasteboard)
 #include <map>
 #include <set>
 #include <utility>
@@ -138,6 +140,7 @@ enum Refusal
 	kRefusedNested,			// Move to Active Layer: in a group or in text - its group or its story moves it
 	kRefusedNoLayer,		// ...its document has no layer of that name
 	kRefusedOnLayer,		// ...on that layer already
+	kRefusedBeyondPasteboard,	// a transform would take it a pasteboard beyond its spread's (BeyondPasteboard)
 	kRefusedNotApplicable,	// InDesign's own question said no (OpInfo::notApplicable)
 	kRefusedUnchanged,		// written, and InDesign changed nothing of it (E7 - not marked)
 	kRefusalCount
@@ -171,6 +174,7 @@ PMString RowSentence(const OpInfo& info, Refusal why, const KFCSpecialParams& pa
 			out.Append(params.text);
 			out.Append("\" already.");
 			break;
+		case kRefusedBeyondPasteboard:	out = "the object would go beyond the pasteboard - left as it is."; break;
 		case kRefusedNotApplicable:
 			out = info.notApplicable;
 			out.Append(" - left as it is.");
@@ -209,6 +213,7 @@ PMString RefusalWords(const OpInfo& info, Refusal why, const KFCSpecialParams& p
 			out.Append(params.text);
 			out.Append("\" already");
 			break;
+		case kRefusedBeyondPasteboard:	out = "beyond the pasteboard"; break;
 		case kRefusedNotApplicable:	out = info.notApplicable; break;
 		case kRefusedUnchanged:		out = "unchanged"; break;
 		default:					break;
@@ -482,6 +487,57 @@ Transform::TransformValue ShearBy(const KFCSpecialParams& params)
 	return Transform::TransformBy(m);
 }
 
+// THE TRANSFORM OF AN OPERATION THAT WRITES EACH ITEM (kWriteEach) - the write's (TransformEach) and the measure of its
+// result (BeyondPasteboard). Transform::RotateBy takes the angle as InDesign's dialogs do - counter-clockwise positive.
+Transform::TransformValue TransformOf(const OpInfo& info, const KFCSpecialParams& params)
+{
+	switch (info.op)
+	{
+		case kKFCSpecialRotate90CW:		return Transform::RotateBy(-90.0);
+		case kKFCSpecialRotate90CCW:	return Transform::RotateBy(90.0);
+		case kKFCSpecialRotate180:		return Transform::RotateBy(180.0);
+		case kKFCSpecialFlipHorizontal:	return Transform::ScaleBy(-1.0, 1.0);
+		case kKFCSpecialFlipVertical:	return Transform::ScaleBy(1.0, -1.0);
+		case kKFCSpecialMove:			return Transform::TranslateBy(params.x, params.y);
+		case kKFCSpecialScale:			return Transform::ScaleBy(params.x / 100.0, params.y / 100.0);
+		case kKFCSpecialRotate:			return Transform::RotateBy(params.x);
+		case kKFCSpecialShear:			return ShearBy(params);
+		default:						return Transform::TranslateBy(0.0, 0.0);	// (no operation of this table)
+	}
+}
+
+// BEYOND THE PASTEBOARD: would the transform take the item more than a pasteboard beyond its spread's pasteboard? Its
+// bounds as they stand (pasteboard coordinates - the centre's bounds) transformed about their centre, against the
+// spread's bounds grown by their own width and height on each side. InDesign's own trackers keep a drag inside the
+// spread's bounds (CLayoutTracker, CPathCreationTracker) and its Move and Scale dialogs warn of objects lost from the
+// pasteboard and too large - let past that warning, a Scale of 999999999% took InDesign down (measured); so a value out
+// of all measure, or one a dialog read as infinite, is refused here, before anything is written. Not finite = beyond.
+bool BeyondPasteboard(IDataBase* db, UID item, const Transform::TransformValue& how, const Geometry::BoundsKind& bounds)
+{
+	Utils<Facade::IGeometryFacade> geometry;
+	InterfacePtr<IHierarchy> hier(db, item, UseDefaultIID());
+	const UID spread = (hier != nil) ? hier->GetSpreadUID() : kInvalidUID;
+	if (!geometry || spread == kInvalidUID)
+		return false;		// (nothing to measure by - InDesign's own refusals are left to stop it)
+	const PMRect board = geometry->GetItemBounds(UIDRef(db, spread), Transform::PasteboardCoordinates(),
+		Geometry::OuterStrokeBounds());
+	const PMRect now = geometry->GetItemBounds(UIDRef(db, item), Transform::PasteboardCoordinates(), bounds);
+	const PMReal cx = (now.Left() + now.Right()) / 2;
+	const PMReal cy = (now.Top() + now.Bottom()) / 2;
+	PMRect after(now.Left() - cx, now.Top() - cy, now.Right() - cx, now.Bottom() - cy);
+	how.transformMatrix.Transform(&after);		// (the smallest upright rectangle holding the transformed one)
+	const double left = ::ToDouble(after.Left() + cx);
+	const double top = ::ToDouble(after.Top() + cy);
+	const double right = ::ToDouble(after.Right() + cx);
+	const double bottom = ::ToDouble(after.Bottom() + cy);
+	if (!std::isfinite(left) || !std::isfinite(top) || !std::isfinite(right) || !std::isfinite(bottom))
+		return true;
+	const double width = ::ToDouble(board.Width());
+	const double height = ::ToDouble(board.Height());
+	return left < ::ToDouble(board.Left()) - width || top < ::ToDouble(board.Top()) - height
+		|| right > ::ToDouble(board.Right()) + width || bottom > ::ToDouble(board.Bottom()) + height;
+}
+
 // TRANSFORM EACH ITEM ABOUT ITS OWN CENTRE (E5) - the official shape (codesnippets/SnpTransformPageItems.cpp:
 // ITransformFacade::TransformItems), one item at a time, so each turns or flips where it stands - about the centre of
 // the bounds InDesign's own transforms take (CentreBounds). kSuccess, or the error.
@@ -579,16 +635,16 @@ ErrorCode WriteDocument(const OpInfo& info, const KFCSpecialParams& params, cons
 			if (info.op == kKFCSpecialSendBackward)		return arrange->ProcessSendBackward(items);
 			return arrange->ProcessSendToBack(items, kInvalidUID, kFalse);
 		}
-		// (Transform::RotateBy takes the angle as InDesign's dialogs do - counter-clockwise positive.)
-		case kKFCSpecialRotate90CW:		return TransformEach(items, Transform::RotateBy(-90.0));
-		case kKFCSpecialRotate90CCW:	return TransformEach(items, Transform::RotateBy(90.0));
-		case kKFCSpecialRotate180:		return TransformEach(items, Transform::RotateBy(180.0));
-		case kKFCSpecialFlipHorizontal:	return TransformEach(items, Transform::ScaleBy(-1.0, 1.0));
-		case kKFCSpecialFlipVertical:	return TransformEach(items, Transform::ScaleBy(1.0, -1.0));
-		case kKFCSpecialMove:			return TransformEach(items, Transform::TranslateBy(params.x, params.y));
-		case kKFCSpecialScale:			return TransformEach(items, Transform::ScaleBy(params.x / 100.0, params.y / 100.0));
-		case kKFCSpecialRotate:			return TransformEach(items, Transform::RotateBy(params.x));
-		case kKFCSpecialShear:			return TransformEach(items, ShearBy(params));
+		case kKFCSpecialRotate90CW:
+		case kKFCSpecialRotate90CCW:
+		case kKFCSpecialRotate180:
+		case kKFCSpecialFlipHorizontal:
+		case kKFCSpecialFlipVertical:
+		case kKFCSpecialMove:
+		case kKFCSpecialScale:
+		case kKFCSpecialRotate:
+		case kKFCSpecialShear:
+			return TransformEach(items, TransformOf(info, params));
 		case kKFCSpecialRedefineScaling:
 		{
 			Utils<Facade::ITransformFacade> transform;
@@ -728,6 +784,10 @@ bool KFCObjectSpecial::SpecialRows(int32 op, const KFCRowsByChapter& rows, const
 	// THE DOORS, ROW BY ROW: the rows that pass are written, the rest counted by their reason.
 	int32 counts[kRefusalCount] = {};
 	Refusal lastWhy = kRefusedNone;
+	// A TRANSFORM'S RESULT is measured at the doors, before anything is written (BeyondPasteboard) - its transform and
+	// the bounds its centre is taken from, once.
+	const Transform::TransformValue how = TransformOf(info, params);
+	const Geometry::BoundsKind centreBounds = CentreBounds();
 	std::vector<SpecialChapter> chapters(rows.size());
 	KFCReplaceEngine::DocsAfterWrite docsAfter;		// what each document is left as, on every way out from here
 	size_t toWrite = 0;
@@ -738,7 +798,10 @@ bool KFCObjectSpecial::SpecialRows(int32 op, const KFCRowsByChapter& rows, const
 		for (size_t k = 0; k < rows[c].hits.size(); ++k)
 		{
 			UID item = kInvalidUID;
-			const Refusal why = CheckItem(info, params, chapter.chapterIdx, rows[c].hits[k], true, chapter.docRef, item);
+			Refusal why = CheckItem(info, params, chapter.chapterIdx, rows[c].hits[k], true, chapter.docRef, item);
+			if (why == kRefusedNone && info.kind == kWriteEach
+				&& BeyondPasteboard(chapter.docRef.GetDataBase(), item, how, centreBounds))
+				why = kRefusedBeyondPasteboard;
 			if (why != kRefusedNone)
 			{
 				++counts[why];

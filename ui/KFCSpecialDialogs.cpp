@@ -27,7 +27,7 @@
 #include "Utils.h"
 #include "WideString.h"				// a text read as characters - JsLiteral
 
-#include <cmath>					// std::fabs
+#include <cmath>					// std::fabs, std::isfinite
 #include <cstdio>					// std::snprintf
 #include <cstdlib>					// std::strtod
 #include <string>
@@ -225,7 +225,10 @@ const char* const kMove = R"JS(
   var ok = buttons(w);
   ok.onClick = function () {
     var x = len(eh.text, hu), y = len(ev.text, vu);
-    if (x === null || y === null) { alert("Type a distance - a number, or a number and one of pt, mm, cm, in, pc, px, Q, H."); return; }
+    if (x === null || y === null || !isFinite(x) || !isFinite(y)) {
+      alert("Type a distance - a number, or a number and one of pt, mm, cm, in, pc, px, Q, H.");
+      return;
+    }
     answer = "ok;" + x + ";" + y + ";" + ascii(eh.text) + ";" + ascii(ev.text);
     w.close(1);
   };
@@ -276,7 +279,10 @@ const char* const kScale = R"JS(
   ok.onClick = function () {
     var x = num(ex.text, "%?"), y = num(ey.text, "%?");
     if (chain.value) y = x;
-    if (x === null || y === null || x === 0 || y === 0) { alert("Type a percentage other than 0."); return; }
+    if (x === null || y === null || x === 0 || y === 0 || !isFinite(x) || !isFinite(y)) {
+      alert("Type a percentage other than 0.");
+      return;
+    }
     answer = "ok;" + x + ";" + y + ";" + fmt(x) + ";" + fmt(y) + ";" + (chain.value ? "1" : "0");
     w.close(1);
   };
@@ -396,7 +402,7 @@ const char* const kRotate = R"JS(
   var ok = buttons(w);
   ok.onClick = function () {
     var a = angle(ea.text);
-    if (a === null) { alert("Type an angle in degrees."); return; }
+    if (a === null || !isFinite(a)) { alert("Type an angle in degrees."); return; }
     answer = "ok;" + a + ";0;" + fmt(a);
     w.close(1);
   };
@@ -445,9 +451,23 @@ const char* const kPages = R"JS(
   col.add("statictext", undefined, "e.g. 1-5, 8");
   var ok = buttons(w);
   e.active = true;
+  // A lone surrogate (a pasted text can carry one) does not reach the plug-in whole - its UTF-8 throws or turns into
+  // another character - so a text holding one is refused as an empty one is.
+  function lone(s) {
+    for (var i = 0; i < s.length; i++) {
+      var c = s.charCodeAt(i);
+      if (c >= 0xD800 && c <= 0xDBFF) {
+        var d = s.charCodeAt(i + 1);
+        if (d >= 0xDC00 && d <= 0xDFFF) { i++; continue; }
+        return true;
+      }
+      if (c >= 0xDC00 && c <= 0xDFFF) return true;
+    }
+    return false;
+  }
   ok.onClick = function () {
     var t = trim(e.text);
-    if (t === "") { alert("Type the pages - for example 1-5, 8."); return; }
+    if (t === "" || lone(t)) { alert("Type the pages - for example 1-5, 8."); return; }
     answer = "ok;" + t;
     w.close(1);
   };
@@ -486,8 +506,34 @@ enum DialogRun
 {
 	kDialogAnswered = 0,
 	kDialogNoEngine,		// no script engine to run it in
-	kDialogFailed			// it ran into an error, or answered nothing that reads as text
+	kDialogFailed,			// it ran into an error, or answered nothing that reads as text
+	kDialogBroken			// it answered a text holding a lone surrogate (HasLoneSurrogate)
 };
+
+// A LONE SURROGATE in a text, its UTF-16 read as it stands: GetUTF8String takes a lone high one together with the
+// character after it (or, at the end, makes something else of it), and SetUTF8String throws on a lone low one's UTF-8
+// (measured - KT's u8trip probe) - so no UTF-8 is made of a text holding one.
+bool HasLoneSurrogate(const PMString& s)
+{
+	int32 n = 0;
+	const UTF16TextChar* u = s.GrabUTF16Buffer(&n);
+	for (int32 i = 0; u != nil && i < n; ++i)
+	{
+		if (u[i] >= 0xD800 && u[i] <= 0xDBFF)
+		{
+			if (i + 1 < n && u[i + 1] >= 0xDC00 && u[i + 1] <= 0xDFFF)
+			{
+				++i;
+				continue;
+			}
+			return true;
+		}
+		if (u[i] >= 0xDC00 && u[i] <= 0xDFFF)
+			return true;
+	}
+	return false;
+}
+
 DialogRun RunDialog(const std::string& js, std::string& outAnswer)
 {
 	Utils<IExtendScriptUtils> esUtils;
@@ -507,6 +553,8 @@ DialogRun RunDialog(const std::string& js, std::string& outAnswer)
 	if (ran != kSuccess || !errorString.IsEmpty() || result.GetType() != ScriptData::s_string
 		|| result.GetPMString(answerText) != kSuccess)
 		return kDialogFailed;
+	if (HasLoneSurrogate(answerText))
+		return kDialogBroken;
 	outAnswer = answerText.GetUTF8String();
 	return kDialogAnswered;
 }
@@ -549,9 +597,12 @@ bool KFCSpecialDialogs::AskPageRange(PMString& io, PMString& outWhy)
 	const DialogRun run = RunDialog(js, answer);
 	if (run != kDialogAnswered)
 	{
-		outWhy.Append(run == kDialogNoEngine
-			? "Narrow Down: the dialog could not be shown (no script engine) - nothing was searched."
-			: "Narrow Down: the dialog could not be shown - nothing was searched.");
+		if (run == kDialogNoEngine)
+			outWhy.Append("Narrow Down: the dialog could not be shown (no script engine) - nothing was searched.");
+		else if (run == kDialogBroken)
+			outWhy.Append("Narrow Down: the pages typed hold a broken character - nothing was searched.");
+		else
+			outWhy.Append("Narrow Down: the dialog could not be shown - nothing was searched.");
 		return false;
 	}
 	// "ok;<the range>" - the range is everything after the first ';' (it holds no ';' of its own that matters: a range is
@@ -626,6 +677,15 @@ bool KFCSpecialDialogs::AskTransformValues(int32 op, KFCSpecialParams& io, PMStr
 		return false;		// Cancel: nothing written, nothing said
 	io.x = std::strtod(f[1].c_str(), nil);
 	io.y = std::strtod(f[2].c_str(), nil);
+	// NOT FINITE - refused (the script's own OK asks isFinite; an answer of "Infinity" reads back as inf, and no
+	// transform can be made of it - KFCObjectSpecial's doors measure what a finite one would do).
+	if (!std::isfinite(io.x) || !std::isfinite(io.y))
+	{
+		outWhy = OpName(op);
+		outWhy.Append(": the values are too large - nothing was changed.");
+		outWhy.SetTranslatable(kFalse);
+		return false;
+	}
 	// What was typed, kept for the next one (an empty echo - not ASCII - keeps the last).
 	switch (op)
 	{
