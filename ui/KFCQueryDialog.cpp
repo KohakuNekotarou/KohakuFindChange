@@ -24,14 +24,12 @@
 #include "ISession.h"
 #include "ISubject.h"
 #include "ITextControlData.h"		// the Runs on: line
-#include "ITreeViewController.h"	// IID_ITREEVIEWCONTROLLER - the lists' selection, observed
-#include "IBooleanControlData.h"	// IID_IBOOLEANCONTROLDATA - a push button's press, observed (CDialogObserver.cpp's OK / Cancel)
 #include "IWindow.h"				// GetSysWindow - the platform window behind the dialog (the minimize box)
 #include "IDropDownListController.h"	// Select - a loaded query chosen in Find/Change's own Query menu
 #include "IStringListControlData.h"		// GetIndex - that menu's entries, found by name
 #include "IFindChangeOptions.h"			// kObjectSearch - the tab Find searches with no format (PressFind)
 #include "FindChangeID.h"				// kFindQueryDropDownWidgetID - the Query menu
-#include "widgetid.h"				// kTrueStateMessage / kListSelectionChangedMessage
+#include "widgetid.h"				// IID_IBOOLEANCONTROLDATA / IID_ITREEVIEWCONTROLLER and their messages
 
 // General includes:
 #include "CDialogController.h"
@@ -91,8 +89,8 @@ namespace
 
 	/** Grey the buttons that have nothing to act on (the spec's section 2-2): Add with no saved query picked; Remove with
 	    no row of the order picked; Move Up on the first row, Move Down on the last; Clear and Save Order... with an empty
-	    order. Load Order..., Find and Run are never grey (G5 as changed: a run that cannot go says why on the panel - and
-	    Find the same, the stacked results' spec section 2-1). */
+	    order. Load Order..., Find and Run are never grey - nothing here touches them (G5 as changed: a run that cannot
+	    go says why on the panel - and Find the same, the stacked results' spec section 2-1). */
 	void UpdateButtons(IPanelControlData* panel)
 	{
 		if (panel == nil)
@@ -106,7 +104,6 @@ namespace
 		EnableButton(panel, kKFCQueryDownButtonWidgetID, right >= 0 && right + 1 < rows);
 		EnableButton(panel, kKFCQueryClearButtonWidgetID, rows > 0);
 		EnableButton(panel, kKFCQuerySaveOrderButtonWidgetID, rows > 0);
-		EnableButton(panel, kKFCQueryLoadOrderButtonWidgetID, true);
 	}
 
 	/** The dialog's own message line (the author's call): the words the panel's message line is given, here
