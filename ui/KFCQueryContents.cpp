@@ -222,7 +222,9 @@ namespace
 	{
 		out = KFCQueryOrder::KindAndName(query);
 		out.SetTranslatable(kFalse);
-		if (!query.exists)
+		// Asked of the disk now, not of the row's mark - that was read when the dialog opened or loaded the order, and
+		// a query can be deleted (or put back) since: the double click and Find ask the same way (case qd-pick-gone).
+		if (!FileUtils::DoesFileExist(query.file))
 		{
 			out.Append(": its file is not there.");
 			return false;
