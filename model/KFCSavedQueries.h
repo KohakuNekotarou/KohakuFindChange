@@ -8,9 +8,9 @@
 //  section 2-2). What the query dialog's left list offers, and what a path in its run order is called: the user's
 //  queries (FileUtils::GetAppRoamingDataFolder(.., "Find-Change Queries")\<kind>\*.xml) and InDesign's own
 //  (FileUtils::GetPresetsFolder(.., "Find-Change Queries\<kind>", the UI language)\*.xml - InDesign's put the language's
-//  folder UNDER the kind's). Five kinds - Text, GREP, Glyph, Object (docs/superpowers/specs/2026-10-09-kfc-object-search-design.md
-//  O14), Transliterate: the query run skips Color (KFCQuerySequence), so the dialog does not offer it. The one place that
-//  knows how those folders are laid out.
+//  folder UNDER the kind's). The kinds - Text, GREP, Glyph, Object (O14 of
+//  docs/superpowers/specs/2026-10-09-kfc-object-search-design.md), Transliterate - not Color: the query run skips it
+//  (KFCQuerySequence), so the dialog does not offer it. The one place that knows how those folders are laid out.
 //
 //========================================================================================
 
@@ -25,8 +25,8 @@
 
 namespace KFCSavedQueries
 {
-	/** Every saved query of the five kinds, the user's and InDesign's: kind order (Text, GREP, Glyph, Object, Transliterate),
-	    then name (case-insensitive), then the user's before InDesign's. */
+	/** Every saved query of those kinds, the user's and InDesign's: kind order (Text, GREP, Glyph, Object,
+	    Transliterate), then name (case-insensitive), then the user's before InDesign's. */
 	void List(std::vector<KFCSavedQuery>& out);
 
 	/** One query file as the dialog names it: its name (the file name without .xml), its kind (the folder it is in -
@@ -38,10 +38,10 @@ namespace KFCSavedQueries
 	const char* KindName(int32 mode);
 
 	/** Put one saved query into Edit > Find/Change, whole - its tab, strings, switches and formats - with the SDK's
-	    command that reads a query file (kFCQueryXMLReaderCmdBoss). For each query of a run
-	    (KFCQuerySequence) and for a query double-clicked in the dialog (KFCQueryDialog). A file that is not there
-	    changes nothing and answers true - ask DoesFileExist first. False = the command failed; the error state is
-	    left clear. */
+	    command that reads a query file (kFCQueryXMLReaderCmdBoss). For each query of a run (KFCQuerySequence), and in
+	    the dialog (KFCQueryDialog) for its Find - a query of the run order at a time - and for a query double-clicked.
+	    A file that is not there changes nothing and answers true - ask DoesFileExist first. False = the command failed;
+	    the error state is left clear. */
 	bool LoadIntoFindChange(const IDFile& file);
 }
 

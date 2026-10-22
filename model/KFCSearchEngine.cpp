@@ -3466,8 +3466,8 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 
 #ifdef KFC_DIAG
 	// THE TEST BUILD'S WAY INTO THE QUERY RUN WITHOUT ITS DIALOG: while the fault switch queries-run is on, the Find
-	// action runs the queries its file lists (KFCQuerySequence::RunFromDiagSwitch - the regression cases qs-*, xq-*)
-	// - ahead of the re-entry stop below, because the run asks the same doors itself and sets its own flag.
+	// action runs the queries its file lists (KFCQuerySequence::RunFromDiagSwitch - the regression cases qs-*, oqs-*,
+	// xq-*), ahead of the re-entry stop below, because the run asks the same doors itself and sets its own flag.
 	if (again == nil && KFC_DIAG_FAULT("queries-run"))
 		return KFCQuerySequence::RunFromDiagSwitch(outSummary);
 	// THE TIER SWITCH'S SPIKE (docs/superpowers/plans/2026-10-14-kfc-tier-switch.md Task 3): while one of the fault switches

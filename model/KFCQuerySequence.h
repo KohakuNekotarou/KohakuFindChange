@@ -11,11 +11,11 @@
 //  list, no limit - ALL OF IT ONE UNDO STEP ("Run Queries"): one abortable command sequence around every query, the
 //  run's documents opened and held from before it opens to after it ends (measured: a kOpenLayoutCmdBoss processed
 //  between two chapters' writes threw away the undo history of the chapters already written - their text stayed
-//  replaced with nothing left to undo it with). The panel's list is cleared at the
-//  start (a Ctrl+Z of the run puts it back - KFCUndoFollow::RunRecorder), and Edit > Find/Change is emptied at the end
-//  (the first spec's D7). A query whose file is gone stops the whole run before anything is written (the author's
-//  call); one with nothing to find is skipped and named - and so, under a reason of its own, is one whose file
-//  InDesign's query reader could not read; a failed write or Cancel takes the whole run back.
+//  replaced with nothing left to undo it with). The panel's list is cleared at the start - taking the run back (a
+//  Cancel, a failure, a Ctrl+Z) puts it back whole, with its book (KFCUndoFollow::RunRecorder) - and
+//  Edit > Find/Change is emptied at the end (the first spec's D7). A query whose file is gone stops the whole run
+//  before anything is written (the author's call); one that cannot be run as it stands - nothing to find, say - is
+//  skipped and named under its reason (SkipReason, in the .cpp); a failed write or Cancel takes the whole run back.
 //
 //========================================================================================
 
@@ -40,9 +40,9 @@ namespace KFCQuerySequence
 	bool IsRunning();
 
 #ifdef KFC_DIAG
-	/** THE TEST BUILD'S WAY IN without the dialog (the regression cases qs-*, xq-*): the fault switch queries-run's file
-	    holds one query path per line (UTF-8) - a line starting "#" is skipped - each query named as the dialog names
-	    it; SearchBook hands its run here while the switch is on. */
+	/** THE TEST BUILD'S WAY IN without the dialog (the regression cases qs-*, oqs-*, xq-*): the fault switch
+	    queries-run's file holds one query path per line (UTF-8) - a line starting "#" is skipped - each query named
+	    as the dialog names it; the Find action hands its run here while the switch is on (RunSearch's head). */
 	int32 RunFromDiagSwitch(PMString& outSummary);
 #endif
 }

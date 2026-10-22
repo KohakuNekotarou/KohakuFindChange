@@ -45,9 +45,9 @@ namespace
 		int32		mode;
 	};
 
-	// The five, in the order the dialog lists them. Object too (spec O14 - the run writes it with InDesign's object Change
-	// All, a document at a time). Color is not here: the query run skips it (KFCQuerySequence), so offering it would
-	// offer a query that does nothing.
+	// The kinds, in the order the dialog lists them. Object too (the object search spec's O14 - the run writes it with
+	// InDesign's object Change All, a document at a time). Color is not here: the query run skips it
+	// (KFCQuerySequence), so offering it would offer a query that does nothing.
 	const QueryKind kKinds[] =
 	{
 		{ "Text",			IFindChangeOptions::kTextSearch },
@@ -70,7 +70,7 @@ namespace
 		return kKindCount;
 	}
 
-	/** kKinds' index for a mode - kKindCount for none (the list puts such a query after all five). */
+	/** kKinds' index for a mode - kKindCount for none (the list puts such a query after every kind). */
 	int32 KindIndexOfMode(int32 mode)
 	{
 		for (int32 i = 0; i < kKindCount; ++i)

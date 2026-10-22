@@ -113,8 +113,8 @@ namespace KFCUndoFollow
 	    second run's Undo could not reach the first run's - cases xq-done-undo, xq-two-runs-undo). RestoreBefore = the
 	    run was taken back (cancelled, failed, refused past its commit point): the list goes back as it was - as the
 	    same result set, so the writes kept for it are still followed, and with its book and its Find Format, as the
-	    search puts a list back (cases xq-cancel-other-book, xq-undo-other-book - the run's Undo and Redo the same)
-	    - and nothing is kept. While one stands nothing is followed. */
+	    search puts a list back (cases xq-cancel-other-book, xq-undo-other-book, xq-cancel-own-book, xq-undo-own-book -
+	    the run's Undo and Redo the same) - and nothing is kept. While one stands nothing is followed. */
 	class RunRecorder
 	{
 	public:

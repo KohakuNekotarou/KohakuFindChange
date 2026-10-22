@@ -367,9 +367,10 @@ namespace KFCSearchEngine
 	    then cannot tell, and does not refuse - RememberFindFormat's rule). */
 	void RememberFindFormatOf(const KFCQueryCopy* copy);
 
-	/** Drop the Find Format the search kept. It goes with EVERY KFCResultModel::Clear(), exactly as
-	    KFCBookScope::ReleaseSearchedBook does - the remembered format describes the rows that are
-	    being thrown away, so it has no business outliving them. DropResults does all three. */
+	/** Drop the Find Format the search kept. It goes with EVERY KFCResultModel::Clear() - the remembered format
+	    describes the rows that are being thrown away, so it has no business outliving them. DropResults does all
+	    three; the book is the one that may outlive the rows - a query run's end clears them and forgets the format,
+	    and keeps the book it ran on (KFCBookScope::GetSearchedBookPath says why). */
 	void ForgetSearchedFindFormat();
 
 	/** Drop the Find Format the search kept when the database its UIDs are in is the one closing - and

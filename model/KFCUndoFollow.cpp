@@ -90,8 +90,8 @@ struct Step
 	bool							done;			// the write stands (false: an Undo took it back)
 	uint32							resultSet;		// KFCResultModel::GetResultSetId when it was made
 	uint32							resultSetBefore;	// a whole set's: the one it found - its Undo goes back to it
-	bool							whole;			// it reshaped the result set: a query run (RunRecorder - "Run
-													// Queries" on the message line); else a write of rows
+	bool							whole;			// it reshaped the result set: a query run (RunRecorder -
+													// "Run Queries" on the message line); else a write of rows
 													// (StepRecorder)
 	const char*						name;			// the write's own name (StepRecorder::SetName); nil = "Replace"
 	uint32							layoutBefore;	// the layout the row indices named before it...
@@ -155,8 +155,9 @@ void OpenRecording()
 // the tier switch (KFCTierStore::SwitchTo) put a list back: the searched book is what the book watcher asks
 // (KFCBookWatch.cpp - closing it empties a book's list), the remembered Find Format what a row's Replace compares
 // against (FindFormatHasChanged). With the rows alone, closing the book a run had run on emptied the list it put
-// back (cases xq-cancel-other-book, xq-undo-other-book). The book is changed only when it differs: letting one go
-// hands back the chapters held for it.
+// back (cases xq-cancel-other-book, xq-undo-other-book), and closing the list's own book left it standing (cases
+// xq-cancel-own-book, xq-undo-own-book). The book is changed only when it differs: letting one go hands back the
+// chapters held for it.
 void PutWholeListBack(const KFCResultModel::ModelSnapshot& list, uint32 resultSet, const PMString& book)
 {
 	PMString now;
@@ -899,9 +900,9 @@ static void Follow()
 {
 	KFC_DIAG_LOG("FOLLOW recording=%d steps=%u running=%d", gRecording.open ? 1 : 0, (unsigned)gSteps.size(),
 		KFCRunGuard::IsAnyRunning() ? 1 : 0);
-	// A write of ours is standing (its own mark is heard as its sequence ends), or a run is up (a search, Change
-	// All in Book or a query run pumps events behind its bar, and a row's Replace runs the message loop as it opens a
-	// chapter or a window - KFCRunGuard::IsAnyRunning asks each of them).
+	// A write of ours is standing (its own mark is heard as its sequence ends), or a run is up (a search,
+	// Change All in Book or a query run pumps events behind its bar, and a row's Replace runs the message loop as it
+	// opens a chapter or a window - KFCRunGuard::IsAnyRunning asks each of them).
 	if (gRecording.open || gSteps.empty() || KFCRunGuard::IsAnyRunning())
 		return;
 	// (Only KFC's own writes leave a mark, so nothing but their Do, Undo and Redo comes here - typing does not.)

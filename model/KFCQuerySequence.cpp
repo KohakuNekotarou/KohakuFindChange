@@ -12,11 +12,11 @@
 
 // Interface includes:
 #include "ICommand.h"
-#include "ICommandSequence.h"		// IAbortableCmdSeq - the run's one undo step, and a cancel that is stated
+#include "ICommandSequence.h"		// IAbortableCmdSeq - one undo step across documents, its abort stated outright
 #include "IDataBase.h"
 #include "IDocument.h"
 #include "IFindChangeOptions.h"		// kObjectSearch - an Object query
-#include "IWalkerScopeFactoryUtils.h"	// kDocumentScope - a book or All Documents writes each document whole
+#include "IWalkerScopeFactoryUtils.h"	// kDocumentScope - each document written whole (WHAT EACH WRITE COVERS)
 
 // General includes:
 #include "CmdUtils.h"
@@ -30,7 +30,7 @@
 // Project includes:
 #include "KFCQuerySequence.h"
 #include "KFCBookScope.h"
-#include "KFCChangeAll.h"		// WriteDocument - each query a document at a time with InDesign's own Change All (F7)
+#include "KFCChangeAll.h"		// WriteDocument (a query in one document), PutRunDocumentsBack, LeaveRunDocuments
 #include "KFCDiag.h"
 #include "KFCDiagCommands.h"	// the test build's command count (KFC_DIAG_COMMANDS)
 #include "KFCDiagWrittenDocs.h"	// the test build's written-document check (nothing in a shipping one)
@@ -78,17 +78,20 @@ void AppendItem(std::vector<QueryItem>& queries, const IDFile& file)
 // EDIT > FIND/CHANGE EMPTIED AFTER THE RUN (the query-sequence spec's D7 - FindChangeByList.jsx empties the strings
 // and the formats after every query). kClearFindChangeOptionsCmdBoss (TextWalkerServiceProviderID.h:109) - measured on
 // a live run (docs/ai-notes/kfc-query-sequence-engine-2026-10-04.md, M2): the four strings (Text and GREP, find and
-// change) come back empty, and the dialog's Query box reads [Custom]. Outside the run's sequence: a Ctrl+Z of the run must not
-// bring the last query back.
+// change) come back empty, and the dialog's Query box reads [Custom]. Outside the run's sequence: a Ctrl+Z of the run
+// must not bring the last query back.
 void ClearFindChange()
 {
-	// Never processed over an error left standing (a command processed while the global error code is set is InDesign's
-	// protective shutdown - CmdUtils.h): this runs once the run's sequence has ended, and what stands then is the run's own,
-	// taken back and said already.
+	// Never processed over an error left standing (a command processed while the global error code is set is
+	// InDesign's protective shutdown - CmdUtils.h): this runs once the run's sequence has ended, and what stands then
+	// is the run's own, taken back and said already.
 	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kClearFindChangeOptionsCmdBoss));
 	if (cmd != nil)
 		CmdUtils::ProcessCommand(cmd);
+	// Its own failure is cleared without a word: it is outside the run's undo step and touches no document - only
+	// Edit > Find/Change, where a failure shows as the last query still standing - and an error left standing would
+	// bring on that shutdown at the next command anyone processes.
 	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 }
 
@@ -152,9 +155,8 @@ void AppendSkipped(PMString& s, const char* why, const std::vector<PMString>& na
 // WHY A QUERY IS SKIPPED, in the order the message says them - the run collects each skipped query under one of these
 // and the message walks the table, so no reason is collected without its words: nothing to find (a Colour query
 // included - the spec map's QRY-22 - and an Object query with no Find Object Format); a file InDesign's query reader
-// could not read (it read "nothing to find" too); and, O14
-// (docs/superpowers/specs/2026-10-09-kfc-object-search-design.md), an Object query on a run over part of a document,
-// and one with nothing to change to.
+// could not read (it read "nothing to find" too); and an Object query on a run over part of a document and one with
+// nothing to change to (O14 - docs/superpowers/specs/2026-10-09-kfc-object-search-design.md).
 enum SkipReason
 {
 	kSkipNothingToFind,
@@ -215,7 +217,8 @@ int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 	if (!KFCSearchEngine::ResolveRunScope(scope, outSummary))
 		return 0;
 
-	// ===== THE COMMIT POINT. The list as it is now is copied for an Undo (RunRecorder) BEFORE it goes.
+	// ===== THE COMMIT POINT. The list as it is now and its book are copied (RunRecorder - what a take-back or an Undo
+	// puts back) BEFORE DropResults lets them go.
 	KFCUndoFollow::RunRecorder recorder;
 	KFCBookScope::ReleaseHeldDocs(true /*close now*/);
 	KFCSearchEngine::DropResults();
@@ -288,14 +291,14 @@ int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 	const int32 writeScope = wholeDocuments
 		? static_cast<int32>(IWalkerScopeFactoryUtils::kDocumentScope) : scope.selectionScope;
 
-	// ONE BAR FOR THE WHOLE RUN: a query x document a step, its Cancel
-	// asked between steps - one document's Change All does not stop half way (the dialog's own rule). It comes down
-	// before the sequence ends: the chapters are handed back with no bar up.
+	// ONE BAR FOR THE WHOLE RUN: a query x document a step, its Cancel asked between steps - one document's Change All
+	// does not stop half way (the dialog's own rule). It comes down before the sequence ends: the chapters are handed
+	// back with no bar up.
 	{
-		// A query's stretch of the bar split among the documents by their sizes (docs/superpowers/specs/2026-10-18-kfc-copy-
-		// results-progress-share-design.md - KFCBookScope::ProgressBases): a document's step is as long as its size makes it,
-		// not one each. `unit` still counts the steps (the test build's queries-cancel names one); the bar's place is
-		// Place(q, d).
+		// A query's stretch of the bar split among the documents by their sizes
+		// (docs/superpowers/specs/2026-10-18-kfc-copy-results-progress-share-design.md - KFCBookScope::ProgressBases):
+		// a document's step is as long as its size makes it, not one each. `unit` still counts the steps (the test
+		// build's queries-cancel names one); the bar's place is Place(q, d).
 		const int32 perQueryBar = static_cast<int32>(targets.size()) * 100;
 		const std::vector<int32> shares(KFCBookScope::ProgressBases(targets, perQueryBar));
 		const int32 units = static_cast<int32>(queries.size()) * perQueryBar;
@@ -334,9 +337,10 @@ int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 				skip(loaded ? kSkipNothingToFind : kSkipUnread);
 				continue;
 			}
-			// AN OBJECT QUERY (spec O14) writes WHOLE DOCUMENTS with InDesign's object Change All: the object walker has
-			// no story, and a text Selection names no page item - so on a run over part of the front document it is skipped
-			// and said; and one with nothing to change to is skipped as Change All in Book refuses it.
+			// AN OBJECT QUERY (the object search spec's O14) writes WHOLE DOCUMENTS with InDesign's object Change All:
+			// the object walker has no story, and a text Selection names no page item - so on a run over part of the
+			// front document it is skipped and said; and one with nothing to change to is skipped as Change All in Book
+			// refuses it.
 			const bool objectQuery = (mode == IFindChangeOptions::kObjectSearch);
 			if (objectQuery && !wholeDocuments)
 			{
@@ -414,8 +418,9 @@ int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 					continue;
 				}
 
-				// EACH DOCUMENT WITH InDesign's OWN CHANGE ALL (F7 - docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md
-				// section 5): no rows collected, no limit - over writeScope (asked once, above the loops).
+				// EACH DOCUMENT WITH InDesign's OWN CHANGE ALL (F7 and section 5 of
+				// docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md): no rows collected, no
+				// limit - over writeScope (asked once, above the loops).
 				int32 count = 0, partial = 0;
 				const bool wrote = objectQuery
 					? KFCObjectReplace::ReplaceAllInDoc(targets[d].docRef, count, partial)
@@ -480,15 +485,16 @@ int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 		// NO ERROR LEFT STANDING PAST THE ABORT - before ClearFindChange below, which PROCESSES A COMMAND: one processed while
 		// the global error code is set brings on InDesign's protective shutdown (CmdUtils.h, ProcessCommand). The run that
 		// failed on a standing error (above) has taken its words already (why); every other road out of the loop cleared
-		// its own. The same line every other abort of KFC's has after it, ahead of any command (KFCReplaceEngine,
-		// KFCObjectReplace, KFCChangeAll).
+		// its own. The same line follows the aborts of KFC's other writes, ahead of any command - KFCReplaceEngine
+		// (a write step, the preview), KFCChangeAll, KFCQueryScope.
 		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 	}
 	else
 		CmdUtils::EndCommandSequence(seq);
 	seq = nil;
+	// The shared walker named the run's documents: aimed back at the front (the object search spec's O7).
 	if (objectRan)
-		KFCObjectSearch::AimSharedWalkerAtFront();		// O7 - the walker named the run's documents
+		KFCObjectSearch::AimSharedWalkerAtFront();
 	ClearFindChange();		// outside the sequence (the query-sequence spec's section 5)
 
 	if (cancelled || failed)
@@ -540,7 +546,7 @@ int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 		outSummary.Append(" selected document(s) of ");
 		outSummary.AppendNumber(selection.total);
 	}
-	outSummary.Append(".");		// one undo step; nothing said of Ctrl+Z (spec F20)
+	outSummary.Append(".");		// one undo step; nothing said of Ctrl+Z (the no-track spec's F20)
 	for (int32 r = 0; r < kSkipReasons; ++r)
 		AppendSkipped(outSummary, kSkipWords[r], skipped[r]);
 	KFCBookScope::AppendUnopenableNote(outSummary, unopenable);
