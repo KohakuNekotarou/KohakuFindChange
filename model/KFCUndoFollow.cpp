@@ -104,6 +104,8 @@ struct Step
 	std::vector<size_t>				frozenBefore;	// a whole set's book chapters closed since, as indexes into before's
 	std::vector<size_t>				frozenAfter;	// and after's chapters: kept as the panel has them when that set is
 													// put back (KFCUndoFollow::ForgetBookChapter)
+	PMString						bookBefore;		// a whole set's: the book its list before was searched in...
+	PMString						bookAfter;		// ...and the one the run left recorded (empty: none)
 	Step() : done(true), resultSet(0), resultSetBefore(0), whole(false), name(nil), layoutBefore(0), layoutAfter(0) {}
 };
 
@@ -127,7 +129,8 @@ struct Recording
 	uint32							layout;		// ...and its layout generation
 	std::vector<StoryMoved>			stories;	// the stories read, each at its version before the write
 	std::vector<ItemMoved>			items;		// the items RecordItem read
-	KFCResultModel::ModelSnapshot	before;		// a query run's: the whole list before it
+	KFCResultModel::ModelSnapshot	before;		// a query run's: the whole list before it...
+	PMString						bookBefore;	// ...and the book it was searched in (GetSearchedBookPath)
 	const char*						name;		// the write's name (StepRecorder::SetName)
 	Recording() : open(false), resultSet(0), layout(0), name(nil) {}
 };
@@ -145,6 +148,29 @@ void OpenRecording()
 	gRecording.open = true;
 	gRecording.resultSet = KFCResultModel::GetResultSetId();
 	gRecording.layout = KFCResultModel::GetLayoutGeneration();
+}
+
+// A WHOLE LIST PUT BACK - a query run taken back (RunRecorder::RestoreBefore), or a run's Undo or Redo (Follow) -
+// COMES BACK WITH ITS BOOK AND ITS FIND FORMAT, as the search's own put-back (KFCSearchEngine.cpp, putBack) and
+// the tier switch (KFCTierStore::SwitchTo) put a list back: the searched book is what the book watcher asks
+// (KFCBookWatch.cpp - closing it empties a book's list), the remembered Find Format what a row's Replace compares
+// against (FindFormatHasChanged). With the rows alone, closing the book a run had run on emptied the list it put
+// back (cases xq-cancel-other-book, xq-undo-other-book). The book is changed only when it differs: letting one go
+// hands back the chapters held for it.
+void PutWholeListBack(const KFCResultModel::ModelSnapshot& list, uint32 resultSet, const PMString& book)
+{
+	PMString now;
+	now.SetTranslatable(kFalse);
+	(void)KFCBookScope::GetSearchedBookPath(now);
+	const bool otherBook = !now.IsEqual(book, kFalse);
+	if (otherBook)
+		KFCBookScope::ReleaseSearchedBook();
+	KFCResultModel::RestoreModelSnapshot(list);
+	// ...as that list's result set: the writes kept for it are followed again (KFCResultModel::ReturnToResultSet).
+	KFCResultModel::ReturnToResultSet(resultSet);
+	if (otherBook && !book.IsEmpty())
+		KFCBookScope::SetSearchedBookPath(book);
+	KFCSearchEngine::RememberFindFormatOf(list.header.query.get());
 }
 
 // The document a story (or an object row's item, or a chapter of a kept list) lives in, if it is open - by its chapter's
@@ -809,6 +835,7 @@ KFCUndoFollow::RunRecorder::RunRecorder()
 {
 	OpenRecording();		// its result set: the list as it stands - RestoreBefore goes back to it
 	KFCResultModel::TakeModelSnapshot(gRecording.before);
+	(void)KFCBookScope::GetSearchedBookPath(gRecording.bookBefore);		// ...and its book, before the run lets it go
 }
 
 KFCUndoFollow::RunRecorder::~RunRecorder()
@@ -845,6 +872,8 @@ void KFCUndoFollow::RunRecorder::Keep()
 	// changed), so a run of Object queries alone is not followed (the spec map's OBJ-11).
 	TakeMovedStories(step);
 	step.before = std::move(gRecording.before);	// the list before the run, header and all - moved, not copied
+	step.bookBefore = gRecording.bookBefore;
+	(void)KFCBookScope::GetSearchedBookPath(step.bookAfter);		// the run's own book when it ran on one
 	KFCResultModel::TakeModelSnapshot(step.after);
 	step.layoutAfter = KFCResultModel::GetLayoutGeneration();
 	CloseRecording();
@@ -859,9 +888,7 @@ void KFCUndoFollow::RunRecorder::RestoreBefore()
 	if (!fOpen)
 		return;
 	fOpen = false;
-	KFCResultModel::RestoreModelSnapshot(gRecording.before);
-	// ...and as the same result set: the writes kept for the list are followed again (KFCResultModel::ReturnToResultSet).
-	KFCResultModel::ReturnToResultSet(gRecording.resultSet);
+	PutWholeListBack(gRecording.before, gRecording.resultSet, gRecording.bookBefore);	// the same result set, its book
 	CloseRecording();
 }
 
@@ -937,17 +964,19 @@ static void Follow()
 		else if (step.whole)
 		{
 			const std::vector<size_t>& frozen = undo ? step.frozenBefore : step.frozenAfter;
+			// ...AS THAT LIST'S RESULT SET (DropOtherResultSets) - the writes kept for it are followed next - AND
+			// WITH ITS BOOK AND ITS FIND FORMAT (PutWholeListBack).
+			const uint32 resultSet = undo ? step.resultSetBefore : step.resultSet;
+			const PMString& book = undo ? step.bookBefore : step.bookAfter;
 			if (frozen.empty())
-				KFCResultModel::RestoreModelSnapshot(undo ? step.before : step.after);
+				PutWholeListBack(undo ? step.before : step.after, resultSet, book);
 			else
 			{
 				// a book chapter closed since keeps what the panel has for it (KeepFrozenAsTheyAre)
 				KFCResultModel::ModelSnapshot set(undo ? step.before : step.after);
 				KeepFrozenAsTheyAre(set, frozen);
-				KFCResultModel::RestoreModelSnapshot(set);
+				PutWholeListBack(set, resultSet, book);
 			}
-			// ...AS THAT LIST'S RESULT SET (DropOtherResultSets): the writes kept for it are followed next.
-			KFCResultModel::ReturnToResultSet(undo ? step.resultSetBefore : step.resultSet);
 			reshaped = true;
 		}
 		else

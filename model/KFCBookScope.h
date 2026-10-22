@@ -259,7 +259,8 @@ namespace KFCBookScope
 	bool GetSearchedBookPath(PMString& outPath);
 
 	/** THE BOOK A LIST PUT BACK WAS SEARCHED IN (the tier switch - KFCTierStore::SwitchTo; a search again that does not
-	    go through - KFCSearchEngine::RunSearch): recorded as a run that resolved it records it (GetSearchedBookPath),
+	    go through - KFCSearchEngine::RunSearch; a query run taken back, undone or redone - KFCUndoFollow): recorded
+	    as a run that resolved it records it (GetSearchedBookPath),
 	    holding nothing - the list's chapters are reached by their files, as ever. Call ReleaseSearchedBook first, as a
 	    run does at its commit point. */
 	void SetSearchedBookPath(const PMString& path);

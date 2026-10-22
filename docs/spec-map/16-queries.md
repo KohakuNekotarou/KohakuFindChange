@@ -180,6 +180,7 @@
   （ダイアログで並べた並びも、読み込んだ並びも同じ。実行の入口の1か所で判断する）／範囲の断り（`Cannot run:` の行と同じ理由）／
   `That book has no chapters.`／`No document of the run could be opened - nothing was run.`／ほかの実行が走っている間はその旨。
   途中のキャンセルと失敗は全部を巻き戻す（`Cancelled - nothing was changed.`／`Stopped - nothing was changed: <理由>.`）。
+  ★巻き戻した一覧は**その一覧の本ごと**戻る＝KFC が見張る本（閉じると一覧が消える本）は一覧の本で、実行した本ではない（2026-10-22 ブロック18 の不具合の再検査 D18-2・Ctrl+Z とやり直しで戻る一覧も同じ＝UNDO-03。検索のし直しが通らなかったときと段の切り替えの戻し方にそろえた＝行の Replace が比べる Find Format の写しも一覧のものに戻る〈コードから〉）。それまでは行だけが戻り、実行した本を見張り続けた＝その本を閉じると戻った一覧が消え（`Results cleared - the book was closed.`）、一覧の本を閉じても消えなかった。回帰＝`xq-cancel-other-book`・`xq-cancel-own-book`（Ctrl+Z＝`xq-undo-other-book`・`xq-undo-own-book`）。
   走っている途中でクエリのファイルが消えたときも失敗として全部を巻き戻す（`… the query cannot be found: <名前>.`）。
   - 訂正:
 
@@ -233,4 +234,4 @@
 - QRY-21：「検索と置換」の設定を空にした後、クエリの欄が何を出すかは実機で見ていない。
 - QRY-15・QRY-16：回帰の試験は、テスト用ビルドの故障スイッチ `qd-order-file` でファイルの場所を渡す（Windows の画面は試験から押せない）。本物の「名前を付けて保存」「開く」の画面の題名・種類・置き換えの確認は、試験では押していない。
 - QRY-14：InDesign を終了して起動し直すと並びが空になることは、作りから読んだもの（並びは UI 側の静的な一覧で、ファイルに書かない）。
-- QRY-20（2026-10-14・ブロック9の不具合の再検査 D9-1）：**書かなかった文書が「変更あり」になっていたら、入る前に変更なしだったものは変更なしに戻してから返す**＝Change All in Book と同じ規則（`KFCChangeAll::LeaveRunDocuments` を共有）。それまでのクエリの実行は戻さなかった＝歩きが文字を変えずに印を立てた章は閉じられず窓なしで残り（`left open with no window`）、利用者の文書は何も変わらないのに「変更あり」になる見込み（実機ではまだ起きたことが無い＝`xq-book-nomatch`・`xq-doc-nomatch` は合格）。⬜実機＝全件の回で `xq-book-dirty-unwritten`／`-armed`・`xq-doc-dirty-unwritten`／`-armed`・`ca-book-dirty-unwritten`（テスト用ビルドの故障スイッチ `run-dirty-unwritten`＝歩きが印を立てる・`run-leave-no-flag`＝前の形）。
+- QRY-20（2026-10-14・ブロック9の不具合の再検査 D9-1）：**書かなかった文書が「変更あり」になっていたら、入る前に変更なしだったものは変更なしに戻してから返す**＝Change All in Book と同じ規則（`KFCChangeAll::LeaveRunDocuments` を共有）。それまでのクエリの実行は戻さなかった＝歩きが文字を変えずに印を立てた章は閉じられず窓なしで残り（`left open with no window`）、利用者の文書は何も変わらないのに「変更あり」になる見込み（実機ではまだ起きたことが無い＝`xq-book-nomatch`・`xq-doc-nomatch` は合格）。✅（2026-10-22 ブロック18 の検査の回＝無駄取り〈②〉から不具合の再検査〈⑤〉まで毎回）クエリの実行の4本＝`xq-book-dirty-unwritten`／`-armed`・`xq-doc-dirty-unwritten`／`-armed` は実機で合格。⬜残り＝Change All in Book の `ca-book-dirty-unwritten`＝全件の回（テスト用ビルドの故障スイッチ `run-dirty-unwritten`＝歩きが印を立てる・`run-leave-no-flag`＝前の形）。
