@@ -5,14 +5,14 @@
 //  KohakuFindChange (KFC)
 //
 //  The values an object row's transform asks first - see KFCSpecialDialogs.h.
-//  LAID OUT AS INDESIGN'S OWN (the author, 2026-10-17 night: "photograph the official Move, Rotate and Scale dialogs and
-//  make KFC's look like them" - work/note-scripts/2026-10-17-kfc-object-special/official-*.png): the fields on the left,
-//  each label before its box; OK and Cancel stacked on the right; a value shown with its unit ("0 mm", "100%", "0" and the
-//  degree sign); Move's Horizontal and Vertical in a Position panel, with Distance and Angle under a line, each pair
-//  worked out from the other; Scale's chain between its two fields; Shear's Axis. What InDesign's has and these have not:
-//  Copy (a transformed copy - a row would have nothing to follow) and Preview. The words that explained KFC's own ways (a
-//  number alone in ruler units, each object about its own centre) went into the fields' tips, where InDesign's dialogs
-//  say nothing.
+//  LAID OUT AS INDESIGN'S OWN (the author's call: "photograph the official Move, Rotate and Scale dialogs and make
+//  KFC's look like them" - work/note-scripts/2026-10-17-kfc-object-special/official-*.png): the fields on the left,
+//  each label before its box; OK and Cancel stacked on the right; a value shown with its unit ("0 mm", "100%", "0" and
+//  the degree sign); Move's Horizontal and Vertical in a Position panel, with Distance and Angle under a line, each
+//  pair worked out from the other; Scale's chain between its two fields; Shear's Axis. What InDesign's has and these
+//  have not: Copy (a transformed copy - a row would have nothing to follow) and Preview. KFC's own ways (a number alone
+//  in ruler units, each object about its own centre) are said in the fields' tips, where InDesign's dialogs say
+//  nothing.
 //
 //========================================================================================
 
@@ -39,9 +39,9 @@
 
 namespace
 {
-// WHAT WAS TYPED LAST, offered again for the session (E12) - a distance as typed, so it keeps its unit; a percentage or an
-// angle as the number it was read as. Fixed buffers: nothing to tear down when the plug-in goes (an ASCII text the script
-// handed back, or the default).
+// WHAT WAS TYPED LAST, offered again for the session (the special operations spec's E12) - a distance as typed, so it
+// keeps its unit; a percentage or an angle as the number it was read as. Fixed buffers: nothing to tear down when the
+// plug-in goes (an ASCII text the script handed back, or the default).
 const size_t kTyped = 40;
 char gMoveH[kTyped] = "0";
 char gMoveV[kTyped] = "0";
@@ -64,7 +64,8 @@ void Keep(char (&slot)[kTyped], const std::string& typed)
 // A JavaScript string literal's body for any text (UTF-8 in): printable ASCII as it is, the quote and the backslash
 // escaped, every other character as \uXXXX (a surrogate pair past U+FFFF) - the script stays pure ASCII (KFCHowTo's
 // rule). What the transforms keep is printable ASCII already (the script's ascii() echo, fmt()'s numbers); a page range
-// can be any text.
+// can be any text but one holding a lone surrogate (RunDialog refuses it before any UTF-8 is made), so the UTF-8 kept
+// reads back here.
 std::string JsLiteral(const char* utf8)
 {
 	PMString text;
@@ -499,9 +500,11 @@ std::string Head()
 	return head;
 }
 
-// A DIALOG'S SCRIPT RUN THROUGH THE PLUG-IN'S OWN ENGINE (KFCHowTo's - "KFC", out of the user's #targetengine
-// sessions), its answer read back (KIDMCP's RunOnce is the shape: a script handed as ScriptData, no arguments, the
-// result and an error string; no alert of the runner's own - the caller says what went wrong, in its own words).
+// A DIALOG'S SCRIPT RUN THROUGH THE PLUG-IN'S OWN ENGINE (KFCHowTo's - "KFC", out of the user's
+// #targetengine sessions), its answer read back: the script handed as ScriptData with no arguments, its value the
+// result, an error its string (Adobe's own code calls RunScriptInEngine nowhere -
+// docs/ai-notes/api-official-examples.md); no alert of the runner's own - the caller says what went wrong, in its own
+// words.
 enum DialogRun
 {
 	kDialogAnswered = 0,
@@ -512,7 +515,7 @@ enum DialogRun
 
 // A LONE SURROGATE in a text, its UTF-16 read as it stands: GetUTF8String takes a lone high one together with the
 // character after it (or, at the end, makes something else of it), and SetUTF8String throws on a lone low one's UTF-8
-// (measured - KT's u8trip probe) - so no UTF-8 is made of a text holding one.
+// (measured - KT's u8trip probe, branch exp/2026-10-23-u8trip) - so no UTF-8 is made of a text holding one.
 bool HasLoneSurrogate(const PMString& s)
 {
 	int32 n = 0;

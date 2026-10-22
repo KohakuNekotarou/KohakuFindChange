@@ -4,12 +4,13 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  AN OBJECT ROW'S SPECIAL OPERATIONS (docs/superpowers/specs/2026-10-17-kfc-object-outlines-design.md - the author,
-//  2026-10-17: "do it on the selected rows' objects, so that objects across spreads can be operated on"): Create Outlines
+//  AN OBJECT ROW'S SPECIAL OPERATIONS (docs/superpowers/specs/2026-10-17-kfc-object-outlines-design.md - the author's
+//  call: "do it on the selected rows' objects, so that objects across spreads can be operated on"): Create Outlines
 //  over the rows selected together - their text frames outlined by InDesign's own command (Type > Create Outlines,
-//  ICreateOutlinesUtils::CreateCOFrameCmd) wherever they stand, on every spread and in every document of the list, in ONE
-//  undo step the panel follows; each row then reads Outlined, names its outlines, and keeps its eye. The object Replace's
-//  shape (KFCObjectReplace.h): the doors row by row, one write, the rows marked, the documents left as a write leaves them.
+//  ICreateOutlinesUtils::CreateCOFrameCmd) wherever they stand, on every spread and in every document of the list, in
+//  ONE undo step the panel follows; each row then reads Outlined, names its outlines, and keeps its eye. The object
+//  Replace's shape (KFCObjectReplace.h): the doors row by row, one write, the rows marked, the documents left as a
+//  write leaves them.
 //
 //========================================================================================
 
@@ -31,16 +32,17 @@ namespace KFCObjectOutline
 	    an error standing takes the whole step back. Each written row: Outlined, its item the outlines InDesign made, their
 	    fingerprint, its eye on (KFCResultModel::MarkItemOutlined); a chapter of ours written given a window, one not
 	    written handed back (KFCReplaceEngine::DocsAfterWrite).
-	    outStatus: "Outlined 3 objects: ID:259, ID:260, ID:261." - "Outlined 2 of 3 objects: ... Left as they were: 1 not a
-	    text frame." - "Outlined 3 objects in 2 documents: a.indd ID:259, ID:260; b.indd ID:12."; a refusal ("Create
-	    Outlines: ...") when none could be written. True when something was written. Refused while a run of ours is up. */
+	    outStatus: "Outlined 3 objects: ID:259, ID:260, ID:261." - "Outlined 2 of 3 objects: ... Left as they were: 1
+	    not a text frame." - "Outlined 3 objects in 2 documents: a.indd ID:259, ID:260; b.indd ID:12."; a refusal
+	    ("Create Outlines: ...") when none could be written. True when something was written. Refused while a run of
+	    ours is up. */
 	bool OutlineRows(const KFCRowsByChapter& rows, PMString& outStatus);
 
-	/** WHETHER CREATE OUTLINES CAN BE OFFERED FOR A ROW (the menu's grey - the author, 2026-10-17: a menu item that cannot
-	    run is greyed). OutlineRows's doors, READ ONLY: no document is reached or opened and no row is touched. An object
-	    row not outlined yet; when its document is open now, its item there, on a spread, not locked, a text frame
-	    (InDesign's own filter). A row of a document not open now answers true - only reaching it can tell, and pressing
-	    does that (its doors say why when it cannot). */
+	/** WHETHER CREATE OUTLINES CAN BE OFFERED FOR A ROW (the menu's grey - the author's call: a menu item that cannot
+	    run is greyed). OutlineRows's doors, READ ONLY: no document is reached or opened and no row is touched. An
+	    object row not outlined yet; when its document is open now, its item there, on a spread, not locked, a text
+	    frame (InDesign's own filter). A row of a document not open now answers true - only reaching it can tell, and
+	    pressing does that (its doors say why when it cannot). */
 	bool CanOutlineHit(int32 chapterIdx, int32 hitIdx);
 }
 

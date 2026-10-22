@@ -256,11 +256,11 @@ UID StyleOf(IDataBase* db, UID item)
 }
 
 // THE TRANSFORM PANEL'S SETTINGS, as InDesign's own transforms read them (the session's ITransformPanelPrefs, read as
-// publiclib's CPathCreationTracker reads it). Measured against InDesign's own: with Dimensions Include Stroke Weight
-// off, its Rotate 90 Degrees Clockwise turns an item about its path's centre, not its stroke's; with Transformations
-// are Totals off, its Clear Transformations clears an item in a group in the group's coordinates - its Move, Flip and
-// Shear stay in the pasteboard's either way.
-// The bounds an item's centre is taken from (TransformEach).
+// widgetbin's CPathCreationTracker::GetPathCreationBoundsKind reads it). Measured against InDesign's own: with
+// Dimensions Include Stroke Weight off, its Rotate 90 Degrees Clockwise turns an item about its path's centre, not its
+// stroke's; with Transformations are Totals off, its Clear Transformations clears an item in a group in the group's
+// coordinates - its Move, Flip and Shear stay in the pasteboard's either way.
+// The bounds an item's centre is taken from (TransformEach - and BeyondPasteboard's measure of a transform's result).
 Geometry::BoundsKind CentreBounds()
 {
 	Geometry::BoundsKind bounds = Geometry::PathBounds();
@@ -302,9 +302,9 @@ Refusal CheckLayerMove(const KFCSpecialParams& params, const UIDRef& docRef, UID
 }
 
 // ARRANGE'S QUESTION, OF A SPREAD'S ITEMS TOGETHER - as InDesign asks it of a selection: the items move together, their
-// order among themselves kept, so an item already at the back stays among them. (Asked one item at a time, the backmost of
-// four was left out "at the back already" and the other three went behind it, where InDesign's own Send to Back over the
-// four leaves them as they are - measured live, 2026-10-17 night.)
+// order among themselves kept, so an item already at the back stays among them. (Asked one item at a time, the backmost
+// of four was left out "at the back already" and the other three went behind it, where InDesign's own Send to Back over
+// the four leaves them as they are - measured live.)
 bool CanArrange(int32 op, const UIDList& items)
 {
 	Utils<Facade::IArrangeFacade> arrange;
@@ -320,9 +320,12 @@ bool CanArrange(int32 op, const UIDList& items)
 	}
 }
 
-// INDESIGN'S OWN QUESTION FOR THE OPERATION, of one item (E4) - its Can..., the one its menu item is enabled by. forWrite:
-// asked for the write, where an Arrange row is not asked alone - its spread's items are asked together (CanArrange, in the
-// write); the menu's grey asks each row.
+// INDESIGN'S OWN QUESTION FOR THE OPERATION, of one item (E4) - its Can... (Fitting: the Facade's CanFillFrameProp and
+// the others; Object > Fitting's own grey is IFrameContentSuite's, which the Facade's header says asks
+// CanEnableFitFrameToContent / CanEnableFitContentToFrame - all three answered alike for the six Fitting items over
+// nine kinds of item, measured with KT's fitcan probe, branch exp/2026-10-23-fitcan). forWrite: asked for the write,
+// where an Arrange row is not asked alone - its spread's items are asked together (CanArrange, in the write); the
+// menu's grey asks each row.
 Refusal AskInDesign(const OpInfo& info, const KFCSpecialParams& params, const UIDRef& docRef, UID item, bool forWrite)
 {
 	IDataBase* const db = docRef.GetDataBase();
@@ -474,10 +477,11 @@ Refusal CheckItem(const OpInfo& info, const KFCSpecialParams& params, int32 chap
 	return AskInDesign(info, params, outDoc, outItem, reach);
 }
 
-// SHEAR ON ITS AXIS - the Shear dialog's Axis, as InDesign's own (KFCSpecialParams::y: 0 Horizontal, 1 Vertical). Horizontal
-// is Transform::SkewBy; Vertical skews the other way round - the x left as it is, the y moved with it (PMMatrix's
-// SkewVertical), with SkewBy's own sign for the left-handed coordinates (TransformTypes.h: SkewHorizontal(-degrees)). Its
-// direction was measured against InDesign's own Shear dialog with the Vertical axis (the live test of 2026-10-17).
+// SHEAR ON ITS AXIS - the Shear dialog's Axis, as InDesign's own (KFCSpecialParams::y: 0 Horizontal, 1 Vertical).
+// Horizontal is Transform::SkewBy; Vertical skews the other way round - the x left as it is, the y moved with it
+// (PMMatrix's SkewVertical), with SkewBy's own sign for the left-handed coordinates (TransformTypes.h:
+// SkewHorizontal(-degrees)). Its direction was measured against InDesign's own Shear dialog with the Vertical axis: the
+// same matrix.
 Transform::TransformValue ShearBy(const KFCSpecialParams& params)
 {
 	if (params.y < 0.5)
@@ -508,10 +512,11 @@ Transform::TransformValue TransformOf(const OpInfo& info, const KFCSpecialParams
 
 // BEYOND THE PASTEBOARD: would the transform take the item more than a pasteboard beyond its spread's pasteboard? Its
 // bounds as they stand (pasteboard coordinates - the centre's bounds) transformed about their centre, against the
-// spread's bounds grown by their own width and height on each side. InDesign's own trackers keep a drag inside the
-// spread's bounds (CLayoutTracker, CPathCreationTracker) and its Move and Scale dialogs warn of objects lost from the
-// pasteboard and too large - let past that warning, a Scale of 999999999% took InDesign down (measured); so a value out
-// of all measure, or one a dialog read as infinite, is refused here, before anything is written. Not finite = beyond.
+// spread's bounds grown by their own width and height on each side. InDesign's own trackers take a spread's bounds as
+// its pasteboard (CLayoutTracker.cpp:93) and keep a new path's points inside them (CPathCreationTracker.cpp:1304,
+// 1316), and its Move and Scale dialogs warn of objects lost from the pasteboard and too large - let past that warning,
+// a Scale of 999999999% took InDesign down (measured); so a value out of all measure, or one a dialog read as infinite,
+// is refused here, before anything is written. Not finite = beyond.
 bool BeyondPasteboard(IDataBase* db, UID item, const Transform::TransformValue& how, const Geometry::BoundsKind& bounds)
 {
 	Utils<Facade::IGeometryFacade> geometry;
@@ -695,9 +700,9 @@ ErrorCode WriteDocument(const OpInfo& info, const KFCSpecialParams& params, cons
 	}
 }
 
-// THE ITEMS BY THEIR SPREAD, in the order the rows list them - the unit InDesign's own commands take: a selection is one
-// spread's, and a Facade handed items of two spreads at once can act as if they were one's (ILayerFacade::MoveToLayer put
-// the second spread's items on the first - measured live, 2026-10-17).
+// THE ITEMS BY THEIR SPREAD, in the order the rows list them - the unit InDesign's own commands take: a selection is
+// one spread's, and a Facade handed items of two spreads at once can act as if they were one's
+// (ILayerFacade::MoveToLayer put the second spread's items on the first - measured live).
 void SpreadGroups(IDataBase* db, const std::vector<std::pair<int32, UID> >& todo, std::vector<UIDList>& out)
 {
 	out.clear();
