@@ -45,6 +45,17 @@ namespace KFCObjectReplace
 	void RowsTheWriteCanMove(int32 chapterIdx, IDataBase* db, const std::set<UID>& toWrite, RowItems& out);
 	void FollowRowsTheWriteMoved(int32 chapterIdx, IDataBase* db, const RowItems& rows, const std::set<UID>& written);
 
+	/** WHAT A WRITE OF OBJECT ROWS DID - the one sentence of the object Replace (ReplaceRows), Create Outlines
+	    (KFCObjectOutline) and the other Special Operations (KFCObjectSpecial): "<head><count>[ of <total>]
+	    object(s)[ in <n> documents]<afterCount><beforeIDs><IDs>." - the items' IDs up to 8 of them (", ..." after),
+	    each document named before its IDs when there are several - and, with rows left, " Left as they were:
+	    <left>." `written` = each document's items written, in the rows' order (a document with none left out);
+	    `count` = the items written (the caller's own count); `total` = the rows the command was given; `left` = the
+	    others, counted by why. */
+	typedef std::vector<std::pair<int32, std::vector<UID> > > ItemsWritten;		// (the chapter, its items written)
+	void SayItemsWritten(PMString& out, const PMString& head, size_t count, size_t total, const ItemsWritten& written,
+		const PMString& afterCount, const char* beforeIDs, const PMString& left);
+
 	/** O10 steps 1-5 for an object row, with nothing written: the Find/Change settings still the search's (the tab, the
 	    Type, the five switches, Find Object Format and its style - a changed one CLEARS the results, as for text), something
 	    to change to, the item still in its document (else the row reads Missing), not locked, and its fingerprint the one

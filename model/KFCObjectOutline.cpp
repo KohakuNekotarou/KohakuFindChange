@@ -26,10 +26,10 @@
 
 // Project includes:
 #include "KFCBookScope.h"
-#include "KFCDiag.h"
 #include "KFCDiagWrittenDocs.h"	// a test build's written-document check (nothing in a shipping one)
 #include "KFCID.h"				// kKFCCreateOutlinesStepKey - the Edit menu's name of the step
 #include "KFCObjectOutline.h"
+#include "KFCObjectReplace.h"	// SayItemsWritten - what a write of object rows says
 #include "KFCObjectSearch.h"	// IsOnSpread, Fingerprint
 #include "KFCPageItemFacts.h"	// IsPageItemLockedForEdit, IsFrameOnLockedLayer
 #include "KFCReplaceEngine.h"	// the write's undo step (WriteStep) and what its documents are left as (DocsAfterWrite)
@@ -366,67 +366,22 @@ bool KFCObjectOutline::OutlineRows(const KFCRowsByChapter& rows, PMString& outSt
 	}
 	recorder.Keep();
 
-	// D10: "Outlined 3 objects: ID:259, ID:260, ID:261." - the frames' IDs, up to kNamedIDs; several documents named before
-	// their IDs; the rows left as they were counted after.
-	const size_t kNamedIDs = 8;
-	outStatus = "Outlined ";
-	outStatus.AppendNumber(static_cast<int32>(writtenCount));
-	if (writtenCount < total)
-	{
-		outStatus.Append(" of ");
-		outStatus.AppendNumber(static_cast<int32>(total));
-	}
-	outStatus.Append(writtenCount == 1 && total == 1 ? " object" : " objects");
-	size_t writtenDocuments = 0;
+	// D10: "Outlined 3 objects: ID:259, ID:260, ID:261." - the frames' IDs (SayItemsWritten), each document's in the
+	// order written.
+	KFCObjectReplace::ItemsWritten items;
 	for (size_t c = 0; c < chapters.size(); ++c)
-		if (!chapters[c].written.empty())
-			++writtenDocuments;
-	if (writtenDocuments > 1)
 	{
-		outStatus.Append(" in ");
-		outStatus.AppendNumber(static_cast<int32>(writtenDocuments));
-		outStatus.Append(" documents");
-	}
-	outStatus.Append(": ");
-	size_t named = 0;
-	bool firstDocument = true;
-	for (size_t c = 0; c < chapters.size() && named < kNamedIDs; ++c)
-	{
-		const OutlineChapter& chapter = chapters[c];
-		if (chapter.written.empty())
+		if (chapters[c].written.empty())
 			continue;
-		if (writtenDocuments > 1)
-		{
-			if (!firstDocument)
-				outStatus.Append("; ");
-			PMString docName;
-			int32 rowsNow = 0;
-			if (KFCResultModel::GetChapterDisplay(chapter.chapterIdx, docName, rowsNow))
-			{
-				outStatus.Append(docName);
-				outStatus.Append(" ");
-			}
-		}
-		firstDocument = false;
-		for (size_t k = 0; k < chapter.written.size() && named < kNamedIDs; ++k)
-		{
-			if (k > 0 || (writtenDocuments <= 1 && named > 0))
-				outStatus.Append(", ");
-			outStatus.Append("ID:");
-			outStatus.AppendNumber(static_cast<int32>(chapter.written[k].frame.Get()));
-			++named;
-		}
+		std::vector<UID> frames;
+		for (size_t k = 0; k < chapters[c].written.size(); ++k)
+			frames.push_back(chapters[c].written[k].frame);
+		items.push_back(std::make_pair(chapters[c].chapterIdx, frames));
 	}
-	if (writtenCount > kNamedIDs)
-		outStatus.Append(", ...");
-	outStatus.Append(".");
-	if (writtenCount < total)
-	{
-		outStatus.Append(" Left as they were: ");
-		AppendRefusals(outStatus, counts);
-		outStatus.Append(".");
-	}
-	outStatus.SetTranslatable(kFalse);
+	PMString left;
+	AppendRefusals(left, counts);
+	KFCObjectReplace::SayItemsWritten(outStatus, PMString("Outlined "), writtenCount, total, items, PMString(), ": ",
+		left);
 	return true;
 }
 

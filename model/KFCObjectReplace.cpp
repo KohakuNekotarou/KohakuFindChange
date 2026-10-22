@@ -315,6 +315,66 @@ void KFCObjectReplace::FollowRowsTheWriteMoved(int32 chapterIdx, IDataBase* db, 
 	KFC_DIAG_LOG("OBJPRINTS after chapter=%d followed=%d", chapterIdx, followed);
 }
 
+// WHAT A WRITE OF OBJECT ROWS DID (O10's message - the object search spec). (In the namespace: Create Outlines' and the
+// other Special Operations' writes say it too - KFCObjectOutline, KFCObjectSpecial.)
+void KFCObjectReplace::SayItemsWritten(PMString& out, const PMString& head, size_t count, size_t total,
+	const ItemsWritten& written, const PMString& afterCount, const char* beforeIDs, const PMString& left)
+{
+	const size_t kNamedIDs = 8;
+	const bool severalDocuments = written.size() > 1;
+	out = head;
+	out.AppendNumber(static_cast<int32>(count));
+	if (count < total)
+	{
+		out.Append(" of ");
+		out.AppendNumber(static_cast<int32>(total));
+	}
+	out.Append(count == 1 && total == 1 ? " object" : " objects");
+	if (severalDocuments)
+	{
+		out.Append(" in ");
+		out.AppendNumber(static_cast<int32>(written.size()));
+		out.Append(" documents");
+	}
+	out.Append(afterCount);
+	out.Append(beforeIDs);
+	size_t named = 0;
+	for (size_t c = 0; c < written.size() && named < kNamedIDs; ++c)
+	{
+		if (severalDocuments)
+		{
+			if (c > 0)
+				out.Append("; ");
+			PMString docName;
+			int32 rowsNow = 0;
+			if (KFCResultModel::GetChapterDisplay(written[c].first, docName, rowsNow))
+			{
+				out.Append(docName);
+				out.Append(" ");
+			}
+		}
+		const std::vector<UID>& items = written[c].second;
+		for (size_t k = 0; k < items.size() && named < kNamedIDs; ++k)
+		{
+			if (k > 0 || (!severalDocuments && named > 0))
+				out.Append(", ");
+			out.Append("ID:");
+			out.AppendNumber(static_cast<int32>(items[k].Get()));
+			++named;
+		}
+	}
+	if (count > kNamedIDs)
+		out.Append(", ...");
+	out.Append(".");
+	if (count < total)
+	{
+		out.Append(" Left as they were: ");
+		out.Append(left);
+		out.Append(".");
+	}
+	out.SetTranslatable(kFalse);
+}
+
 namespace
 {
 using KFCObjectReplace::RowItems;
@@ -797,73 +857,25 @@ bool KFCObjectReplace::ReplaceRows(const KFCRowsByChapter& rows, PMString& outSt
 		outStatus.SetTranslatable(kFalse);
 		return false;
 	}
-	const size_t writtenCount = wrote.writtenCount;
 	// "Replaced 3 objects: ID:259, ID:260, ID:261." - and, when some were left, "Replaced 3 of 5 objects: ... Left as they
-	// were: 1 locked, 1 changed since the search." The IDs are listed up to kNamedIDs. Objects of several documents name
-	// each document before its IDs: "Replaced 3 objects in 2 documents: a.indd ID:259, ID:260; b.indd ID:12."
-	const size_t kNamedIDs = 8;
-	outStatus = "Replaced ";
-	outStatus.AppendNumber(static_cast<int32>(writtenCount));
-	if (writtenCount < total)
-	{
-		outStatus.Append(" of ");
-		outStatus.AppendNumber(static_cast<int32>(total));
-	}
-	outStatus.Append(" objects");
-	size_t writtenDocuments = 0;
+	// were: 1 locked, 1 changed since the search." / "Replaced 3 objects in 2 documents: a.indd ID:259, ID:260; b.indd
+	// ID:12." (SayItemsWritten) - each document's items written, in its rows' order.
+	KFCObjectReplace::ItemsWritten items;
 	for (size_t c = 0; c < chapters.size(); ++c)
-		if (!chapters[c].written.empty())
-			++writtenDocuments;
-	if (writtenDocuments > 1)
-	{
-		outStatus.Append(" in ");
-		outStatus.AppendNumber(static_cast<int32>(writtenDocuments));
-		outStatus.Append(" documents");
-	}
-	outStatus.Append(": ");
-	size_t named = 0;
-	bool firstDocument = true;
-	for (size_t c = 0; c < chapters.size() && named < kNamedIDs; ++c)
 	{
 		const ObjectChapterWrite& chapter = chapters[c];
 		if (chapter.written.empty())
 			continue;
-		bool first = true;
-		if (writtenDocuments > 1)
-		{
-			if (!firstDocument)
-				outStatus.Append("; ");
-			PMString docName;
-			int32 rowsNow = 0;
-			if (KFCResultModel::GetChapterDisplay(chapter.chapterIdx, docName, rowsNow))
-			{
-				outStatus.Append(docName);
-				outStatus.Append(" ");
-			}
-		}
-		firstDocument = false;
-		for (size_t k = 0; k < chapter.todo.size() && named < kNamedIDs; ++k)
-		{
-			if (chapter.written.count(chapter.todo[k].second) == 0)
-				continue;
-			if (!first || (writtenDocuments <= 1 && named > 0))
-				outStatus.Append(", ");
-			outStatus.Append("ID:");
-			outStatus.AppendNumber(static_cast<int32>(chapter.todo[k].second.Get()));
-			first = false;
-			++named;
-		}
+		std::vector<UID> ids;
+		for (size_t k = 0; k < chapter.todo.size(); ++k)
+			if (chapter.written.count(chapter.todo[k].second) > 0)
+				ids.push_back(chapter.todo[k].second);
+		items.push_back(std::make_pair(chapter.chapterIdx, ids));
 	}
-	if (writtenCount > kNamedIDs)
-		outStatus.Append(", ...");
-	outStatus.Append(".");
-	if (writtenCount < total)
-	{
-		outStatus.Append(" Left as they were: ");
-		AppendRefusals(outStatus, counts);
-		outStatus.Append(".");
-	}
-	outStatus.SetTranslatable(kFalse);
+	PMString left;
+	AppendRefusals(left, counts);
+	KFCObjectReplace::SayItemsWritten(outStatus, PMString("Replaced "), wrote.writtenCount, total, items, PMString(),
+		": ", left);
 	return true;
 }
 

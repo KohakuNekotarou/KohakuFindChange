@@ -25,7 +25,7 @@
 #include "PMString.h"
 #include "ScriptData.h"				// ScriptData / ScriptRecordData - the script handed over, its answer
 #include "Utils.h"
-#include "WideString.h"				// a typed range read as characters - JsLiteralUtf8
+#include "WideString.h"				// a text read as characters - JsLiteral
 
 #include <cmath>					// std::fabs
 #include <cstdio>					// std::snprintf
@@ -34,6 +34,7 @@
 #include <vector>
 
 // Project includes:
+#include "KFCBoundaryID.h"			// kKFCDisplayName - the dialogs' titles are built from it
 #include "KFCSpecialDialogs.h"
 
 namespace
@@ -60,28 +61,11 @@ void Keep(char (&slot)[kTyped], const std::string& typed)
 		std::snprintf(slot, kTyped, "%s", typed.c_str());
 }
 
-// A JavaScript string literal's body: printable ASCII as it is, the quote and the backslash escaped - the script is pure
-// ASCII, whatever came back from the last one (KFCHowTo's rule).
-std::string JsLiteral(const char* text)
-{
-	std::string out;
-	for (const char* p = text; *p != 0; ++p)
-	{
-		const unsigned char ch = static_cast<unsigned char>(*p);
-		if (ch == '"' || ch == '\\')
-		{
-			out += '\\';
-			out += static_cast<char>(ch);
-		}
-		else if (ch >= 0x20 && ch <= 0x7E)
-			out += static_cast<char>(ch);
-	}
-	return out;
-}
-
-// A JavaScript string literal's body for any text (UTF-8 in): printable ASCII as it is, the quote and the backslash escaped,
-// every other character as \uXXXX (a surrogate pair past U+FFFF) - the script stays pure ASCII (KFCHowTo's rule).
-std::string JsLiteralUtf8(const char* utf8)
+// A JavaScript string literal's body for any text (UTF-8 in): printable ASCII as it is, the quote and the backslash
+// escaped, every other character as \uXXXX (a surrogate pair past U+FFFF) - the script stays pure ASCII (KFCHowTo's
+// rule). What the transforms keep is printable ASCII already (the script's ascii() echo, fmt()'s numbers); a page range
+// can be any text.
+std::string JsLiteral(const char* utf8)
 {
 	PMString text;
 	text.SetUTF8String(utf8);
@@ -121,13 +105,15 @@ void ReplaceAll(std::string& s, const std::string& from, const std::string& to)
 
 // THE DIALOG'S SCRIPT, one per operation, ASCII (the degree sign is the escape \u00B0). The shared head: the units, the
 // readers and the writers of a value, ASCII-only echoes of what was typed, a field and the button column as InDesign's
-// dialogs lay them out; then the operation's own window. Each answers "ok;<x>;<y>;<typed>..." or "cancel".
+// dialogs lay them out, the display name (NAME - Head writes kKFCDisplayName in); then the operation's own window. Each
+// answers "ok;<x>;<y>;<typed>..." or "cancel".
 // ! ExtendScript is ES3: no nested ?: (memory extendscript-nested-ternary-is-left-associative) - none is written here.
 const char* const kHead = R"JS(
 (function () {
   var U = { pt: 1, mm: 72 / 25.4, cm: 72 / 2.54, "in": 72, pc: 12, px: 1, q: 72 / 25.4 / 4, h: 72 / 25.4 / 4 };
   var SHOWN = { pt: "pt", mm: "mm", cm: "cm", "in": "in", pc: "pc", px: "px", q: "Q", h: "H" };
   var DEG = "\u00B0";
+  var NAME = "@@NAME@@";
   function unitOf(mu) {
     try {
       if (mu == MeasurementUnits.MILLIMETERS) return "mm";
@@ -199,7 +185,7 @@ const char* const kHead = R"JS(
 )JS";
 
 const char* const kMove = R"JS(
-  var w = frame("Kohaku Find/Change - Move");
+  var w = frame(NAME + " - Move");
   var pos = w.add("panel", undefined, "Position");
   pos.orientation = "column";
   pos.alignChildren = "right";
@@ -249,7 +235,7 @@ const char* const kMove = R"JS(
 )JS";
 
 const char* const kScale = R"JS(
-  var w = frame("Kohaku Find/Change - Scale");
+  var w = frame(NAME + " - Scale");
   var g = w.add("group");
   g.orientation = "row";
   g.alignChildren = "center";
@@ -401,7 +387,7 @@ const char* const kChain = R"JS(
 )JS";
 
 const char* const kRotate = R"JS(
-  var w = frame("Kohaku Find/Change - Rotate");
+  var w = frame(NAME + " - Rotate");
   var col = w.add("group");
   col.orientation = "column";
   col.alignChildren = "right";
@@ -420,7 +406,7 @@ const char* const kRotate = R"JS(
 )JS";
 
 const char* const kShear = R"JS(
-  var w = frame("Kohaku Find/Change - Shear");
+  var w = frame(NAME + " - Shear");
   var col = w.add("group");
   col.orientation = "column";
   col.alignChildren = "left";
@@ -449,7 +435,7 @@ const char* const kShear = R"JS(
 )JS";
 
 const char* const kPages = R"JS(
-  var w = frame("Kohaku Find/Change - Narrow Down");
+  var w = frame(NAME + " - Narrow Down");
   var col = w.add("group");
   col.orientation = "column";
   col.alignChildren = "left";
@@ -484,6 +470,46 @@ std::vector<std::string> Fields(const std::string& answer)
 	}
 	return out;
 }
+
+// The scripts' shared head (kHead), the display name written in (kKFCDisplayName - the one definition of the name).
+std::string Head()
+{
+	std::string head(kHead);
+	ReplaceAll(head, "@@NAME@@", JsLiteral(kKFCDisplayName));
+	return head;
+}
+
+// A DIALOG'S SCRIPT RUN THROUGH THE PLUG-IN'S OWN ENGINE (KFCHowTo's - "KFC", out of the user's #targetengine
+// sessions), its answer read back (KIDMCP's RunOnce is the shape: a script handed as ScriptData, no arguments, the
+// result and an error string; no alert of the runner's own - the caller says what went wrong, in its own words).
+enum DialogRun
+{
+	kDialogAnswered = 0,
+	kDialogNoEngine,		// no script engine to run it in
+	kDialogFailed			// it ran into an error, or answered nothing that reads as text
+};
+DialogRun RunDialog(const std::string& js, std::string& outAnswer)
+{
+	Utils<IExtendScriptUtils> esUtils;
+	if (!esUtils.Exists())
+		return kDialogNoEngine;
+	PMString scriptText;
+	scriptText.SetTranslatable(kFalse);
+	scriptText.SetUTF8String(js);
+	ScriptData script;
+	script.SetPMString(scriptText);
+	ScriptRecordData arguments;
+	ScriptData result;
+	PMString errorString;
+	const ErrorCode ran = esUtils->RunScriptInEngine("KFC", script, arguments, result, errorString,
+		kFalse /*showErrorAlert*/, kFalse /*invokeDebugger*/);
+	PMString answerText;
+	if (ran != kSuccess || !errorString.IsEmpty() || result.GetType() != ScriptData::s_string
+		|| result.GetPMString(answerText) != kSuccess)
+		return kDialogFailed;
+	outAnswer = answerText.GetUTF8String();
+	return kDialogAnswered;
+}
 }	// anonymous namespace
 
 const char* KFCSpecialDialogs::OpName(int32 op)
@@ -515,37 +541,21 @@ bool KFCSpecialDialogs::AskPageRange(PMString& io, PMString& outWhy)
 {
 	outWhy.Clear();
 	outWhy.SetTranslatable(kFalse);
-	std::string js(kHead);
+	std::string js(Head());
 	std::string body(kPages);
-	ReplaceAll(body, "@@P@@", JsLiteralUtf8(gPages));
+	ReplaceAll(body, "@@P@@", JsLiteral(gPages));
 	js += body;
-	// Through the plug-in's own engine, as the transforms' (AskTransformValues says why).
-	Utils<IExtendScriptUtils> esUtils;
-	if (!esUtils.Exists())
+	std::string answer;
+	const DialogRun run = RunDialog(js, answer);
+	if (run != kDialogAnswered)
 	{
-		outWhy.Append("Narrow Down: the dialog could not be shown (no script engine) - nothing was searched.");
-		return false;
-	}
-	PMString scriptText;
-	scriptText.SetTranslatable(kFalse);
-	scriptText.SetUTF8String(js);
-	ScriptData script;
-	script.SetPMString(scriptText);
-	ScriptRecordData arguments;
-	ScriptData result;
-	PMString errorString;
-	const ErrorCode ran = esUtils->RunScriptInEngine("KFC", script, arguments, result, errorString, kFalse /*showErrorAlert*/,
-		kFalse /*invokeDebugger*/);
-	PMString answerText;
-	if (ran != kSuccess || !errorString.IsEmpty() || result.GetType() != ScriptData::s_string
-		|| result.GetPMString(answerText) != kSuccess)
-	{
-		outWhy.Append("Narrow Down: the dialog could not be shown - nothing was searched.");
+		outWhy.Append(run == kDialogNoEngine
+			? "Narrow Down: the dialog could not be shown (no script engine) - nothing was searched."
+			: "Narrow Down: the dialog could not be shown - nothing was searched.");
 		return false;
 	}
 	// "ok;<the range>" - the range is everything after the first ';' (it holds no ';' of its own that matters: a range is
 	// separated by commas).
-	const std::string answer(answerText.GetUTF8String());
 	if (answer.compare(0, 3, "ok;") != 0)
 		return false;		// Cancel: nothing searched, nothing said
 	const std::string typed(answer.substr(3));
@@ -560,7 +570,7 @@ bool KFCSpecialDialogs::AskTransformValues(int32 op, KFCSpecialParams& io, PMStr
 {
 	outWhy.Clear();
 	outWhy.SetTranslatable(kFalse);
-	std::string js(kHead);
+	std::string js(Head());
 	switch (op)
 	{
 		case kKFCSpecialMove:
@@ -600,37 +610,18 @@ bool KFCSpecialDialogs::AskTransformValues(int32 op, KFCSpecialParams& io, PMStr
 			return false;
 	}
 
-	// RUN THROUGH THE PLUG-IN'S OWN ENGINE (KFCHowTo's - "KFC", out of the user's #targetengine sessions), the answer read
-	// back (KIDMCP's RunOnce is the shape: a script handed as ScriptData, no arguments, the result and an error string; no
-	// alert of the runner's own - an error is said here).
-	Utils<IExtendScriptUtils> esUtils;
-	if (!esUtils.Exists())
+	std::string answer;
+	const DialogRun run = RunDialog(js, answer);
+	if (run != kDialogAnswered)
 	{
 		outWhy = OpName(op);
-		outWhy.Append(": the dialog could not be shown (no script engine) - nothing was changed.");
+		outWhy.Append(run == kDialogNoEngine
+			? ": the dialog could not be shown (no script engine) - nothing was changed."
+			: ": the dialog could not be shown - nothing was changed.");
 		outWhy.SetTranslatable(kFalse);
 		return false;
 	}
-	PMString scriptText;
-	scriptText.SetTranslatable(kFalse);
-	scriptText.SetUTF8String(js);
-	ScriptData script;
-	script.SetPMString(scriptText);
-	ScriptRecordData arguments;
-	ScriptData result;
-	PMString errorString;
-	const ErrorCode ran = esUtils->RunScriptInEngine("KFC", script, arguments, result, errorString, kFalse /*showErrorAlert*/,
-		kFalse /*invokeDebugger*/);
-	PMString answerText;
-	if (ran != kSuccess || !errorString.IsEmpty() || result.GetType() != ScriptData::s_string
-		|| result.GetPMString(answerText) != kSuccess)
-	{
-		outWhy = OpName(op);
-		outWhy.Append(": the dialog could not be shown - nothing was changed.");
-		outWhy.SetTranslatable(kFalse);
-		return false;
-	}
-	const std::vector<std::string> f = Fields(answerText.GetUTF8String());
+	const std::vector<std::string> f = Fields(answer);
 	if (f.size() < 3 || f[0] != "ok")
 		return false;		// Cancel: nothing written, nothing said
 	io.x = std::strtod(f[1].c_str(), nil);

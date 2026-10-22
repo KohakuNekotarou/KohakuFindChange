@@ -47,7 +47,8 @@
 #include "KFCDiag.h"
 #include "KFCDiagWrittenDocs.h"		// a test build's written-document check (nothing in a shipping one)
 #include "KFCID.h"					// the Edit menu's names of the steps
-#include "KFCObjectReplace.h"		// RowsTheWriteCanMove, FollowRowsTheWriteMoved - the other rows a write moves
+#include "KFCObjectReplace.h"		// RowsTheWriteCanMove, FollowRowsTheWriteMoved - the other rows a write moves;
+									// SayItemsWritten - what a write of object rows says
 #include "KFCObjectSearch.h"		// IsOnSpread, Fingerprint, ReadItemPlace
 #include "KFCObjectSpecial.h"
 #include "KFCPageItemFacts.h"		// IsPageItemLockedForEdit, IsFrameOnLockedLayer, StackIndex, ItemIsThere
@@ -75,40 +76,39 @@ struct OpInfo
 	const char*	stepKey;		// the Edit menu's name of its undo step (a key - KFC_enUS.fr)
 	WriteKind	kind;
 	bool		order;			// its write moves no fingerprint, only the item's place in its stack (Arrange - E6)
-	bool		ready;			// written now (an operation listed ahead of its stage is refused as not available yet)
 	const char*	notApplicable;	// InDesign's own question said no: the words a count of such rows reads
 };
 
 const OpInfo kOps[] =
 {
-	{ kKFCSpecialFillFrameProp,			"Fill Frame Proportionally",			kKFCFillFramePropStepKey,		kWriteBatch,	false,	true,	"no content to fit" },
-	{ kKFCSpecialFitContentProp,		"Fit Content Proportionally",			kKFCFitContentPropStepKey,		kWriteBatch,	false,	true,	"no content to fit" },
-	{ kKFCSpecialContentAwareFit,		"Content-Aware Fit",					kKFCContentAwareFitStepKey,		kWriteBatch,	false,	true,	"not an image frame" },
-	{ kKFCSpecialFitFrameToContent,		"Fit Frame to Content",					kKFCFrameToContentStepKey,		kWriteBatch,	false,	true,	"no content to fit to" },
-	{ kKFCSpecialFitContentToFrame,		"Fit Content to Frame",					kKFCFitContentToFrameStepKey,	kWriteBatch,	false,	true,	"no content to fit" },
-	{ kKFCSpecialCenterContent,			"Center Content",						kKFCCenterContentStepKey,		kWriteBatch,	false,	true,	"no content to center" },
-	{ kKFCSpecialBringToFront,			"Bring to Front",						kKFCBringFrontStepKey,			kWriteBatch,	true,	true,	"in front already" },
-	{ kKFCSpecialBringForward,			"Bring Forward",						kKFCBringForwardStepKey,		kWriteBatch,	true,	true,	"in front already" },
-	{ kKFCSpecialSendBackward,			"Send Backward",						kKFCSendBackwardStepKey,		kWriteBatch,	true,	true,	"at the back already" },
-	{ kKFCSpecialSendToBack,			"Send to Back",							kKFCSendToBackStepKey,			kWriteBatch,	true,	true,	"at the back already" },
-	{ kKFCSpecialRotate90CW,			"Rotate 90 Degrees Clockwise",			kKFCRotate90CWStepKey,			kWriteEach,		false,	true,	"cannot be rotated" },
-	{ kKFCSpecialRotate90CCW,			"Rotate 90 Degrees Counter-clockwise",	kKFCRotate90CCWStepKey,			kWriteEach,		false,	true,	"cannot be rotated" },
-	{ kKFCSpecialRotate180,				"Rotate 180 Degrees",					kKFCRotate180StepKey,			kWriteEach,		false,	true,	"cannot be rotated" },
-	{ kKFCSpecialFlipHorizontal,		"Flip Horizontal",						kKFCFlipHorizontalStepKey,		kWriteEach,		false,	true,	"cannot be flipped" },
-	{ kKFCSpecialFlipVertical,			"Flip Vertical",						kKFCFlipVerticalStepKey,		kWriteEach,		false,	true,	"cannot be flipped" },
-	{ kKFCSpecialRedefineScaling,		"Redefine Scaling as 100%",				kKFCRedefineScalingStepKey,		kWriteBatch,	false,	true,	"at 100% already" },
-	{ kKFCSpecialClearTransformations,	"Clear Transformations",				kKFCClearTransformationsStepKey,	kWriteBatch,	false,	true,	"not transformed" },
-	{ kKFCSpecialLock,					"Lock",									kKFCLockStepKey,				kWriteBatch,	false,	true,	"cannot be locked" },
-	{ kKFCSpecialUnlock,				"Unlock",								kKFCUnlockStepKey,				kWriteBatch,	false,	true,	"cannot be unlocked" },
-	{ kKFCSpecialHide,					"Hide",									kKFCHideStepKey,				kWriteBatch,	false,	true,	"cannot be hidden" },
-	{ kKFCSpecialShow,					"Show",									kKFCShowStepKey,				kWriteBatch,	false,	true,	"cannot be shown" },
-	{ kKFCSpecialMoveToLayer,			"Move to Active Layer",					kKFCMoveToLayerStepKey,			kWriteBatch,	false,	true,	"cannot be moved" },
-	{ kKFCSpecialClearStyleOverrides,	"Clear Object Style Overrides",			kKFCClearStyleOverridesStepKey,	kWriteBatch,	false,	true,	"no object style" },
-	{ kKFCSpecialDelete,				"Delete",								kKFCDeleteStepKey,				kWriteGone,		false,	true,	"cannot be deleted" },
-	{ kKFCSpecialMove,					"Move",									kKFCMoveStepKey,				kWriteEach,		false,	true,	"cannot be moved" },
-	{ kKFCSpecialScale,					"Scale",								kKFCScaleStepKey,				kWriteEach,		false,	true,	"cannot be scaled" },
-	{ kKFCSpecialRotate,				"Rotate",								kKFCRotateStepKey,				kWriteEach,		false,	true,	"cannot be rotated" },
-	{ kKFCSpecialShear,					"Shear",								kKFCShearStepKey,				kWriteEach,		false,	true,	"cannot be sheared" },
+	{ kKFCSpecialFillFrameProp,			"Fill Frame Proportionally",			kKFCFillFramePropStepKey,		kWriteBatch,	false,	"no content to fit" },
+	{ kKFCSpecialFitContentProp,		"Fit Content Proportionally",			kKFCFitContentPropStepKey,		kWriteBatch,	false,	"no content to fit" },
+	{ kKFCSpecialContentAwareFit,		"Content-Aware Fit",					kKFCContentAwareFitStepKey,		kWriteBatch,	false,	"not an image frame" },
+	{ kKFCSpecialFitFrameToContent,		"Fit Frame to Content",					kKFCFrameToContentStepKey,		kWriteBatch,	false,	"no content to fit to" },
+	{ kKFCSpecialFitContentToFrame,		"Fit Content to Frame",					kKFCFitContentToFrameStepKey,	kWriteBatch,	false,	"no content to fit" },
+	{ kKFCSpecialCenterContent,			"Center Content",						kKFCCenterContentStepKey,		kWriteBatch,	false,	"no content to center" },
+	{ kKFCSpecialBringToFront,			"Bring to Front",						kKFCBringFrontStepKey,			kWriteBatch,	true,	"in front already" },
+	{ kKFCSpecialBringForward,			"Bring Forward",						kKFCBringForwardStepKey,		kWriteBatch,	true,	"in front already" },
+	{ kKFCSpecialSendBackward,			"Send Backward",						kKFCSendBackwardStepKey,		kWriteBatch,	true,	"at the back already" },
+	{ kKFCSpecialSendToBack,			"Send to Back",							kKFCSendToBackStepKey,			kWriteBatch,	true,	"at the back already" },
+	{ kKFCSpecialRotate90CW,			"Rotate 90 Degrees Clockwise",			kKFCRotate90CWStepKey,			kWriteEach,		false,	"cannot be rotated" },
+	{ kKFCSpecialRotate90CCW,			"Rotate 90 Degrees Counter-clockwise",	kKFCRotate90CCWStepKey,			kWriteEach,		false,	"cannot be rotated" },
+	{ kKFCSpecialRotate180,				"Rotate 180 Degrees",					kKFCRotate180StepKey,			kWriteEach,		false,	"cannot be rotated" },
+	{ kKFCSpecialFlipHorizontal,		"Flip Horizontal",						kKFCFlipHorizontalStepKey,		kWriteEach,		false,	"cannot be flipped" },
+	{ kKFCSpecialFlipVertical,			"Flip Vertical",						kKFCFlipVerticalStepKey,		kWriteEach,		false,	"cannot be flipped" },
+	{ kKFCSpecialRedefineScaling,		"Redefine Scaling as 100%",				kKFCRedefineScalingStepKey,		kWriteBatch,	false,	"at 100% already" },
+	{ kKFCSpecialClearTransformations,	"Clear Transformations",				kKFCClearTransformationsStepKey,	kWriteBatch,	false,	"not transformed" },
+	{ kKFCSpecialLock,					"Lock",									kKFCLockStepKey,				kWriteBatch,	false,	"cannot be locked" },
+	{ kKFCSpecialUnlock,				"Unlock",								kKFCUnlockStepKey,				kWriteBatch,	false,	"cannot be unlocked" },
+	{ kKFCSpecialHide,					"Hide",									kKFCHideStepKey,				kWriteBatch,	false,	"cannot be hidden" },
+	{ kKFCSpecialShow,					"Show",									kKFCShowStepKey,				kWriteBatch,	false,	"cannot be shown" },
+	{ kKFCSpecialMoveToLayer,			"Move to Active Layer",					kKFCMoveToLayerStepKey,			kWriteBatch,	false,	"cannot be moved" },
+	{ kKFCSpecialClearStyleOverrides,	"Clear Object Style Overrides",			kKFCClearStyleOverridesStepKey,	kWriteBatch,	false,	"no object style" },
+	{ kKFCSpecialDelete,				"Delete",								kKFCDeleteStepKey,				kWriteGone,		false,	"cannot be deleted" },
+	{ kKFCSpecialMove,					"Move",									kKFCMoveStepKey,				kWriteEach,		false,	"cannot be moved" },
+	{ kKFCSpecialScale,					"Scale",								kKFCScaleStepKey,				kWriteEach,		false,	"cannot be scaled" },
+	{ kKFCSpecialRotate,				"Rotate",								kKFCRotateStepKey,				kWriteEach,		false,	"cannot be rotated" },
+	{ kKFCSpecialShear,					"Shear",								kKFCShearStepKey,				kWriteEach,		false,	"cannot be sheared" },
 };
 
 const OpInfo* FindOp(int32 op)
@@ -123,7 +123,6 @@ const OpInfo* FindOp(int32 op)
 enum Refusal
 {
 	kRefusedNone = 0,
-	kRefusedNotReady,		// an operation of a later stage (never from the panel - its menu has no item for it)
 	kRefusedNotObject,		// not an object row (never from the panel - the menu is the object rows')
 	kRefusedNoDoc,			// its document could not be found
 	kRefusedNotOpened,		// ...or not opened
@@ -149,7 +148,6 @@ PMString RowSentence(const OpInfo& info, Refusal why, const KFCSpecialParams& pa
 	out.SetTranslatable(kFalse);
 	switch (why)
 	{
-		case kRefusedNotReady:		out = "this operation is not available yet."; break;
 		case kRefusedNotObject:		out = "this row is not an object row."; break;
 		case kRefusedNoDoc:			out = "the document of this row could not be found."; break;
 		case kRefusedNotOpened:		out = "the document of this row could not be opened."; break;
@@ -188,7 +186,6 @@ PMString RefusalWords(const OpInfo& info, Refusal why, const KFCSpecialParams& p
 	PMString out;
 	switch (why)
 	{
-		case kRefusedNotReady:		out = "not available yet"; break;
 		case kRefusedNotObject:		out = "not an object row"; break;
 		case kRefusedNoDoc:			out = "document not found"; break;
 		case kRefusedNotOpened:		out = "document not opened"; break;
@@ -222,7 +219,7 @@ PMString RefusalWords(const OpInfo& info, Refusal why, const KFCSpecialParams& p
 void AppendRefusals(PMString& out, const OpInfo& info, const KFCSpecialParams& params, const int32 (&counts)[kRefusalCount])
 {
 	bool first = true;
-	for (int32 why = kRefusedNotReady; why < kRefusalCount; ++why)
+	for (int32 why = kRefusedNotObject; why < kRefusalCount; ++why)
 	{
 		if (counts[why] == 0)
 			continue;
@@ -242,13 +239,6 @@ void Refuse(PMString& out, const OpInfo& info, const PMString& why)
 	out.Append(": ");
 	out.Append(why);
 	out.SetTranslatable(kFalse);
-}
-
-// The layer of that name in a document (Move to Active Layer - E11: the front document's active layer's name, found in
-// each document of the rows). kInvalidUID = none.
-UID LayerNamed(const UIDRef& docRef, const PMString& name)
-{
-	return KFCPageItemFacts::DocLayerNamed(docRef, name);		// the one reading of it - Narrow Down's On Active Layer's too
 }
 
 // The object style applied to an item (kInvalidUID = none).
@@ -273,7 +263,7 @@ Refusal CheckLayerMove(const KFCSpecialParams& params, const UIDRef& docRef, UID
 		return kRefusedNested;
 	if (params.text.IsEmpty())
 		return kRefusedNone;
-	const UID target = LayerNamed(docRef, params.text);
+	const UID target = KFCPageItemFacts::DocLayerNamed(docRef, params.text);
 	if (target == kInvalidUID)
 		return kRefusedNoLayer;
 	return (spreadLayer->GetDocLayerUID() == target) ? kRefusedOnLayer : kRefusedNone;
@@ -423,8 +413,6 @@ Refusal CheckItem(const OpInfo& info, const KFCSpecialParams& params, int32 chap
 	outItem = KFCResultModel::GetHitItem(chapterIdx, hitIdx);
 	if (outItem == kInvalidUID)
 		return kRefusedNotObject;
-	if (!info.ready)
-		return kRefusedNotReady;
 	IDFile file;
 	if (!KFCResultModel::GetChapterLocation(chapterIdx, outDoc, file))
 		return kRefusedNoDoc;
@@ -601,7 +589,7 @@ ErrorCode WriteDocument(const OpInfo& info, const KFCSpecialParams& params, cons
 		case kKFCSpecialMoveToLayer:
 		{
 			Utils<Facade::ILayerFacade> layers;
-			const UID targetUID = LayerNamed(docRef, params.text);
+			const UID targetUID = KFCPageItemFacts::DocLayerNamed(docRef, params.text);
 			if (!layers || targetUID == kInvalidUID)
 				return kFailure;
 			InterfacePtr<IDocumentLayer> target(docRef.GetDataBase(), targetUID, UseDefaultIID());
@@ -913,74 +901,31 @@ bool KFCObjectSpecial::SpecialRows(int32 op, const KFCRowsByChapter& rows, const
 	}
 	recorder.Keep();
 
-	// E8: "<operation>: 3 objects - ID:259, ID:260, ID:261." - the items' IDs, up to kNamedIDs; several documents named
-	// before their IDs; the rows left as they were counted after.
-	const size_t kNamedIDs = 8;
-	outStatus = info.name;
-	outStatus.Append(": ");
-	outStatus.AppendNumber(static_cast<int32>(changedCount));
-	if (changedCount < total)
-	{
-		outStatus.Append(" of ");
-		outStatus.AppendNumber(static_cast<int32>(total));
-	}
-	outStatus.Append(changedCount == 1 && total == 1 ? " object" : " objects");
-	size_t writtenDocuments = 0;
+	// E8: "<operation>: 3 objects - ID:259, ID:260, ID:261." - the items' IDs (SayItemsWritten), each document's in its
+	// rows' order; Move to Active Layer's layer named after the count ("... 5 of 8 objects to "Images" - ...").
+	KFCObjectReplace::ItemsWritten items;
 	for (size_t c = 0; c < chapters.size(); ++c)
-		if (!chapters[c].changed.empty())
-			++writtenDocuments;
-	if (writtenDocuments > 1)
-	{
-		outStatus.Append(" in ");
-		outStatus.AppendNumber(static_cast<int32>(writtenDocuments));
-		outStatus.Append(" documents");
-	}
-	if (info.op == kKFCSpecialMoveToLayer)
-	{
-		outStatus.Append(" to \"");
-		outStatus.Append(params.text);
-		outStatus.Append("\"");
-	}
-	outStatus.Append(" - ");
-	size_t named = 0;
-	bool firstDocument = true;
-	for (size_t c = 0; c < chapters.size() && named < kNamedIDs; ++c)
 	{
 		const SpecialChapter& chapter = chapters[c];
 		if (chapter.changed.empty())
 			continue;
-		if (writtenDocuments > 1)
-		{
-			if (!firstDocument)
-				outStatus.Append("; ");
-			PMString docName;
-			int32 rowsNow = 0;
-			if (KFCResultModel::GetChapterDisplay(chapter.chapterIdx, docName, rowsNow))
-			{
-				outStatus.Append(docName);
-				outStatus.Append(" ");
-			}
-		}
-		firstDocument = false;
-		for (size_t n = 0; n < chapter.changed.size() && named < kNamedIDs; ++n)
-		{
-			if (n > 0 || (writtenDocuments <= 1 && named > 0))
-				outStatus.Append(", ");
-			outStatus.Append("ID:");
-			outStatus.AppendNumber(static_cast<int32>(chapter.todo[chapter.changed[n]].second.Get()));
-			++named;
-		}
+		std::vector<UID> changed;
+		for (size_t n = 0; n < chapter.changed.size(); ++n)
+			changed.push_back(chapter.todo[chapter.changed[n]].second);
+		items.push_back(std::make_pair(chapter.chapterIdx, changed));
 	}
-	if (changedCount > kNamedIDs)
-		outStatus.Append(", ...");
-	outStatus.Append(".");
-	if (changedCount < total)
+	PMString head(info.name);
+	head.Append(": ");
+	PMString toLayer;
+	if (info.op == kKFCSpecialMoveToLayer)
 	{
-		outStatus.Append(" Left as they were: ");
-		AppendRefusals(outStatus, info, params, counts);
-		outStatus.Append(".");
+		toLayer = " to \"";
+		toLayer.Append(params.text);
+		toLayer.Append("\"");
 	}
-	outStatus.SetTranslatable(kFalse);
+	PMString left;
+	AppendRefusals(left, info, params, counts);
+	KFCObjectReplace::SayItemsWritten(outStatus, head, changedCount, total, items, toLayer, " - ", left);
 	return true;
 }
 
