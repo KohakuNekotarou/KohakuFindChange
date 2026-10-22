@@ -63,8 +63,8 @@ namespace
 	{
 		uint32					set;		// the model's result set of the list it copies - the number the model keeps the tier
 											// under (KFCTierStore): what the copies follow, and what a switch asks for
-		PMString				name;		// the name a search here gave that list (Find's label) - empty when none did (a list
-											// an Undo put back): the switch's third check reads the query against it
+		PMString				name;		// the name a search here gave that list (Find's label) - empty when none
+											// did (a query run's): the switch's third check reads the query against it
 		PMString				label;		// "<name>  (R/N)" as the tier's row read when it was kept
 		PMString				head;		// ...its "<name>" alone (LiveTierLabel then): KeptChapterGone writes
 											// the counts after it again when a closed document's rows go
@@ -621,8 +621,23 @@ PMString KFCResultHistory::QueryLabel()
 
 void KFCResultHistory::DropStackIfRemade(uint32 setBefore)
 {
-	if (KFCResults()->GetResultSetId() != setBefore)
-		(void)DropStack();
+	if (KFCResults()->GetResultSetId() == setBefore)
+		return;
+	// THE LIST IT REPLACED KEEPS ITS NAME (the author's call): a query run's Ctrl+Z puts that list back as its own
+	// result set (KFCUndoFollow - the run's step names the set it found), and it comes back as it was - its tier
+	// named, a row's Replace reading the list's query against that name (QueryReadsAsTier), and the query dialog's Find
+	// refusing the query that made it (QueryJustFound). The name and that note are kept by their set and read only
+	// while it is the live list's (LiveIsStacked), so they wait unread until it comes back - after a second run too,
+	// whose Ctrl+Z comes first. Change All in Book's Ctrl+Z puts no list back: there they are never read. The tiers
+	// go (cases qd-run-undo-name, qd-find-run-undo-refused, qd-run-undo-replace).
+	const LiveTier live = gLive;
+	const IDFile lastFound = gLastFound;
+	const uint32 lastFoundSet = gLastFoundSet;
+	(void)DropStack();
+	gLive = live;
+	gLastFound = lastFound;
+	gLastFoundSet = lastFoundSet;
+	KFC_DIAG_LOG("STACK remade - the name kept for set=%u", gLive.set);
 }
 
 bool KFCResultHistory::DropStack()

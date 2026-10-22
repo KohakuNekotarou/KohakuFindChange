@@ -215,8 +215,8 @@
   灰色にしない（Run と同じく、動けない理由はメッセージの行で言う）。Enter は Run のまま。
   押したときの文（ダイアログの行。検索したときはパネルの行に検索の文）＝
   `Find 2 of 3: <kind>  <name> - <検索の文>`（検索した・次へ）／`... - nothing was searched: <検索の文>`（検索が断られた・位置はそのまま）／`... cannot be found - nothing was searched.`（ファイルが無い＝Run の「1本でも無ければ実行しない」に揃えて、位置はそのまま）／`... skipped: the file could not be read.`・`... skipped: nothing to find.`（読めない・探すものが無い＝Colour のタブ、Object 以外で検索の文字も書式も無い＝Run と同じく飛ばして次へ。Object のクエリは書式が空でも検索する＝パネルの Find と同じ）／`Find: the run order is empty.`／`Find: all <N> queries of the run order have been searched - Clear Results or change the run order to search them again.`（最後の後に押した＝知らせて止まる・一覧は残る）。KFC の実行が立っている間は本体の Busy の文。
-  ★2026-10-14 夜の作者の決定（チャットの設計に「はい」）＝**選ばれた行が位置**：検索が通ったら、また読めない・探すものが無いで飛ばしたら、**選択を1つ下へ**（最後の行ではそのまま）。ファイルが無い・検索が断られたときは動かさない。**同じクエリを続けて Find しない**＝最後の Find のクエリ（ファイルで比べる）と、そのとき出来た一覧がまだパネルの今の一覧なら、検索せずに `Find <n> of <N>: <kind>  <name> was searched just now - its results are on the panel. Pick another query of the run order.`（灰色にはしない）。ほかの検索・Run・Clear Results・段の切り替えの後なら同じクエリでも検索する。`Find: all <N> queries of the run order have been searched ...` の文と「1本目へ戻る」決まりは外した。段の見出しの頭の番号は選んだ行の番号。✅ 2026-10-14 夜に実機（1行目→2→3→3で止まる→断る→1行目を選び直して検索）。
-  **Run が通ると段は消える**（ROW-41）。
+  ★2026-10-14 夜の作者の決定（チャットの設計に「はい」）＝**選ばれた行が位置**：検索が通ったら、また読めない・探すものが無いで飛ばしたら、**選択を1つ下へ**（最後の行ではそのまま）。ファイルが無い・検索が断られたときは動かさない。**同じクエリを続けて Find しない**＝最後の Find のクエリ（ファイルで比べる）と、そのとき出来た一覧がまだパネルの今の一覧なら、検索せずに `Find <n> of <N>: <kind>  <name> was searched just now - its results are on the panel. Pick another query of the run order.`（灰色にはしない）。ほかの検索・Run・Clear Results・段の切り替えの後なら同じクエリでも検索する（ただし Run を Ctrl+Z してその一覧が今の一覧に戻れば、また断る＝ROW-41・2026-10-22 作者の決定 W12-a）。`Find: all <N> queries of the run order have been searched ...` の文と「1本目へ戻る」決まりは外した。段の見出しの頭の番号は選んだ行の番号。✅ 2026-10-14 夜に実機（1行目→2→3→3で止まる→断る→1行目を選び直して検索）。
+  **Run が通ると段は消える**（ROW-41）。今の一覧の名前は控えられ、Run を Ctrl+Z して一覧が戻ると名前も戻る（ROW-41・2026-10-22 作者の決定 W12-a）。
   ★Find で積んだ段も、灰色になった後で中の行をクリックすれば**その段に切り替えられる**（ROW-42・2026-10-14 夕）＝条件は段ができた時に KFC がメモリの中に写したもので戻す＝**元のクエリのファイルは読み直さない**（後でファイルを直しても消しても、段の条件は変わらない）。戻した後の見出しの検算では、段の見出しの先頭の `<n>  ` を除いて比べる。Find の位置（次に検索する1本）は切り替えでは変わらない。
   - 訂正:
 

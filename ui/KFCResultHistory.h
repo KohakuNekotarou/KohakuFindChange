@@ -79,11 +79,14 @@ namespace KFCResultHistory
 
 	/** A LIST MADE ANEW ELSEWHERE - a Run of the query dialog, Change All in Book (No List): the tiers go when the list the
 	    model holds is not the one it held before (`setBefore` = KFCResults()->GetResultSetId() before it ran). A run turned
-	    away leaves them. */
+	    away leaves them. THE LIST IT REPLACED KEEPS ITS NAME (the author's call): the live tier's name and the query
+	    dialog's last Find stay, each under its result set, unread until that list is the live one again - a query run's
+	    Ctrl+Z puts it back (KFCUndoFollow), named as it was. */
 	void DropStackIfRemade(uint32 setBefore);
 
-	/** Clear Results (the spec's section 2-4) and the drops above: the kept tiers, the live tier's name and the query
-	    dialog's place go. True = there was something to take away (IsStacking, before). */
+	/** Clear Results (the spec's section 2-4), and the drops above: the kept tiers, the live tier's name and the query
+	    dialog's place go (DropStackIfRemade puts the name and the place back after it). True = there was something to
+	    take away (IsStacking, before). */
 	bool DropStack();
 
 	/** Is the list drawn in tiers now - a tier kept, or the live list made by a search that keeps? The one question the
@@ -98,7 +101,8 @@ namespace KFCResultHistory
 	/** THE SAME QUERY TWICE IN A ROW (the author's call): did the query dialog's last Find search `file` (FileUtils::IsEqual
 	    - a saved query is its file), and is the list it made the panel's live list still? True = the Find is refused - its
 	    list would be the one on the panel again. A search since (the panel's, another query's), a Run, Clear Results or a
-	    switch to another tier makes another list live, and the query can be searched again. */
+	    switch to another tier makes another list live, and the query can be searched again - until a Run's Ctrl+Z makes
+	    its list the live one again (DropStackIfRemade kept the note). */
 	bool QueryJustFound(const IDFile& file);
 	/** ...noted after a Find of `file` that went through: the query, and the list it made (the live list's set). */
 	void NoteQueryFound(const IDFile& file);
@@ -110,8 +114,8 @@ namespace KFCResultHistory
 
 	/** The live tier's name as its row draws it: the label of the search that made the list the model holds, with the
 	    Search: it was searched with after the tab ("[Text/Story] F:..." - the author: "easy to read"; drawn, not kept
-	    in the name, which QueryReadsAsTier reads the query against), or "Results" for a list KFC did not name (one an
-	    Undo put back, say) - and a narrowed list's conditions after it, drawn so too ("... / In Tables"). */
+	    in the name, which QueryReadsAsTier reads the query against), or "Results" for a list KFC did not name (the
+	    one a query run leaves, say) - and a narrowed list's conditions after it, drawn so too ("... / In Tables"). */
 	PMString LiveTierLabel();
 
 	/** WHERE THE LIVE TIER STANDS AMONG THE TIERS (v2 R4 - the tiers stay in search order, the live one in its place: the
