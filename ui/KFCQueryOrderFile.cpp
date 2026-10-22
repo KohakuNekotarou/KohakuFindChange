@@ -376,8 +376,10 @@ bool KFCChooseOrderFile(bool forSave, IDFile& outFile)
 		// So kSaveFileDialogBoss itself, the SDK chooser's steps one level down (SDKFileSaveChooser::ShowDialog): the
 		// chooser fixes its flags at FOS_OVERWRITEPROMPT | FOS_NOREADONLYRETURN. KCM's Task Start takes the same level
 		// for its own reason (KCMTaskStartSave.cpp).
-		// kDefaultIID is missing on ISaveFileDialog - named, as the chooser does.
-		InterfacePtr<ISaveFileDialog> dialog(static_cast<ISaveFileDialog*>(::CreateObject(kSaveFileDialogBoss, IID_ISAVEFILEDIALOG)));
+		// kDefaultIID is missing on ISaveFileDialog, so the IID is named - CreateObject2's two-argument form, as
+		// KFC makes its ICallbackTimers (the chooser casts ::CreateObject's answer by hand, SDKFileHelper.cpp).
+		InterfacePtr<ISaveFileDialog> dialog(
+			::CreateObject2<ISaveFileDialog>(kSaveFileDialogBoss, IID_ISAVEFILEDIALOG));
 		if (dialog == nil)
 			return false;
 		// The type's name TRANSLATED first, as the chooser's Filter does (SDKFileHelper.cpp) - AddFileTypeInfo shows
@@ -388,9 +390,10 @@ bool KFCChooseOrderFile(bool forSave, IDFile& outFile)
 #ifdef WINDOWS
 		dialog->SetAdditionalFOSFlags(FOS_OVERWRITEPROMPT | FOS_NOREADONLYRETURN | FOS_STRICTFILETYPES);
 #endif
-		// A name without a folder: the dialog starts where Windows last saved (ISaveFileDialog.h).
-		IDFile defaultFile;
-		defaultFile.SetString(PMString("Query Order.json"));
+		// A name without a folder: the dialog starts where Windows last saved (ISaveFileDialog.h). The IDFile is
+		// made by FileUtils, as the fault switch's above: the chooser's IDFile::SetString stands under IDFile.h's
+		// "DEPRECATED Methods" ("New code should avoid using the following methods").
+		const IDFile defaultFile(FileUtils::PMStringToSysFile(PMString("Query Order.json")));
 		PMString title(kKFCQuerySaveOrderTitleKey);		// "Save Query Order"
 		title.Translate();
 		int32 selectedIndex = 0;
