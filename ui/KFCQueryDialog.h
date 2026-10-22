@@ -19,11 +19,11 @@
     brings that one forward (back from the taskbar if minimized) and fills it again. */
 void KFCQueryDialogOpen();
 
-/** The open dialog's Runs on: line asked again (nothing when it is not open) - KFCPanelTitle::Update calls it, so the
-    line follows Book Scope, Search: and the selection as the panel's tab does (the query dialog spec's section 2-2),
-    but only while the panel is shown: with it closed, a new selection, front document or Search: reaches neither the
-    tab nor the line (KFCPanelTitle.cpp; the front document measured - spec map QRY-18), and the line waits for the
-    dialog's next open, Run or Find (one that searches). */
+/** The open dialog's Runs on: line asked again (nothing when it is not open). The dialog's scope observer calls it
+    while the dialog is open - the front document, the selection or Search: changed, the KFC panel shown or not
+    (KFCQueryScopeObserver.cpp; the author's call: with the panel closed the line was left behind, measured -
+    spec map QRY-18) - and KFCPanelTitle::Update with the panel's tab: Book Scope and the other toggles, a search or a
+    run started (the query dialog spec's section 2-2). */
 void KFCQueryDialogRefreshScope();
 
 /** A saved query double-clicked in the left list (KFCQueryRowEH): put into Edit > Find/Change, whole, and that dialog

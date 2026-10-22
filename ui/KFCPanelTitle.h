@@ -13,6 +13,8 @@
 #ifndef __KFCPanelTitle_h__
 #define __KFCPanelTitle_h__
 
+class IObserver;
+
 namespace KFCPanelTitle
 {
 	/** Write the Find/Change tab and the scope onto the panel's tab.
@@ -31,6 +33,12 @@ namespace KFCPanelTitle
 	    A label already on the tab is not written again (the selection moves with every caret step).
 	    Safe to call when the panel has never been opened (does nothing then). */
 	void Update();
+
+	/** THE FIND/CHANGE SETTINGS' SUBJECT: attach `observer` to it on IID_IFINDCHANGEOPTIONS (attach false: detach it),
+	    the subject calling back through `observerIID` - how the panel's observer hears the tab's settings, and the
+	    query dialog's scope observer its Runs on: line's Search: (KFCQueryScopeObserver.cpp). Asked first: attaching
+	    twice does nothing. */
+	void AttachToFindChangeOptions(IObserver* observer, bool attach, const PMIID& observerIID);
 
 	// NOTHING PUTS THE TAB BACK AT SHUTDOWN. A label lives only in the running palette: the saved workspace
 	// names a panel by its resource KEY (OWLPaletteLeaf name="0x1EA600kKFCPanelTitleKey") and the session's

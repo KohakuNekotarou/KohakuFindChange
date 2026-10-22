@@ -26,6 +26,8 @@
 #include "ISubject.h"
 #include "ITextControlData.h"		// the Runs on: line
 #include "IWindow.h"				// GetSysWindow - the platform window behind the dialog (the minimize box)
+#include "IWidgetParent.h"			// QueryParentFor - the window above the dialog's panel, as the dialog closes
+#include "IObserver.h"				// the scope observer beside the dialog's observer (KFCQueryScopeObserver.cpp)
 #include "IDropDownListController.h"	// Select - a loaded query chosen in Find/Change's own Query menu
 #include "IStringListControlData.h"		// GetIndex - that menu's entries, found by name
 #include "IFindChangeOptions.h"			// kObjectSearch - the tab Find searches with no format (PressFind)
@@ -69,6 +71,15 @@ namespace
 	    away when it is detached (the dialog closing) - not AddRef'd, so it never outlives the dialog it points into.
 	    What lets a change made elsewhere reach the dialog that is open (KFCQueryDialogRefreshScope). */
 	IPanelControlData* gOpenPanel = nil;
+
+#ifdef WINDOWS
+	/** WHERE THE DIALOG STOOD AS IT CLOSED (the author's call): a dialog closed while minimized opened again at the
+	    screen's top left (measured: (345,130) -> (0,43) - spec map QRY-30), so the placement is kept at every close
+	    (KeepWhereItStood) and given back at the next open (PrepareWindow), once - the reopening does not lean on what
+	    InDesign keeps of a closed dialog. */
+	bool gReopenWhereKept = false;
+	WINDOWPLACEMENT gReopenWhere = {};
+#endif
 
 	// The buttons the observer hears, and what each changes in the run order (Clear: the author's addition).
 	const WidgetID kOrderButtons[] = { kKFCQueryAddButtonWidgetID, kKFCQueryRemoveButtonWidgetID, kKFCQueryUpButtonWidgetID,
@@ -156,8 +167,9 @@ namespace
 	}
 
 	/** The Runs on: line: what Run would run on now, or why it cannot - the model's words (DescribeRunScope), made from
-	    the very answer the run asks (the query dialog spec's section 4-4). Written only when they read differently:
-	    KFCPanelTitle::Update asks on every caret step while the panel is shown (KFCQueryDialog.h says when else). */
+	    the very answer the run asks (the query dialog spec's section 4-4). Written only when they read differently: it
+	    is asked on every caret step - by the dialog's scope observer while the dialog is open
+	    (KFCQueryScopeObserver.cpp), and by KFCPanelTitle::Update while the panel is shown. */
 	void ShowRunScope(IPanelControlData* panel)
 	{
 		if (panel == nil)
@@ -440,13 +452,14 @@ namespace
 		SayOnBoth(panel, path);
 	}
 
-	/** The dialog's platform window: a minimize box, and back from the taskbar if it sits minimized. The SDK cannot
-	    give an existing window a minimize box (a modeless dialog's controls are the close box alone - IWindow.h), so it
-	    is put on with Win32: WS_MINIMIZEBOX alone shows nothing - the box appears only once WS_EX_TOOLWINDOW is off
-	    (Windows draws none on a tool window's frame) - and WS_EX_APPWINDOW puts the minimized dialog on the taskbar
-	    rather than leaving a stub at the screen's bottom left (KCM, measured). The window is ours - made by
-	    KFCQueryDialogOpen and destroyed when the dialog closes - so nothing is put back. Open() on a dialog that sits
-	    minimized does not bring it back (KCM, measured): ShowWindow(SW_RESTORE) does. */
+	/** The dialog's platform window: a minimize box, back from the taskbar if it sits minimized, and back where it
+	    stood as it last closed. The SDK cannot give an existing window a minimize box (a modeless dialog's controls are
+	    the close box alone - IWindow.h), so it is put on with Win32: WS_MINIMIZEBOX alone shows nothing - the box
+	    appears only once WS_EX_TOOLWINDOW is off (Windows draws none on a tool window's frame) - and WS_EX_APPWINDOW
+	    puts the minimized dialog on the taskbar rather than leaving a stub at the screen's bottom left (KCM, measured).
+	    The window is ours - made by KFCQueryDialogOpen and destroyed when the dialog closes - so its styles need not be
+	    put back. Open() on a dialog that sits minimized does not bring it back (KCM, measured): ShowWindow(SW_RESTORE)
+	    does. */
 	void PrepareWindow(IDialog* dialog)
 	{
 #ifdef WINDOWS
@@ -462,18 +475,88 @@ namespace
 		::SetWindowPos(hwnd, nullptr, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
 		if (::IsIconic(hwnd))
 			::ShowWindow(hwnd, SW_RESTORE);
+		// BACK WHERE IT STOOD AS IT LAST CLOSED (gReopenWhere): the placement GetWindowPlacement gave then, given back
+		// to SetWindowPlacement - workspace coordinates both ways, as Microsoft's WINDOWPLACEMENT remarks ask (not
+		// SetWindowPos's screen coordinates), and moved onto a screen when they would be off every one
+		// (SetWindowPlacement's remarks). The window keeps its own size; SW_SHOWNORMAL, as it stands now.
+		if (gReopenWhereKept)
+		{
+			gReopenWhereKept = false;
+			WINDOWPLACEMENT now = {};
+			now.length = sizeof(now);
+			if (::GetWindowPlacement(hwnd, &now))
+			{
+				const LONG width = now.rcNormalPosition.right - now.rcNormalPosition.left;
+				const LONG height = now.rcNormalPosition.bottom - now.rcNormalPosition.top;
+				now.rcNormalPosition.left = gReopenWhere.rcNormalPosition.left;
+				now.rcNormalPosition.top = gReopenWhere.rcNormalPosition.top;
+				now.rcNormalPosition.right = now.rcNormalPosition.left + width;
+				now.rcNormalPosition.bottom = now.rcNormalPosition.top + height;
+				now.flags = 0;
+				now.showCmd = SW_SHOWNORMAL;
+				(void)::SetWindowPlacement(hwnd, &now);
+				KFC_DIAG_LOG("QUERYWHERE reopened at (%d,%d)", static_cast<int>(now.rcNormalPosition.left),
+					static_cast<int>(now.rcNormalPosition.top));
+			}
+		}
 #else
 		(void)dialog;
 #endif
 	}
+
+#ifdef WINDOWS
+	/** The dialog's platform window, asked upwards from a boss on the dialog's panel (the controller's) - the window
+	    CDialogController::GetName reads the title of (CDialogController.cpp). nullptr when there is none. */
+	HWND DialogWindowAbove(IPMUnknown* panelBoss)
+	{
+		InterfacePtr<IWidgetParent> parent(panelBoss, UseDefaultIID());
+		if (parent == nil)
+			return nullptr;
+		InterfacePtr<IWindow> window(static_cast<IWindow*>(parent->QueryParentFor(IID_IWINDOW)));
+		if (window == nil)
+			return nullptr;
+		HWND hwnd = (HWND)window->GetSysWindow();
+		return (hwnd != nullptr && ::IsWindow(hwnd)) ? hwnd : nullptr;
+	}
+#endif
+
+	/** As the dialog closes: its placement - where it stands, or where the taskbar would bring it back to
+	    (GetWindowPlacement's rcNormalPosition) - kept for the next open (gReopenWhere). */
+	void KeepWhereItStood(IPMUnknown* panelBoss)
+	{
+#ifdef WINDOWS
+		gReopenWhereKept = false;
+		HWND hwnd = DialogWindowAbove(panelBoss);
+		if (hwnd != nullptr)
+		{
+			gReopenWhere = WINDOWPLACEMENT();
+			gReopenWhere.length = sizeof(gReopenWhere);
+			gReopenWhereKept = (::GetWindowPlacement(hwnd, &gReopenWhere) != FALSE);
+		}
+		KFC_DIAG_LOG("QUERYWHERE closing window=%d minimized=%d kept=%d at (%d,%d)", hwnd != nullptr ? 1 : 0,
+			(hwnd != nullptr && ::IsIconic(hwnd)) ? 1 : 0, gReopenWhereKept ? 1 : 0,
+			static_cast<int>(gReopenWhere.rcNormalPosition.left), static_cast<int>(gReopenWhere.rcNormalPosition.top));
+#else
+		(void)panelBoss;
+#endif
+	}
 }
 
-/** Fills the dialog when the framework builds it - its first open (KFCQueryDialogOpen fills it again on every open). */
+/** Fills the dialog when the framework builds it - its first open (KFCQueryDialogOpen fills it again on every open) -
+    and, as it closes, keeps where it stood. */
 class KFCQueryDialogController : public CDialogController
 {
 public:
 	KFCQueryDialogController(IPMUnknown* boss) : CDialogController(boss) {}
 	virtual ~KFCQueryDialogController() {}
+
+	// AS IT CLOSES - "an opportunity to do some special cleanup" (CDialogController.h): where it stood
+	// (KeepWhereItStood).
+	virtual void ClosingDialog(IActiveContext* lastChanceToUseMyContext)
+	{
+		CDialogController::ClosingDialog(lastChanceToUseMyContext);
+		KeepWhereItStood(this);
+	}
 
 protected:
 	virtual void InitializeDialogFields(IActiveContext* context)
@@ -496,7 +579,8 @@ CREATE_PMINTERFACE(KFCQueryDialogController, kKFCQueryDialogControllerImpl)
     ProblemLinksDialogObserver its Fix Links button; MEASURED: attached on IID_ITRISTATECONTROLDATA - basicdialog's ICON
     button's - the presses never arrived) and the two lists' selection (kListSelectionChangedMessage on
     IID_ITREEVIEWCONTROLLER, as the paneltreeview sample's PnlTrvTreeObserver hears it) - the buttons' grey, and what a
-    picked row's query does (ShowPickedQuery) - and says, through gOpenPanel, whether the dialog is open. */
+    picked row's query does (ShowPickedQuery) - and says, through gOpenPanel, whether the dialog is open. Beside it on
+    the boss, the scope observer (KFCQueryScopeObserver.cpp), attached and detached with it. */
 class KFCQueryDialogObserver : public CDialogObserver
 {
 public:
@@ -517,6 +601,11 @@ public:
 		this->AttachToWidget(kKFCQueryFindButtonWidgetID, IID_IBOOLEANCONTROLDATA, panel);
 		for (size_t i = 0; i < sizeof(kLists) / sizeof(kLists[0]); ++i)
 			this->AttachToWidget(kLists[i], IID_ITREEVIEWCONTROLLER, panel);
+		// ...and the Runs on: line's own follower beside this observer (KFCQueryScopeObserver.cpp): attached last and
+		// detached first, as the product's ConditionStaticTextView.cpp drives its selection observer.
+		InterfacePtr<IObserver> scopeObserver(this, IID_IKFCQUERYSCOPEOBSERVER);
+		if (scopeObserver != nil)
+			scopeObserver->AutoAttach();
 	}
 
 	virtual void AutoDetach()
@@ -525,6 +614,9 @@ public:
 		InterfacePtr<IPanelControlData> panel(this, UseDefaultIID());
 		if (panel != nil)
 		{
+			InterfacePtr<IObserver> scopeObserver(this, IID_IKFCQUERYSCOPEOBSERVER);
+			if (scopeObserver != nil)
+				scopeObserver->AutoDetach();
 			for (size_t i = 0; i < sizeof(kOrderButtons) / sizeof(kOrderButtons[0]); ++i)
 				this->DetachFromWidget(kOrderButtons[i], IID_IBOOLEANCONTROLDATA, panel);
 			for (size_t i = 0; i < sizeof(kFileButtons) / sizeof(kFileButtons[0]); ++i)

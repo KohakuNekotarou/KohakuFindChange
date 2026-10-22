@@ -132,6 +132,10 @@ DECLARE_PMID(kInterfaceIDSpace, IID_IKFCSTATUSTEXTDATA, kKFCUIPrefix + 9)
 // (KFCAppBarSearchEnter.cpp). Its own IID for the reason the two observers above have one: an AddIn onto
 // kActiveContextBoss.
 DECLARE_PMID(kInterfaceIDSpace, IID_IKFCAPPBARMIRROROBSERVER, kKFCUIPrefix + 10)
+// The query dialog's scope observer (KFCQueryScopeObserver.cpp): it follows what the Runs on: line is made of while the
+// dialog is open. Its own IID: it sits on the dialog's boss beside the dialog's observer (IID_IOBSERVER), which
+// attaches and detaches it. + 11: the next after the highest spent.
+DECLARE_PMID(kInterfaceIDSpace, IID_IKFCQUERYSCOPEOBSERVER, kKFCUIPrefix + 11)
 
 
 // ImplementationIDs:
@@ -221,6 +225,8 @@ DECLARE_PMID(kImplementationIDSpace, kKFCResultEyeDropTargetImpl, kKFCUIPrefix +
 // next after the highest spent.
 DECLARE_PMID(kImplementationIDSpace, kKFCAlertAnswerImpl, kKFCUIPrefix + 56)
 DECLARE_PMID(kImplementationIDSpace, kKFCAlertAnswerServiceImpl, kKFCUIPrefix + 57)
+// The query dialog's scope observer (KFCQueryScopeObserver.cpp). + 58: the next after the highest spent.
+DECLARE_PMID(kImplementationIDSpace, kKFCQueryScopeObserverImpl, kKFCUIPrefix + 58)
 
 
 // ActionIDs:

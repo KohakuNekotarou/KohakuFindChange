@@ -88,6 +88,8 @@ REGISTER_PMINTERFACE(KFCQueryListWidgetMgr, kKFCQueryListWidgetMgrImpl)
 // KFCQueryRowTip.cpp).
 REGISTER_PMINTERFACE(KFCQueryContentsHandler, kKFCQueryContentsHandlerImpl)
 REGISTER_PMINTERFACE(KFCQueryRowTip, kKFCQueryRowTipImpl)
+// The query dialog's scope observer - its Runs on: line followed while it is open (KFCQueryScopeObserver.cpp).
+REGISTER_PMINTERFACE(KFCQueryScopeObserver, kKFCQueryScopeObserverImpl)
 // InDesign's hidden-spread alert answered OK inside a walk of ours: the alert handler and its service provider
 // (KFCAlertAnswer.cpp).
 REGISTER_PMINTERFACE(KFCAlertAnswer, kKFCAlertAnswerImpl)

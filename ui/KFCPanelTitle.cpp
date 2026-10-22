@@ -151,16 +151,12 @@ void KFCPanelTitle::Update()
 	SetTabLabel(title);
 
 	// THE QUERY DIALOG'S Runs on: LINE follows from the same moments - Book Scope switched, Search: or the tab changed
-	// in Edit > Find/Change, the selection moved, the panel shown, a search or a run started - so it is asked here
-	// rather than by observers of its own. (The selection and Edit > Find/Change reach here through the panel's
-	// observer, so only while the panel is shown; with it closed, the line is asked again when the dialog opens, when
-	// its Run is pressed and when its Find searches - a front document changed with the panel closed was measured to
-	// leave it behind, spec map QRY-18.)
+	// in Edit > Find/Change, the selection moved, the panel shown, a search or a run started - so it is asked here too.
+	// The selection and Edit > Find/Change reach here through the panel's observer, only while the panel is shown: the
+	// dialog hears those two itself while it is open (KFCQueryScopeObserver.cpp - the author's call: with the panel
+	// closed the line was left behind, measured - spec map QRY-18).
 	KFCQueryDialogRefreshScope();
 }
-
-namespace
-{
 
 // THE FIND/CHANGE TAB ON THE PANEL'S NAME. The dialog's settings are a session preference
 // (IFindChangeOptions on the session workspace), and a preference command notifies the subject of the
@@ -174,7 +170,10 @@ namespace
 // (QuerySessionPreferences -> ISubject -> AttachObserver, and the same in AutoDetach) - and so through
 // the very call the engine reads the settings by. (It is the same boss as the session's IWorkspace -
 // PreferenceUtils.h: "a preferences interface in the session workspace".)
-void AttachToFindChangeOptions(IObserver* observer, bool attach)
+// The query dialog's scope observer hears Search: the same way (KFCQueryScopeObserver.cpp): `observerIID` is the
+// interface the subject calls back through (ISubject.h: "must be used if the observer has an interface id that is
+// different than IID_IOBSERVER").
+void KFCPanelTitle::AttachToFindChangeOptions(IObserver* observer, bool attach, const PMIID& observerIID)
 {
 	if (GetExecutionContextSession() == nil)
 		return;		// the guard this always had (SetTabLabel says why a session is not taken for granted)
@@ -182,12 +181,15 @@ void AttachToFindChangeOptions(IObserver* observer, bool attach)
 	InterfacePtr<ISubject> subject(settings, UseDefaultIID());
 	if (subject == nil)
 		return;
-	const bool attached = subject->IsAttached(observer, IID_IFINDCHANGEOPTIONS) != kFalse;
+	const bool attached = subject->IsAttached(observer, IID_IFINDCHANGEOPTIONS, observerIID) != kFalse;
 	if (attach && !attached)
-		subject->AttachObserver(observer, IID_IFINDCHANGEOPTIONS);
+		subject->AttachObserver(observer, IID_IFINDCHANGEOPTIONS, observerIID);
 	else if (!attach && attached)
-		subject->DetachObserver(observer, IID_IFINDCHANGEOPTIONS);
+		subject->DetachObserver(observer, IID_IFINDCHANGEOPTIONS, observerIID);
 }
+
+namespace
+{
 
 /** Attach to (or detach from) one of the panel's own widgets on the protocol it reports clicks on.
     Silently does nothing when the widget is not there, which is the ordinary state while the panel
@@ -289,7 +291,7 @@ public:
 			AttachToWidget(panelData, this, KFCPanelIcon::NthWidgetID(i), true);
 
 		// The Find/Change tab on the name follows the dialog while the panel is up.
-		AttachToFindChangeOptions(this, true);
+		KFCPanelTitle::AttachToFindChangeOptions(this, true, IID_IOBSERVER);
 
 		// *At startup (KFCUIStartupShutdown::Startup) the panel manager may not have come up yet, in
 		// which case the subscription failed - so it is tried again here. IsAttached guards it, so
@@ -321,7 +323,7 @@ public:
 		for (int32 i = 0; i < KFCPanelIcon::Count(); ++i)
 			AttachToWidget(panelData, this, KFCPanelIcon::NthWidgetID(i), false);
 
-		AttachToFindChangeOptions(this, false);
+		KFCPanelTitle::AttachToFindChangeOptions(this, false, IID_IOBSERVER);
 
 		// The selection last - the mirror of AutoAttach (SelectionObserver.h).
 		ActiveSelectionObserver::AutoDetach();

@@ -39,6 +39,9 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCQueryRowTip.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCQueryScopeObserver.cpp">
+         <Filter>Source Files</Filter>
+      </ClCompile>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCBookPanelPlacement.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
