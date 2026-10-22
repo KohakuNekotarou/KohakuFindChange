@@ -45,7 +45,7 @@ namespace
 }
 
 /** The two lists' hierarchy: flat, as long as the list it is. ListTreeViewAdapter's own count is a placeholder that
-    answers 10 (KCMBookTreeAdapter.cpp), so this is the one method a flat list has to say. */
+    answers 10 (ListTreeViewAdapter.cpp), so this is the one method a flat list has to say. */
 class KFCQueryListAdapter : public ListTreeViewAdapter
 {
 public:
@@ -65,7 +65,8 @@ CREATE_PMINTERFACE(KFCQueryListAdapter, kKFCQueryListAdapterImpl)
 class KFCQueryListWidgetMgr : public CTreeViewWidgetMgr
 {
 public:
-	// kList: no levels, and the flag tells the base class to leave the indent alone (CTreeViewWidgetMgr.h).
+	// kList: no levels - the base class then gives every row an indent of zero (CTreeViewWidgetMgr.cpp's
+	// GetIndentForNode), but its ApplyIndentToWidget still moves the cell (below).
 	KFCQueryListWidgetMgr(IPMUnknown* boss) : CTreeViewWidgetMgr(boss, kList) {}
 	virtual ~KFCQueryListWidgetMgr() {}
 
@@ -104,8 +105,11 @@ public:
 		return this->GetTreeViewWidth();
 	}
 
-	// A flat list has nothing to indent - and the framework's indent would throw away the cell's left edge as the row
-	// resource writes it (KCMBookTreeWidgetMgr.cpp).
+	// A flat list has nothing to indent - and the base's indent would throw away the cell's left edge as the row
+	// resource writes it: it sets the left edge of a cell bound left and right to its base offset plus the indent, and
+	// the base offset is only ever read from a registered style's row (CTreeViewWidgetMgr.cpp) - this class makes its
+	// rows itself (CreateWidgetForNode), so the offset stays 0 (measured on KCM's panel list -
+	// memory treeview-indent-overwrites-cell-frames).
 	virtual void ApplyIndentToWidget(const NodeID& /*node*/, IPanelControlData* /*widgetList*/, int32 /*message*/) const
 	{
 	}

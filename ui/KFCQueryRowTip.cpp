@@ -10,12 +10,12 @@
 //  ON THE ROW'S TEXT CELL, NOT ON THE ROW. The cell covers the row, and it is the widget the pointer is over: a stock
 //  InfoStaticTextWidget, which carries a tooltip of its own (kInfoStaticTextWidgetBoss's IID_ITIP - with
 //  IID_ITRUNCATEDSTATICNAME, the cell's whole text when it is cut short). The cell's boss is
-//  kKFCQueryRowTextWidgetBoss - the stock cell with this one interface replaced. Replacing it reads nothing into
-//  this class: the cell's resource type holds no tooltip's data (InfoStaticTextWidget, Widgets.fh - StaticTextWidget's
-//  and a font), and a resource hands its data only to the interfaces it names (memory
+//  kKFCQueryRowTextWidgetBoss - the stock cell with this one interface replaced. Replacing it reads nothing into this
+//  class: the cell's resource type holds no tooltip's data (InfoStaticTextWidget, Widgets.fh - StaticTextWidget's and a
+//  font), and a resource hands its data only to the interfaces it names (memory
 //  widget-boss-inherited-persistent-interface - the result list's text cell, kKFCColorTextWidgetBoss, once had its
-//  resource's "Panel name" read into a class with no ReadWrite, and InDesign went down). The product's own tree-row tooltip is the same kind of class (conditionaltextui's
-//  ConditionTagTVNodeTip.cpp, on its row boss).
+//  resource's "Panel name" read into a class with no ReadWrite, and InDesign went down). The product's own tree-row
+//  tooltip is the same kind of class (conditionaltextui's ConditionTagTVNodeTip.cpp, on its row boss).
 //
 //  Derived from AbstractTip, as every product tooltip is (KFCIconTip.cpp says why).
 //

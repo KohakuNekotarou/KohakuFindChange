@@ -43,8 +43,9 @@ struct KFCOrderFileEntry
 /** The order file's text for these entries. */
 std::string KFCOrderFileText(const std::vector<KFCOrderFileEntry>& entries);
 
-/** The entries of an order file's text (a BOM is passed over). false = it is not a KFC query order - no "kfcQueryOrder",
-    no "queries" list, or text that does not read as JSON - and outEntries is empty. */
+/** The entries of an order file's text (a BOM is passed over). false = it is not a KFC query order - no
+    "kfcQueryOrder", no "queries" list, text not in UTF-8 throughout, text that is not JSON or escapes half a surrogate
+    pair alone, or values nested deeper than the .cpp's kMaxDepth - and outEntries is empty. */
 bool KFCOrderFileParse(const std::string& text, std::vector<KFCOrderFileEntry>& outEntries);
 
 /** Ask the person for the file to save the order to (ToSave) or to load one from (ToLoad), through InDesign's own

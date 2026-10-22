@@ -7,7 +7,7 @@
 //  THE QUERY DIALOG'S TWO LISTS, AS WIDGETS: flat tree-view lists of what KFCQueryOrder holds - the saved
 //  queries (kKFCQuerySavedListWidgetID) and the run order (kKFCQueryOrderListWidgetID). One adapter and one row maker
 //  serve both; each asks its own widget id which list it is. Drawing them, and the selection - the dialog's controller
-//  and observer (KFCQueryDialog.cpp) use these three.
+//  and observer (KFCQueryDialog.cpp) use the functions below.
 //
 //========================================================================================
 

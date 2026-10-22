@@ -7,14 +7,15 @@
 //  A row of the query dialog's two lists (KFCQueryList.cpp). A DOUBLE CLICK on a saved query - a row of the left list -
 //  puts it into Edit > Find/Change and brings that dialog up, so what the query holds can be seen at once (the author's
 //  call: "double click", the dialog "opened to show"); KFCQueryDialogShowInFindChange is what happens. A single click
-//  only selects, as before, and the run order's rows - the right list - keep the stock handling alone.
+//  is the stock one - it selects, and the dialog's observer, told of the selection, says what the query does - and the
+//  run order's rows, the right list, keep the stock handling alone.
 //
-//  THE DOUBLE CLICK'S ONE BIT OF STATE - KCM's book dialog rows' (KCMBookRowEH.cpp; the result list's rows no longer
-//  tell a double click apart - KFCResultNodeEH.cpp): a double click arrives as LButtonDn, LButtonUp, ButtonDblClk,
-//  LButtonUp, so ButtonDblClk only raises a flag and the trailing up acts on it, after the stock handler has finished
-//  the click. The flag is cleared on every down, so one never consumed cannot turn a later single click into a load.
+//  THE DOUBLE CLICK'S ONE BIT OF STATE - KCM's book dialog rows' (KCMBookRowEH.cpp): a double click arrives as
+//  LButtonDn, LButtonUp, ButtonDblClk, LButtonUp, so ButtonDblClk only raises a flag and the trailing up acts on it,
+//  after the stock handler has finished the click. The flag is cleared on every down, so one never consumed cannot turn
+//  a later single click into a load.
 //
-//  The keyboard is left alone, as in KCM's dialog rows: the dialog's own machinery has it.
+//  The keyboard is left alone: the dialog's own machinery has it.
 //
 //========================================================================================
 

@@ -146,7 +146,9 @@ namespace
 	}
 
 	// A small JSON reader, for this file's shape and nothing more: objects, lists, strings, and any other value passed
-	// over (a number, true, false, null). Every read answers false on text that is not JSON.
+	// over (a number, true, false, null). Every read answers false on text that is not JSON - and on two things JSON
+	// allows and no order file holds: half a surrogate pair escaped alone (String) and nesting deeper than kMaxDepth
+	// (SkipValue).
 	class JsonReader
 	{
 	public:
@@ -225,8 +227,7 @@ namespace
 			return false;		// no closing quote
 		}
 
-		// How deep SkipValue reads into lists and objects inside one another - far beyond the three levels of an order
-		// file.
+		// How deep SkipValue follows lists and objects inside one another - far beyond an order file's three levels.
 		static const int kMaxDepth = 64;
 
 		// Any value, passed over: a string, an object, a list, or a bare word / number. A list or an object is passed
@@ -306,7 +307,7 @@ namespace
 		size_t				fAt;
 	};
 
-	// One "queries" entry: its three strings (any other key passed over).
+	// One "queries" entry: its kind, name and file (any other key passed over).
 	bool ReadEntry(JsonReader& reader, KFCOrderFileEntry& out)
 	{
 		if (!reader.Take('{'))
@@ -450,8 +451,7 @@ bool KFCChooseOrderFileToSave(IDFile& outFile)
 	// overwrite question is asked about the name that is written - adding ".json" after the dialog would replace an
 	// existing "Test.A.json" unasked.
 	// So kSaveFileDialogBoss itself, the SDK chooser's steps one level down (SDKFileSaveChooser::ShowDialog): the
-	// chooser fixes its flags at FOS_OVERWRITEPROMPT | FOS_NOREADONLYRETURN. KCM's Task Start takes the same level
-	// for its own reason (KCMTaskStartSave.cpp).
+	// chooser fixes its flags at FOS_OVERWRITEPROMPT | FOS_NOREADONLYRETURN.
 	// kDefaultIID is missing on ISaveFileDialog, so the IID is named - CreateObject2's two-argument form, as
 	// KFC makes its ICallbackTimers (the chooser casts ::CreateObject's answer by hand, SDKFileHelper.cpp).
 	InterfacePtr<ISaveFileDialog> dialog(
@@ -485,9 +485,9 @@ bool KFCChooseOrderFileToLoad(IDFile& outFile)
 #endif
 	// THE SDK'S OWN CHOOSER (sdksamples/common/SDKFileHelper.h - SnpChooseFile.cpp). JSON ONLY (the author's call: "not
 	// all files - only JSON can be loaded"): one type and no All Files - the chooser's own one-type road
-	// (SDKFileOpenChooser::ShowDialog: AddExtension alone), as KCM's Import Story Text offers Word's files only. The
-	// type's name and the title go in as string-table keys: the chooser translates them. The Mac type ('TEXT', as the
-	// SDK's text-writing snippets pass) means nothing on Windows.
+	// (SDKFileOpenChooser::ShowDialog: AddExtension alone). The type's name and the title go in as string-table keys:
+	// the chooser translates them. The Mac type ('TEXT', as the SDK's text-writing snippets pass) means nothing on
+	// Windows.
 	SDKFileOpenChooser chooser;
 	chooser.SetTitle(PMString(kKFCQueryLoadOrderTitleKey));		// "Load Query Order"
 	chooser.AddFilter('TEXT', PMString("json"), PMString(kKFCQueryOrderFileTypeKey));	// "KFC Query Order"

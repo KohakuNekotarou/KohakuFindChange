@@ -150,11 +150,12 @@ void KFCPanelTitle::Update()
 
 	SetTabLabel(title);
 
-	// THE QUERY DIALOG'S Runs on: LINE follows from the same moments - Book Scope switched, Search: or the
-	// tab changed in Edit > Find/Change, the selection moved, the panel shown, a run started - so it is asked here
+	// THE QUERY DIALOG'S Runs on: LINE follows from the same moments - Book Scope switched, Search: or the tab changed
+	// in Edit > Find/Change, the selection moved, the panel shown, a search or a run started - so it is asked here
 	// rather than by observers of its own. (The selection and Edit > Find/Change reach here through the panel's
-	// observer, so only while the panel is shown; with it closed, the line is asked again when the dialog opens and
-	// when Run is pressed.)
+	// observer, so only while the panel is shown; with it closed, the line is asked again when the dialog opens, when
+	// its Run is pressed and when its Find searches - a front document changed with the panel closed was measured to
+	// leave it behind, spec map QRY-18.)
 	KFCQueryDialogRefreshScope();
 }
 

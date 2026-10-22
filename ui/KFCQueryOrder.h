@@ -5,14 +5,14 @@
 //  KohakuFindChange (KFC)
 //
 //  THE QUERY DIALOG'S TWO LISTS (docs/superpowers/specs/_done/2026-10-07-kfc-query-dialog-and-selected-documents-design.md
-//  sections 2-2 and 3): the saved queries the dialog offers (the left list, asked of the model at every open -
+//  section 2-2): the saved queries the dialog offers (the left list, asked of the model at every open -
 //  KFCSavedQueries) and the run order (the right list). What the dialog draws comes from here, and only from here: the
 //  lists' row maker (KFCQueryList.cpp) reads these vectors by index.
-//  THE RUN ORDER IS THE SESSION'S (the author's call): kept here while InDesign runs - the dialog closed and
-//  opened again shows it as it was left - and empty after a restart. An order is kept beyond that only as a file the
-//  person saves and loads (SaveOrderTo / LoadOrderFrom - KFCQueryOrderFile.h). (No build that shipped wrote a run order
-//  of its own anywhere: KFCQueryOrder.txt, which test builds kept in InDesign's roaming folder, is neither read nor
-//  written.)
+//  THE RUN ORDER IS THE SESSION'S (the author's call - spec map QRY-14): kept here while InDesign runs - the dialog
+//  closed and opened again shows it as it was left - and empty after a restart. An order is kept beyond that only as a
+//  file the person saves and loads (SaveOrderTo / LoadOrderFrom - KFCQueryOrderFile.h). (No build that shipped wrote a
+//  run order of its own anywhere: KFCQueryOrder.txt, which test builds kept in InDesign's roaming folder, is neither
+//  read nor written.)
 //  Main thread only, one dialog at a time - the state is this file's.
 //
 //========================================================================================
@@ -29,7 +29,7 @@
 
 namespace KFCQueryOrder
 {
-	/** The left list: every saved query of the five kinds, as the model lists them (LoadSaved fills it). */
+	/** The left list: the saved queries, as the model lists them (LoadSaved fills it). */
 	const std::vector<KFCSavedQuery>& Saved();
 
 	/** Fill the left list again - at every open, so a query saved while the dialog was closed is there. */
@@ -57,13 +57,14 @@ namespace KFCQueryOrder
 		kNotAnOrder			// read, but not a KFC query order - the run order is left as it was
 	};
 
-	/** Make the run order the one `file` holds. Each entry is its file when that is there; otherwise the saved query of
-	    the same kind and name (the user's own before InDesign's - a query's folder moves with InDesign's version);
-	    otherwise it stays, "(not found)", and Run refuses while it does (KFCQuerySequence). */
+	/** Make the run order the one `file` holds. Each entry is its file when that is there; otherwise - a query's folder
+	    moves with InDesign's version - the saved query of the same kind and name, the user's own before InDesign's (a
+	    user's query can share a name with one of InDesign's); otherwise it stays, "(not found)", and Run refuses while
+	    it does (KFCQuerySequence). */
 	LoadOutcome LoadOrderFrom(const IDFile& file);
 
-	/** The four buttons' and Clear's changes - the session's order alone (nothing is written). Indices outside the lists
-	    change nothing. */
+	/** The changes of the run order's buttons (Add, Remove, Move Up, Move Down, Clear) - the session's order alone
+	    (nothing is written). Indices outside the lists change nothing. */
 	void Add(int32 savedIndex);			// Saved()[savedIndex] at the end of the order
 	void Remove(int32 orderIndex);
 	void MoveUp(int32 orderIndex);

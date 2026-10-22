@@ -4,12 +4,13 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  The query dialog - see KFCQueryDialog.h. A MODELESS dialog with a minimize box (the author's call: "other
-//  work can go on while it is open, with a minimize button" - the spec's G4 as changed), made the way KCM's book
-//  comparison dialog is (KCMBookDialog.cpp): Open(nil, kFalse), and the minimize box put on the platform window by hand.
-//  Its controller fills it when the framework builds it; KFCQueryDialogOpen fills it again on every open, because a
-//  modeless dialog opened while it is already open never sees InitializeDialogFields (memory
-//  modeless-dialog-reopen-not-reinitialized - KCM's book dialog showed the previous comparison's rows that way).
+//  The query dialog - see KFCQueryDialog.h. A MODELESS dialog with a minimize box (the author's call: "other work can
+//  go on while it is open, with a minimize button" - the query dialog spec's G4 as changed), made the way KCM's book
+//  comparison dialog is (KCMBookDialog.cpp): Open(nil, kFalse), and the minimize box put on the platform window by
+//  hand. Its controller fills it when the framework builds it; KFCQueryDialogOpen fills it again on every open, because
+//  a modeless dialog opened while it is already open never sees InitializeDialogFields
+//  (memory modeless-dialog-reopen-not-reinitialized - KCM's book dialog showed the previous comparison's rows that
+//  way).
 //
 //========================================================================================
 
@@ -72,7 +73,7 @@ namespace
 	// The buttons the observer hears, and what each changes in the run order (Clear: the author's addition).
 	const WidgetID kOrderButtons[] = { kKFCQueryAddButtonWidgetID, kKFCQueryRemoveButtonWidgetID, kKFCQueryUpButtonWidgetID,
 		kKFCQueryDownButtonWidgetID, kKFCQueryClearButtonWidgetID };
-	// ...and the two that take the run order to a file of its own and back (KFCQueryOrderFile.h).
+	// ...and those that take the run order to a file of its own and back (KFCQueryOrderFile.h).
 	const WidgetID kFileButtons[] = { kKFCQuerySaveOrderButtonWidgetID, kKFCQueryLoadOrderButtonWidgetID };
 	const WidgetID kLists[] = { kKFCQuerySavedListWidgetID, kKFCQueryOrderListWidgetID };
 
@@ -87,10 +88,11 @@ namespace
 			button->Disable();
 	}
 
-	/** Grey the buttons that have nothing to act on (the spec's section 2-2): Add with no saved query picked; Remove with
-	    no row of the order picked; Move Up on the first row, Move Down on the last; Clear and Save Order... with an empty
-	    order. Load Order..., Find and Run are never grey - nothing here touches them (G5 as changed: a run that cannot
-	    go says why on the panel - and Find the same, the stacked results' spec section 2-1). */
+	/** Grey the buttons that have nothing to act on (the query dialog spec's section 2-2): Add with no saved query
+	    picked; Remove with no row of the order picked; Move Up on the first row, Move Down on the last; Clear and
+	    Save Order... with an empty order. Load Order..., Find and Run are never grey - nothing here touches them
+	    (the query dialog spec's G5 as changed: a run that cannot go says why on the message lines - and Find the same,
+	    the stacked results' spec section 2-1). */
 	void UpdateButtons(IPanelControlData* panel)
 	{
 		if (panel == nil)
@@ -106,10 +108,11 @@ namespace
 		EnableButton(panel, kKFCQuerySaveOrderButtonWidgetID, rows > 0);
 	}
 
-	/** The dialog's own message line (the author's call): the words the panel's message line is given, here
-	    too. The dialog is modeless and stands while the KFC panel is closed, and a Run's result - or why it could not
-	    run - was then shown nowhere; the panel still gets the same line (KFCResultTree::ShowStatus keeps it for its next
-	    show). At every open it says how a saved query is seen in Find/Change (Repaint - the author's call). */
+	/** The dialog's own message line (the author's call). A press's words go here as well as to the panel's message
+	    line (SayOnBoth): the dialog is modeless and stands while the KFC panel is closed, where a Run's result - or why
+	    it could not run - would otherwise be shown nowhere; the panel still gets the same line
+	    (KFCResultTree::ShowStatus keeps it for its next show). Words only the dialog needs go here alone (its other
+	    callers below); at every open, how a saved query is seen in Find/Change (Repaint - the author's call). */
 	void ShowDialogMessage(IPanelControlData* panel, const PMString& message)
 	{
 		if (panel == nil)
@@ -152,9 +155,9 @@ namespace
 		ShowDialogMessage(panel, say);
 	}
 
-	/** The Runs on: line: what Run would run on now, or why it cannot - the model's words (DescribeRunScope), made from the
-	    very answer the run asks (the spec's section 4-4). Written only when they read differently: KFCPanelTitle::Update
-	    asks on every caret step while the dialog is open. */
+	/** The Runs on: line: what Run would run on now, or why it cannot - the model's words (DescribeRunScope), made from
+	    the very answer the run asks (the query dialog spec's section 4-4). Written only when they read differently:
+	    KFCPanelTitle::Update asks on every caret step while the panel is shown (KFCQueryDialog.h says when else). */
 	void ShowRunScope(IPanelControlData* panel)
 	{
 		if (panel == nil)
@@ -210,15 +213,16 @@ namespace
 		UpdateButtons(panel);
 	}
 
-	/** Find (docs/superpowers/specs/2026-10-14-kfc-stacked-results-design.md section 2-1 - the author's call (a); the row
-	    searched, the author's call of 10-14 night): the RUN ORDER'S SELECTED query - the first when none is selected -
-	    loaded into Find/Change and searched with the panel's own search, its list put on the panel as a new tier
+	/** Find (docs/superpowers/specs/2026-10-14-kfc-stacked-results-design.md section 2-1 - the author's call (a); the
+	    row searched, the author's call): the RUN ORDER'S SELECTED query - the first when none is selected - loaded into
+	    Find/Change and searched with the panel's own search, its list put on the panel as a new tier
 	    (KFCResultHistory::Find, keeping); then the selection moves down one (PickNextOrderRow - the last row stays), so
-	    pressing Find again searches the next. Run's rules for a query that cannot go: one whose file is gone stops the press
-	    (Run does not run at all then) and the selection stays; one that cannot be read, or has nothing to find, is stepped
-	    over (Run skips them) - the selection moves on. THE SAME QUERY TWICE IN A ROW is refused (the author's call) while
-	    the list its last Find made is the panel's live list (KFCResultHistory::QueryJustFound) - said, not greyed, as Find
-	    and Run say why they cannot go. The query stays in Find/Change - the new tier's rows are replaced against it. */
+	    pressing Find again searches the next. Run's rules for a query that cannot go: one whose file is gone stops the
+	    press (Run does not run at all then) and the selection stays; one that cannot be read, or has nothing to find,
+	    is stepped over (Run skips them) - the selection moves on. THE SAME QUERY TWICE IN A ROW is refused (the
+	    author's call) while the list its last Find made is the panel's live list (KFCResultHistory::QueryJustFound) -
+	    said, not greyed, as Find and Run say why they cannot go. The query stays in Find/Change - the new tier's rows
+	    are replaced against it. */
 	void PressFind(IPanelControlData* panel)
 	{
 		KFC_DIAG_HIDDEN_DOCS_CHECK("query-find");	// (test builds only - a document left with no window when the find is over)
@@ -282,7 +286,7 @@ namespace
 			return;
 		}
 		// The tier's name: the query's place in the run order, then the query as Find/Change holds it now - loaded above -
-		// in the words every tier is named by (the author's call, 10-14): "<n>  [<tab>] F:"<find>" C:"<change>"".
+		// in the words every tier is named by (the author's call): "<n>  [<tab>] F:"<find>" C:"<change>"".
 		PMString label;
 		label.SetTranslatable(kFalse);
 		label.AppendNumber(next + 1);
@@ -305,11 +309,11 @@ namespace
 		ShowRunScope(panel);		// a search can close what it opened, and a book can go: asked again, as after a Run
 	}
 
-	/** Run (G5 as changed by the author: "Run can always be pressed - with results on the panel too, pressing it runs"):
-	    the run order as the dialog shows it, run by the model - InDesign's Change All, query by query, all of it one undo
-	    step - and the panel told as Find tells it (KFCActionComponent). The dialog stays open for the next run. A run
-	    that cannot go - no queries, no query's file, a scope it cannot run on, another run going - says why on the
-	    panel's message line (the model's refusals); nothing is greyed for it. */
+	/** Run (the query dialog spec's G5 as changed by the author: "Run can always be pressed - with results on the panel
+	    too, pressing it runs"): the run order as the dialog shows it, run by the model - InDesign's Change All, query
+	    by query, all of it one undo step - and the panel told as Find tells it (KFCActionComponent). The dialog stays
+	    open for the next run. A run that cannot go - no queries, no query's file, a scope it cannot run on, another run
+	    going - says why on both message lines (the model's refusals, SayOnBoth); nothing is greyed for it. */
 	void PressRun(IPanelControlData* panel)
 	{
 		KFC_DIAG_HIDDEN_DOCS_CHECK("query-run");	// (test builds only - a document left with no window when the run is over)
@@ -329,9 +333,9 @@ namespace
 		ShowRunScope(panel);		// a run can close what it opened, and a book can go: asked again
 	}
 
-	/** One of the five buttons pressed: change the session's order (nothing is written - the order is kept as a file only
-	    by Save Order...), draw it, and pick the row the change leaves the eye on - the added row, the row that took a
-	    removed one's place, the moved row. */
+	/** One of the run order's buttons pressed (kOrderButtons): change the session's order (nothing is written - the
+	    order is kept as a file only by Save Order...), draw it, and pick the row the change leaves the eye on - the
+	    added row, the row that took a removed one's place, the moved row. */
 	void PressOrderButton(IPanelControlData* panel, const WidgetID& button)
 	{
 		const int32 left = KFCQueryListSelectedIndex(panel, kKFCQuerySavedListWidgetID);
@@ -411,8 +415,9 @@ namespace
 
 	/** Load Order...: the run order the file holds, through InDesign's own Open dialog, put in place of the one shown
 	    (KFCQueryOrder::LoadOrderFrom - a query found again by its kind and name when its file has moved, "(not found)"
-	    otherwise, and Run then refuses). Loaded: the file's full path on both lines, as Save says it. Not loaded - not
-	    there, or not a KFC query order: the order is left as it was, and the lines say why. */
+	    otherwise, and Run then refuses). Loaded: the file's full path on both lines, as Save says it. Not loaded - the
+	    file could not be read, or is not a KFC query order (KFCQueryOrder::LoadOutcome): the order is left as it was,
+	    and the lines say which. */
 	void PressLoadOrder(IPanelControlData* panel)
 	{
 		IDFile file;
@@ -435,13 +440,13 @@ namespace
 		SayOnBoth(panel, path);
 	}
 
-	/** The dialog's platform window: a minimize box, and back from the taskbar if it sits minimized. The SDK cannot give
-	    an existing window a minimize box (a modeless dialog's controls are the close box alone - IWindow.h), so it is
-	    put on with Win32, as KCM's book dialog has it: WS_MINIMIZEBOX alone shows nothing - the box appears only once
-	    WS_EX_TOOLWINDOW is off (Windows draws none on a tool window's frame) - and WS_EX_APPWINDOW puts the minimized
-	    dialog on the taskbar rather than leaving a stub at the screen's bottom left (KCM, measured). The
-	    window is ours - made by KFCQueryDialogOpen and destroyed when the dialog closes - so nothing is put back.
-	    Open() on a dialog that sits minimized does not bring it back (KCM, measured): ShowWindow(SW_RESTORE) does. */
+	/** The dialog's platform window: a minimize box, and back from the taskbar if it sits minimized. The SDK cannot
+	    give an existing window a minimize box (a modeless dialog's controls are the close box alone - IWindow.h), so it
+	    is put on with Win32: WS_MINIMIZEBOX alone shows nothing - the box appears only once WS_EX_TOOLWINDOW is off
+	    (Windows draws none on a tool window's frame) - and WS_EX_APPWINDOW puts the minimized dialog on the taskbar
+	    rather than leaving a stub at the screen's bottom left (KCM, measured). The window is ours - made by
+	    KFCQueryDialogOpen and destroyed when the dialog closes - so nothing is put back. Open() on a dialog that sits
+	    minimized does not bring it back (KCM, measured): ShowWindow(SW_RESTORE) does. */
 	void PrepareWindow(IDialog* dialog)
 	{
 #ifdef WINDOWS
@@ -481,17 +486,17 @@ protected:
 
 CREATE_PMINTERFACE(KFCQueryDialogController, kKFCQueryDialogControllerImpl)
 
-/** The dialog's observer. It stands in for the stock CDialogObserver kDialogBoss carries, and calls it FIRST in each
-    method - that is what keeps Close (Cancel) and the close box working (basicdialog's BscDlgDialogObserver) - except
-    for Run (the OK button, Enter), which it takes itself and does not hand on: the base's OK closes the dialog, and
-    runs ApplyDialog inside a command sequence of its own (CDialogObserver.cpp) that the query run's abortable sequence
-    would nest in. It hears
-    the five buttons that change the run order, Save Order..., Load Order... and Find (a PUSH button's press: kTrueStateMessage on IID_IBOOLEANCONTROLDATA - how
-    CDialogObserver.cpp itself hears OK and Cancel, and the product's ProblemLinksDialogObserver its Fix Links button;
-    MEASURED: attached on IID_ITRISTATECONTROLDATA - basicdialog's ICON button's - the presses never arrived)
-    and the two lists' selection (kListSelectionChangedMessage on IID_ITREEVIEWCONTROLLER -
-    the paneltreeview sample's PnlTrvTreeObserver: the buttons' grey, and what a picked row's query does -
-    ShowPickedQuery), and says, through gOpenPanel, whether the dialog is open. */
+/** The dialog's observer. It stands in for the stock CDialogObserver kDialogBoss carries, and calls it in every
+    method - that is what keeps Close (Cancel) and the close box working (basicdialog's BscDlgDialogObserver): first in
+    AutoAttach and Update, last in AutoDetach (its own widgets let go first, the mirror of the attach), and never for
+    Run (the OK button, Enter), which it takes itself: the base's OK closes the dialog, and runs ApplyDialog inside a
+    command sequence of its own (CDialogObserver.cpp) that the query run's abortable sequence would nest in. It hears
+    the run order's buttons, Save Order..., Load Order... and Find (a PUSH button's press: kTrueStateMessage on
+    IID_IBOOLEANCONTROLDATA - how CDialogObserver.cpp itself hears OK and Cancel, and the product's
+    ProblemLinksDialogObserver its Fix Links button; MEASURED: attached on IID_ITRISTATECONTROLDATA - basicdialog's ICON
+    button's - the presses never arrived) and the two lists' selection (kListSelectionChangedMessage on
+    IID_ITREEVIEWCONTROLLER, as the paneltreeview sample's PnlTrvTreeObserver hears it) - the buttons' grey, and what a
+    picked row's query does (ShowPickedQuery) - and says, through gOpenPanel, whether the dialog is open. */
 class KFCQueryDialogObserver : public CDialogObserver
 {
 public:
@@ -556,8 +561,8 @@ public:
 		}
 		if (protocol != IID_IBOOLEANCONTROLDATA || theChange != kTrueStateMessage)
 			return;
-		// One of OUR five, asked before anything else is touched: Close (Cancel) arrives here too, after the base above
-		// has begun closing the dialog, and its lists must not be read then.
+		// Which of OUR buttons, asked before anything else is touched: Close (Cancel) arrives here too, after the base
+		// above has begun closing the dialog, and its lists must not be read then.
 		InterfacePtr<IControlView> pressed(theSubject, UseDefaultIID());
 		if (pressed == nil)
 			return;
@@ -608,11 +613,11 @@ void KFCQueryDialogOpen()
 		kTrue							// Initially visible
 	);
 
-	// kModeless (G4 as changed): other work goes on while it is open. One copy, and kCacheDialog FOR THAT: MEASURED
-	// with kDontCacheDialog - the dialog minimized, Run Saved Queries... made a SECOND dialog beside it (two
-	// windows), whatever IDialogMgr.h says of a modeless dialog being single-copy. With kCacheDialog the open one comes
-	// back - KCM's book dialog relies on the same. What it shows is not the cache's: Repaint below reads the lists anew
-	// on every open. Fixed size. The pointer is not held: the dialog destroys itself when it closes.
+	// kModeless (the query dialog spec's G4 as changed): other work goes on while it is open. One copy, and
+	// kCacheDialog FOR THAT: MEASURED with kDontCacheDialog - the dialog minimized, Run Saved Queries... made a SECOND
+	// dialog beside it (two windows), whatever IDialogMgr.h says of a modeless dialog being single-copy. With
+	// kCacheDialog the open one comes back. What it shows is not the cache's: Repaint below reads the lists anew on
+	// every open. Fixed size. The pointer is not held: the dialog destroys itself when it closes.
 	IDialog* dialog = dialogMgr->CreateNewDialog(dialogSpec, IDialog::kModeless,
 		IDialogMgr::kDontAllowMultipleCopies, IDialogMgr::kCacheDialog, IDialogMgr::kDontAllowUserResize);
 	if (dialog == nil)
@@ -623,7 +628,7 @@ void KFCQueryDialogOpen()
 	PrepareWindow(dialog);
 
 	// Filled again on EVERY open: one opened while it is already open (to bring it forward, or to list a query saved
-	// since) is not given InitializeDialogFields. The panel is the dialog boss's own (KCMBookDialog.cpp reaches it so).
+	// since) is not given InitializeDialogFields. The panel is the dialog boss's own.
 	InterfacePtr<IPanelControlData> panel(dialog, UseDefaultIID());
 	Repaint(panel);
 }
