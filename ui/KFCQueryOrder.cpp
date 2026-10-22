@@ -164,28 +164,20 @@ bool KFCQueryOrder::SaveOrderTo(const IDFile& file, PMString& outWhy)
 	return false;
 }
 
-bool KFCQueryOrder::LoadOrderFrom(const IDFile& file, PMString& outWhy)
+KFCQueryOrder::LoadOutcome KFCQueryOrder::LoadOrderFrom(const IDFile& file)
 {
-	outWhy.Clear();
-	outWhy.SetTranslatable(kFalse);
 	std::string text;
 	if (!KFCReadFileWhole(file, text))
-	{
-		outWhy.Append("read");
-		return false;
-	}
+		return kOrderNotRead;
 	std::vector<KFCOrderFileEntry> entries;
 	if (!KFCOrderFileParse(text, entries))
-	{
-		outWhy.Append("format");
-		return false;
-	}
+		return kNotAnOrder;
 	LoadSaved();		// the queries there are now - an entry whose file has moved is found among them by its kind and name
 	std::vector<KFCSavedQuery> order;
 	for (size_t i = 0; i < entries.size(); ++i)
 		order.push_back(RowOfEntry(entries[i]));
 	gOrder.swap(order);
-	return true;
+	return kOrderLoaded;
 }
 
 void KFCQueryOrder::Add(int32 savedIndex)

@@ -49,11 +49,18 @@ namespace KFCQueryOrder
 	    (KFCWriteFileSafely). false = outWhy says which step failed - "open", "write", "replace". */
 	bool SaveOrderTo(const IDFile& file, PMString& outWhy);
 
+	/** What LoadOrderFrom found - the dialog says each in its own words (KFCQueryDialog.cpp's PressLoadOrder). */
+	enum LoadOutcome
+	{
+		kOrderLoaded,		// the run order is now the file's
+		kOrderNotRead,		// not there, or not read whole - the run order is left as it was
+		kNotAnOrder			// read, but not a KFC query order - the run order is left as it was
+	};
+
 	/** Make the run order the one `file` holds. Each entry is its file when that is there; otherwise the saved query of
 	    the same kind and name (the user's own before InDesign's - a query's folder moves with InDesign's version);
-	    otherwise it stays, "(not found)", and Run refuses while it does (KFCQuerySequence). false = outWhy "read" (not
-	    there, or not read whole) or "format" (not a KFC query order); the run order is then left as it was. */
-	bool LoadOrderFrom(const IDFile& file, PMString& outWhy);
+	    otherwise it stays, "(not found)", and Run refuses while it does (KFCQuerySequence). */
+	LoadOutcome LoadOrderFrom(const IDFile& file);
 
 	/** The four buttons' and Clear's changes - the session's order alone (nothing is written). Indices outside the lists
 	    change nothing. */

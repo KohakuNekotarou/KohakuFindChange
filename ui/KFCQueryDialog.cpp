@@ -51,7 +51,7 @@
 #include "KFCQueryContents.h"		// KFCQueryContentsLine - what a picked row's query does
 #include "KFCQueryList.h"
 #include "KFCQueryOrder.h"
-#include "KFCQueryOrderFile.h"		// KFCChooseOrderFile - Save Order... / Load Order...'s file
+#include "KFCQueryOrderFile.h"		// KFCChooseOrderFileToSave / ToLoad - Save Order... / Load Order...'s file
 #include "KFCResultHistory.h"		// Find - a query searched as a new tier; the same query twice in a row; a Run's drop
 #include "KFCResultTree.h"			// Rebuild / ShowStatus - the panel, told of a run as Find tells it
 #include "KFCUIID.h"
@@ -337,43 +337,43 @@ namespace
 		const int32 left = KFCQueryListSelectedIndex(panel, kKFCQuerySavedListWidgetID);
 		const int32 right = KFCQueryListSelectedIndex(panel, kKFCQueryOrderListWidgetID);
 		int32 pick = -1;
-		if (button == kKFCQueryAddButtonWidgetID)
+		switch (button.Get())
 		{
-			if (left < 0)
+			case kKFCQueryAddButtonWidgetID:
+				if (left < 0)
+					return;
+				KFCQueryOrder::Add(left);
+				pick = static_cast<int32>(KFCQueryOrder::Order().size()) - 1;
+				break;
+			case kKFCQueryRemoveButtonWidgetID:
+			{
+				if (right < 0)
+					return;
+				KFCQueryOrder::Remove(right);
+				const int32 rows = static_cast<int32>(KFCQueryOrder::Order().size());
+				pick = right < rows ? right : rows - 1;
+				break;
+			}
+			case kKFCQueryUpButtonWidgetID:
+				if (right <= 0)
+					return;
+				KFCQueryOrder::MoveUp(right);
+				pick = right - 1;
+				break;
+			case kKFCQueryDownButtonWidgetID:
+				if (right < 0 || right + 1 >= static_cast<int32>(KFCQueryOrder::Order().size()))
+					return;
+				KFCQueryOrder::MoveDown(right);
+				pick = right + 1;
+				break;
+			case kKFCQueryClearButtonWidgetID:
+				if (KFCQueryOrder::Order().empty())
+					return;
+				KFCQueryOrder::Clear();
+				break;
+			default:
 				return;
-			KFCQueryOrder::Add(left);
-			pick = static_cast<int32>(KFCQueryOrder::Order().size()) - 1;
 		}
-		else if (button == kKFCQueryRemoveButtonWidgetID)
-		{
-			if (right < 0)
-				return;
-			KFCQueryOrder::Remove(right);
-			const int32 rows = static_cast<int32>(KFCQueryOrder::Order().size());
-			pick = right < rows ? right : rows - 1;
-		}
-		else if (button == kKFCQueryUpButtonWidgetID)
-		{
-			if (right <= 0)
-				return;
-			KFCQueryOrder::MoveUp(right);
-			pick = right - 1;
-		}
-		else if (button == kKFCQueryDownButtonWidgetID)
-		{
-			if (right < 0 || right + 1 >= static_cast<int32>(KFCQueryOrder::Order().size()))
-				return;
-			KFCQueryOrder::MoveDown(right);
-			pick = right + 1;
-		}
-		else if (button == kKFCQueryClearButtonWidgetID)
-		{
-			if (KFCQueryOrder::Order().empty())
-				return;
-			KFCQueryOrder::Clear();
-		}
-		else
-			return;
 
 		// (Find searches the row picked - the one the change leaves the eye on.)
 		KFCQueryListRebuild(panel, kKFCQueryOrderListWidgetID);
@@ -382,8 +382,8 @@ namespace
 	}
 
 	/** Save Order... (the author's call): the run order to a file the person names, through InDesign's own Save
-	    dialog (KFCChooseOrderFile). Written: the file's full path and nothing else on both lines - Save Panel Settings'
-	    way (the author's call: "show where it was saved"). Cancelled: nothing changes, nothing is said. */
+	    dialog (KFCChooseOrderFileToSave). Written: the file's full path and nothing else on both lines - Save Panel
+	    Settings' way (the author's call: "show where it was saved"). Cancelled: nothing changes, nothing is said. */
 	void PressSaveOrder(IPanelControlData* panel)
 	{
 		if (KFCQueryOrder::Order().empty())
@@ -392,7 +392,7 @@ namespace
 			return;
 		}
 		IDFile file;
-		if (!KFCChooseOrderFile(true, file))
+		if (!KFCChooseOrderFileToSave(file))
 			return;
 		const PMString path(FileUtils::SysFileToPMString(file));
 		PMString why;
@@ -416,16 +416,16 @@ namespace
 	void PressLoadOrder(IPanelControlData* panel)
 	{
 		IDFile file;
-		if (!KFCChooseOrderFile(false, file))
+		if (!KFCChooseOrderFileToLoad(file))
 			return;
 		const PMString path(FileUtils::SysFileToPMString(file));
-		PMString why;
-		if (!KFCQueryOrder::LoadOrderFrom(file, why))
+		const KFCQueryOrder::LoadOutcome loaded = KFCQueryOrder::LoadOrderFrom(file);
+		if (loaded != KFCQueryOrder::kOrderLoaded)
 		{
 			PMString say("Load Order: ");
 			say.SetTranslatable(kFalse);
 			say.Append(path);
-			say.Append(why == PMString("format") ? " is not a KFC query order." : " could not be read.");
+			say.Append(loaded == KFCQueryOrder::kNotAnOrder ? " is not a KFC query order." : " could not be read.");
 			SayOnBoth(panel, say);
 			return;
 		}
@@ -568,12 +568,20 @@ public:
 				PressOrderButton(panel, id);
 				return;
 			}
-		if (id == kKFCQuerySaveOrderButtonWidgetID)
-			PressSaveOrder(panel);
-		else if (id == kKFCQueryLoadOrderButtonWidgetID)
-			PressLoadOrder(panel);
-		else if (id == kKFCQueryFindButtonWidgetID)
-			PressFind(panel);
+		switch (id.Get())
+		{
+			case kKFCQuerySaveOrderButtonWidgetID:
+				PressSaveOrder(panel);
+				break;
+			case kKFCQueryLoadOrderButtonWidgetID:
+				PressLoadOrder(panel);
+				break;
+			case kKFCQueryFindButtonWidgetID:
+				PressFind(panel);
+				break;
+			default:		// Close (Cancel) - the base above has it
+				break;
+		}
 	}
 };
 
