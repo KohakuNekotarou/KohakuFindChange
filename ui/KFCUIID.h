@@ -109,6 +109,9 @@ DECLARE_PMID(kClassIDSpace, kKFCResultEyeDEHandlerBoss, kKFCUIPrefix + 30)
 // InDesign's hidden-spread alert answered OK inside a walk of ours (KFCAlertAnswer.cpp - the spec map's OBJ-23): an
 // alert handler registered as a service (kAlertHandlerService). + 31: the next after the highest spent.
 DECLARE_PMID(kClassIDSpace, kKFCAlertAnswerBoss, kKFCUIPrefix + 31)
+// The value dialogs - Move..., Scale..., Rotate..., Shear... and Narrow Down's Pages... (KFCSpecialDialogs.cpp): one
+// boss for the five, each its own view. + 32: the next after the highest spent.
+DECLARE_PMID(kClassIDSpace, kKFCValueDialogBoss, kKFCUIPrefix + 32)
 
 
 // InterfaceIDs:
@@ -227,6 +230,9 @@ DECLARE_PMID(kImplementationIDSpace, kKFCAlertAnswerImpl, kKFCUIPrefix + 56)
 DECLARE_PMID(kImplementationIDSpace, kKFCAlertAnswerServiceImpl, kKFCUIPrefix + 57)
 // The query dialog's scope observer (KFCQueryScopeObserver.cpp). + 58: the next after the highest spent.
 DECLARE_PMID(kImplementationIDSpace, kKFCQueryScopeObserverImpl, kKFCUIPrefix + 58)
+// The value dialogs' controller and observer (KFCSpecialDialogs.cpp). + 59 and + 60: the next after the highest spent.
+DECLARE_PMID(kImplementationIDSpace, kKFCValueDialogControllerImpl, kKFCUIPrefix + 59)
+DECLARE_PMID(kImplementationIDSpace, kKFCValueDialogObserverImpl, kKFCUIPrefix + 60)
 
 
 // ActionIDs:
@@ -526,6 +532,21 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryFindButtonWidgetID, kKFCUIPrefix + 45)
 // A hit row's eye (the row eye) - found by the widget manager in each hit row (+ 46: the next after the highest spent;
 // the retired check box's + 7 stays unused - the regression runner still reads 0x1ea687).
 DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
+// The value dialogs (KFCSpecialDialogs.cpp): the dialog, and its fields - one ID for a field of the same use in each
+// dialog (a widget ID need only be unique among its own dialog's widgets): X is Move's Horizontal and Scale's Scale X,
+// Y is Move's Vertical and Scale's Scale Y, the angle is Move's, Rotate's and Shear's; the two labels head a group
+// panel. + 47 ... + 57: the next after the highest spent (never used at either prefix).
+DECLARE_PMID(kWidgetIDSpace, kKFCValueDialogWidgetID, kKFCUIPrefix + 47)
+DECLARE_PMID(kWidgetIDSpace, kKFCValueXWidgetID, kKFCUIPrefix + 48)
+DECLARE_PMID(kWidgetIDSpace, kKFCValueYWidgetID, kKFCUIPrefix + 49)
+DECLARE_PMID(kWidgetIDSpace, kKFCValueDistanceWidgetID, kKFCUIPrefix + 50)
+DECLARE_PMID(kWidgetIDSpace, kKFCValueAngleWidgetID, kKFCUIPrefix + 51)
+DECLARE_PMID(kWidgetIDSpace, kKFCValueChainWidgetID, kKFCUIPrefix + 52)
+DECLARE_PMID(kWidgetIDSpace, kKFCValueAxisHorizontalWidgetID, kKFCUIPrefix + 53)
+DECLARE_PMID(kWidgetIDSpace, kKFCValueAxisVerticalWidgetID, kKFCUIPrefix + 54)
+DECLARE_PMID(kWidgetIDSpace, kKFCValuePagesWidgetID, kKFCUIPrefix + 55)
+DECLARE_PMID(kWidgetIDSpace, kKFCValuePositionLabelWidgetID, kKFCUIPrefix + 56)
+DECLARE_PMID(kWidgetIDSpace, kKFCValueAxisLabelWidgetID, kKFCUIPrefix + 57)
 
 
 // "About Plug-ins" sub-menu:
@@ -666,6 +687,31 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 #define kKFCQuerySaveOrderTitleKey		kKFCStringPrefix "kKFCQuerySaveOrderTitleKey"
 #define kKFCQueryLoadOrderTitleKey		kKFCStringPrefix "kKFCQueryLoadOrderTitleKey"
 #define kKFCQueryOrderFileTypeKey		kKFCStringPrefix "kKFCQueryOrderFileTypeKey"
+// The value dialogs' words (KFCSpecialDialogs.cpp): the titles, the fields' labels as InDesign's English dialogs have
+// them, OK and Cancel (English, as the rest of the plug-in's UI), and what an OK refused says. The titles end in
+// "DialogKey": "...TitleKey" read to a weak hash the same as keys already spent (key_collisions.py).
+#define kKFCValueMoveDialogKey			kKFCStringPrefix "kKFCValueMoveDialogKey"
+#define kKFCValueScaleDialogKey			kKFCStringPrefix "kKFCValueScaleDialogKey"
+#define kKFCValueRotateDialogKey		kKFCStringPrefix "kKFCValueRotateDialogKey"
+#define kKFCValueShearDialogKey			kKFCStringPrefix "kKFCValueShearDialogKey"
+#define kKFCValuePagesDialogKey			kKFCStringPrefix "kKFCValuePagesDialogKey"
+#define kKFCValuePositionKey			kKFCStringPrefix "kKFCValuePositionKey"
+#define kKFCValueHorizontalKey			kKFCStringPrefix "kKFCValueHorizontalKey"
+#define kKFCValueVerticalKey			kKFCStringPrefix "kKFCValueVerticalKey"
+#define kKFCValueDistanceKey			kKFCStringPrefix "kKFCValueDistanceKey"
+#define kKFCValueAngleKey				kKFCStringPrefix "kKFCValueAngleKey"
+#define kKFCValueScaleXKey				kKFCStringPrefix "kKFCValueScaleXKey"
+#define kKFCValueScaleYKey				kKFCStringPrefix "kKFCValueScaleYKey"
+#define kKFCValueShearAngleKey			kKFCStringPrefix "kKFCValueShearAngleKey"
+#define kKFCValueAxisKey				kKFCStringPrefix "kKFCValueAxisKey"
+#define kKFCValueAxisHorizontalKey		kKFCStringPrefix "kKFCValueAxisHorizontalKey"
+#define kKFCValueAxisVerticalKey		kKFCStringPrefix "kKFCValueAxisVerticalKey"
+#define kKFCValuePagesKey				kKFCStringPrefix "kKFCValuePagesKey"
+#define kKFCValuePagesHintKey			kKFCStringPrefix "kKFCValuePagesHintKey"
+#define kKFCValueOKKey					kKFCStringPrefix "kKFCValueOKKey"
+#define kKFCValueCancelKey				kKFCStringPrefix "kKFCValueCancelKey"
+#define kKFCValueNotZeroKey				kKFCStringPrefix "kKFCValueNotZeroKey"
+#define kKFCValueNoPagesKey				kKFCStringPrefix "kKFCValueNoPagesKey"
 // "Find/Change Selected Documents (Book)" - the toggle under Book Scope.
 #define kKFCSelectedDocumentsMenuKey	kKFCStringPrefix "kKFCSelectedDocumentsMenuKey"
 
@@ -862,6 +908,15 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultEyeWidgetID, kKFCUIPrefix + 46)
 // row its two lists are made of (next to the result tree's rows).
 #define kKFCQueryDialogRsrcID				kSDKDefDialogResourceID
 #define kKFCQueryRowRsrcID					(kSDKDefPanelResourceID + 22)
+// The value dialogs' views (KFCSpecialDialogs.cpp), after the query dialog's at the SDK's place for a plug-in's
+// dialog - each LocaleIndex points at its ID + index_enUS, so the IDs stand two apart. And one width for their value
+// fields, about InDesign's own Move dialog's.
+#define kKFCMoveDialogRsrcID				(kSDKDefDialogResourceID + 10)
+#define kKFCScaleDialogRsrcID				(kSDKDefDialogResourceID + 12)
+#define kKFCRotateDialogRsrcID				(kSDKDefDialogResourceID + 14)
+#define kKFCShearDialogRsrcID				(kSDKDefDialogResourceID + 16)
+#define kKFCPagesDialogRsrcID				(kSDKDefDialogResourceID + 18)
+#define kKFCValueFieldWidth					84
 // One row of the query dialog's lists: KCM's book comparison dialog's row height (kKCMBookRowHeight), the one other
 // list the Kohaku plug-ins draw in a dialog's font. Read by the row resource, the lists' scroll increments
 // and KFCQueryListWidgetMgr::GetNodeWidgetHeight - one number.

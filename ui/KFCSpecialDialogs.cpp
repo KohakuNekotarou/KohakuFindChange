@@ -4,562 +4,503 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  The values an object row's transform asks first - see KFCSpecialDialogs.h.
-//  LAID OUT AS INDESIGN'S OWN (the author's call: "photograph the official Move, Rotate and Scale dialogs and make
-//  KFC's look like them" - work/note-scripts/2026-10-17-kfc-object-special/official-*.png): the fields on the left,
-//  each label before its box; OK and Cancel stacked on the right; a value shown with its unit ("0 mm", "100%", "0" and
-//  the degree sign); Move's Horizontal and Vertical in a Position panel, with Distance and Angle under a line, each
-//  pair worked out from the other; Scale's chain between its two fields; Shear's Axis. What InDesign's has and these
-//  have not: Copy (a transformed copy - a row would have nothing to follow) and Preview. KFC's own ways (a number alone
-//  in ruler units, each object about its own centre) are said in the fields' tips, where InDesign's dialogs say
-//  nothing.
+//  The values an object row's transform asks first, and Narrow Down's page range - see KFCSpecialDialogs.h.
+//  MADE OF INDESIGN'S OWN WIDGETS (the author's call: the dialogs are to be InDesign's own - the design is
+//  docs/superpowers/specs/2026-10-23-kfc-native-value-dialogs-design.md): the measure, angle and percentage fields
+//  InDesign's dialogs are made of (EveInfo.fh), so a value reads and shows in the front document's ruler units, in
+//  every unit and way of writing one InDesign knows (a cicero, 1p6), and a value out of a field's range is refused in
+//  InDesign's own words; the chain is InDesign's own button (kChainButtonBoss - it toggles itself and draws its own
+//  pictures). Laid out as InDesign's Move, Scale, Rotate and Shear dialogs - LayoutUIID.h's kMoveDlg... /
+//  kScaleDlg... / kRotate... / kShearDlg... widgets, and photographs of them in
+//  work/note-scripts/2026-10-17-kfc-object-special/official-*.png: the fields on the left, OK and Cancel stacked on the
+//  right. What InDesign's have and these have not: Copy (a transformed copy - a row would have nothing to follow) and
+//  Preview (it would write the document while the dialog stands).
+//
+//  One dialog boss for the five (kKFCValueDialogBoss - KFCUI.fr), each its own view; which one stands is the question
+//  being asked (gAsking - modal, so one at a time). Asked as snippetrunner asks a value (SnipRunParameterUtils.cpp):
+//  the dialog made and opened, Open() waiting until it is dismissed ("Open by default now calls WaitForDialog" -
+//  IDialog.h), the answer then read from what the controller kept on OK.
 //
 //========================================================================================
 
 #include "VCPlugInHeaders.h"
 
 // Interface includes:
-#include "IExtendScriptUtils.h"		// RunScriptInEngine - the dialog, and its answer read back
+#include "IApplication.h"
+#include "IControlView.h"			// GetWidgetID - which field a change came from
+#include "IDialog.h"
+#include "IDialogController.h"		// the field helpers, asked by the observer of the controller beside it
+#include "IDialogMgr.h"
+#include "IPanelControlData.h"		// FindWidget - the fields a dialog has
+#include "ISession.h"
+#include "ISubject.h"				// the observer's Update hears one
+#include "ITextDataValidation.h"	// IsEntryLegal / GetErrorString - a field's own range check, and its words
+#include "ITriStateControlData.h"	// the chain, the axis buttons
+#include "widgetid.h"				// IID_ITEXTCONTROLDATA / IID_ITRISTATECONTROLDATA and their messages
 
 // General includes:
+#include "CAlert.h"					// WarningAlert - a value refused
+#include "CDialogController.h"
+#include "CDialogObserver.h"
+#include "CoreResTypes.h"			// kViewRsrcType
+#include "LocaleSetting.h"
+#include "PMReal.h"					// kPMPi
 #include "PMString.h"
-#include "ScriptData.h"				// ScriptData / ScriptRecordData - the script handed over, its answer
-#include "Utils.h"
-#include "WideString.h"				// a text read as characters - JsLiteral
+#include "RsrcSpec.h"
 
-#include <cmath>					// std::fabs, std::isfinite
-#include <cstdio>					// std::snprintf
-#include <cstdlib>					// std::strtod
-#include <string>
-#include <vector>
+#include <cmath>					// std::sqrt, std::atan2, std::cos, std::sin, std::fabs, std::isfinite
 
 // Project includes:
-#include "KFCBoundaryID.h"			// kKFCDisplayName - the dialogs' titles are built from it
 #include "KFCSpecialDialogs.h"
+#include "KFCUIID.h"
 
 namespace
 {
-// WHAT WAS TYPED LAST, offered again for the session (the special operations spec's E12) - a distance as typed, so it
-// keeps its unit; a percentage or an angle as the number it was read as. Fixed buffers: nothing to tear down when the
-// plug-in goes (an ASCII text the script handed back, or the default).
-const size_t kTyped = 40;
-char gMoveH[kTyped] = "0";
-char gMoveV[kTyped] = "0";
-char gScaleX[kTyped] = "100";
-char gScaleY[kTyped] = "100";
-bool gScaleConstrain = true;
-char gRotate[kTyped] = "0";
-char gShear[kTyped] = "0";
-bool gShearVertical = false;
-// Narrow Down's Pages...: the range as typed, UTF-8 (a section's name can be any text) - longer ones are not kept.
-const size_t kTypedPages = 256;
-char gPages[kTypedPages] = "";
+// WHAT WAS ANSWERED LAST, offered again for the session (the special operations spec's E12) - kept on OK alone. Plain
+// values: nothing to tear down when the plug-in goes. A distance is kept in points and shown in the ruler units of the
+// document in front when the dialog opens.
+double gMoveX = 0.0;				// points, right positive
+double gMoveY = 0.0;				// points, down positive
+double gScaleX = 100.0;				// percent
+double gScaleY = 100.0;
+bool gScaleConstrain = true;		// the chain linked
+double gRotate = 0.0;				// degrees, counter-clockwise positive
+double gShear = 0.0;				// degrees
+bool gShearVertical = false;		// the axis
+// Narrow Down's Pages...: the range as typed, UTF-16 (a section's name can be any text) - a longer one is not kept.
+const int32 kTypedPages = 256;
+UTF16TextChar gPages[kTypedPages] = { 0 };
+int32 gPagesLength = 0;
 
-void Keep(char (&slot)[kTyped], const std::string& typed)
+// THE QUESTION BEING ASKED - which dialog stands (modal: one at a time), so the one controller and the one observer
+// know which fields they fill, follow and read.
+enum Asking { kAskingNone = 0, kAskingMove, kAskingScale, kAskingRotate, kAskingShear, kAskingPages };
+Asking gAsking = kAskingNone;
+bool gAnswered = false;				// OK pressed, and what it answered kept (ApplyDialogFields)
+PMString* gPagesAnswer = nil;		// AskPageRange's answer while its dialog stands - the range, whatever its length
+// MOVE: which pair was typed last - Distance and Angle (true) or Horizontal and Vertical. Followed on every key stroke,
+// so the pair typed is the one answered even when OK is pressed before the field is committed (Enter typed in it).
+bool gMoveByDistance = false;
+
+// THE VALUE FIELDS THAT ANSWER, checked on OK in the order they are read (the first refused is the one selected).
+// Move's are the pair it answers by: the other pair is worked out, and a distance worked out from two values in range
+// can stand beyond the Distance field's own range without being typed there.
+const WidgetID kMoveXYFields[] = { kKFCValueXWidgetID, kKFCValueYWidgetID };
+const WidgetID kMoveDistanceFields[] = { kKFCValueDistanceWidgetID, kKFCValueAngleWidgetID };
+const WidgetID kScaleFields[] = { kKFCValueXWidgetID, kKFCValueYWidgetID };
+const WidgetID kAngleFields[] = { kKFCValueAngleWidgetID };
+
+// The dialog's view, by the question.
+RsrcID ViewOf(Asking asking)
 {
-	if (!typed.empty())
-		std::snprintf(slot, kTyped, "%s", typed.c_str());
+	switch (asking)
+	{
+		case kAskingMove:	return kKFCMoveDialogRsrcID;
+		case kAskingScale:	return kKFCScaleDialogRsrcID;
+		case kAskingRotate:	return kKFCRotateDialogRsrcID;
+		case kAskingShear:	return kKFCShearDialogRsrcID;
+		default:			return kKFCPagesDialogRsrcID;
+	}
 }
 
-// A JavaScript string literal's body for any text (UTF-8 in): printable ASCII as it is, the quote and the backslash
-// escaped, every other character as \uXXXX (a surrogate pair past U+FFFF) - the script stays pure ASCII (KFCHowTo's
-// rule). What the transforms keep is printable ASCII already (the script's ascii() echo, fmt()'s numbers); a page range
-// can be any text but one holding a lone surrogate (RunDialog refuses it before any UTF-8 is made), so the UTF-8 kept
-// reads back here.
-std::string JsLiteral(const char* utf8)
+// A value next to nothing written as nothing: the arithmetic below leaves a trace (the cosine of 90 degrees) that a
+// field would show as "-0 mm".
+double Clean(double v)
 {
-	PMString text;
-	text.SetUTF8String(utf8);
-	const WideString wide(text);
-	std::string out;
-	char buf[16];
-	for (WideString::const_iterator c = wide.begin(); c != wide.end(); ++c)
+	return (std::fabs(v) < 1e-9) ? 0.0 : v;
+}
+
+// MOVE'S TWO PAIRS, each worked out from the other as InDesign's Move works them: the angle counter-clockwise from the
+// right, down positive (InDesign's pasteboard coordinates).
+void PolarOf(double x, double y, double& outDistance, double& outAngle)
+{
+	outDistance = Clean(std::sqrt(x * x + y * y));
+	outAngle = (x != 0.0 || y != 0.0) ? Clean(std::atan2(-y, x) * 180.0 / kPMPi) : 0.0;
+}
+
+void CartesianOf(double distance, double angle, double& outX, double& outY)
+{
+	const double r = angle * kPMPi / 180.0;
+	outX = Clean(distance * std::cos(r));
+	outY = Clean(-distance * std::sin(r));
+}
+
+// A button's state, from whether it is on.
+ITriStateControlData::TriState StateOf(bool on)
+{
+	return on ? ITriStateControlData::kSelected : ITriStateControlData::kUnselected;
+}
+
+// A field of the dialog the boss is, by its ID - nil when this dialog has none.
+IControlView* FieldOf(IPMUnknown* boss, const WidgetID& id)
+{
+	InterfacePtr<IPanelControlData> panel(boss, UseDefaultIID());
+	return (panel != nil) ? panel->FindWidget(id) : nil;
+}
+
+// A FIELD'S VALUE WHEN IT READS: a number its own check accepts (in range, not blank) - false otherwise, out left as it
+// was. In the field's base unit: points for a measure, percent, degrees (ITextValue.h).
+bool ReadValue(IDialogController* controller, const WidgetID& id, double& out)
+{
+	InterfacePtr<ITextDataValidation> check(FieldOf(controller, id), UseDefaultIID());
+	if (check == nil || !check->IsEntryLegal())
+		return false;
+	bool16 notANumber = kFalse, blank = kFalse;
+	const PMReal value = controller->GetTextValue(id, nil, &notANumber, &blank);
+	if (notANumber || blank)
+		return false;
+	out = ::ToDouble(value);
+	return true;
+}
+
+// One field's value written into another as that field writes it ("50" becomes "50%") - without a word back to the
+// observer (notifyOfChange kFalse), so no field answers a field.
+void Mirror(IDialogController* controller, const WidgetID& from, const WidgetID& to)
+{
+	double v = 0.0;
+	if (ReadValue(controller, from, v))
+		controller->SetTextValue(to, v, nil, kTrue, kFalse);
+}
+}	// anonymous namespace
+
+/** The value dialogs' controller: fills the dialog that stands with what was answered last, checks it on OK - each
+    field by its own check, in InDesign's words - and keeps what it answered. */
+class KFCValueDialogController : public CDialogController
+{
+public:
+	KFCValueDialogController(IPMUnknown* boss) : CDialogController(boss) {}
+	virtual ~KFCValueDialogController() {}
+
+protected:
+	// Filled at every open (a cached dialog too) - written without a word to the observer (notifyOfChange kFalse):
+	// nothing is typed yet. The first field takes the keyboard, as in InDesign's own (the product's Layer Options
+	// dialog the same - LayerOptionsDlgController.cpp).
+	virtual void InitializeDialogFields(IActiveContext* context)
 	{
-		const uint32 cp = static_cast<uint32>(*c);
-		if (cp == '"' || cp == '\\')
+		CDialogController::InitializeDialogFields(context);
+		gMoveByDistance = false;
+		switch (gAsking)
 		{
-			out += '\\';
-			out += static_cast<char>(cp);
+			case kAskingMove:
+			{
+				double distance = 0.0, angle = 0.0;
+				PolarOf(gMoveX, gMoveY, distance, angle);
+				SetTextValue(kKFCValueXWidgetID, gMoveX, nil, kTrue, kFalse);
+				SetTextValue(kKFCValueYWidgetID, gMoveY, nil, kTrue, kFalse);
+				SetTextValue(kKFCValueDistanceWidgetID, distance, nil, kTrue, kFalse);
+				SetTextValue(kKFCValueAngleWidgetID, angle, nil, kTrue, kFalse);
+				SelectDialogWidget(kKFCValueXWidgetID);
+				break;
+			}
+			case kAskingScale:
+				SetTextValue(kKFCValueXWidgetID, gScaleX, nil, kTrue, kFalse);
+				SetTextValue(kKFCValueYWidgetID, gScaleY, nil, kTrue, kFalse);
+				SetTriStateControlData(kKFCValueChainWidgetID, StateOf(gScaleConstrain), nil, kTrue, kFalse);
+				SelectDialogWidget(kKFCValueXWidgetID);
+				break;
+			case kAskingRotate:
+				SetTextValue(kKFCValueAngleWidgetID, gRotate, nil, kTrue, kFalse);
+				SelectDialogWidget(kKFCValueAngleWidgetID);
+				break;
+			case kAskingShear:
+				SetTextValue(kKFCValueAngleWidgetID, gShear, nil, kTrue, kFalse);
+				// Both buttons, each by hand: written without a word, the cluster does not unset the other.
+				SetTriStateControlData(kKFCValueAxisHorizontalWidgetID, StateOf(!gShearVertical), nil, kTrue, kFalse);
+				SetTriStateControlData(kKFCValueAxisVerticalWidgetID, StateOf(gShearVertical), nil, kTrue, kFalse);
+				SelectDialogWidget(kKFCValueAngleWidgetID);
+				break;
+			case kAskingPages:
+			{
+				PMString pages;
+				pages.SetXString(gPages, gPagesLength);
+				pages.SetTranslatable(kFalse);
+				SetTextControlData(kKFCValuePagesWidgetID, pages, nil, kTrue, kFalse);
+				SelectDialogWidget(kKFCValuePagesWidgetID);
+				break;
+			}
+			default:
+				break;
 		}
-		else if (cp >= 0x20 && cp <= 0x7E)
-			out += static_cast<char>(cp);
-		else if (cp > 0xFFFF)
+	}
+
+	// ON OK. The base checks nothing (CDialogController.cpp), so the fields that answer are asked here, as the product
+	// asks its fields (DynamicDocumentsUIUtils.cpp): each by its own check - the range in KFCUI.fr, a value that is no
+	// number - and, when it refuses, in its own words. Then what KFC refuses itself: a scale of 0% (no object can be
+	// scaled to nothing) and a page range of nothing. The field returned is the one the framework selects
+	// (CDialogObserver.cpp).
+	virtual WidgetID ValidateDialogFields(IActiveContext* /*context*/)
+	{
+		const WidgetID* fields = nil;
+		size_t count = 0;
+		switch (gAsking)
 		{
-			const uint32 v = cp - 0x10000;
-			std::snprintf(buf, sizeof(buf), "\\u%04X\\u%04X", 0xD800 + (v >> 10), 0xDC00 + (v & 0x3FF));
-			out += buf;
+			case kAskingMove:
+				fields = gMoveByDistance ? kMoveDistanceFields : kMoveXYFields;
+				count = 2;
+				break;
+			case kAskingScale:
+				fields = kScaleFields;
+				count = sizeof(kScaleFields) / sizeof(kScaleFields[0]);
+				break;
+			case kAskingRotate:
+			case kAskingShear:
+				fields = kAngleFields;
+				count = sizeof(kAngleFields) / sizeof(kAngleFields[0]);
+				break;
+			default:
+				break;
+		}
+		for (size_t i = 0; i < count; ++i)
+		{
+			InterfacePtr<ITextDataValidation> check(FieldOf(this, fields[i]), UseDefaultIID());
+			if (check != nil && !check->IsEntryLegal())
+			{
+				CAlert::WarningAlert(check->GetErrorString());
+				return fields[i];
+			}
+		}
+		if (gAsking == kAskingScale)
+		{
+			const bool linked = GetTriStateControlData(kKFCValueChainWidgetID) == ITriStateControlData::kSelected;
+			WidgetID zero = kNoInvalidWidgets;
+			if (::ToDouble(GetTextValue(kKFCValueXWidgetID)) == 0.0)
+				zero = kKFCValueXWidgetID;
+			else if (!linked && ::ToDouble(GetTextValue(kKFCValueYWidgetID)) == 0.0)
+				zero = kKFCValueYWidgetID;
+			if (zero != kNoInvalidWidgets)
+			{
+				CAlert::WarningAlert(PMString(kKFCValueNotZeroKey));
+				return zero;
+			}
+		}
+		if (gAsking == kAskingPages)
+		{
+			PMString pages(GetTextControlData(kKFCValuePagesWidgetID));
+			pages.StripWhiteSpace(PMString::kLeadingAndTrailingWhiteSpace);
+			if (pages.IsEmpty())
+			{
+				CAlert::WarningAlert(PMString(kKFCValueNoPagesKey));
+				return kKFCValuePagesWidgetID;
+			}
+		}
+		return kNoInvalidWidgets;
+	}
+
+	// ON OK, THE VALUES CHECKED: kept for the next open and for the caller to read. Move answers by the pair typed last
+	// (gMoveByDistance); Scale with the chain linked answers Scale X for both.
+	virtual void ApplyDialogFields(IActiveContext* /*context*/, const WidgetID& /*widgetId*/)
+	{
+		switch (gAsking)
+		{
+			case kAskingMove:
+				if (gMoveByDistance)
+					CartesianOf(::ToDouble(GetTextValue(kKFCValueDistanceWidgetID)),
+						::ToDouble(GetTextValue(kKFCValueAngleWidgetID)), gMoveX, gMoveY);
+				else
+				{
+					gMoveX = ::ToDouble(GetTextValue(kKFCValueXWidgetID));
+					gMoveY = ::ToDouble(GetTextValue(kKFCValueYWidgetID));
+				}
+				break;
+			case kAskingScale:
+				gScaleConstrain = GetTriStateControlData(kKFCValueChainWidgetID) == ITriStateControlData::kSelected;
+				gScaleX = ::ToDouble(GetTextValue(kKFCValueXWidgetID));
+				gScaleY = gScaleConstrain ? gScaleX : ::ToDouble(GetTextValue(kKFCValueYWidgetID));
+				break;
+			case kAskingRotate:
+				gRotate = ::ToDouble(GetTextValue(kKFCValueAngleWidgetID));
+				break;
+			case kAskingShear:
+				gShear = ::ToDouble(GetTextValue(kKFCValueAngleWidgetID));
+				gShearVertical = (GetTriStateControlData(kKFCValueAxisVerticalWidgetID)
+					== ITriStateControlData::kSelected);
+				break;
+			case kAskingPages:
+			{
+				PMString pages(GetTextControlData(kKFCValuePagesWidgetID));
+				pages.StripWhiteSpace(PMString::kLeadingAndTrailingWhiteSpace);
+				pages.SetTranslatable(kFalse);
+				if (gPagesAnswer != nil)
+					*gPagesAnswer = pages;
+				int32 n = 0;
+				const UTF16TextChar* typed = pages.GrabUTF16Buffer(&n);
+				if (typed != nil && n < kTypedPages)
+				{
+					for (int32 i = 0; i < n; ++i)
+						gPages[i] = typed[i];
+					gPagesLength = n;
+				}
+				break;
+			}
+			default:
+				break;
+		}
+		gAnswered = true;
+	}
+};
+
+CREATE_PMINTERFACE(KFCValueDialogController, kKFCValueDialogControllerImpl)
+
+/** The value dialogs' observer. It stands in for the stock CDialogObserver kDialogBoss carries and calls it first in
+    AutoAttach and Update, last in AutoDetach (KFCQueryDialogObserver's shape) - OK and Cancel are the base's: OK asks
+    the controller to check the values and keep them. Its own: Move's two pairs, each worked out from the other as one
+    is committed, and which pair was typed last; Scale's chain - the two values one while it is linked. It hears the
+    fields its dialog has - the same IDs in every dialog, so a field the question does not follow is heard and let
+    be. */
+class KFCValueDialogObserver : public CDialogObserver
+{
+public:
+	KFCValueDialogObserver(IPMUnknown* boss) : CDialogObserver(boss) {}
+	virtual ~KFCValueDialogObserver() {}
+
+	virtual void AutoAttach()
+	{
+		CDialogObserver::AutoAttach();
+		Hear(true);
+	}
+
+	virtual void AutoDetach()
+	{
+		Hear(false);
+		CDialogObserver::AutoDetach();
+	}
+
+	virtual void Update(const ClassID& theChange, ISubject* theSubject, const PMIID& protocol, void* changedBy)
+	{
+		CDialogObserver::Update(theChange, theSubject, protocol, changedBy);
+		InterfacePtr<IControlView> view(theSubject, UseDefaultIID());
+		InterfacePtr<IDialogController> controller(this, UseDefaultIID());
+		if (view == nil || controller == nil)
+			return;
+		const WidgetID id = view->GetWidgetID();
+		if (protocol == IID_ITEXTCONTROLDATA
+			&& (theChange == kEditBoxKeyStrokeMessage || theChange == kTextChangeStateMessage))
+		{
+			const bool committed = (theChange == kTextChangeStateMessage);
+			if (gAsking == kAskingMove)
+				FollowMove(controller, id, committed);
+			else if (gAsking == kAskingScale)
+				FollowScale(controller, id, committed);
+		}
+		else if (protocol == IID_ITRISTATECONTROLDATA && id == kKFCValueChainWidgetID && theChange == kTrueStateMessage)
+			Mirror(controller, kKFCValueXWidgetID, kKFCValueYWidgetID);		// linked: Scale Y takes Scale X
+	}
+
+private:
+	// The value fields on IID_ITEXTCONTROLDATA - a key stroke (kEditBoxKeyStrokeMessage: KFCUI.fr sets "notify every
+	// key stroke" on Move's and Scale's) and a commit (kTextChangeStateMessage) - and the chain on
+	// IID_ITRISTATECONTROLDATA, those this dialog has.
+	void Hear(bool attach)
+	{
+		InterfacePtr<IPanelControlData> panel(this, UseDefaultIID());
+		if (panel == nil)
+			return;
+		const WidgetID kFields[] = { kKFCValueXWidgetID, kKFCValueYWidgetID, kKFCValueDistanceWidgetID,
+			kKFCValueAngleWidgetID };
+		for (size_t i = 0; i < sizeof(kFields) / sizeof(kFields[0]); ++i)
+		{
+			if (panel->FindWidget(kFields[i]) == nil)
+				continue;
+			if (attach)
+				this->AttachToWidget(kFields[i], IID_ITEXTCONTROLDATA, panel);
+			else
+				this->DetachFromWidget(kFields[i], IID_ITEXTCONTROLDATA, panel);
+		}
+		if (panel->FindWidget(kKFCValueChainWidgetID) == nil)
+			return;
+		if (attach)
+			this->AttachToWidget(kKFCValueChainWidgetID, IID_ITRISTATECONTROLDATA, panel);
+		else
+			this->DetachFromWidget(kKFCValueChainWidgetID, IID_ITRISTATECONTROLDATA, panel);
+	}
+
+	// MOVE: the pair typed is the pair OK answers by, and once it is committed, the other pair is worked out from it. A
+	// pair that does not read (a value refused, a field left blank) leaves the other as it stands.
+	void FollowMove(IDialogController* controller, const WidgetID& id, bool committed)
+	{
+		const bool byDistance = (id == kKFCValueDistanceWidgetID || id == kKFCValueAngleWidgetID);
+		if (!byDistance && id != kKFCValueXWidgetID && id != kKFCValueYWidgetID)
+			return;
+		gMoveByDistance = byDistance;
+		if (!committed)
+			return;
+		double a = 0.0, b = 0.0, c = 0.0, d = 0.0;
+		if (byDistance)
+		{
+			if (!ReadValue(controller, kKFCValueDistanceWidgetID, a)
+				|| !ReadValue(controller, kKFCValueAngleWidgetID, b))
+				return;
+			CartesianOf(a, b, c, d);
+			controller->SetTextValue(kKFCValueXWidgetID, c, nil, kTrue, kFalse);
+			controller->SetTextValue(kKFCValueYWidgetID, d, nil, kTrue, kFalse);
 		}
 		else
 		{
-			std::snprintf(buf, sizeof(buf), "\\u%04X", cp);
-			out += buf;
+			if (!ReadValue(controller, kKFCValueXWidgetID, a) || !ReadValue(controller, kKFCValueYWidgetID, b))
+				return;
+			PolarOf(a, b, c, d);
+			controller->SetTextValue(kKFCValueDistanceWidgetID, c, nil, kTrue, kFalse);
+			controller->SetTextValue(kKFCValueAngleWidgetID, d, nil, kTrue, kFalse);
 		}
 	}
-	return out;
-}
 
-void ReplaceAll(std::string& s, const std::string& from, const std::string& to)
-{
-	for (size_t at = s.find(from); at != std::string::npos; at = s.find(from, at + to.size()))
-		s.replace(at, from.size(), to);
-}
-
-// THE DIALOG'S SCRIPT, one per operation, ASCII (the degree sign is the escape \u00B0). The shared head: the units, the
-// readers and the writers of a value, ASCII-only echoes of what was typed, a field and the button column as InDesign's
-// dialogs lay them out, the display name (NAME - Head writes kKFCDisplayName in); then the operation's own window. Each
-// answers "ok;<x>;<y>;<typed>..." or "cancel".
-// ! ExtendScript is ES3: no nested ?: (memory extendscript-nested-ternary-is-left-associative) - none is written here.
-const char* const kHead = R"JS(
-(function () {
-  var U = { pt: 1, mm: 72 / 25.4, cm: 72 / 2.54, "in": 72, pc: 12, px: 1, q: 72 / 25.4 / 4, h: 72 / 25.4 / 4 };
-  var SHOWN = { pt: "pt", mm: "mm", cm: "cm", "in": "in", pc: "pc", px: "px", q: "Q", h: "H" };
-  var DEG = "\u00B0";
-  var NAME = "@@NAME@@";
-  function unitOf(mu) {
-    try {
-      if (mu == MeasurementUnits.MILLIMETERS) return "mm";
-      if (mu == MeasurementUnits.CENTIMETERS) return "cm";
-      if (mu == MeasurementUnits.INCHES || mu == MeasurementUnits.INCHES_DECIMAL) return "in";
-      if (mu == MeasurementUnits.PICAS) return "pc";
-      if (mu == MeasurementUnits.PIXELS) return "px";
-      if (mu == MeasurementUnits.Q) return "q";
-      if (mu == MeasurementUnits.HA) return "h";
-    } catch (e) {}
-    return "pt";
-  }
-  var hu = "pt", vu = "pt";
-  try { var vp = app.activeDocument.viewPreferences; hu = unitOf(vp.horizontalMeasurementUnits); vu = unitOf(vp.verticalMeasurementUnits); } catch (e) {}
-  function trim(s) { return String(s).replace(/^\s+|\s+$/g, ""); }
-  // A distance in points: a number alone in the ruler's unit, or a number and its unit.
-  function len(text, unit) {
-    var m = trim(text).toLowerCase().match(/^([-+]?(?:\d+\.?\d*|\.\d+))\s*(pt|mm|cm|in|pc|px|q|h)?$/);
-    if (!m) return null;
-    return parseFloat(m[1]) * U[m[2] || unit];
-  }
-  // A number, with the suffix allowed after it (a regular expression's text).
-  function num(text, suffix) {
-    var m = trim(text).toLowerCase().match(new RegExp("^([-+]?(?:\\d+\\.?\\d*|\\.\\d+))\\s*" + suffix + "$"));
-    if (!m) return null;
-    return parseFloat(m[1]);
-  }
-  function angle(text) { return num(text, "(?:" + DEG + "|deg)?"); }
-  // An angle left is written again with the degree sign ("30" becomes "30" and the sign), as InDesign's fields write it.
-  function degrees(e) { var a = angle(e.text); if (a !== null) e.text = fmt(a) + DEG; }
-  // A number written as InDesign's fields write one: three places at most, no trailing zeros.
-  function fmt(n) { var r = Math.round(n * 1000) / 1000; if (Math.abs(r) < 0.0005) r = 0; return String(r); }
-  function lenText(pts, unit) { return fmt(pts / U[unit]) + " " + SHOWN[unit]; }
-  // What was typed last, shown as InDesign shows a value: a number alone with the ruler's unit after it.
-  function shownLen(typed, unit) {
-    var t = trim(typed);
-    if (/^[-+]?(?:\d+\.?\d*|\.\d+)$/.test(t)) return t + " " + SHOWN[unit];
-    return t;
-  }
-  function ascii(s) { s = trim(s); return /^[\x20-\x3a\x3c-\x7e]*$/.test(s) ? s : ""; }
-  // A field row as InDesign's dialogs have it: the label, then the box - rows right-aligned, so the boxes line up.
-  function field(parent, label, text, tip) {
-    var g = parent.add("group");
-    g.add("statictext", undefined, label);
-    var e = g.add("edittext", undefined, text);
-    e.characters = 9;
-    if (tip) { e.helpTip = tip; }
-    return e;
-  }
-  // The window: fields on the left, OK and Cancel stacked on the right. Answers the OK button.
-  function frame(title) {
-    var w = new Window("dialog", title);
-    w.orientation = "row";
-    w.alignChildren = "top";
-    w.spacing = 18;
-    w.margins = [18, 16, 18, 16];
-    return w;
-  }
-  function buttons(w) {
-    var b = w.add("group");
-    b.orientation = "column";
-    b.alignChildren = "fill";
-    b.spacing = 8;
-    var ok = b.add("button", undefined, "OK", { name: "ok" });
-    b.add("button", undefined, "Cancel", { name: "cancel" });
-    return ok;
-  }
-  var answer = "cancel";
-)JS";
-
-const char* const kMove = R"JS(
-  var w = frame(NAME + " - Move");
-  var pos = w.add("panel", undefined, "Position");
-  pos.orientation = "column";
-  pos.alignChildren = "right";
-  pos.margins = [14, 18, 14, 12];
-  var tip = "A number alone is in the document's ruler units (" + SHOWN[hu] + "), or type pt, mm, cm, in, pc, px, Q or H. Right and down are positive; every object moves by the same distance.";
-  var eh = field(pos, "Horizontal:", shownLen("@@H@@", hu), tip);
-  var ev = field(pos, "Vertical:", shownLen("@@V@@", vu), tip);
-  var line = pos.add("panel");
-  line.alignment = "fill";
-  line.minimumSize.height = 1;
-  line.maximumSize.height = 1;
-  var ed = field(pos, "Distance:", "", "How far each object moves - Horizontal and Vertical worked out from it and the Angle.");
-  var ea = field(pos, "Angle:", "", "The direction, counter-clockwise from the right - as InDesign's own Move.");
-  // Each pair worked out from the other when it is left, as InDesign's Move does - and what was typed written again with
-  // its unit ("10" becomes "10 mm"), as InDesign's fields write it.
-  function fromXY() {
-    var x = len(eh.text, hu), y = len(ev.text, vu);
-    if (x === null || y === null) return;
-    eh.text = lenText(x, hu);
-    ev.text = lenText(y, vu);
-    ed.text = lenText(Math.sqrt(x * x + y * y), hu);
-    var a = 0;
-    if (x !== 0 || y !== 0) a = Math.atan2(-y, x) * 180 / Math.PI;
-    ea.text = fmt(a) + DEG;
-  }
-  function fromDA() {
-    var d = len(ed.text, hu), a = angle(ea.text);
-    if (d === null || a === null) return;
-    var r = a * Math.PI / 180;
-    ed.text = lenText(d, hu);
-    ea.text = fmt(a) + DEG;
-    eh.text = lenText(d * Math.cos(r), hu);
-    ev.text = lenText(-d * Math.sin(r), vu);
-  }
-  eh.onChange = fromXY; ev.onChange = fromXY; ed.onChange = fromDA; ea.onChange = fromDA;
-  fromXY();
-  var ok = buttons(w);
-  ok.onClick = function () {
-    var x = len(eh.text, hu), y = len(ev.text, vu);
-    if (x === null || y === null || !isFinite(x) || !isFinite(y)) {
-      alert("Type a distance - a number, or a number and one of pt, mm, cm, in, pc, px, Q, H.");
-      return;
-    }
-    answer = "ok;" + x + ";" + y + ";" + ascii(eh.text) + ";" + ascii(ev.text);
-    w.close(1);
-  };
-  w.show();
-  return answer;
-})();
-)JS";
-
-const char* const kScale = R"JS(
-  var w = frame(NAME + " - Scale");
-  var g = w.add("group");
-  g.orientation = "row";
-  g.alignChildren = "center";
-  g.spacing = 6;
-  var col = g.add("group");
-  col.orientation = "column";
-  col.alignChildren = "right";
-  var tip = "In percent. Each object is scaled about its own centre.";
-  var ex = field(col, "Scale X:", "@@X@@%", tip);
-  var ey = field(col, "Scale Y:", "@@Y@@%", tip);
-  // THE CHAIN, as InDesign's own (the author: "the icon and what it does change as it is pressed" - and "the same as the
-  // official"): linked, the chain whole on its square and the two values one; unlinked, the chain broken and each value
-  // its own; a square under the pointer and a blue ring with the keyboard focus, as InDesign's button draws them - drawn
-  // from that button, photographed in each colour theme and state (kChain).
-@@CHAIN@@
-  var first = null;
-  try { first = chainImage(@@C@@, false, false); } catch (e1) {}
-  var chain = g.add("iconbutton", undefined, first, { style: "toolbutton", toggle: true });
-  chain.preferredSize = [20, 20];
-  chain.value = @@C@@;
-  chain.helpTip = "Constrain proportions for scaling";
-  chain.onDraw = function (state) {
-    try {
-      var hover = false, focus = false;
-      if (state) { hover = state.mouseOver; focus = state.hasFocus; }
-      var img = chainImage(this.value, hover, focus);
-      if (img) this.graphics.drawImage(img, (this.size[0] - 20) / 2, (this.size[1] - 20) / 2);
-    } catch (e2) {}
-  };
-  ex.onChanging = function () { if (chain.value) ey.text = ex.text; };
-  ey.onChanging = function () { if (chain.value) ex.text = ey.text; };
-  chain.onClick = function () { if (chain.value) ey.text = ex.text; };
-  // A value left is written again with its sign ("50" becomes "50%"), as InDesign's fields write it.
-  function percent(e) { var v = num(e.text, "%?"); if (v !== null) e.text = fmt(v) + "%"; }
-  ex.onChange = function () { percent(ex); if (chain.value) ey.text = ex.text; };
-  ey.onChange = function () { percent(ey); if (chain.value) ex.text = ey.text; };
-  var ok = buttons(w);
-  ok.onClick = function () {
-    var x = num(ex.text, "%?"), y = num(ey.text, "%?");
-    if (chain.value) y = x;
-    if (x === null || y === null || x === 0 || y === 0 || !isFinite(x) || !isFinite(y)) {
-      alert("Type a percentage other than 0.");
-      return;
-    }
-    answer = "ok;" + x + ";" + y + ";" + fmt(x) + ";" + fmt(y) + ";" + (chain.value ? "1" : "0");
-    w.close(1);
-  };
-  w.show();
-  return answer;
-})();
-)JS";
-
-// THE CHAIN, for Scale's script (@@CHAIN@@): InDesign's own chain button, drawn as InDesign draws it. Not the SDK's link
-// icons (source/open/icons) nor the app's own PNG resources 296 / 297 (Required/(Application UI Resources)/idrc_PNGA and
-// idrc_PNGD - on screen InDesign draws the button from the SVG ones, idrc_SVGA, which come out a little differently): the
-// button was photographed in InDesign's Scale dialog at the four colour-theme presets in every state it draws - at rest,
-// under the pointer, with the keyboard focus, linked and unlinked - and ONE shape (the square's ring and inside, the two
-// chains: coverage masks) with each theme's colours was fitted to those photographs; drawn back through this script's own
-// arithmetic, every one of them comes out within 2 greys. The script builds the state's PNG from them when it is first
-// drawn. ! Two of InDesign's drawings were left out: its first drawing after a theme change, still in the old theme's chain
-// colour until the button is pressed, and the button held down (not photographed - drawn as under the pointer).
-// Made by work/note-scripts/2026-10-17-kfc-object-special/chain_js2.py (photographs: theme_states.ps1; fit: chain_model2.py).
-const char* const kChain = R"JS(
-  // The button's shape, 20 x 20, one hex pair (0..255) a pixel: the square's ring and its inside (one shape for every
-  // state), the chain whole and the chain broken.
-  var CH_RING = "20a0ffffffffffffffffffffffffffffffffa820b07f01ffffffffffffffffffffffffffff016dd0ff01ffffffffffffffffffffffffffffffff01ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff01ffffffffffffffffffffffffffffffff06ffd04702ffffffffffffffffffffffffffff0832e740e0ffffffffffffffffffffffffffffffffe749";
-  var CH_FILL = "0001000000000000000000000000000000000200000ea2ffffffffffffffffffffffffffffa6200100afffffffffffffffffffffffffffffffffcf0000ffffffffffffffffffffffffffffffffffff0000ffffffffffffffffffffffffffffffffffff0000ffffffffffffffffffffffffffffffffffff0000ffffffffffffffffffffffffffffffffffff0000ffffffffffffffffffffffffffffffffffff0000ffffffffffffffffffffffffffffffffffff0000ffffffffffffffffffffffffffffffffffff0000ffffffffffffffffffffffffffffffffffff0000ffffffffffffffffffffffffffffffffffff0000ffffffffffffffffffffffffffffffffffff0000ffffffffffffffffffffffffffffffffffff0000ffffffffffffffffffffffffffffffffffff0000ffffffffffffffffffffffffffffffffffff0000ffffffffffffffffffffffffffffffffffff0000cfffffffffffffffffffffffffffffffffe4000133e2fffffffffffffffffffffffffffff159000202000000000000000000000000000000000000";
-  var CH_LINK = "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004fb8b85f00000000000000000000000000000058ffd0d0ff760000000000000000000000000000c1c70000a7df0000000000000000000000000000ff7f00007fff0000000000000000000000000000b80f40207fff000000000000000000000000000018d0ff7f7fff0000000000000000000000000000a7f75f207fff0000000000000000000000000000f0980018d0e70000000000000000000000000000ff7f7fffff5f0000000000000000000000000000ff7f407f40470000000000000000000000000000ff7f000067ff0000000000000000000000000000d8a0000089f0000000000000000000000000000089ff9089f7a0000000000000000000000000000008a0ffffa708000000000000000000000000000000000f0f00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
-  var CH_BREAK = "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000050b6c060000000000000000000000039e72f0050ffd0d0ff780000000000000000000008b6ef2f60c60000a7d6000000000000000000000008b6ef2f1000007fff00000000000000000000000008b6ef2f00007fff0000000000000000000000000008b6ef2f007fff000000000000000000000000000008b6ef2f50ff0000000000000000000000000000a710b6ef2f500000000000000000000000000000ff7808b6ef2f0000000000000000000000000000ff7f0008b6ef2f00000000000000000000000000ff7f000008b6ef2f000000000000000000000000d69f00004910b6ef2f000000000000000000000078ff8f87f78f08b6ef0800000000000000000000009fffffc01000084900000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
-  // InDesign's colours for it at the four colour-theme presets (uiBrightnessPreference): the chain; the linked square's ring
-  // and inside; the unlinked one's under the pointer; the inside with the keyboard focus; the focus ring.
-  var CH_THEMES = [
-    { at: 0, glyph: 0xb6, lring: 0x3e, lin: 0x1f, hring: 0x47, hin: 0x29, fin: 0x2a, blue: [0x46, 0xa0, 0xf5] },
-    { at: 0.5, glyph: 0xc2, lring: 0x56, lin: 0x30, hring: 0x59, hin: 0x3d, fin: 0x45, blue: [0x46, 0xa0, 0xf5] },
-    { at: 0.51, glyph: 0x40, lring: 0x83, lin: 0x96, hring: 0xb2, hin: 0xdc, fin: 0xdf, blue: [0x0f, 0x67, 0xd2] },
-    { at: 1, glyph: 0x53, lring: 0xa7, lin: 0xbd, hring: 0xbd, hin: 0xf9, fin: 0xfb, blue: [0x14, 0x76, 0xe6] }
-  ];
-  // The colours for the theme now. Between two presets on one side (dark 0..0.50, light 0.51..1) they are taken in
-  // proportion - a guess: InDesign's own between its presets were not measured.
-  function chainColours() {
-    var b = 0.5;
-    try { b = app.generalPreferences.uiBrightnessPreference; } catch (e0) {}
-    var lo = CH_THEMES[0], hi = CH_THEMES[1];
-    if (b > 0.5) { lo = CH_THEMES[2]; hi = CH_THEMES[3]; }
-    var t = (b - lo.at) / (hi.at - lo.at);
-    if (t < 0) t = 0;
-    if (t > 1) t = 1;
-    var out = {}, k;
-    for (k in lo) { if (k != "at" && k != "blue") out[k] = lo[k] + (hi[k] - lo[k]) * t; }
-    out.blue = [lo.blue[0] + (hi.blue[0] - lo.blue[0]) * t, lo.blue[1] + (hi.blue[1] - lo.blue[1]) * t, lo.blue[2] + (hi.blue[2] - lo.blue[2]) * t];
-    return out;
-  }
-  // A PNG of 20 x 20 straight RGBA (px: 1600 numbers), for ScriptUI.newImage: zlib's stored block - no compression - and
-  // each chunk's CRC-32.
-  var CH_CRC = [];
-  (function () {
-    for (var n = 0; n < 256; n++) {
-      var c = n;
-      for (var k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
-      CH_CRC[n] = c;
-    }
-  })();
-  function chU32(n) { return String.fromCharCode((n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255); }
-  function chChunk(type, data) {
-    var s = type + data, c = -1;
-    for (var i = 0; i < s.length; i++) c = CH_CRC[(c ^ s.charCodeAt(i)) & 255] ^ (c >>> 8);
-    return chU32(data.length) + s + chU32((c ^ -1) >>> 0);
-  }
-  function chPng(px) {
-    var raw = "", a = 1, b = 0, i;
-    for (var y = 0; y < 20; y++) {
-      raw += "\x00";
-      for (var x = 0; x < 80; x++) raw += String.fromCharCode(px[y * 80 + x]);
-    }
-    for (i = 0; i < raw.length; i++) { a = (a + raw.charCodeAt(i)) % 65521; b = (b + a) % 65521; }
-    var n = raw.length;
-    var z = "\x78\x01\x01" + String.fromCharCode(n & 255, (n >>> 8) & 255, ~n & 255, (~n >>> 8) & 255) + raw + chU32(((b << 16) | a) >>> 0);
-    return "\x89PNG\r\n\x1A\n" + chChunk("IHDR", chU32(20) + chU32(20) + "\x08\x06\x00\x00\x00") + chChunk("IDAT", z) + chChunk("IEND", "");
-  }
-  // The button as InDesign draws it in this state, made once: linked - the square (grey ring) and the chain whole;
-  // unlinked - the chain broken, a square only under the pointer or with the focus; the keyboard focus - a blue ring.
-  var CH_IMG = {};
-  function chainImage(linked, hover, focus) {
-    var key = (linked ? "L" : "U") + (hover ? "H" : "") + (focus ? "F" : "");
-    if (CH_IMG[key]) return CH_IMG[key];
-    var c = chainColours(), ring = null, inside = 0;
-    if (focus) ring = c.blue;
-    else if (linked) ring = [c.lring, c.lring, c.lring];
-    else if (hover) ring = [c.hring, c.hring, c.hring];
-    if (linked) inside = c.lin;
-    else if (hover) inside = c.hin;
-    else if (focus) inside = c.fin;
-    var glyph = CH_BREAK;
-    if (linked) glyph = CH_LINK;
-    var px = [];
-    for (var i = 0; i < 400; i++) {
-      var r = 0, g = 0, bl = 0, al = 0, o;
-      if (ring) {
-        o = parseInt(CH_RING.substr(i * 2, 2), 16) / 255;
-        r = ring[0] * o + r * (1 - o); g = ring[1] * o + g * (1 - o); bl = ring[2] * o + bl * (1 - o); al = o + al * (1 - o);
-        o = parseInt(CH_FILL.substr(i * 2, 2), 16) / 255;
-        r = inside * o + r * (1 - o); g = inside * o + g * (1 - o); bl = inside * o + bl * (1 - o); al = o + al * (1 - o);
-      }
-      o = parseInt(glyph.substr(i * 2, 2), 16) / 255;
-      r = c.glyph * o + r * (1 - o); g = c.glyph * o + g * (1 - o); bl = c.glyph * o + bl * (1 - o); al = o + al * (1 - o);
-      if (al > 0) px.push(Math.floor(r / al + 0.5), Math.floor(g / al + 0.5), Math.floor(bl / al + 0.5), Math.floor(al * 255 + 0.5));
-      else px.push(0, 0, 0, 0);
-    }
-    CH_IMG[key] = ScriptUI.newImage(chPng(px));
-    return CH_IMG[key];
-  }
-)JS";
-
-const char* const kRotate = R"JS(
-  var w = frame(NAME + " - Rotate");
-  var col = w.add("group");
-  col.orientation = "column";
-  col.alignChildren = "right";
-  var ea = field(col, "Angle:", "@@A@@" + DEG, "Counter-clockwise is positive, as in InDesign's own Rotate. Each object turns about its own centre.");
-  ea.onChange = function () { degrees(ea); };
-  var ok = buttons(w);
-  ok.onClick = function () {
-    var a = angle(ea.text);
-    if (a === null || !isFinite(a)) { alert("Type an angle in degrees."); return; }
-    answer = "ok;" + a + ";0;" + fmt(a);
-    w.close(1);
-  };
-  w.show();
-  return answer;
-})();
-)JS";
-
-const char* const kShear = R"JS(
-  var w = frame(NAME + " - Shear");
-  var col = w.add("group");
-  col.orientation = "column";
-  col.alignChildren = "left";
-  col.spacing = 10;
-  var ea = field(col, "Shear Angle:", "@@A@@" + DEG, "Between -90 and 90 degrees. Each object is sheared about its own centre.");
-  ea.onChange = function () { degrees(ea); };
-  var axis = col.add("panel", undefined, "Axis");
-  axis.orientation = "column";
-  axis.alignChildren = "left";
-  axis.alignment = "fill";
-  axis.margins = [14, 18, 14, 10];
-  var rh = axis.add("radiobutton", undefined, "Horizontal");
-  var rv = axis.add("radiobutton", undefined, "Vertical");
-  rv.value = @@V@@;
-  rh.value = !rv.value;
-  var ok = buttons(w);
-  ok.onClick = function () {
-    var a = angle(ea.text);
-    if (a === null || a <= -90 || a >= 90) { alert("Type an angle between -90 and 90 degrees."); return; }
-    answer = "ok;" + a + ";" + (rv.value ? "1" : "0") + ";" + fmt(a);
-    w.close(1);
-  };
-  w.show();
-  return answer;
-})();
-)JS";
-
-const char* const kPages = R"JS(
-  var w = frame(NAME + " - Narrow Down");
-  var col = w.add("group");
-  col.orientation = "column";
-  col.alignChildren = "left";
-  col.spacing = 6;
-  var e = field(col, "Pages:", "@@P@@", "As the Print dialog's Range: 1-5, 8 - a section's pages by its name (Sec1:3), absolute numbers with + (+3). Each document reads it by its own page numbers.");
-  e.characters = 18;
-  col.add("statictext", undefined, "e.g. 1-5, 8");
-  var ok = buttons(w);
-  e.active = true;
-  // A lone surrogate (a pasted text can carry one) does not reach the plug-in whole - its UTF-8 throws or turns into
-  // another character - so a text holding one is refused as an empty one is.
-  function lone(s) {
-    for (var i = 0; i < s.length; i++) {
-      var c = s.charCodeAt(i);
-      if (c >= 0xD800 && c <= 0xDBFF) {
-        var d = s.charCodeAt(i + 1);
-        if (d >= 0xDC00 && d <= 0xDFFF) { i++; continue; }
-        return true;
-      }
-      if (c >= 0xDC00 && c <= 0xDFFF) return true;
-    }
-    return false;
-  }
-  ok.onClick = function () {
-    var t = trim(e.text);
-    if (t === "" || lone(t)) { alert("Type the pages - for example 1-5, 8."); return; }
-    answer = "ok;" + t;
-    w.close(1);
-  };
-  w.show();
-  return answer;
-})();
-)JS";
-
-// The answer's fields, split at ';'.
-std::vector<std::string> Fields(const std::string& answer)
-{
-	std::vector<std::string> out;
-	size_t from = 0;
-	for (size_t at = answer.find(';'); ; at = answer.find(';', from))
+	// SCALE, WHILE THE CHAIN IS LINKED: the two values one - each key stroke's text copied to the other field as it is
+	// typed, and once committed, the value written there as that field writes it.
+	void FollowScale(IDialogController* controller, const WidgetID& id, bool committed)
 	{
-		out.push_back(answer.substr(from, at == std::string::npos ? std::string::npos : at - from));
-		if (at == std::string::npos)
-			break;
-		from = at + 1;
+		if ((id != kKFCValueXWidgetID && id != kKFCValueYWidgetID)
+			|| controller->GetTriStateControlData(kKFCValueChainWidgetID) != ITriStateControlData::kSelected)
+			return;
+		const WidgetID other = (id == kKFCValueXWidgetID) ? kKFCValueYWidgetID : kKFCValueXWidgetID;
+		if (committed)
+		{
+			Mirror(controller, id, other);
+			return;
+		}
+		PMString typed(controller->GetTextControlData(id));
+		typed.SetTranslatable(kFalse);
+		controller->SetTextControlData(other, typed, nil, kTrue, kFalse);
 	}
-	return out;
-}
-
-// The scripts' shared head (kHead), the display name written in (kKFCDisplayName - the one definition of the name).
-std::string Head()
-{
-	std::string head(kHead);
-	ReplaceAll(head, "@@NAME@@", JsLiteral(kKFCDisplayName));
-	return head;
-}
-
-// A DIALOG'S SCRIPT RUN THROUGH THE PLUG-IN'S OWN ENGINE (KFCHowTo's - "KFC", out of the user's
-// #targetengine sessions), its answer read back: the script handed as ScriptData with no arguments, its value the
-// result, an error its string (Adobe's own code calls RunScriptInEngine nowhere -
-// docs/ai-notes/api-official-examples.md); no alert of the runner's own - the caller says what went wrong, in its own
-// words.
-enum DialogRun
-{
-	kDialogAnswered = 0,
-	kDialogNoEngine,		// no script engine to run it in
-	kDialogFailed,			// it ran into an error, or answered nothing that reads as text
-	kDialogBroken			// it answered a text holding a lone surrogate (HasLoneSurrogate)
 };
 
-// A LONE SURROGATE in a text, its UTF-16 read as it stands: GetUTF8String takes a lone high one together with the
-// character after it (or, at the end, makes something else of it), and SetUTF8String throws on a lone low one's UTF-8
-// (measured - KT's u8trip probe, branch exp/2026-10-23-u8trip) - so no UTF-8 is made of a text holding one.
-bool HasLoneSurrogate(const PMString& s)
-{
-	int32 n = 0;
-	const UTF16TextChar* u = s.GrabUTF16Buffer(&n);
-	for (int32 i = 0; u != nil && i < n; ++i)
-	{
-		if (u[i] >= 0xD800 && u[i] <= 0xDBFF)
-		{
-			if (i + 1 < n && u[i + 1] >= 0xDC00 && u[i + 1] <= 0xDFFF)
-			{
-				++i;
-				continue;
-			}
-			return true;
-		}
-		if (u[i] >= 0xDC00 && u[i] <= 0xDFFF)
-			return true;
-	}
-	return false;
-}
+CREATE_PMINTERFACE(KFCValueDialogObserver, kKFCValueDialogObserverImpl)
 
-DialogRun RunDialog(const std::string& js, std::string& outAnswer)
+namespace
 {
-	Utils<IExtendScriptUtils> esUtils;
-	if (!esUtils.Exists())
-		return kDialogNoEngine;
-	PMString scriptText;
-	scriptText.SetTranslatable(kFalse);
-	scriptText.SetUTF8String(js);
-	ScriptData script;
-	script.SetPMString(scriptText);
-	ScriptRecordData arguments;
-	ScriptData result;
-	PMString errorString;
-	const ErrorCode ran = esUtils->RunScriptInEngine("KFC", script, arguments, result, errorString,
-		kFalse /*showErrorAlert*/, kFalse /*invokeDebugger*/);
-	PMString answerText;
-	if (ran != kSuccess || !errorString.IsEmpty() || result.GetType() != ScriptData::s_string
-		|| result.GetPMString(answerText) != kSuccess)
-		return kDialogFailed;
-	if (HasLoneSurrogate(answerText))
-		return kDialogBroken;
-	outAnswer = answerText.GetUTF8String();
-	return kDialogAnswered;
+// ASKED: the question's dialog made and opened - Open() waits until it is dismissed - and whether OK kept its values.
+// kNotShown = no dialog (no dialog manager, the view not made, or a value dialog standing already).
+enum AskResult { kAnswered, kCancelled, kNotShown };
+
+AskResult Ask(Asking asking, PMString* pagesAnswer)
+{
+	if (gAsking != kAskingNone)
+		return kNotShown;
+	ISession* session = GetExecutionContextSession();
+	InterfacePtr<IApplication> application((session != nil) ? session->QueryApplication() : nil);
+	InterfacePtr<IDialogMgr> dialogMgr(application, UseDefaultIID());
+	if (dialogMgr == nil)
+		return kNotShown;
+	RsrcSpec dialogSpec
+	(
+		LocaleSetting::GetLocale(),		// Locale index
+		kKFCUIPluginID,					// This plug-in
+		kViewRsrcType,
+		ViewOf(asking),					// The question's view
+		kTrue							// Initially visible
+	);
+	gAsking = asking;					// before the dialog is made: the controller fills it by the question
+	gAnswered = false;
+	gPagesAnswer = pagesAnswer;
+	// Modal and movable, as InDesign's own. The pointer is not held: the dialog takes care of itself as it closes.
+	IDialog* dialog = dialogMgr->CreateNewDialog(dialogSpec, IDialog::kMovableModal);
+	if (dialog != nil)
+		dialog->Open();
+	const bool answered = gAnswered;
+	gAsking = kAskingNone;
+	gPagesAnswer = nil;
+	if (dialog == nil)
+		return kNotShown;
+	return answered ? kAnswered : kCancelled;
 }
 }	// anonymous namespace
 
@@ -592,31 +533,17 @@ bool KFCSpecialDialogs::AskPageRange(PMString& io, PMString& outWhy)
 {
 	outWhy.Clear();
 	outWhy.SetTranslatable(kFalse);
-	std::string js(Head());
-	std::string body(kPages);
-	ReplaceAll(body, "@@P@@", JsLiteral(gPages));
-	js += body;
-	std::string answer;
-	const DialogRun run = RunDialog(js, answer);
-	if (run != kDialogAnswered)
+	PMString answer;
+	const AskResult asked = Ask(kAskingPages, &answer);
+	if (asked == kNotShown)
 	{
-		if (run == kDialogNoEngine)
-			outWhy.Append("Narrow Down: the dialog could not be shown (no script engine) - nothing was searched.");
-		else if (run == kDialogBroken)
-			outWhy.Append("Narrow Down: the pages typed hold a broken character - nothing was searched.");
-		else
-			outWhy.Append("Narrow Down: the dialog could not be shown - nothing was searched.");
+		outWhy.Append("Narrow Down: the dialog could not be shown - nothing was searched.");
 		return false;
 	}
-	// "ok;<the range>" - the range is everything after the first ';' (it holds no ';' of its own that matters: a range is
-	// separated by commas).
-	if (answer.compare(0, 3, "ok;") != 0)
+	if (asked == kCancelled)
 		return false;		// Cancel: nothing searched, nothing said
-	const std::string typed(answer.substr(3));
-	io.SetUTF8String(typed);
+	io = answer;
 	io.SetTranslatable(kFalse);
-	if (typed.size() < kTypedPages)
-		std::snprintf(gPages, kTypedPages, "%s", typed.c_str());
 	return !io.IsEmpty();
 }
 
@@ -624,89 +551,41 @@ bool KFCSpecialDialogs::AskTransformValues(int32 op, KFCSpecialParams& io, PMStr
 {
 	outWhy.Clear();
 	outWhy.SetTranslatable(kFalse);
-	std::string js(Head());
+	Asking asking = kAskingNone;
 	switch (op)
 	{
-		case kKFCSpecialMove:
-		{
-			std::string body(kMove);
-			ReplaceAll(body, "@@H@@", JsLiteral(gMoveH));
-			ReplaceAll(body, "@@V@@", JsLiteral(gMoveV));
-			js += body;
-			break;
-		}
-		case kKFCSpecialScale:
-		{
-			std::string body(kScale);
-			ReplaceAll(body, "@@X@@", JsLiteral(gScaleX));
-			ReplaceAll(body, "@@Y@@", JsLiteral(gScaleY));
-			ReplaceAll(body, "@@C@@", gScaleConstrain ? "true" : "false");
-			ReplaceAll(body, "@@CHAIN@@", kChain);
-			js += body;
-			break;
-		}
-		case kKFCSpecialRotate:
-		{
-			std::string body(kRotate);
-			ReplaceAll(body, "@@A@@", JsLiteral(gRotate));
-			js += body;
-			break;
-		}
-		case kKFCSpecialShear:
-		{
-			std::string body(kShear);
-			ReplaceAll(body, "@@A@@", JsLiteral(gShear));
-			ReplaceAll(body, "@@V@@", gShearVertical ? "true" : "false");
-			js += body;
-			break;
-		}
-		default:
-			return false;
+		case kKFCSpecialMove:	asking = kAskingMove; break;
+		case kKFCSpecialScale:	asking = kAskingScale; break;
+		case kKFCSpecialRotate:	asking = kAskingRotate; break;
+		case kKFCSpecialShear:	asking = kAskingShear; break;
+		default:				return false;
 	}
-
-	std::string answer;
-	const DialogRun run = RunDialog(js, answer);
-	if (run != kDialogAnswered)
+	const AskResult asked = Ask(asking, nil);
+	if (asked == kNotShown)
 	{
 		outWhy = OpName(op);
-		outWhy.Append(run == kDialogNoEngine
-			? ": the dialog could not be shown (no script engine) - nothing was changed."
-			: ": the dialog could not be shown - nothing was changed.");
+		outWhy.Append(": the dialog could not be shown - nothing was changed.");
 		outWhy.SetTranslatable(kFalse);
 		return false;
 	}
-	const std::vector<std::string> f = Fields(answer);
-	if (f.size() < 3 || f[0] != "ok")
+	if (asked == kCancelled)
 		return false;		// Cancel: nothing written, nothing said
-	io.x = std::strtod(f[1].c_str(), nil);
-	io.y = std::strtod(f[2].c_str(), nil);
-	// NOT FINITE - refused (the script's own OK asks isFinite; an answer of "Infinity" reads back as inf, and no
-	// transform can be made of it - KFCObjectSpecial's doors measure what a finite one would do).
+	switch (asking)
+	{
+		case kAskingMove:	io.x = gMoveX; io.y = gMoveY; break;
+		case kAskingScale:	io.x = gScaleX; io.y = gScaleY; break;
+		case kAskingRotate:	io.x = gRotate; io.y = 0.0; break;
+		case kAskingShear:	io.x = gShear; io.y = gShearVertical ? 1.0 : 0.0; break;
+		default:			break;
+	}
+	// NOT FINITE - refused: no transform can be made of it (KFCObjectSpecial's doors measure what a finite one does).
+	// The fields' ranges (KFCUI.fr) keep every value finite: this says so where it is relied on.
 	if (!std::isfinite(io.x) || !std::isfinite(io.y))
 	{
 		outWhy = OpName(op);
 		outWhy.Append(": the values are too large - nothing was changed.");
 		outWhy.SetTranslatable(kFalse);
 		return false;
-	}
-	// What was typed, kept for the next one (an empty echo - not ASCII - keeps the last).
-	switch (op)
-	{
-		case kKFCSpecialMove:
-			if (f.size() >= 5) { Keep(gMoveH, f[3]); Keep(gMoveV, f[4]); }
-			break;
-		case kKFCSpecialScale:
-			if (f.size() >= 6) { Keep(gScaleX, f[3]); Keep(gScaleY, f[4]); gScaleConstrain = (f[5] == "1"); }
-			break;
-		case kKFCSpecialRotate:
-			if (f.size() >= 4) Keep(gRotate, f[3]);
-			break;
-		case kKFCSpecialShear:
-			if (f.size() >= 4) Keep(gShear, f[3]);
-			gShearVertical = (io.y > 0.5);
-			break;
-		default:
-			break;
 	}
 	return true;
 }

@@ -94,3 +94,7 @@ REGISTER_PMINTERFACE(KFCQueryScopeObserver, kKFCQueryScopeObserverImpl)
 // (KFCAlertAnswer.cpp).
 REGISTER_PMINTERFACE(KFCAlertAnswer, kKFCAlertAnswerImpl)
 REGISTER_PMINTERFACE(KFCAlertAnswerService, kKFCAlertAnswerServiceImpl)
+// The value dialogs - Move..., Scale..., Rotate..., Shear... and Narrow Down's Pages...: their controller and observer
+// (KFCSpecialDialogs.cpp).
+REGISTER_PMINTERFACE(KFCValueDialogController, kKFCValueDialogControllerImpl)
+REGISTER_PMINTERFACE(KFCValueDialogObserver, kKFCValueDialogObserverImpl)

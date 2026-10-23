@@ -449,8 +449,8 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	 * InDesign's hidden-spread alert answered OK inside a walk of ours (KFCAlertAnswer.cpp - the spec map's OBJ-23):
 	 * the alert handler, registered under kAlertHandlerService - "If alerts are set to not show, rather than showing an
 	 * alert we ask the service registry for a list of IAlertHandlers" (IAlertHandler.h). No parent class: a service is
-	 * found by the ServiceID its provider states, so there is nothing to inherit (KIDMCP's alert handler was declared
-	 * so).
+	 * found by the ServiceID its provider states, so there is nothing to inherit.
+	 *
 	 */
 	Class
 	{
@@ -497,6 +497,23 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 			IID_IDIALOGCONTROLLER, kKFCQueryDialogControllerImpl,
 			IID_IOBSERVER, kKFCQueryDialogObserverImpl,
 			IID_IKFCQUERYSCOPEOBSERVER, kKFCQueryScopeObserverImpl,
+		}
+	},
+
+	/*
+	 * The value dialogs - Move..., Scale..., Rotate..., Shear... (an object row's Special Operations > Transform) and
+	 * Narrow Down > Pages... (docs/superpowers/specs/2026-10-23-kfc-native-value-dialogs-design.md): one boss for the
+	 * five, each its own view below. The controller fills the dialog from what was answered last, checks it on OK
+	 * and keeps it; the observer stands in for the stock CDialogObserver kDialogBoss carries and calls it, so OK,
+	 * Cancel and the close box keep working (KFCSpecialDialogs.cpp).
+	 */
+	Class
+	{
+		kKFCValueDialogBoss,
+		kDialogBoss,
+		{
+			IID_IDIALOGCONTROLLER, kKFCValueDialogControllerImpl,
+			IID_IOBSERVER, kKFCValueDialogObserverImpl,
 		}
 	},
 
@@ -1948,6 +1965,11 @@ type KFCQueryListWidget(kViewRsrcType) : TreeViewWidget(ClassID = kKFCQueryListW
 type KFCQueryRowWidget(kViewRsrcType) : PrimaryResourcePanelWidget(ClassID = kKFCQueryRowWidgetBoss) { };
 type KFCQueryRowTextWidget(kViewRsrcType) : InfoStaticTextWidget(ClassID = kKFCQueryRowTextWidgetBoss) { };
 type KFCQueryFixedTextWidget(kViewRsrcType) : EVEStaticTextWidget(ClassID = kKFCQueryFixedTextWidgetBoss) { };
+// The value dialogs (KFCSpecialDialogs.cpp): DialogBoss with WidgetEveInfo, as the query dialog - EVE lays them out.
+type KFCValueDialogWidget(kViewRsrcType) : DialogBoss(ClassID = kKFCValueDialogBoss)
+{
+	WidgetEveInfo;
+};
 
 /*
  * The illustration's artwork, compiled into the plug-in. The same image is given to the normal
@@ -2266,6 +2288,50 @@ resource LocaleIndex (kKFCQueryRowRsrcID)
 	kViewRsrcType,
 	{
 		kWildFS, k_Wild, kKFCQueryRowRsrcID + index_enUS
+	}
+};
+
+/*
+ * THE VALUE DIALOGS (KFCSpecialDialogs.cpp) - one wild locale row each, as the query dialog's: every word comes from
+ * the string table.
+ */
+resource LocaleIndex (kKFCMoveDialogRsrcID)
+{
+	kViewRsrcType,
+	{
+		kWildFS, k_Wild, kKFCMoveDialogRsrcID + index_enUS
+	}
+};
+
+resource LocaleIndex (kKFCScaleDialogRsrcID)
+{
+	kViewRsrcType,
+	{
+		kWildFS, k_Wild, kKFCScaleDialogRsrcID + index_enUS
+	}
+};
+
+resource LocaleIndex (kKFCRotateDialogRsrcID)
+{
+	kViewRsrcType,
+	{
+		kWildFS, k_Wild, kKFCRotateDialogRsrcID + index_enUS
+	}
+};
+
+resource LocaleIndex (kKFCShearDialogRsrcID)
+{
+	kViewRsrcType,
+	{
+		kWildFS, k_Wild, kKFCShearDialogRsrcID + index_enUS
+	}
+};
+
+resource LocaleIndex (kKFCPagesDialogRsrcID)
+{
+	kViewRsrcType,
+	{
+		kWildFS, k_Wild, kKFCPagesDialogRsrcID + index_enUS
 	}
 };
 
@@ -2592,6 +2658,765 @@ resource KFCQueryDialogWidget (kKFCQueryDialogRsrcID + index_enUS)
 	},
 
 	kEVEArrangeChildrenInColumn | kEVERegularMargin,
+};
+
+/*
+ * THE VALUE DIALOGS' VIEWS (KFCSpecialDialogs.cpp - the design's section 3:
+ * docs/superpowers/specs/2026-10-23-kfc-native-value-dialogs-design.md): InDesign's own fields, laid out as InDesign's
+ * Move, Scale, Rotate and Shear - the fields on the left, OK and Cancel stacked on the right. Each field's range is its
+ * own check on OK, refused in InDesign's words: a distance in points (a value beyond the pasteboard is refused by the
+ * model - KFCObjectSpecial), an angle in degrees (Shear's between -90 and 90), a percentage. Move's and Scale's fields
+ * tell of every key stroke: the observer follows which of Move's pairs was typed, and copies a Scale value to the
+ * other while the chain is linked.
+ */
+resource KFCValueDialogWidget (kKFCMoveDialogRsrcID + index_enUS)
+{
+	__FILE__, __LINE__,
+	kKFCValueDialogWidgetID,		// WidgetID
+	kPMRsrcID_None,					// RsrcID
+	kBindNone,						// Binding
+	Frame(0, 0, 300, 160)			// Frame (l,t,r,b) - not the window's size: EVE sizes it from the children
+	kTrue, kTrue,					// Visible, Enabled
+	kKFCValueMoveDialogKey,		// Dialog name - "... - Move"
+	{
+		EVEGroupPanelWidget
+		(
+			kInvalidWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+			kBindNone,							// Frame binding
+			Frame(0, 0, 0, 0)					// Frame (EVE sizes it)
+			kTrue, kTrue,						// Visible, Enabled
+			kKFCValuePositionLabelWidgetID,		// Header widget - the group's title
+			kEVEAlignLeft | kEVELargeSpaceAfter | kEVEArrangeChildrenInColumn | kEVERegularMargin,
+			{
+				EVEStaticTextWidget
+				(
+					kKFCValuePositionLabelWidgetID,	// WidgetId - the header
+					kSysStaticTextPMRsrcId,		// RsrcId
+					kBindNone,					// Frame binding
+					Frame(0, 0, 0, 0)			// Frame
+					kTrue, kTrue, kAlignLeft,	// Visible, Enabled, Alignment
+					kDontEllipsize, kTrue,		// Ellipsize style, Convert ampersands
+					kKFCValuePositionKey,		// "Position"
+					kInvalidWidgetID			// Associated control (none)
+					kEVERegularSpaceAfter,
+				),
+				EVEGenericPanelWidget
+				(
+					kInvalidWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+					kBindNone,							// Frame binding
+					Frame(0, 0, 0, 0)					// Frame (EVE sizes it)
+					kTrue, kTrue,						// Visible, Enabled
+					kEVEAlignLeft | kEVERegularSpaceAfter | kEVEArrangeChildrenInRow,
+					{
+						EVEStaticTextWidget
+						(
+							kInvalidWidgetID,			// WidgetId
+							kSysStaticTextPMRsrcId,		// RsrcId
+							kBindNone,					// Frame binding
+							Frame(0, 0, 72, 0)			// Frame - the column's one width
+							kTrue, kTrue, kAlignRight,	// Visible, Enabled, Alignment
+							kDontEllipsize, kTrue,		// Ellipsize style, Convert ampersands
+							kKFCValueHorizontalKey,		// "Horizontal:"
+							kKFCValueXWidgetID			// Associated control - the field
+							kEVESmallSpaceAfter,
+						),
+						EVEXMeasureEditBoxWidget
+						(
+							kKFCValueXWidgetID,			// WidgetId
+							kSysEditBoxPMRsrcId,		// RsrcId
+							kBindNone,					// Frame binding
+							Frame(0, 0, kKFCValueFieldWidth, 0)	// Frame - a height of 0: the field's own
+							kTrue, kTrue,				// Visible, Enabled
+							kInvalidWidgetID,			// Nudge control (none, as in InDesign's own)
+							1.0, 10.0,					// Small / large nudge (the arrow keys, with Shift)
+							0,							// Max chars (no limit)
+							kFalse,						// Read only
+							kTrue,						// Notify every key stroke - which pair was typed
+							kTrue,						// Range checking
+							kFalse,						// Blank entry allowed
+							100000.0, -100000.0,		// Upper / lower limits
+							"0",						// Initial text (the controller fills it)
+							kEVENoSpaceAfter,
+						),
+					}
+				),
+				EVEGenericPanelWidget
+				(
+					kInvalidWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+					kBindNone,							// Frame binding
+					Frame(0, 0, 0, 0)					// Frame (EVE sizes it)
+					kTrue, kTrue,						// Visible, Enabled
+					kEVEAlignLeft | kEVERegularSpaceAfter | kEVEArrangeChildrenInRow,
+					{
+						EVEStaticTextWidget
+						(
+							kInvalidWidgetID,			// WidgetId
+							kSysStaticTextPMRsrcId,		// RsrcId
+							kBindNone,					// Frame binding
+							Frame(0, 0, 72, 0)			// Frame - the column's one width
+							kTrue, kTrue, kAlignRight,	// Visible, Enabled, Alignment
+							kDontEllipsize, kTrue,		// Ellipsize style, Convert ampersands
+							kKFCValueVerticalKey,		// "Vertical:"
+							kKFCValueYWidgetID			// Associated control - the field
+							kEVESmallSpaceAfter,
+						),
+						EVEYMeasureEditBoxWidget
+						(
+							kKFCValueYWidgetID,			// WidgetId
+							kSysEditBoxPMRsrcId,		// RsrcId
+							kBindNone,					// Frame binding
+							Frame(0, 0, kKFCValueFieldWidth, 0)	// Frame - a height of 0: the field's own
+							kTrue, kTrue,				// Visible, Enabled
+							kInvalidWidgetID,			// Nudge control (none, as in InDesign's own)
+							1.0, 10.0,					// Small / large nudge (the arrow keys, with Shift)
+							0,							// Max chars (no limit)
+							kFalse,						// Read only
+							kTrue,						// Notify every key stroke - which pair was typed
+							kTrue,						// Range checking
+							kFalse,						// Blank entry allowed
+							100000.0, -100000.0,		// Upper / lower limits
+							"0",						// Initial text (the controller fills it)
+							kEVENoSpaceAfter,
+						),
+					}
+				),
+				EVESeparatorWidget
+				(
+					kInvalidWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+					kBindNone,							// Frame binding
+					Frame(0, 0, 159, 1)					// Frame - the rows' width, one line high (the product's)
+					kTrue, kTrue,						// Visible, Enabled
+					kEVEAlignLeft | kEVERegularSpaceAfter,
+				),
+				EVEGenericPanelWidget
+				(
+					kInvalidWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+					kBindNone,							// Frame binding
+					Frame(0, 0, 0, 0)					// Frame (EVE sizes it)
+					kTrue, kTrue,						// Visible, Enabled
+					kEVEAlignLeft | kEVERegularSpaceAfter | kEVEArrangeChildrenInRow,
+					{
+						EVEStaticTextWidget
+						(
+							kInvalidWidgetID,			// WidgetId
+							kSysStaticTextPMRsrcId,		// RsrcId
+							kBindNone,					// Frame binding
+							Frame(0, 0, 72, 0)			// Frame - the column's one width
+							kTrue, kTrue, kAlignRight,	// Visible, Enabled, Alignment
+							kDontEllipsize, kTrue,		// Ellipsize style, Convert ampersands
+							kKFCValueDistanceKey,		// "Distance:"
+							kKFCValueDistanceWidgetID	// Associated control - the field
+							kEVESmallSpaceAfter,
+						),
+						EVEXMeasureEditBoxWidget
+						(
+							kKFCValueDistanceWidgetID,	// WidgetId
+							kSysEditBoxPMRsrcId,		// RsrcId
+							kBindNone,					// Frame binding
+							Frame(0, 0, kKFCValueFieldWidth, 0)	// Frame - a height of 0: the field's own
+							kTrue, kTrue,				// Visible, Enabled
+							kInvalidWidgetID,			// Nudge control (none, as in InDesign's own)
+							1.0, 10.0,					// Small / large nudge (the arrow keys, with Shift)
+							0,							// Max chars (no limit)
+							kFalse,						// Read only
+							kTrue,						// Notify every key stroke - which pair was typed
+							kTrue,						// Range checking
+							kFalse,						// Blank entry allowed
+							100000.0, -100000.0,		// Upper / lower limits
+							"0",						// Initial text (the controller fills it)
+							kEVENoSpaceAfter,
+						),
+					}
+				),
+				EVEGenericPanelWidget
+				(
+					kInvalidWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+					kBindNone,							// Frame binding
+					Frame(0, 0, 0, 0)					// Frame (EVE sizes it)
+					kTrue, kTrue,						// Visible, Enabled
+					kEVEAlignLeft | kEVENoSpaceAfter | kEVEArrangeChildrenInRow,
+					{
+						EVEStaticTextWidget
+						(
+							kInvalidWidgetID,			// WidgetId
+							kSysStaticTextPMRsrcId,		// RsrcId
+							kBindNone,					// Frame binding
+							Frame(0, 0, 72, 0)			// Frame - the column's one width
+							kTrue, kTrue, kAlignRight,	// Visible, Enabled, Alignment
+							kDontEllipsize, kTrue,		// Ellipsize style, Convert ampersands
+							kKFCValueAngleKey,			// "Angle:"
+							kKFCValueAngleWidgetID		// Associated control - the field
+							kEVESmallSpaceAfter,
+						),
+						EVEAngleEditBoxWidget
+						(
+							kKFCValueAngleWidgetID,		// WidgetId
+							kSysEditBoxPMRsrcId,		// RsrcId
+							kBindNone,					// Frame binding
+							Frame(0, 0, kKFCValueFieldWidth, 0)	// Frame - a height of 0: the field's own
+							kTrue, kTrue,				// Visible, Enabled
+							kInvalidWidgetID,			// Nudge control (none, as in InDesign's own)
+							1.0, 10.0,					// Small / large nudge (the arrow keys, with Shift)
+							0,							// Max chars (no limit)
+							kFalse,						// Read only
+							kTrue,						// Notify every key stroke - which pair was typed
+							kTrue,						// Range checking
+							kFalse,						// Blank entry allowed
+							360.0, -360.0,		// Upper / lower limits
+							"0",						// Initial text (the controller fills it)
+							kEVENoSpaceAfter,
+						),
+					}
+				),
+			}
+		),
+		// ----- OK and Cancel, stacked on the right, as InDesign's own -----
+		EVEGenericPanelWidget
+		(
+			kInvalidWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+			kBindNone,							// Frame binding
+			Frame(0, 0, 0, 0)					// Frame (EVE sizes it)
+			kTrue, kTrue,						// Visible, Enabled
+			kEVEAlignLeft | kEVENoSpaceAfter | kEVEArrangeChildrenInColumn,
+			{
+				EVEDefaultButtonWidget
+				(
+					kOKButtonWidgetID,			// WidgetID - the dialog's default button: Enter
+					kSysButtonPMRsrcId,			// RsrcID
+					kBindNone,					// Binding
+					Frame(0, 0, 0, 0)			// Frame (EVE sizes it)
+					kTrue, kTrue,				// Visible, Enabled
+					kKFCValueOKKey,				// "OK"
+					kEVERegularSpaceAfter,
+				),
+				EVECancelButtonWidget
+				(
+					kCancelButton_WidgetID,		// WidgetID - the dialog's cancel button: Escape
+					kSysButtonPMRsrcId,			// RsrcID
+					kBindNone,					// Binding
+					Frame(0, 0, 0, 0)			// Frame (EVE sizes it)
+					kTrue, kTrue,				// Visible, Enabled
+					kKFCValueCancelKey,			// "Cancel"
+					kTrue,						// "Reset" with Alt, as InDesign's own: the fields filled again
+					kEVENoSpaceAfter,
+				),
+			}
+		),
+	},
+
+	kEVEArrangeChildrenInRow | kEVERegularMargin,
+};
+
+resource KFCValueDialogWidget (kKFCScaleDialogRsrcID + index_enUS)
+{
+	__FILE__, __LINE__,
+	kKFCValueDialogWidgetID,		// WidgetID
+	kPMRsrcID_None,					// RsrcID
+	kBindNone,						// Binding
+	Frame(0, 0, 300, 160)			// Frame (l,t,r,b) - not the window's size: EVE sizes it from the children
+	kTrue, kTrue,					// Visible, Enabled
+	kKFCValueScaleDialogKey,		// Dialog name - "... - Scale"
+	{
+		EVEGenericPanelWidget
+		(
+			kInvalidWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+			kBindNone,							// Frame binding
+			Frame(0, 0, 0, 0)					// Frame (EVE sizes it)
+			kTrue, kTrue,						// Visible, Enabled
+			kEVEAlignLeft | kEVELargeSpaceAfter | kEVEArrangeChildrenInRow,
+			{
+				EVEGenericPanelWidget
+				(
+					kInvalidWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+					kBindNone,							// Frame binding
+					Frame(0, 0, 0, 0)					// Frame (EVE sizes it)
+					kTrue, kTrue,						// Visible, Enabled
+					kEVEAlignLeft | kEVESmallSpaceAfter | kEVEArrangeChildrenInColumn,
+					{
+						EVEGenericPanelWidget
+						(
+							kInvalidWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+							kBindNone,							// Frame binding
+							Frame(0, 0, 0, 0)					// Frame (EVE sizes it)
+							kTrue, kTrue,						// Visible, Enabled
+							kEVEAlignLeft | kEVERegularSpaceAfter | kEVEArrangeChildrenInRow,
+							{
+								EVEStaticTextWidget
+								(
+									kInvalidWidgetID,			// WidgetId
+									kSysStaticTextPMRsrcId,		// RsrcId
+									kBindNone,					// Frame binding
+									Frame(0, 0, 54, 0)			// Frame - the column's one width
+									kTrue, kTrue, kAlignRight,	// Visible, Enabled, Alignment
+									kDontEllipsize, kTrue,		// Ellipsize style, Convert ampersands
+									kKFCValueScaleXKey,			// "Scale X:"
+									kKFCValueXWidgetID			// Associated control - the field
+									kEVESmallSpaceAfter,
+								),
+								EVEPercentageEditBoxWidget
+								(
+									kKFCValueXWidgetID,			// WidgetId
+									kSysEditBoxPMRsrcId,		// RsrcId
+									kBindNone,					// Frame binding
+									Frame(0, 0, kKFCValueFieldWidth, 0)	// Frame - a height of 0: the field's own
+									kTrue, kTrue,				// Visible, Enabled
+									kInvalidWidgetID,			// Nudge control (none, as in InDesign's own)
+									1.0, 10.0,					// Small / large nudge (the arrow keys, with Shift)
+									0,							// Max chars (no limit)
+									kFalse,						// Read only
+									kTrue,						// Notify every key stroke - the chain copies it
+									kTrue,						// Range checking
+									kFalse,						// Blank entry allowed
+									100000.0, -100000.0,		// Upper / lower limits
+									"0",						// Initial text (the controller fills it)
+									kEVENoSpaceAfter,
+								),
+							}
+						),
+						EVEGenericPanelWidget
+						(
+							kInvalidWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+							kBindNone,							// Frame binding
+							Frame(0, 0, 0, 0)					// Frame (EVE sizes it)
+							kTrue, kTrue,						// Visible, Enabled
+							kEVEAlignLeft | kEVENoSpaceAfter | kEVEArrangeChildrenInRow,
+							{
+								EVEStaticTextWidget
+								(
+									kInvalidWidgetID,			// WidgetId
+									kSysStaticTextPMRsrcId,		// RsrcId
+									kBindNone,					// Frame binding
+									Frame(0, 0, 54, 0)			// Frame - the column's one width
+									kTrue, kTrue, kAlignRight,	// Visible, Enabled, Alignment
+									kDontEllipsize, kTrue,		// Ellipsize style, Convert ampersands
+									kKFCValueScaleYKey,			// "Scale Y:"
+									kKFCValueYWidgetID			// Associated control - the field
+									kEVESmallSpaceAfter,
+								),
+								EVEPercentageEditBoxWidget
+								(
+									kKFCValueYWidgetID,			// WidgetId
+									kSysEditBoxPMRsrcId,		// RsrcId
+									kBindNone,					// Frame binding
+									Frame(0, 0, kKFCValueFieldWidth, 0)	// Frame - a height of 0: the field's own
+									kTrue, kTrue,				// Visible, Enabled
+									kInvalidWidgetID,			// Nudge control (none, as in InDesign's own)
+									1.0, 10.0,					// Small / large nudge (the arrow keys, with Shift)
+									0,							// Max chars (no limit)
+									kFalse,						// Read only
+									kTrue,						// Notify every key stroke - the chain copies it
+									kTrue,						// Range checking
+									kFalse,						// Blank entry allowed
+									100000.0, -100000.0,		// Upper / lower limits
+									"0",						// Initial text (the controller fills it)
+									kEVENoSpaceAfter,
+								),
+							}
+						),
+					}
+				),
+				EVEGenericPanelWidget
+				(
+					kInvalidWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+					kBindNone,							// Frame binding
+					Frame(0, 0, 20, 47)					// Frame - the two rows' height
+					kTrue, kTrue,						// Visible, Enabled
+					kEVEAlignLeft | kEVENoSpaceAfter | kEVEDontArrangeChildren,
+					{
+						EVEChainButtonWidget
+						(
+							kKFCValueChainWidgetID, kChainIconConstrained, kApplicationRsrcPluginID,	// Id, RsrcId
+							kBindNone,					// Frame binding
+							Frame(0, 13, 20, 33)		// Frame - InDesign's chain button's size, between the rows
+							kTrue, kTrue,				// Visible, Enabled
+							kADBEIconSuiteButtonType,	// Centering, look, well
+							kEVENoSpaceAfter,
+						),
+					}
+				),
+			}
+		),
+		// ----- OK and Cancel, stacked on the right, as InDesign's own -----
+		EVEGenericPanelWidget
+		(
+			kInvalidWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+			kBindNone,							// Frame binding
+			Frame(0, 0, 0, 0)					// Frame (EVE sizes it)
+			kTrue, kTrue,						// Visible, Enabled
+			kEVEAlignLeft | kEVENoSpaceAfter | kEVEArrangeChildrenInColumn,
+			{
+				EVEDefaultButtonWidget
+				(
+					kOKButtonWidgetID,			// WidgetID - the dialog's default button: Enter
+					kSysButtonPMRsrcId,			// RsrcID
+					kBindNone,					// Binding
+					Frame(0, 0, 0, 0)			// Frame (EVE sizes it)
+					kTrue, kTrue,				// Visible, Enabled
+					kKFCValueOKKey,				// "OK"
+					kEVERegularSpaceAfter,
+				),
+				EVECancelButtonWidget
+				(
+					kCancelButton_WidgetID,		// WidgetID - the dialog's cancel button: Escape
+					kSysButtonPMRsrcId,			// RsrcID
+					kBindNone,					// Binding
+					Frame(0, 0, 0, 0)			// Frame (EVE sizes it)
+					kTrue, kTrue,				// Visible, Enabled
+					kKFCValueCancelKey,			// "Cancel"
+					kTrue,						// "Reset" with Alt, as InDesign's own: the fields filled again
+					kEVENoSpaceAfter,
+				),
+			}
+		),
+	},
+
+	kEVEArrangeChildrenInRow | kEVERegularMargin,
+};
+
+resource KFCValueDialogWidget (kKFCRotateDialogRsrcID + index_enUS)
+{
+	__FILE__, __LINE__,
+	kKFCValueDialogWidgetID,		// WidgetID
+	kPMRsrcID_None,					// RsrcID
+	kBindNone,						// Binding
+	Frame(0, 0, 300, 160)			// Frame (l,t,r,b) - not the window's size: EVE sizes it from the children
+	kTrue, kTrue,					// Visible, Enabled
+	kKFCValueRotateDialogKey,		// Dialog name - "... - Rotate"
+	{
+		EVEGenericPanelWidget
+		(
+			kInvalidWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+			kBindNone,							// Frame binding
+			Frame(0, 0, 0, 0)					// Frame (EVE sizes it)
+			kTrue, kTrue,						// Visible, Enabled
+			kEVEAlignLeft | kEVELargeSpaceAfter | kEVEArrangeChildrenInRow,
+			{
+				EVEStaticTextWidget
+				(
+					kInvalidWidgetID,			// WidgetId
+					kSysStaticTextPMRsrcId,		// RsrcId
+					kBindNone,					// Frame binding
+					Frame(0, 0, 0, 0)			// Frame (EVE sizes it - the only label in its column)
+					kTrue, kTrue, kAlignRight,	// Visible, Enabled, Alignment
+					kDontEllipsize, kTrue,		// Ellipsize style, Convert ampersands
+					kKFCValueAngleKey,			// "Angle:"
+					kKFCValueAngleWidgetID		// Associated control - the field
+					kEVESmallSpaceAfter,
+				),
+				EVEAngleEditBoxWidget
+				(
+					kKFCValueAngleWidgetID,		// WidgetId
+					kSysEditBoxPMRsrcId,		// RsrcId
+					kBindNone,					// Frame binding
+					Frame(0, 0, kKFCValueFieldWidth, 0)	// Frame - a height of 0: the field's own
+					kTrue, kTrue,				// Visible, Enabled
+					kInvalidWidgetID,			// Nudge control (none, as in InDesign's own)
+					1.0, 10.0,					// Small / large nudge (the arrow keys, with Shift)
+					0,							// Max chars (no limit)
+					kFalse,						// Read only
+					kFalse,						// Notify every key stroke
+					kTrue,						// Range checking
+					kFalse,						// Blank entry allowed
+					360.0, -360.0,		// Upper / lower limits
+					"0",						// Initial text (the controller fills it)
+					kEVENoSpaceAfter,
+				),
+			}
+		),
+		// ----- OK and Cancel, stacked on the right, as InDesign's own -----
+		EVEGenericPanelWidget
+		(
+			kInvalidWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+			kBindNone,							// Frame binding
+			Frame(0, 0, 0, 0)					// Frame (EVE sizes it)
+			kTrue, kTrue,						// Visible, Enabled
+			kEVEAlignLeft | kEVENoSpaceAfter | kEVEArrangeChildrenInColumn,
+			{
+				EVEDefaultButtonWidget
+				(
+					kOKButtonWidgetID,			// WidgetID - the dialog's default button: Enter
+					kSysButtonPMRsrcId,			// RsrcID
+					kBindNone,					// Binding
+					Frame(0, 0, 0, 0)			// Frame (EVE sizes it)
+					kTrue, kTrue,				// Visible, Enabled
+					kKFCValueOKKey,				// "OK"
+					kEVERegularSpaceAfter,
+				),
+				EVECancelButtonWidget
+				(
+					kCancelButton_WidgetID,		// WidgetID - the dialog's cancel button: Escape
+					kSysButtonPMRsrcId,			// RsrcID
+					kBindNone,					// Binding
+					Frame(0, 0, 0, 0)			// Frame (EVE sizes it)
+					kTrue, kTrue,				// Visible, Enabled
+					kKFCValueCancelKey,			// "Cancel"
+					kTrue,						// "Reset" with Alt, as InDesign's own: the fields filled again
+					kEVENoSpaceAfter,
+				),
+			}
+		),
+	},
+
+	kEVEArrangeChildrenInRow | kEVERegularMargin,
+};
+
+resource KFCValueDialogWidget (kKFCShearDialogRsrcID + index_enUS)
+{
+	__FILE__, __LINE__,
+	kKFCValueDialogWidgetID,		// WidgetID
+	kPMRsrcID_None,					// RsrcID
+	kBindNone,						// Binding
+	Frame(0, 0, 300, 160)			// Frame (l,t,r,b) - not the window's size: EVE sizes it from the children
+	kTrue, kTrue,					// Visible, Enabled
+	kKFCValueShearDialogKey,		// Dialog name - "... - Shear"
+	{
+		EVEGenericPanelWidget
+		(
+			kInvalidWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+			kBindNone,							// Frame binding
+			Frame(0, 0, 0, 0)					// Frame (EVE sizes it)
+			kTrue, kTrue,						// Visible, Enabled
+			kEVEAlignLeft | kEVELargeSpaceAfter | kEVEArrangeChildrenInColumn,
+			{
+				EVEGenericPanelWidget
+				(
+					kInvalidWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+					kBindNone,							// Frame binding
+					Frame(0, 0, 0, 0)					// Frame (EVE sizes it)
+					kTrue, kTrue,						// Visible, Enabled
+					kEVEAlignLeft | kEVERegularSpaceAfter | kEVEArrangeChildrenInRow,
+					{
+						EVEStaticTextWidget
+						(
+							kInvalidWidgetID,			// WidgetId
+							kSysStaticTextPMRsrcId,		// RsrcId
+							kBindNone,					// Frame binding
+							Frame(0, 0, 0, 0)			// Frame (EVE sizes it - the only label in its column)
+							kTrue, kTrue, kAlignRight,	// Visible, Enabled, Alignment
+							kDontEllipsize, kTrue,		// Ellipsize style, Convert ampersands
+							kKFCValueShearAngleKey,		// "Shear Angle:"
+							kKFCValueAngleWidgetID		// Associated control - the field
+							kEVESmallSpaceAfter,
+						),
+						EVEAngleEditBoxWidget
+						(
+							kKFCValueAngleWidgetID,		// WidgetId
+							kSysEditBoxPMRsrcId,		// RsrcId
+							kBindNone,					// Frame binding
+							Frame(0, 0, kKFCValueFieldWidth, 0)	// Frame - a height of 0: the field's own
+							kTrue, kTrue,				// Visible, Enabled
+							kInvalidWidgetID,			// Nudge control (none, as in InDesign's own)
+							1.0, 10.0,					// Small / large nudge (the arrow keys, with Shift)
+							0,							// Max chars (no limit)
+							kFalse,						// Read only
+							kFalse,						// Notify every key stroke
+							kTrue,						// Range checking
+							kFalse,						// Blank entry allowed
+							89.999, -89.999,		// Upper / lower limits
+							"0",						// Initial text (the controller fills it)
+							kEVENoSpaceAfter,
+						),
+					}
+				),
+				EVEGroupPanelWidget
+				(
+					kInvalidWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+					kBindNone,							// Frame binding
+					Frame(0, 0, 0, 0)					// Frame (EVE sizes it)
+					kTrue, kTrue,						// Visible, Enabled
+					kKFCValueAxisLabelWidgetID,		// Header widget - the group's title
+					kEVEAlignLeft | kEVENoSpaceAfter | kEVEArrangeChildrenInColumn | kEVERegularMargin,
+					{
+						EVEStaticTextWidget
+						(
+							kKFCValueAxisLabelWidgetID,	// WidgetId - the header
+							kSysStaticTextPMRsrcId,		// RsrcId
+							kBindNone,					// Frame binding
+							Frame(0, 0, 0, 0)			// Frame
+							kTrue, kTrue, kAlignLeft,	// Visible, Enabled, Alignment
+							kDontEllipsize, kTrue,		// Ellipsize style, Convert ampersands
+							kKFCValueAxisKey,		// "Axis"
+							kInvalidWidgetID			// Associated control (none)
+							kEVERegularSpaceAfter,
+						),
+						EVEClusterPanelWidget
+						(
+							kInvalidWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+							kBindNone,							// Frame binding
+							Frame(0, 0, 0, 0)					// Frame (EVE sizes it)
+							kTrue, kTrue,						// Visible, Enabled
+							kEVEAlignLeft | kEVENoSpaceAfter | kEVEArrangeChildrenInColumn,
+							{
+								EVERadioButtonWidget
+								(
+									kKFCValueAxisHorizontalWidgetID,	// WidgetId
+									kSysRadioButtonPMRsrcId,			// RsrcId
+									kBindNone,							// Frame binding
+									Frame(0, 0, 0, 0)					// Frame (EVE sizes it)
+									kTrue, kTrue,						// Visible, Enabled
+									kKFCValueAxisHorizontalKey,		// "Horizontal"
+									kEVERegularSpaceAfter,
+								),
+								EVERadioButtonWidget
+								(
+									kKFCValueAxisVerticalWidgetID,		// WidgetId
+									kSysRadioButtonPMRsrcId,			// RsrcId
+									kBindNone,							// Frame binding
+									Frame(0, 0, 0, 0)					// Frame (EVE sizes it)
+									kTrue, kTrue,						// Visible, Enabled
+									kKFCValueAxisVerticalKey,			// "Vertical"
+									kEVENoSpaceAfter,
+								),
+							}
+						),
+					}
+				),
+			}
+		),
+		// ----- OK and Cancel, stacked on the right, as InDesign's own -----
+		EVEGenericPanelWidget
+		(
+			kInvalidWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+			kBindNone,							// Frame binding
+			Frame(0, 0, 0, 0)					// Frame (EVE sizes it)
+			kTrue, kTrue,						// Visible, Enabled
+			kEVEAlignLeft | kEVENoSpaceAfter | kEVEArrangeChildrenInColumn,
+			{
+				EVEDefaultButtonWidget
+				(
+					kOKButtonWidgetID,			// WidgetID - the dialog's default button: Enter
+					kSysButtonPMRsrcId,			// RsrcID
+					kBindNone,					// Binding
+					Frame(0, 0, 0, 0)			// Frame (EVE sizes it)
+					kTrue, kTrue,				// Visible, Enabled
+					kKFCValueOKKey,				// "OK"
+					kEVERegularSpaceAfter,
+				),
+				EVECancelButtonWidget
+				(
+					kCancelButton_WidgetID,		// WidgetID - the dialog's cancel button: Escape
+					kSysButtonPMRsrcId,			// RsrcID
+					kBindNone,					// Binding
+					Frame(0, 0, 0, 0)			// Frame (EVE sizes it)
+					kTrue, kTrue,				// Visible, Enabled
+					kKFCValueCancelKey,			// "Cancel"
+					kTrue,						// "Reset" with Alt, as InDesign's own: the fields filled again
+					kEVENoSpaceAfter,
+				),
+			}
+		),
+	},
+
+	kEVEArrangeChildrenInRow | kEVERegularMargin,
+};
+
+resource KFCValueDialogWidget (kKFCPagesDialogRsrcID + index_enUS)
+{
+	__FILE__, __LINE__,
+	kKFCValueDialogWidgetID,		// WidgetID
+	kPMRsrcID_None,					// RsrcID
+	kBindNone,						// Binding
+	Frame(0, 0, 300, 160)			// Frame (l,t,r,b) - not the window's size: EVE sizes it from the children
+	kTrue, kTrue,					// Visible, Enabled
+	kKFCValuePagesDialogKey,		// Dialog name - "... - Narrow Down"
+	{
+		EVEGenericPanelWidget
+		(
+			kInvalidWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+			kBindNone,							// Frame binding
+			Frame(0, 0, 0, 0)					// Frame (EVE sizes it)
+			kTrue, kTrue,						// Visible, Enabled
+			kEVEAlignLeft | kEVELargeSpaceAfter | kEVEArrangeChildrenInColumn,
+			{
+				EVEGenericPanelWidget
+				(
+					kInvalidWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+					kBindNone,							// Frame binding
+					Frame(0, 0, 0, 0)					// Frame (EVE sizes it)
+					kTrue, kTrue,						// Visible, Enabled
+					kEVEAlignLeft | kEVESmallSpaceAfter | kEVEArrangeChildrenInRow,
+					{
+						EVEStaticTextWidget
+						(
+							kInvalidWidgetID,			// WidgetId
+							kSysStaticTextPMRsrcId,		// RsrcId
+							kBindNone,					// Frame binding
+							Frame(0, 0, 0, 0)			// Frame (EVE sizes it - the only label in its column)
+							kTrue, kTrue, kAlignRight,	// Visible, Enabled, Alignment
+							kDontEllipsize, kTrue,		// Ellipsize style, Convert ampersands
+							kKFCValuePagesKey,			// "Pages:"
+							kKFCValuePagesWidgetID		// Associated control - the field
+							kEVESmallSpaceAfter,
+						),
+						EVETextEditBoxWidget
+						(
+							kKFCValuePagesWidgetID,		// WidgetId
+							kSysEditBoxPMRsrcId,		// RsrcId
+							kBindNone,					// Frame binding
+							Frame(0, 0, 170, 0)	// Frame - a height of 0: the field's own
+							kTrue, kTrue,				// Visible, Enabled
+							kInvalidWidgetID,			// Nudge control (none, as in InDesign's own)
+							1.0, 10.0,					// Small / large nudge (the arrow keys, with Shift)
+							0,							// Max chars (no limit)
+							kFalse,						// Read only
+							kFalse,						// Notify every key stroke
+							kFalse,						// Range checking
+							kTrue,						// Blank entry allowed
+							0, 0,		// Upper / lower limits
+							"",						// Initial text (the controller fills it)
+							kEVENoSpaceAfter,
+						),
+					}
+				),
+				EVEStaticTextWidget
+				(
+					kInvalidWidgetID,			// WidgetId
+					kSysStaticTextPMRsrcId,		// RsrcId
+					kBindNone,					// Frame binding
+					Frame(0, 0, 0, 0)			// Frame (EVE sizes it)
+					kTrue, kTrue, kAlignLeft,	// Visible, Enabled, Alignment
+					kDontEllipsize, kTrue,		// Ellipsize style, Convert ampersands
+					kKFCValuePagesHintKey,		// "e.g. 1-5, 8"
+					kInvalidWidgetID			// Associated control (none)
+					kEVENoSpaceAfter,
+				),
+			}
+		),
+		// ----- OK and Cancel, stacked on the right, as InDesign's own -----
+		EVEGenericPanelWidget
+		(
+			kInvalidWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+			kBindNone,							// Frame binding
+			Frame(0, 0, 0, 0)					// Frame (EVE sizes it)
+			kTrue, kTrue,						// Visible, Enabled
+			kEVEAlignLeft | kEVENoSpaceAfter | kEVEArrangeChildrenInColumn,
+			{
+				EVEDefaultButtonWidget
+				(
+					kOKButtonWidgetID,			// WidgetID - the dialog's default button: Enter
+					kSysButtonPMRsrcId,			// RsrcID
+					kBindNone,					// Binding
+					Frame(0, 0, 0, 0)			// Frame (EVE sizes it)
+					kTrue, kTrue,				// Visible, Enabled
+					kKFCValueOKKey,				// "OK"
+					kEVERegularSpaceAfter,
+				),
+				EVECancelButtonWidget
+				(
+					kCancelButton_WidgetID,		// WidgetID - the dialog's cancel button: Escape
+					kSysButtonPMRsrcId,			// RsrcID
+					kBindNone,					// Binding
+					Frame(0, 0, 0, 0)			// Frame (EVE sizes it)
+					kTrue, kTrue,				// Visible, Enabled
+					kKFCValueCancelKey,			// "Cancel"
+					kTrue,						// "Reset" with Alt, as InDesign's own: the fields filled again
+					kEVENoSpaceAfter,
+				),
+			}
+		),
+	},
+
+	kEVEArrangeChildrenInRow | kEVERegularMargin,
 };
 #endif // __ODFRC__
 

@@ -142,6 +142,30 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCQuerySaveOrderTitleKey,		"Save Query Order",
                 kKFCQueryLoadOrderTitleKey,		"Load Query Order",
                 kKFCQueryOrderFileTypeKey,		"KFC Query Order",
+                // The value dialogs (KFCSpecialDialogs.cpp): the titles, the fields' labels as InDesign's English
+                // dialogs have them, OK and Cancel, and what an OK refused says.
+                kKFCValueMoveDialogKey,			kKFCDisplayName " - Move",
+                kKFCValueScaleDialogKey,		kKFCDisplayName " - Scale",
+                kKFCValueRotateDialogKey,		kKFCDisplayName " - Rotate",
+                kKFCValueShearDialogKey,		kKFCDisplayName " - Shear",
+                kKFCValuePagesDialogKey,		kKFCDisplayName " - Narrow Down",
+                kKFCValuePositionKey,			"Position",
+                kKFCValueHorizontalKey,			"Horizontal:",
+                kKFCValueVerticalKey,			"Vertical:",
+                kKFCValueDistanceKey,			"Distance:",
+                kKFCValueAngleKey,				"Angle:",
+                kKFCValueScaleXKey,				"Scale X:",
+                kKFCValueScaleYKey,				"Scale Y:",
+                kKFCValueShearAngleKey,			"Shear Angle:",
+                kKFCValueAxisKey,				"Axis",
+                kKFCValueAxisHorizontalKey,		"Horizontal",
+                kKFCValueAxisVerticalKey,		"Vertical",
+                kKFCValuePagesKey,				"Pages:",
+                kKFCValuePagesHintKey,			"e.g. 1-5, 8",
+                kKFCValueOKKey,					"OK",
+                kKFCValueCancelKey,				"Cancel",
+                kKFCValueNotZeroKey,			"Type a percentage other than 0.",
+                kKFCValueNoPagesKey,			"Type the pages - for example 1-5, 8.",
                 // The message line as a freshly opened panel shows it - the plug-in has no search
                 // box of its own, so the first thing to say is where the query is typed.
                 // Read through InitialMessage (KFCResultListWidgetMgr.cpp) whenever the message line falls
