@@ -48,8 +48,9 @@ namespace KFCResultModel { struct Hit; struct SearchedRange; }	// FileChapter
     lookarounds read other text backwards). The one exception is the replace's writing walk for a GREP
     query holding ^ (KFCBackwardSearchScope, below). For the life of the object the session's search
     direction is forward; the user's own setting is put back by the destructor, whatever way the run
-    ends (kSearchBackwardsSilentCmdBoss, measured). Create it OUTSIDE any command sequence: an aborted
-    sequence would take the switch back and leave the restore to set it a second time. */
+    ends (kSearchBackwardsSilentCmdBoss, measured) - over an error the run left standing as well. Create
+    it OUTSIDE any command sequence: an aborted sequence would take the switch back and leave the restore
+    to set it a second time. */
 class KFCForwardSearchScope
 {
 public:

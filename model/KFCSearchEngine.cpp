@@ -58,7 +58,7 @@
 #include "CTextEnum.h"				// Text::GlyphID / kInvalidGlyphID (the Glyph tab's query)
 #include "TextChar.h"				// kTextChar_Ellipse - the mark a cut segment carries (SplitLineWithScanner)
 #include "WalkerScopeOptions.h"
-#include "ErrorUtils.h"				// PMSetGlobalErrorCode
+#include "ErrorUtils.h"				// PMSetGlobalErrorCode; GlobalErrorStatePreserver - PutSessionDirectionBack
 #include "KFCProgressBar.h"		// the search's progress + cancel (both scopes) - the bar is the UI half's
 #include "CmdUtils.h"
 #include "CreateObject.h"
@@ -1773,6 +1773,17 @@ bool TurnSessionDirection(bool16 backwards, int32& outMode)
 		return false;
 	return SetSessionSearchBackwards(backwards, mode);
 }
+
+// THE USER'S DIRECTION PUT BACK (the two scopes' destructors), however the run ended - over an error it left standing
+// too: a command processed while the global error code is set is InDesign's protective shutdown (CmdUtils.h,
+// ProcessCommand), so the run's error state is kept aside for the one command and stands again after it, the run's
+// own (KFCQueryScope::PutBack's pair).
+void PutSessionDirectionBack(bool16 backwards, int32 mode)
+{
+	GlobalErrorStatePreserver runErrorState;
+	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+	SetSessionSearchBackwards(backwards, static_cast<IFindChangeOptions::SearchMode>(mode));
+}
 }	// anonymous namespace
 
 KFCForwardSearchScope::KFCForwardSearchScope() : fRestore(false), fMode(0)
@@ -1783,7 +1794,7 @@ KFCForwardSearchScope::KFCForwardSearchScope() : fRestore(false), fMode(0)
 KFCForwardSearchScope::~KFCForwardSearchScope()
 {
 	if (fRestore)
-		SetSessionSearchBackwards(kTrue, static_cast<IFindChangeOptions::SearchMode>(fMode));
+		PutSessionDirectionBack(kTrue, fMode);
 }
 
 KFCBackwardSearchScope::KFCBackwardSearchScope(bool wanted) : fRestore(false), fMode(0)
@@ -1795,7 +1806,7 @@ KFCBackwardSearchScope::KFCBackwardSearchScope(bool wanted) : fRestore(false), f
 KFCBackwardSearchScope::~KFCBackwardSearchScope()
 {
 	if (fRestore)
-		SetSessionSearchBackwards(kFalse, static_cast<IFindChangeOptions::SearchMode>(fMode));
+		PutSessionDirectionBack(kFalse, fMode);
 }
 
 namespace

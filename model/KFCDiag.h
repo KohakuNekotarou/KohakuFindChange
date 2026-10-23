@@ -177,6 +177,10 @@
 //    query-scope-refuse  KFCQueryScope (a row operation under its list's query - the tier switch v2) refuses once every
 //                check has passed: the refusal's whole path - the sequence aborted, Find/Change put back, nothing done -
 //                tried on demand (the v2 spec's section 5, item 7). One-shot.
+//    putback-over-error  KFCQueryScope::Finish leaves an error standing for its put-back of Find/Change to meet - what
+//                an operation that failed without clearing would leave - and clears it after: the QSCOPE line says
+//                whether Find/Change was put back over it and whether the error stood again (hd-sw-case-putback-error).
+//                One-shot.
 //    copy-fail  KFCCopyStore::Take keeps no copy: a row's Replace goes through all the same, and that row's
 //                Restore from Copy says no copy could be kept
 //                (docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md C3, R16)

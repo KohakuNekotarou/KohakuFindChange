@@ -56,7 +56,8 @@ public:
 
 private:
 	/** Find/Change as it was: the list's tab first when it is another (Apply turns to it), then the tab that was on screen
-	    - each checked (Matches). False = outWhat names what did not read back. */
+	    - each checked (Matches). False = outWhat names what did not read back. Over an error the operation left
+	    standing as well: kept aside for the put-back, it stands again after it. */
 	bool PutBack(PMString& outWhat);
 
 	bool			fStated;		// the list's query is in Find/Change now - put back by Finish or the destructor

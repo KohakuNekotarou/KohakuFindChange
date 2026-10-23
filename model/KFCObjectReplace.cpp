@@ -495,6 +495,10 @@ public:
 	{
 		if (!fStated)
 			return;
+		// Over an error the write left standing as well: kept aside for the put-back, standing again after it
+		// (KFCQueryScope::PutBack says why).
+		GlobalErrorStatePreserver writeErrorState;
+		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 		PMString what;
 		bool back = KFCQueryCopier::Apply(fBeforeObject, what) && KFCQueryCopier::Matches(fBeforeObject, what);
 		if (back && fBeforeNow.mode != fBeforeObject.mode)

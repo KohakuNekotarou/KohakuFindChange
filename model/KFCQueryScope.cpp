@@ -16,7 +16,7 @@
 
 // General includes:
 #include "CmdUtils.h"				// BeginAbortableCmdSeq / EndCommandSequence / AbortCommandSequence
-#include "ErrorUtils.h"				// the error a refusal's abort leaves, cleared before any command
+#include "ErrorUtils.h"				// the error a refusal's abort leaves cleared; an operation's kept aside (PutBack)
 #include <memory>					// std::make_shared - the list's copy taken again (R3)
 
 // Project includes:
@@ -238,7 +238,26 @@ void KFCQueryScope::Finish(bool wrote, PMString& ioStatus)
 		// list's name - and that Find/Change is as it was (the spec's section 2-2), or loudly that it is not.
 		fStated = false;
 		PMString what;
+#ifdef KFC_DIAG
+		// TEST BUILDS ONLY: the fault switch putback-over-error (KFCDiag.h) - an error left standing for the put-back
+		// to meet, as an operation that failed without clearing would leave it; the trace then says whether Find/Change
+		// was put back over it and whether it stood again after, and it is cleared (the test's own error). One-shot.
+		const bool errorFault = KFC_DIAG_FAULT("putback-over-error");
+		if (errorFault)
+		{
+			KFCDiagFaultOff("putback-over-error");
+			ErrorUtils::PMSetGlobalErrorCode(kFailure);
+		}
+#endif
 		const bool back = PutBack(what);
+#ifdef KFC_DIAG
+		if (errorFault)
+		{
+			KFC_DIAG_LOG("QSCOPE put back over a standing error back=%d stood again=%d", back ? 1 : 0,
+				ErrorUtils::PMGetGlobalErrorCode() == kFailure ? 1 : 0);
+			ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+		}
+#endif
 		if (!ioStatus.IsEmpty())
 			ioStatus.Append(" ");
 		if (back)
@@ -280,6 +299,13 @@ bool KFCQueryScope::PutBack(PMString& outWhat)
 {
 	outWhat.Clear();
 	outWhat.SetTranslatable(kFalse);
+	// NOT OVER AN ERROR THE OPERATION LEFT STANDING. This runs after the operation however it ended (Finish, the
+	// destructor), and a command processed while the global error code is set is InDesign's protective shutdown
+	// (CmdUtils.h, ProcessCommand) - so the put-back does not hang on every exit of every operation clearing its own:
+	// the operation's error state is kept aside while Find/Change is put back and stands again after it, its own, for
+	// whoever reports it (widgetbin's CDialogObserver::FireOffEndDialogCmd - KFCBookScope's closes keep the same pair).
+	GlobalErrorStatePreserver operationErrorState;
+	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 	bool back = true;
 	// The list's tab first, when it is another: Apply turns to it and puts its fields back as they were...
 	if (fBeforeListTab.valid)
