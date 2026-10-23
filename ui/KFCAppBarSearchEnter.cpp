@@ -33,6 +33,7 @@
 #include "ITextAttrFont.h"		// kTextAttrFontStyleBoss's value - the style name
 #include "ITextAttrUID.h"		// kTextAttrFontUIDBoss's value - the font family
 #include "TextAttrID.h"
+#include "TextChar.h"			// kTextChar_LeftSquareBracket - a missing font named as the font menus name it
 
 // The search runs once the key has gone through the loop - never inside the hook (see RunPendingSearch):
 #include "ICallbackTimer.h"		// StartTimer / StopTimer (an IIdleTask; kEndOfTime comes with it)
@@ -203,6 +204,33 @@ static std::wstring WideOf(const PMString& s)
 	return (buf != nil && units > 0) ? std::wstring(reinterpret_cast<const wchar_t*>(buf), units) : std::wstring();
 }
 
+// A NAME IN SQUARE BRACKETS, ONCE - the product's AddBracketsAroundString (buttonui/appearancepanel): a name
+// that begins with one already is left as it is. Read as a Unicode character (GetWChar - PMString's [] is the
+// platform's).
+static void BracketMissing(PMString& name)
+{
+	if (name.IsEmpty() || name.GetWChar(0).GetValue() == kTextChar_LeftSquareBracket)
+		return;
+	name.InsertW(kTextChar_LeftSquareBracket);
+	name.AppendW(kTextChar_RightSquareBracket);
+}
+
+// Whether any face of the family is installed: the family itself is missing when none is (the product lists a family
+// among the installed ones by its installed faces - FontUtilData::Initialize).
+static bool AnyFaceInstalled(IFontFamily* family)
+{
+	const int32 faces = family->CountFontFaces();
+	for (int32 i = 0; i < faces; ++i)
+	{
+		PMString name;
+		family->AppendStyleName(i, name);
+		InterfacePtr<IPMFont> face(family->QueryFace(name));
+		if (face != nil && face->GetFontStatus() == IPMFont::kFontInstalled)
+			return true;
+	}
+	return false;
+}
+
 // The Glyph tab's query as the field can show it: the character the glyph stands for (when an installed font says),
 // then the glyph id and the font - "<char> (GID 8123, Kozuka Mincho Pr6N R)". The font is the two attributes the
 // dialog keeps on that tab's list, kTextAttrFontUIDBoss (the family) and kTextAttrFontStyleBoss (the style),
@@ -234,20 +262,32 @@ static PMString GlyphDescription(const IFindChangeOptions* opts, bool changeSide
 		if (family != nil)
 		{
 			const PMString style = (styleAttr != nil) ? styleAttr->GetFontName() : PMString();
-			font = family->GetDisplayFamilyName();
-			if (!style.IsEmpty())
-			{
-				font.Append(" ");
-				font.Append(style);
-			}
 			// The character only from the font itself: for a family that is not installed, QueryFace still answers
 			// with a face, and that face's glyph of this id is another font's character (measured: a missing family's
 			// GID 50 came out as a full-width Q). QueryFace's own note says to check the status:
 			// SnpInspectFontMgr.cpp's test.
 			InterfacePtr<IPMFont> face(family->QueryFace(style));
+			const bool installed = face != nil && face->GetFontStatus() == IPMFont::kFontInstalled;
 			Utils<IGlyphUtils> glyphUtils;
-			if (face != nil && face->GetFontStatus() == IPMFont::kFontInstalled && glyphUtils)
+			if (installed && glyphUtils)
 				character = glyphUtils->GetUnicodeForGlyphID(face, gid);
+			// A FONT THAT IS NOT INSTALLED IS NAMED AS INDESIGN'S FONT MENUS NAME A MISSING ONE (the author's call):
+			// its style in square brackets, and its family too when none of the family's faces is installed (the
+			// product's FontUtilData.cpp, InitializeMissingFonts) - "[KFCNoSuchFont] [Regular]".
+			PMString familyName(family->GetDisplayFamilyName());
+			PMString styleName(style);
+			if (!installed)
+			{
+				BracketMissing(styleName);
+				if (!AnyFaceInstalled(family))
+					BracketMissing(familyName);
+			}
+			font = familyName;
+			if (!styleName.IsEmpty())
+			{
+				font.Append(" ");
+				font.Append(styleName);
+			}
 		}
 	}
 	if (character.GetValue() != 0)
