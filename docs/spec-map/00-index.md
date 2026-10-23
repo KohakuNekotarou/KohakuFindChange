@@ -127,7 +127,7 @@ git log -p -- docs/spec-map/        # コミット済みの書き込み
 **2026-10-17 の追記の基準**: branch `feat/2026-10-14-kfc-tier-switch`（`83225d0` の上に、段の見出しの右クリック Search These Results Again＝その段の検索をその段の条件でもう一度回す）。版数 `1.4.0`。ROW-44 と、ROW-39・ROW-40・ROW-41・ROW-43・LIFE-01 の Search These Results Again への言及はこの基準で書いた。
 **2026-10-17 の追記の基準（2）**: branch `feat/2026-10-14-kfc-tier-switch`（`ca4bd41` の上に、行の目玉＝`2f4a328`）。版数 `1.4.0`。ROW-45 と、ROW-44・REP-35・REP-37・UNDO-03・LIFE-01 の目玉への言及はこの基準で書いた。
 **2026-10-17 の追記の基準（3）**: branch `feat/2026-10-14-kfc-tier-switch`（`86f1273` の上に、物の行の特殊操作 Create Outlines＝`08ad356`）。版数 `1.4.0`。OBJ-19 と、ROW-32・UNDO-02 の Create Outlines への言及はこの基準で書いた（OBJ-19 の決めどころは作者の不在中に私が決めた＝同じ夜に作者が承認）。
-**2026-10-17 の追記の基準（4）**: branch `feat/2026-10-14-kfc-tier-switch`（`6d6a997` の上に、文字の行の Restore Original＝`8d1a4b9`〜`e4857ff`）。版数 `1.4.0`。REP-38 と、ROW-32・UNDO-02 の Restore Original への言及はこの基準で書いた（REP-38 の決めどころは作者の不在中に私が決めた＝⬜作者の確認待ち）。
+**2026-10-17 の追記の基準（4）**: branch `feat/2026-10-14-kfc-tier-switch`（`6d6a997` の上に、文字の行の Restore Original＝`8d1a4b9`〜`e4857ff`）。版数 `1.4.0`。REP-38 と、ROW-32・UNDO-02 の Restore Original への言及はこの基準で書いた（REP-38 の決めどころは作者の不在中に私が決めた＝設計書 C1〜C16・✅10-23 に作者の確認待ちの印を外した＝作者の判断⑨）。
 **2026-10-17 の追記の基準（5）**: branch `feat/2026-10-14-kfc-tier-switch`（`4c5aa33` の上に、灰色・段落の書式・名前 Restore from Copy・リンクを1本で戻す・アンカー付きの物は写さない・リンクの文字が丸ごと置き換わる形は写さない＝`269ff8c`〜`25bf814`）。版数 `1.4.0`。REP-38 の書き直しと、ROW-32・UNDO-02 の名前、OBJ-19 の灰色はこの基準で書いた（作者の決定＝同じ夜の承認・依頼）。
 **2026-10-17 の追記の基準（6）**: branch `feat/2026-10-14-kfc-tier-switch`（`bff8e64` の上に、文書の一部を探した段の探し直し＝`38c14ef`）。ROW-44（段の見出しは最初と同じ条件で探し直す）と REP-37（文書の行は灰色）はこの基準で書いた（作者の決定＝同じ夜）。
 
