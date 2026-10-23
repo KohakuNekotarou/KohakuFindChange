@@ -44,8 +44,7 @@ namespace KFCHiddenSpreadAlert
 		Answering(IDataBase* db, bool docHasHidden);
 		~Answering();
 	private:
-		bool	fArmed;
-		bool	fShowAlertsWas;
+		bool	fArmed;		// this one switched alerts off (the one armed - Answerings do not nest)
 		Answering(const Answering&);
 		Answering& operator=(const Answering&);
 	};

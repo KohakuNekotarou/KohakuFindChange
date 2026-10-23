@@ -31,7 +31,7 @@ namespace
 // with the walker's item's, never read through.
 bool		gArmed = false;
 IDataBase*	gArmedDB = nil;
-bool		gShowAlertsWas = true;		// CAlert::GetShowAlerts as the Answering found it
+bool		gShowAlertsWas = true;		// CAlert::GetShowAlerts as the Answering found it - put back as it goes
 
 // THE ALERT, BY ITS KEY: InDesign's "Cannot show the object: the item is on a hidden spread" comes to a handler as
 // kObjectOnHiddenSpread, its buttons as Unhide Spread (the default, 1) and OK (2) - measured, the test build's HSALERT
@@ -46,14 +46,13 @@ bool IsKey(const PMString& s, const char* key)
 }
 }	// anonymous namespace
 
-KFCHiddenSpreadAlert::Answering::Answering(IDataBase* db, bool docHasHidden) : fArmed(false), fShowAlertsWas(true)
+KFCHiddenSpreadAlert::Answering::Answering(IDataBase* db, bool docHasHidden) : fArmed(false)
 {
 	if (!docHasHidden || db == nil || gArmed || !IDThreading::IsMainThreadDomain())
 		return;
-	fShowAlertsWas = CAlert::GetShowAlerts() != kFalse;
+	gShowAlertsWas = CAlert::GetShowAlerts() != kFalse;
 	gArmed = true;
 	gArmedDB = db;
-	gShowAlertsWas = fShowAlertsWas;
 	fArmed = true;
 	CAlert::SetShowAlerts(kFalse);
 }
@@ -62,7 +61,7 @@ KFCHiddenSpreadAlert::Answering::~Answering()
 {
 	if (!fArmed)
 		return;
-	CAlert::SetShowAlerts(fShowAlertsWas ? kTrue : kFalse);
+	CAlert::SetShowAlerts(gShowAlertsWas ? kTrue : kFalse);
 	gArmed = false;
 	gArmedDB = nil;
 }

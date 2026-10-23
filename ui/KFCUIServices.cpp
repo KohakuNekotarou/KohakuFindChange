@@ -154,12 +154,12 @@ namespace
 	/** Each layout window of a document - a minimised one too, a split window's second pane too - and its panes'
 	    layout views: fn(window, pane, view) once for each. EVERY WINDOW, not the document's first layout view alone:
 	    an object search's walk selects in a window of each document it walks (IFindChangeService::SearchObject), and
-	    measured (block 0's O-1 / O-2) it left its last item selected in a minimised window -
+	    measured it left its last item selected in a minimised window -
 	    ILayoutViewUtils::GetAllLayoutViews lists no view of one - and in a document's second window. The windows as
 	    IDocumentUIUtils lists them (is_layout: a story editor or a galley holds no layout view), each window's panes by
 	    WidgetID - the product's way (spellpanel's PrivateSpellingUtils.cpp; KCM's KCMViewLookup.cpp the same): the
 	    window's kLayoutWidgetID, and in a split window the kLayoutWidgetID inside the kLayoutSecondaryPanelWidgetID
-	    panel, while that view is shown. Measured with KT's panesel probe (2026-10-19): every window has a hidden second
+	    panel, while that view is shown. Measured with KT's panesel probe: every window has a hidden second
 	    pane - left out, as the product leaves it. The one reading of which panes a window has: the background
 	    selections' (ForEachWindowSelection) and the views' places (SnapshotViewPlaces). */
 	template <typename Fn>
@@ -190,9 +190,9 @@ namespace
 	/** Each layout pane of a document (ForEachLayoutPane) with its selection manager: fn(window, pane, manager) once
 	    for each manager but skip (the front view's). The manager is the pane's view's
 	    (ISelectionUtils::QueryViewSelectionManager - Adobe's trackers' way, KCM's QuerySelectionManagerFor in
-	    KCMStoryJump.cpp). Measured with KT's panesel probe (2026-10-19): a split window's second pane has a manager of
+	    KCMStoryJump.cpp). Measured with KT's panesel probe: a split window's second pane has a manager of
 	    its own (what is selected there is not the window's DOM selection); the PANEL answers the first pane's manager,
-	    so handed over as it stands it never reached the second pane (1b4e6a9 did that); and the hidden second pane
+	    so handed over as it stands it never reached the second pane; and the hidden second pane
 	    every window has holds a manager of its own (ForEachLayoutPane leaves it out). */
 	template <typename Fn>
 	void ForEachWindowSelection(IDataBase* db, const ISelectionManager* skip, Fn fn)

@@ -127,8 +127,8 @@ namespace KFCObjectSearch
 	    document's page order, on the pasteboard or a parent page, in a group, inline or anchored, overset, on a hidden
 	    spread, hidden, locked - io's fields of those, set whole. The search reads it as it builds a row; a special
 	    operation of KFC's own reads it again after its write (KFCObjectSpecial - a move can take the item to another
-	    page, Lock and Hide change its words). false = no such item (io as it was). */ bool ReadItemPlace(const UIDRef&
-	    docRef, UID item, KFCResultModel::Hit& io);
+	    page, Lock and Hide change its words). false = no such item (io as it was). */
+	bool ReadItemPlace(const UIDRef& docRef, UID item, KFCResultModel::Hit& io);
 
 	/** The shared object walker aimed at the front document again (O7) - after every run of ours that aimed it elsewhere.
 	    No front document: nothing is done. */

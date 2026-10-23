@@ -13,9 +13,9 @@
 //  (IKFCRuns::AnswerAlert): OK for InDesign's "Cannot show the object: the item is on a hidden spread", whose default -
 //  Unhide Spread - would change the document; any other alert put on screen as it would have been.
 //
-//  No worked example in the SDK - the header and one #include in PublicTestHeader.h are the whole of it. The shape is
-//  KIDMCP's, measured there: the handler on a boss of its own, whose service provider registers it under
-//  kAlertHandlerService.
+//  No worked example in the SDK - the header and one #include in PublicTestHeader.h are the whole of it. The shape:
+//  the handler on a boss of its own, whose service provider registers it under kAlertHandlerService - KIDMCP's
+//  alert handler had it, measured there (retired since: its git keeps it at d7e1666, ui/KIDMCPUIAlertHandler.cpp).
 //
 //========================================================================================
 
@@ -39,7 +39,7 @@
 namespace
 {
 /** The registry's own switch for THIS handler (IAlertHandler::SetOverrideAlert), apart from whether a walk of ours is
-    answering - kept apart as KIDMCP kept it: whatever turns the handler off need not know why it was on. */
+    answering - kept apart: whatever turns the handler off need not know why it was on. */
 bool gRegistryWantsUs = true;
 }	// anonymous namespace
 
