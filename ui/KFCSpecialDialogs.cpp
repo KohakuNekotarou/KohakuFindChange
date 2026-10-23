@@ -78,8 +78,10 @@ enum Asking { kAskingNone = 0, kAskingMove, kAskingScale, kAskingRotate, kAsking
 Asking gAsking = kAskingNone;
 bool gAnswered = false;				// OK pressed, and what it answered kept (ApplyDialogFields)
 PMString* gPagesAnswer = nil;		// AskPageRange's answer while its dialog stands - the range, whatever its length
-// MOVE: which pair was typed last - Distance and Angle (true) or Horizontal and Vertical. Followed on every key stroke,
-// so the pair typed is the one answered even when OK is pressed before the field is committed (Enter typed in it).
+// MOVE: which pair was typed last - Distance and Angle (true) or Horizontal and Vertical. Followed on every change of
+// a field's text (kEditBoxKeyStrokeMessage comes for a text put in without a key too - measured with KIDMCP's
+// WM_SETTEXT, as a paste would put it - and Enter commits the field before OK reads it), so the pair typed is the
+// one answered.
 bool gMoveByDistance = false;
 
 // THE VALUE FIELDS THAT ANSWER, checked on OK in the order they are read (the first refused is the one selected).
@@ -387,9 +389,9 @@ public:
 	}
 
 private:
-	// The value fields on IID_ITEXTCONTROLDATA - a key stroke (kEditBoxKeyStrokeMessage: KFCUI.fr sets "notify every
-	// key stroke" on Move's and Scale's) and a commit (kTextChangeStateMessage) - and the chain on
-	// IID_ITRISTATECONTROLDATA, those this dialog has.
+	// The value fields on IID_ITEXTCONTROLDATA - each change of the text (kEditBoxKeyStrokeMessage, a paste's too:
+	// KFCUI.fr sets "notify every key stroke" on Move's and Scale's) and a commit (kTextChangeStateMessage) - and the
+	// chain on IID_ITRISTATECONTROLDATA, those this dialog has.
 	void Hear(bool attach)
 	{
 		InterfacePtr<IPanelControlData> panel(this, UseDefaultIID());
@@ -444,8 +446,8 @@ private:
 		}
 	}
 
-	// SCALE, WHILE THE CHAIN IS LINKED: the two values one - each key stroke's text copied to the other field as it is
-	// typed, and once committed, the value written there as that field writes it.
+	// SCALE, WHILE THE CHAIN IS LINKED: the two values one - the text copied to the other field at each change of it,
+	// and once committed, the value written there as that field writes it.
 	void FollowScale(IDialogController* controller, const WidgetID& id, bool committed)
 	{
 		if ((id != kKFCValueXWidgetID && id != kKFCValueYWidgetID)
