@@ -217,6 +217,10 @@
 //    part-narrow-as-text  a Narrow Down over part of a document (KFCSearchEngine.cpp's SearchPartsAgain) files a
 //                Frames of These Matches list with a text list's limit and words, and says nothing of the matches no
 //                frame holds, the old way (nd-frames-part-armed)
+//    ellipsize-half  (UI half) ui/KFCPanelTextDraw.h's KFCEllipsize takes every width half a pixel wider: a UI at 100 %
+//                hands only whole widths, and PMEllipsizeString's band (where it never comes back) lies between two -
+//                the way into it for the guard's own test
+//                (work\note-scripts\2026-10-25-kfc-full-run\green_ellipsize.ps1)
 //
 //  AND TIMERS: KFC_CLOCK / KFC_SPENT add up the milliseconds a stretch of code takes, and KFCDiagPhase
 //  writes "PHASE <name> begin" and "PHASE <name> end <ms>" around a scope - all of it nothing without KFC_DIAG.

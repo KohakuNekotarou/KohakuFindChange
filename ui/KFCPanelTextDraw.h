@@ -6,7 +6,8 @@
 //
 //  What every hand-drawn text widget in this panel has to agree about: how far the CONTEXT around a
 //  match is faded toward the background, how that faded colour is worked out, the two flags every
-//  draw and every measure passes and how wide a string comes out with them, and the BAR that stands
+//  draw and every measure passes and how wide a string comes out with them, how a run is ellipsized to
+//  a width (KFCEllipsize - the SDK's call has widths it never comes back from), and the BAR that stands
 //  where a change has a place and no characters. (Where a shown string may be CUT is KFCTextCut.h's,
 //  in model/: the model half cuts the rows' texts by the same rule.)
 //
@@ -34,9 +35,13 @@
 // General includes:
 #include "DVAPublicIncludes.h"	// dvaui::drawbot - what both widgets draw with (DV_Draw)
 #include "DVPublicUtilities.h"	// dv_utils::DVFillRect - the bar is filled, not written (source/open/includes/widgets)
-#include "DrawStringUtils.h"	// StringUtils::PMMeasureStringDroverized - how wide a string comes out
+#include "DrawStringUtils.h"	// PMMeasureStringDroverized - how wide a string comes out / PMEllipsizeString
 #include "PMReal.h"
 #include "PMString.h"			// the bar's placeholder
+#include "WidgetDefs.h"			// EllipsizeStyle - KFCEllipsize
+
+// Project includes:
+#include "KFCDiag.h"			// KFC_DIAG_LOG - KFCEllipsize's line in a test build
 
 /** The two flags every draw and every measure passes, spelled out rather than left to a default.
     THE DEFAULTS IN DrawStringUtils.h DISAGREE WITH EACH OTHER: the draw calls default to kFalse, the
@@ -67,6 +72,63 @@ inline PMReal KFCDrawnWidth(const PMString& s, const InterfaceFontInfo& font)
 	if (s.IsEmpty())
 		return PMReal(0.0);
 	return StringUtils::PMMeasureStringDroverized(s, font, kKFCDontConvertAmpersand).X();
+}
+
+/** StringUtils::PMEllipsizeString, never handed a width at which it does not come back. Every cut of a hit row's cell
+    goes through here (KFCColorTextView.cpp: the match, the context before it, the context after it).
+
+    THE SDK CALL NEVER RETURNS for a width a little wider than "..." (found by KCM, 2026-10-24 - KCM's KCMEllipsize is
+    this, brought over). Its loop (DV_WidgetBin.dll 21.0, read from the disassembly): if the string does not fit,
+    room = width - the width of "..."; cut characters and measure again WHILE what is left is wider than room. Cut down
+    to nothing, what is left is the empty string - which measures 1, not 0, in the palette font - so for a room above 0
+    and below that 1 nothing can ever be narrow enough to stop it: InDesign stops answering. A capped copy of the loop
+    swept over two row strings in 0.25 px steps never ended at 15.25 - 15.75 and nowhere else, and KCM's panel froze
+    InDesign at 377 px (its width was halved). The cell's cuts are all worked out by subtraction - the room the match
+    leaves, then what the context before it leaves of that - so any of them can land there once the widths are not
+    whole pixels: on this PC's UI at 100 % they are, and the band (between two of them) was not met in 235 panel widths
+    x 28 rows (2026-10-25); a scaled UI measures in fractions.
+    => Below "..." plus the empty string (plus half a pixel) nothing but the dots can fit anyway: the answer is the
+    dots when they fit and nothing when they do not - what the SDK itself answers on either side of the band. Measured
+    the way the SDK measures inside (the context-free PMMeasureString, convertAmpersand on for the dots and the empty
+    string), so the band tested is the one its loop meets. Whether `str` fits at all is asked of KFCDrawnWidth - how it
+    comes out as drawn. A test build says each width it kept from the SDK that would not have come back (ELLIPSIZE),
+    and its fault switch ellipsize-half widens every width by half a pixel - the way into the band on a whole-pixel UI.
+    ! THE CUT IS MARKED "do not translate": PMEllipsizeString hands back a NEW string, a PMString starts out
+      translatable (PMString.h), and the draw translates what it is given (DrawStringUtils.h: "It will be translated
+      before drawing to screen") - so document text that happens to spell a key of the string table would be drawn as
+      that key's translation. @see memory pmellipsizestring-dead-band */
+inline PMString KFCEllipsize(const PMReal& widthAsked, const PMString& str, const InterfaceFontInfo& fontInfo,
+							 EllipsizeStyle where)
+{
+	PMReal width = widthAsked;
+#ifdef KFC_DIAG
+	// (Test builds only) Fault switch ellipsize-half: every width half a pixel wider. This PC's UI (100 %) measures
+	// in whole pixels, so the cell's subtractions hand only whole widths - and the band lies BETWEEN two of them
+	// (none met in 235 panel widths x 28 rows, 2026-10-25); a scaled UI need not. The way into the band for the
+	// guard's own test.
+	if (KFC_DIAG_FAULT("ellipsize-half"))
+		width += PMReal(0.5);
+#endif
+	if (str.IsEmpty() || KFCDrawnWidth(str, fontInfo) <= width)
+		return str;
+	PMString dots("...", PMString::kDontTranslateDuringCall);
+	dots.Translate();
+	const PMReal dotsW = StringUtils::PMMeasureString(dots, fontInfo, kTrue).X();
+	const PMReal emptyW = StringUtils::PMMeasureString(PMString(), fontInfo, kTrue).X();
+	if (width < dotsW + emptyW + PMReal(0.5))
+	{
+		if (width > dotsW && width < dotsW + emptyW)
+			KFC_DIAG_LOG("ELLIPSIZE band width=%.3f dots=%.3f empty=%.3f - not handed to PMEllipsizeString",
+						 ToDouble(width), ToDouble(dotsW), ToDouble(emptyW));
+		PMString shown;
+		if (width >= dotsW)
+			shown = dots;
+		shown.SetTranslatable(kFalse);
+		return shown;
+	}
+	PMString cut = StringUtils::PMEllipsizeString(width, str, fontInfo, where, nil, kKFCDontConvertAmpersand);
+	cut.SetTranslatable(kFalse);
+	return cut;
 }
 
 /** How much of the theme's text colour the CONTEXT keeps: 0 = the background itself (invisible),

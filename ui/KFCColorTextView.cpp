@@ -38,7 +38,7 @@
 #include "CPMUnknown.h"
 #include "DVAPublicIncludes.h"	// dvaui::drawbot - what DV_Draw is handed
 #include "DVControlView.h"
-#include "DrawStringUtils.h"	// StringUtils::PMDrawStringRGB (drawbot) / PMEllipsizeString
+#include "DrawStringUtils.h"	// StringUtils::PMDrawStringRGB (drawbot) - the cuts go through KFCEllipsize
 #include "WidgetDefs.h"			// EllipsizeStyle (kEllipsizeBeginning / kEllipsizeEnd), kAlignLeft
 #include "ISession.h"			// GetExecutionContextSession
 #include "ShuksanID.h"			// kPaletteWindowSystemScriptFontId
@@ -378,14 +378,9 @@ void KFCColorTextView::DV_Draw(dvaui::drawbot::Drawbot* drawbotP) const
 			drawMatch(match);
 		else
 		{
-			// ! WHAT PMEllipsizeString HANDS BACK IS A NEW STRING, and the draw TRANSLATES what it is given
-			//   (DrawStringUtils.h: "It will be translated before drawing to screen"). The header does not say the
-			//   new string keeps the "do not translate" its source carries (SetSegments), and a PMString starts out
-			//   translatable (PMString.h) - so it is said again: document text that happens to spell a key of the
-			//   string table is drawn as it is, not translated. The two cuts below are the same.
-			PMString m = StringUtils::PMEllipsizeString(availWidth, match, fontInfo, kEllipsizeEnd, nil, kKFCDontConvertAmpersand);
-			m.SetTranslatable(kFalse);
-			drawRun(m, kMatchColor);
+			// (KFCEllipsize, as the two cuts below: the SDK's call never comes back from some widths, and its new
+			// string is marked "do not translate" again - KFCPanelTextDraw.h says why for both)
+			drawRun(KFCEllipsize(availWidth, match, fontInfo, kEllipsizeEnd), kMatchColor);
 		}
 	}
 	else
@@ -395,23 +390,16 @@ void KFCColorTextView::DV_Draw(dvaui::drawbot::Drawbot* drawbotP) const
 		// so the words just before the match survive with a leading "..."); the TRAILING context
 		// loses its tail (kEllipsizeEnd). Leading context is served first, so the run-up to the
 		// match is preferred over what follows it.
-		// (The cuts are marked "do not translate" again - the match's own cut above says why.)
+		// (Both widths are what a subtraction leaves - the kind KFCEllipsize keeps from the SDK's call when it
+		// lands where that call never comes back.)
 		const PMReal rem = availWidth - matchW;
-		PMString preCut = pre;
-		if (!pre.IsEmpty())
-		{
-			preCut = StringUtils::PMEllipsizeString(rem, pre, fontInfo, kEllipsizeBeginning, nil, kKFCDontConvertAmpersand);
-			preCut.SetTranslatable(kFalse);
-		}
+		const PMString preCut = KFCEllipsize(rem, pre, fontInfo, kEllipsizeBeginning);
 		const PMReal preCutW = KFCDrawnWidth(preCut, fontInfo);
 
 		const PMReal postBudget = rem - preCutW;
 		PMString postCut;
 		if (!post.IsEmpty() && postBudget > PMReal(0.0))
-		{
-			postCut = StringUtils::PMEllipsizeString(postBudget, post, fontInfo, kEllipsizeEnd, nil, kKFCDontConvertAmpersand);
-			postCut.SetTranslatable(kFalse);
-		}
+			postCut = KFCEllipsize(postBudget, post, fontInfo, kEllipsizeEnd);
 
 		drawRun(preCut, kContextColor);
 		drawMatch(match);
