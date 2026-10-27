@@ -910,6 +910,8 @@ void ArmKeep(bool native, int32 mode, int32 scope, bool armable, const std::chro
 // (ArmScopeKeep): the Search: of InDesign's OWN tab - the one shown before the QR Code tab, whose mode Find/Change keeps
 // (measured in KT) - as it is before the landing fronts a document or selects, put back as a row's click's is
 // (KeepSearchScopeAfterClick): the dialog's own Find Next leaves Search: alone, and so must the QR Code tab's.
+// (Measured: while the QR Code face is shown, or the dialog is closed, InDesign re-picks nothing - in the QR cases'
+// landings the keep never put anything back. A guard, then: QR-21.)
 void ArmNativeScopeKeep()
 {
 	const std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
@@ -1535,7 +1537,7 @@ bool JumpToObject(int32 chapterIdx, int32 hitIdx, UID item)
 			KFCResults()->SetHitOutcome(chapterIdx, hitIdx, KFCResultModel::kOutcomeMissing);
 			KFCResultTree::RefreshRows();
 		}
-		// (A QR code list's row: its frame gone, or holding no QR code now - IKFCResults::IsHitItemGone, the QR design's Q15.)
+		// (A QR code list's row: its frame gone, or holding no QR code now - IKFCResults::IsHitItemGone, QR-17.)
 		KFCResultTree::ShowStatus(KFCResults()->ListIsQRCodes()
 			? "Not found - the QR code is no longer in the document. Search again."
 			: "Not found - the object is no longer in the document. Search again.");

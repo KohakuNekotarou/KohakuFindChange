@@ -1107,10 +1107,10 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 			{
 				// A tier's own row's menu: Search Text in These Objects over a tier of object rows (TierHoldsObjects -
 				// an Object tab search's, a Frames of These Matches list's); grey over a tier of text rows, kept on the
-				// menu (SET-11). Its other refusals (Find/Change's tab, nothing to find, no object left, a document or
-				// book not open) said on the status line when pressed - the tab can change after the menu opened (the
-				// text-in-objects spec's T2).
-				// (Grey over a tier of QR codes too - their frames hold no text: the QR design's Q13.)
+				// menu (SET-11), and over a tier of QR codes, whose frames hold no text (TierHoldsQRCodes - QR-18).
+				// Its other refusals (Find/Change's tab, nothing to find, no object left, a document or book not open)
+				// said on the status line when pressed - the tab can change after the menu opened
+				// (the text-in-objects spec's T2).
 				int32 tier = -1;
 				const bool enable = RightClickedTier(widget, tier) && KFCResultHistory::TierHoldsObjects(tier)
 					&& !KFCResultHistory::TierHoldsQRCodes(tier);
@@ -1184,7 +1184,7 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 				const int32 narrow = NarrowKindOf(action);
 				if (narrow != kKFCNarrowNone)
 				{
-					// (Every condition grey over a tier of QR codes - it lists every QR code, and is not narrowed: Q13.)
+					// (Every condition grey over a tier of QR codes - it lists every QR code, not narrowed: QR-18.)
 					int32 tier = -1;
 					PMString layer;
 					const bool enable = RightClickedTier(widget, tier)

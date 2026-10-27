@@ -593,10 +593,10 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	},
 
 	/*
-	 * THE QR CODE TAB'S FACE in InDesign's Find/Change dialog (KFCQRTab.cpp - docs/superpowers/specs/
-	 * 2026-10-27-kfc-qr-code-search-design.md D3): the shape of InDesign's own faces (kFindMiniTabbedDialogTextPanelBoss and
-	 * its siblings, the 20.5 dump - KT's face of the same four measured on 2026-10-27): the dialog panel service that offers
-	 * it, a creator that names its resource, an observer for its widgets and a controller for the dialog's calls.
+	 * THE QR CODE TAB'S FACE in InDesign's Find/Change dialog (KFCQRTab.cpp - the shape of InDesign's own faces:
+	 * docs/superpowers/specs/2026-10-27-kfc-qr-code-search-design.md D3, kFindMiniTabbedDialogTextPanelBoss and its
+	 * siblings in the 20.5 dump - KT's face of the same four, measured): the dialog panel service that offers it, a
+	 * creator that names its resource, an observer for its widgets and a controller for the dialog's calls.
 	 */
 	Class
 	{
@@ -3474,12 +3474,12 @@ resource LocaleIndex (kKFCQRTabRsrcID)
 };
 
 /*
- * THE FACE (the design's Q4): Search: with its two entries, Find Next, and the two lines Find Next speaks on (the panel's
+ * THE FACE (QR-02): Search: with its two entries, Find Next, and the two lines Find Next speaks on (the panel's
  * own line is the panel's - Find Next says what it found where the person is looking): what it found, then why it could not
  * select it - one line each, as a static text is one line and cut at its end: a long content cuts its own line only. Each
  * line is the query dialog's fixed-size text, so a long sentence does not grow the dialog. No Done: the dialog's frame has
- * one on every tab (Q11 - measured).
- * LAID OUT AS INDESIGN'S OWN FACES (the author's call, 10-27 night: "match the Object tab's button sizes and positions" -
+ * one on every tab (QR-24 - measured).
+ * LAID OUT AS INDESIGN'S OWN FACES (the author's call: "match the Object tab's button sizes and positions" -
  * measured on its Object tab, the face 486 x 356): a margin of 15 all round; the left part 330 wide - here "Search:" (55)
  * and its list (170) in one row, 5 apart, as the faces' Search: row - and 10 to the buttons' column, whose buttons are
  * 116 x 26 from the top right (15 + 330 + 10 + 116 + 15 = 486, the face's width).

@@ -11,6 +11,7 @@
 //  docs/superpowers/specs/2026-10-14-kfc-tier-switch-v2-design.md section 3-2), and compared field by field after: a
 //  query that does not read back as the copy is refused and put back (the author: "if this goes wrong it is very
 //  frightening"). A replace made with Find/Change as it is takes the copy again (v2 R3).
+//  A QR code list's copy is the mode alone (CaptureQRCodes): nothing of Find/Change's steers its walk (KFCQRSearch).
 //  NO FILE IS WRITTEN (the author's call): not a saved query, not a temporary one.
 //  Left out on purpose: Search: (KFC never states it - kScopeCmdBoss) and the direction (KFC walks forward only).
 //  What the copy does not state back (the XML tag, the case option and the conditions mode of the change side, the CJK

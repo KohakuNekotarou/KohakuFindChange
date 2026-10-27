@@ -3165,10 +3165,10 @@ bool KFCSearchEngine::ResolveRunScope(RunScope& out, PMString& outRefusal, bool 
 	// read as Document ("the scope is never changed behind the user's back" - the rule the toggle has
 	// always kept). An unset Search: reads as Document (CurrentSearchScope); a list of stories is
 	// something only a script can set, and the dialog cannot show - refused too.
-	// A SAVED QUERY RUN READS INDESIGN'S OWN TAB'S (forQueries - the QR code re-check, 2026-10-28): the QR Code tab's Search:
-	// is its list's, and a query states its own tab. With the QR Code tab current and its Search: on All Documents, Run
-	// changed every open document while the Text tab said Document - and the dialog's Find, which steps the QR Code tab
-	// aside first, ran on Document (measured: qr-query-run-scope RED).
+	// THE QUERY DIALOG'S RUN READS INDESIGN'S OWN TAB'S Search: (forQueries): the QR Code tab's Search: is its list's,
+	// and a saved query states its own tab - as the dialog's Find does, which steps the QR Code tab aside first
+	// (KFCQRTab::YieldToSavedQuery). Read off the QR Code tab, the Run would take its All Documents in place of
+	// the query tab's Document and change every open document (regression case qr-query-run-scope; QR-25).
 	const int32 searchScope = forQueries ? KFCSearchEngine::FindChangeScope() : KFCSearchEngine::CurrentSearchScope();
 	const char* const scopeName = KFCSearchEngine::SearchScopeName(searchScope);	// "" = none this panel follows
 	// (asked of Search: as the selection makes it - what the dialog shows: Story with nothing selected IS
@@ -3622,7 +3622,7 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	// Forward, whatever the dialog says - and put back as the function ends. Turned here, past every
 	// refusal above, so a search that is turned away touches no setting at all, and still ahead of the
 	// mode commit below, in the order the two always had. (Not for the QR Code tab: its walk is no walker of Find/Change's,
-	// and its search touches no setting at all - the design's section 5.)
+	// and its search touches no setting at all - QR-10.)
 	KFCForwardSearchScope forward(!qrTab);
 
 	// State the tab before anything is walked. A walk runs in the mode last COMMITTED through
@@ -4274,9 +4274,9 @@ bool KFCSearchEngine::SetQuery(const PMString& text, int32 mode)
 
 bool KFCSearchEngine::CanSearchTab(int32 mode)
 {
-	// Colour searches swatch use, with a walker of its own, and finds no text and no frame this panel lists. The Object
-	// tab is searched (KFCObjectSearch), and so is KFC's QR Code tab (KFCQRSearch). Every other value (including -1,
-	// settings unreadable) is left for the search to answer.
+	// Colour searches swatch use, with a walker of its own, and finds no text and no frame this panel lists. The
+	// Object tab is searched (KFCObjectSearch), and so is KFC's QR Code tab (KFCQRSearch). Every other value
+	// (including -1, settings unreadable) is left for the search to answer.
 	return mode != IFindChangeOptions::kColorSearch;
 }
 
@@ -5570,7 +5570,7 @@ bool SearchListOnceMore(const KFCNarrowStep* step, PMString& outStatus)
 	// spec's N8).
 	if (step != nil)
 	{
-		// A QR CODE LIST IS NOT NARROWED (the design's Q13 - the menu greys it): it lists every QR code.
+		// A QR CODE LIST IS NOT NARROWED (QR-18 - the menu greys it): it lists every QR code.
 		if (KFCResultModel::ListIsQRCodes())
 		{
 			outStatus.Append(lead);
@@ -5781,7 +5781,7 @@ bool KFCSearchEngine::SearchTextInObjects(PMString& outStatus)
 		outStatus.Append("these are text results - use it on a tier of objects.");
 		return false;
 	}
-	// A QR CODE LIST (the design's Q13 - the menu greys it): a QR code's frame holds no text.
+	// A QR CODE LIST (QR-18 - the menu greys it): a QR code's frame holds no text.
 	if (KFCResultModel::ListIsQRCodes())
 	{
 		outStatus.Append(lead);

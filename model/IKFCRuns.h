@@ -171,11 +171,12 @@ public:
 	    Find/Change holds now, as Find does) - a tier heading's Search Text in These Objects: the text inside the live list's
 	    objects, into a new list (a new tier). False = refused, nothing changed (outStatus says why), or cancelled. */
 	virtual bool SearchTextInObjects(PMString& outStatus) = 0;
-	/** = KFCQRSearch::Next (appended - KFC 2.0's QR Code tab) - the tab's Find Next: the QR code after `last` (the one it found
-	    before), in the list's own order over the tab's Search:, the first again after the last. outReach = kKFCQRReach* bits
-	    (KFCModelTypes.h), outWords = the tab's line. Read only. False = no QR code there (outWords says so). */
+	/** = KFCQRSearch::Next (appended - the QR Code tab) - the tab's Find Next: the QR code after `last` (the one it
+	    found before), in the list's own order over the tab's Search:, the first again after the last. outReach =
+	    kKFCQRReach* bits (KFCModelTypes.h), outWords = the tab's first line. Read only. False = no QR code there
+	    (outWords says so). */
 	virtual bool QRCodeNext(const UIDRef& last, UIDRef& outFrame, int32& outReach, PMString& outWords) = 0;
-	/** = KFCSearchEngine::FindChangeMode and FindChangeScope (appended - KFC 2.0's QR Code tab): InDesign's OWN tab and its
+	/** = KFCSearchEngine::FindChangeMode and FindChangeScope (appended - the QR Code tab): InDesign's OWN tab and its
 	    Search:, never the QR Code tab's - what a QR code Find Next's landing keeps (KFCJump). -1 for what cannot be read. */
 	virtual void FindChangeTabAndScope(int32& outMode, int32& outScope) = 0;
 };

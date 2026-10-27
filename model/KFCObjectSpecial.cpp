@@ -763,7 +763,7 @@ bool KFCObjectSpecial::CanSpecialHit(int32 op, int32 chapterIdx, int32 hitIdx)
 	const OpInfo* const info = FindOp(op);
 	if (info == nil)
 		return false;
-	// A QR CODE LIST'S ROWS ARE NOT CHANGED (the design's Q13): greyed - SpecialRows names it.
+	// A QR CODE LIST'S ROWS ARE NOT CHANGED (QR-18): greyed - SpecialRows names it.
 	if (KFCResultModel::ListIsQRCodes())
 		return false;
 	UIDRef docRef;

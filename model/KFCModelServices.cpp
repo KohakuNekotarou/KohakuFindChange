@@ -84,7 +84,7 @@ public:
 	virtual int32 GetObjectRowHit(int32 chapterIdx, int32 nth) { return KFCResultModel::GetObjectRowHit(chapterIdx, nth); }
 	virtual bool IsHitItemGone(int32 chapterIdx, int32 hitIdx)
 	{
-		// (A QR code list's row whose frame holds no QR code now is gone too - KFCQRSearch::RowHoldsQRCode, the design's Q15.)
+		// (A QR code list's row whose frame holds no QR code now is gone too - KFCQRSearch::RowHoldsQRCode, QR-17.)
 		return KFCResultModel::IsHitItemGone(chapterIdx, hitIdx)
 			|| (KFCResultModel::ListIsQRCodes() && !KFCQRSearch::RowHoldsQRCode(chapterIdx, hitIdx));
 	}

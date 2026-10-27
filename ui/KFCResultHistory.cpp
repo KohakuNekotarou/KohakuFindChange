@@ -76,8 +76,8 @@ namespace
 												// Search Text in These Objects is grey over text rows
 												// (TierHoldsObjects)
 		bool					holdsQRCodes;	// ...QR codes (IKFCResults::ListIsQRCodes when it was kept) - its heading's
-												// Narrow Down and Search Text in These Objects grey (TierHoldsQRCodes - the
-												// QR design's Q13)
+												// Narrow Down and Search Text in These Objects grey (TierHoldsQRCodes -
+												// QR-18)
 
 		KeptTier() : set(0), open(false), holdsObjects(false), holdsQRCodes(false) {}
 	};

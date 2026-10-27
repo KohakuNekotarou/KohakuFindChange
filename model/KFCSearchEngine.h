@@ -107,9 +107,9 @@ namespace KFCSearchEngine
 	};
 
 	/** WHAT ONE WALK OVER A RUN'S TARGETS FOUND - SearchBook's tally, filled by the text tabs' walk
-	    (CollectTargets, in the .cpp), the Object tab's (KFCObjectSearch::CollectTargets) and
-	    Search Text in These Objects' (CollectObjectTexts, in the .cpp) alike: the rows
-	    filed, the targets that held one, whether the list reached its limit or the user cancelled, and the
+	    (CollectTargets, in the .cpp), the Object tab's (KFCObjectSearch::CollectTargets), the QR Code tab's
+	    (KFCQRSearch::CollectTargets) and Search Text in These Objects' (CollectObjectTexts, in the .cpp) alike: the
+	    rows filed, the targets that held one, whether the list reached its limit or the user cancelled, and the
 	    targets the summary has to name - never searched ("name: why"), broken off partway, or opened by the
 	    run and not handed back. */
 	struct CollectTally
@@ -328,8 +328,9 @@ namespace KFCSearchEngine
 	    this panel refuses). */
 	const char* FindCommandName(bool bookScopeOn);
 
-	/** Can Find in ... run on this tab? No on Colour alone (the Object tab lists page items - KFCObjectSearch). Asked by
-	    the menu (greys the command) and by the search itself (refuses), so the two cannot disagree. */
+	/** Can Find in ... run on this tab? No on Colour alone (the Object tab lists page items - KFCObjectSearch - and
+	    KFC's QR Code tab its QR codes - KFCQRSearch). Asked by the menu (greys the command) and by the search itself
+	    (refuses), so the two cannot disagree. */
 	bool CanSearchTab(int32 mode);
 
 	/** Put `text` into Edit > Find/Change on the tab `mode` names - IFindChangeOptions::kTextSearch or

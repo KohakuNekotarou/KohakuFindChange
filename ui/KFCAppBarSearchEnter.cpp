@@ -392,7 +392,7 @@ static bool MirrorFindChangeIntoField()
 {
 	if (sShutdown || !sAppBarSearchEnter)
 		return false;
-	// THE QR CODE TAB (KFCQRTab - the design's Q17): the field shows nothing - the tab has no query in words, and a Return
+	// THE QR CODE TAB (KFCQRTab - QR-22): the field shows nothing - the tab has no query in words, and a Return
 	// there lists the QR codes whatever is typed (RunPendingSearch).
 	const bool qrTab = (KFCRuns()->CurrentSearchMode() == kKFCQRCodeSearchMode);
 	PMString query;
@@ -453,7 +453,7 @@ static uint32 RunPendingSearch(void* /*refPtr*/)
 	text.swap(sPendingText);
 	if (sShutdown || !sAppBarSearchEnter)
 		return IIdleTask::kEndOfTime;
-	// THE QR CODE TAB (the design's Q17): its Return lists the QR codes - the field's text is not used (it shows nothing
+	// THE QR CODE TAB (QR-22): its Return lists the QR codes - the field's text is not used (it shows nothing
 	// there), so an empty field searches too, and nothing is put into Find/Change. (Asked after the shutdown test: the
 	// model is not asked anything once the session is going.)
 	const bool qrTab = (KFCRuns()->CurrentSearchMode() == kKFCQRCodeSearchMode);
@@ -522,7 +522,7 @@ static LRESULT CALLBACK AppBarGetMsgProc(int code, WPARAM wParam, LPARAM lParam)
 			&& IsAppBarSearchField(m->hwnd))
 		{
 			const std::wstring text = FieldText(m->hwnd);
-			// (an empty field too on KFC's QR Code tab, whose Return lists the QR codes - the design's Q17)
+			// (an empty field too on KFC's QR Code tab, whose Return lists the QR codes - QR-22)
 			if (!text.empty() || KFCRuns()->CurrentSearchMode() == kKFCQRCodeSearchMode)
 			{
 				m->message = WM_NULL;

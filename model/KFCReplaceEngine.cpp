@@ -1296,7 +1296,7 @@ bool KFCReplaceEngine::CanReplaceHit(int32 chapterIdx, int32 hitIdx)
 {
 	// Nothing greys it (WhyGreyed - the one place the reasons are asked: the menu's grey state and the rows a Replace of
 	// rows selected together leaves are the same question).
-	// A QR CODE LIST'S ROWS ARE NEVER REPLACED (the design's Q13 - the author: "no replace"): greyed whatever the row says
+	// A QR CODE LIST'S ROWS ARE NEVER REPLACED (QR-18 - the author: "no replace"): greyed whatever the row says
 	// - the doors that turn a press away name it (ReplaceHit, ReplaceHits, KFCObjectReplace).
 	if (KFCResultModel::ListIsQRCodes())
 		return false;

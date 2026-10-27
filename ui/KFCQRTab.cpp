@@ -79,9 +79,11 @@ void KeepScopeOf(IDropDownListController* list)
 		gScope = IWalkerScopeFactoryUtils::kDocumentScope;
 }
 
-// THE QR CODE FIND NEXT FOUND LAST - where its next press goes on from (Task 1's ruling: not the selection). Kept only while
-// the face is shown - let go when it is shown again and when the dialog closes: a closed document's database address can be
-// a document opened later (memory uidref-reuse-after-close), and a QR code of the same UID there would be taken for it.
+// THE QR CODE FIND NEXT FOUND LAST - where its next press goes on from (Q10: not the selection). Kept only while the
+// face is shown - let go when it is shown again and when the dialog closes: a closed document's database address can
+// be a document opened later (memory uidref-reuse-after-close), and a QR code of the same UID there would be taken for
+// it. NOT let go when a document closes and another opens while the face stays shown - tried once, the address was
+// not reused (docs/ai-notes/kfc-qr-recheck-2026-10-28.md O21-1).
 UIDRef gLastFound;
 
 // One of the face's lines, written.
@@ -102,9 +104,10 @@ void SayOnFace(IPMUnknown* face, const PMString& found, const PMString& note)
 	SetFaceLine(panel, kKFCQRTabNoteWidgetID, note);
 }
 
-// FIND NEXT (the design's Q10, Task 1's D5): the QR code after the one found last, in the list's own order over the tab's
+// FIND NEXT (the design's Q10 / D5): the QR code after the one found last, in the list's own order over the tab's
 // Search: (the model's KFCQRSearch::Next - read only), landed on as an object row's click lands (KFCJump::LandOnQRCode) -
-// one it cannot select is named on the line, with no alert (Task 1's ruling); after the last, the first again, silently.
+// one it cannot select is named on the face's second line, with no alert (Q10); after the last, the first again,
+// silently.
 void FindNext(IPMUnknown* face)
 {
 	UIDRef next;
@@ -147,7 +150,7 @@ void KFCQRTab::YieldToSavedQuery()
 
 //========================================================================================
 // The face's three implementations - the shape of InDesign's own faces (kFindMiniTabbedDialogTextPanelBoss and its
-// siblings in the 20.5 dump; KT measured the same three on 2026-10-27).
+// siblings in the 20.5 dump; KT measured the same three).
 //========================================================================================
 
 /** Names the resource that describes the face: the IDList / IDListPair id, not the view's (KFCUI.fr). */
@@ -204,7 +207,7 @@ public:
 	virtual void AutoAttach()
 	{
 		// The base first, as the SDK's face on a dialog of InDesign's does (xdocbookworkflowui's XDocBkUIDialogObserver) -
-		// CObserver's, a no-op today.
+		// CObserver's, which does nothing (publiclib's CObserver.cpp).
 		AbstractDialogObserver::AutoAttach();
 		// THE FACE IS SHOWN: the QR Code tab is Find/Change's now, whatever was kept - a close on it, or a saved query's
 		// own tab (YieldToSavedQuery) - until it is hidden.

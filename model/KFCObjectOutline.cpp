@@ -181,7 +181,7 @@ bool KFCObjectOutline::CanOutlineHit(int32 chapterIdx, int32 hitIdx)
 	const UID item = KFCResultModel::GetHitItem(chapterIdx, hitIdx);
 	if (item == kInvalidUID)
 		return false;
-	// A QR CODE LIST'S ROWS ARE NOT OUTLINED (the design's Q13): greyed - OutlineRows names it.
+	// A QR CODE LIST'S ROWS ARE NOT OUTLINED (QR-18): greyed - OutlineRows names it.
 	if (KFCResultModel::ListIsQRCodes())
 		return false;
 	KFCResultModel::RowDisplay row;

@@ -46,7 +46,7 @@ namespace
 // The QR code's EPS item for `item` - the item itself, or a frame's one child - or an invalid UIDRef: an EPS item InDesign's
 // own Facade::IBarcodeFacade::IsQRCode calls a QR code, whose IID_IQRCODEDATAUID names the data boss Read reads (EPSID.h:
 // only kEPSItem carries it). outData (when given) = that data boss.
-// IsQRCode TAKES THE EPS ITEM, NOT ITS FRAME (measured 2026-10-28 in KT - docs/ai-notes/kfc-qr-api-audit-2026-10-28.md:
+// IsQRCode TAKES THE EPS ITEM, NOT ITS FRAME (measured in KT - docs/ai-notes/kfc-qr-api-audit-2026-10-28.md:
 // false for every frame; for the EPS, true exactly where the test of IID_IQRCODEDATAUID alone was, 17 of 17, and false for a
 // placed EPS that holds no QR code). Asked of EPS items only - the input measured (a facade is not safe to ask of every item:
 // memory facade-not-safe-for-every-item). The facade is EPS Page Item's, a model plug-in's (kEPSPrefix; the QR dialogs are
@@ -163,7 +163,7 @@ bool KFCQRCodes::Read(const UIDRef& frameOrItem, Kind& outKind, PMString& outCon
 	InterfacePtr<IQRvCardData> card(data, UseDefaultIID());
 	if (card != nil)
 	{
-		// InDesign's own order for the name (the card's FN line: "<first> <last>" - KT 2026-10-27, M7).
+		// InDesign's own order for the name (the card's FN line: "<first> <last>" - the measure note's M7).
 		outKind = kKindVCard;
 		outContent = Joined(Joined(OneLine(card->GetFirstName()), " ", OneLine(card->GetLastName())), " / ",
 			OneLine(card->GetOrganization()));
@@ -189,7 +189,8 @@ bool KFCQRCodes::CollectFrames(const UIDRef& docRef, std::vector<UID>& outFrames
 	walker->Initialize(options);
 
 	std::set<UID> seen;
-	// (A guard on a walk that never ends - the object search keeps the same one, KFCObjectSearch's WalkDoc.)
+	// (A guard on a walk that never ends. The object search counts no steps - its walk stops when an item comes round
+	// again, KFCObjectSearch's WalkDoc; here a frame met again is only not listed twice.)
 	for (int32 step = 0; step < 100000; ++step)
 	{
 		UIDRef item;

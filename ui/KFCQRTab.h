@@ -6,13 +6,13 @@
 //
 //  THE QR CODE TAB'S FACE IN INDESIGN'S FIND/CHANGE DIALOG (docs/superpowers/specs/2026-10-27-kfc-qr-code-search-design.md -
 //  measured in KT: docs/ai-notes/kfc-qr-tab-measure-2026-10-27.md in the SDK folder). A face of KFC's own among the dialog's
-//  tabs - "QR Code" - offered through kFindChangeMiniTabbedDialogService (KFCUI.fr's IDList / IDListPair): Search: (All
-//  Documents / Document - Q4; Document at launch - Q19), Find Next (the QR code after the one it found last, in the list's
-//  own order - the model's KFCQRSearch::Next - landed on as an object row's click lands, KFCJump::LandOnQRCode) and a line
-//  for what Find Next says. The frame's
-//  Done closes the dialog as on every tab (Q11 - the frame's own). While the face is the dialog's tab - or was when the
-//  dialog closed, the face it opens on again - KFC's Find lists QR codes (KFCQRSearch in the model half, which asks
-//  IsCurrent through IKFCUIServices::IsQRCodeTabCurrent).
+//  tabs - "QR Code" - offered through kFindChangeMiniTabbedDialogService (KFCUI.fr's IDList / IDListPair): Search:
+//  (All Documents / Document - Q4; Document at launch - Q19), Find Next (the QR code after the one it found last, in
+//  the list's own order - the model's KFCQRSearch::Next - landed on as an object row's click lands,
+//  KFCJump::LandOnQRCode) and two lines for what Find Next says: what it found, and why it could not select it. The
+//  frame's Done closes the dialog as on every tab (Q11 - the frame's own). While the face is the dialog's tab - or
+//  was when the dialog closed, the face it opens on again - KFC's Find lists QR codes (KFCQRSearch in the model half,
+//  which asks IsCurrent through IKFCUIServices::IsQRCodeTabCurrent).
 //  WHAT THE TAB IS IS KEPT FROM THE FACE'S OWN CALLS - NO WINDOW IS WALKED (the design's D1, and the measurement's hazard: a
 //  face that walked the dialog's windows and widgets while the dialog closed left Find/Change stuck - drawn, but gone).
 //  Shown = from its AutoAttach to its AutoDetach; closed on it = its ClosingDialog came while it was shown (or its own parent,

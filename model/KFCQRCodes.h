@@ -50,7 +50,7 @@ namespace KFCQRCodes
 	bool CollectFrames(const UIDRef& docRef, std::vector<UID>& outFrames);
 
 #ifdef KFC_DIAG
-	/** TEST BUILDS ONLY - the fault switch qr-probe (plan Task 2, regression case qr-probe-kinds): the active document's QR
+	/** TEST BUILDS ONLY - the fault switch qr-probe (regression case qr-probe-kinds): the active document's QR
 	    codes read into the trace, one line each - QRPROBE <frame's UID> <kind> <content> - and outSummary
 	    "QR probe: <n>". Searches nothing. Returns 0. */
 	int32 DiagProbe(PMString& outSummary);

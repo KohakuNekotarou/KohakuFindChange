@@ -61,14 +61,14 @@ namespace KFCQRSearch
 	    What the QR code holds is not compared - a row keeps the text it was found with (Q15). */
 	bool RowHoldsQRCode(int32 chapterIdx, int32 hitIdx);
 
-	/** FIND NEXT ON THE QR CODE TAB (the design's Q10, Task 1's D5 - the tab's button, ui/KFCQRTab): the QR code after `last` -
+	/** FIND NEXT ON THE QR CODE TAB (the design's Q10 / D5 - the tab's button, ui/KFCQRTab): the QR code after `last` -
 	    the one Find Next found before; an invalid UIDRef, or one of a document not in the range now or no longer holding it =
 	    from the start - in the list's own order: the tab's Search: (the active document, or every open one in the order
 	    All Documents lists them - KFCBookScope::ListOpenDocuments), each document's QR codes in page order
 	    (KFCResultModel::OrderHitsByPage). After the last, the first again, silently (InDesign's own Find Next). The selection is
-	    not asked (Task 1's ruling). outReach = what keeps it from being selected (kKFCQRReach* bits, KFCModelTypes.h); outWords
-	    = what the tab's line says of it: its kind and content, and where. false = no QR code at all there (outWords says so).
-	    Read only. */
+	    not asked (Q10). outReach = what keeps it from being selected (kKFCQRReach* bits, KFCModelTypes.h); outWords
+	    = what the tab's first line says of it: its kind and content, and where. false = no QR code at all there
+	    (outWords says so). Read only. */
 	bool Next(const UIDRef& last, UIDRef& outFrame, int32& outReach, PMString& outWords);
 }
 

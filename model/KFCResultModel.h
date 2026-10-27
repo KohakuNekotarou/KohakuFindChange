@@ -53,8 +53,8 @@ namespace KFCResultModel
 
 	/** THE OBJECT LISTS' LIMIT (docs/superpowers/specs/2026-10-18-kfc-narrow-down-design.md N7 - the author's call: the object
 	    search's limit raised; the number measured, M6 - 1000 objects: the search 4.6 s, the heaviest special operation 20 s, each
-	    one Undo): an Object tab search's list and a Frames of These Matches list hold at most this many rows. Text lists keep
-	    kKFCCollectHitLimit. */
+	    one Undo): an Object tab search's list, a QR Code tab search's and a Frames of These Matches list hold at most
+	    this many rows. Text lists keep kKFCCollectHitLimit. */
 	const int32 kKFCCollectObjectLimit = 1000;
 
 	/** WHY A ROW'S REPLACE KEPT NO COPY (HitCopy::whyNot - docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md
@@ -414,12 +414,12 @@ namespace KFCResultModel
 	/** The steps in words, as a tier's heading draws them after its name and the status line names them: "In Tables /
 	    Pages 1-5" - empty for none. */
 	PMString NarrowWords();
-	/** ARE THE LIST'S ROWS OBJECT ROWS - an Object tab search's, a QR Code tab search's (ListIsQRCodes), or a Frames of These
-	    Matches list's? The heading's menu greys a condition that only text rows can meet, and Search Text in These Objects
-	    over text rows - which KFCSearchEngine::SearchTextInObjects refuses too. */
+	/** ARE THE LIST'S ROWS OBJECT ROWS - an Object tab search's, a QR Code tab search's (ListIsQRCodes), or a
+	    Frames of These Matches list's? The heading's menu greys a condition that only text rows can meet, and
+	    Search Text in These Objects over text rows - which KFCSearchEngine::SearchTextInObjects refuses too. */
 	bool ListHoldsObjects();
 	/** Is the list a QR CODE LIST - KFC's QR Code tab's (KFCQRSearch: its search mode kKFCQRCodeSearchMode)? Its rows are only
-	    gone to (the design's Q13): nothing is replaced, outlined or changed from it, and it is not narrowed. */
+	    gone to (QR-18): nothing is replaced, outlined or changed from it, and it is not narrowed. */
 	bool ListIsQRCodes();
 	/** Is the list a FRAMES OF THESE MATCHES list - object rows found by a text search, not by the Object tab's (its
 	    Replace writes with the Object tab's Change Object Format alone - KFCObjectReplace, the narrow-down
@@ -482,8 +482,9 @@ namespace KFCResultModel
 	// (No "the search stopped short" flag for the replace to ask: a row's Replace writes that row alone, so results
 	//  that stopped at the limit can be replaced - the author's call.)
 
-	/** The Find/Change TAB these results were searched with (an IFindChangeOptions::SearchMode value;
-	    -1 = nothing searched yet). Held as a plain int so this header needs no text includes.
+	/** The Find/Change TAB these results were searched with (an IFindChangeOptions::SearchMode value, or
+	    kKFCQRCodeSearchMode for a QR code list - KFCModelTypes.h; -1 = nothing searched yet). Held as a plain int so
+	    this header needs no text includes.
 	    Recorded beside SetFromBook, and cleared by Clear().
 
 	    Why it has to be remembered: a row's Replace RE-WALKS the row's story, and a walk runs in the

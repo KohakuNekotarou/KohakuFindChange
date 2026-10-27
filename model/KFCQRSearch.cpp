@@ -95,7 +95,7 @@ bool KFCQRSearch::IsTabCurrent(int32* outScope)
 	bool current = false;
 	bool answered = false;
 #ifdef KFC_DIAG
-	// TEST BUILDS - the fault switch qr-tab (the plan's Task 3 cases, made before the tab itself): on = the QR Code tab,
+	// TEST BUILDS - the fault switch qr-tab (the model's cases, which need no dialog): on = the QR Code tab,
 	// whatever the dialog shows; its file's first line "all" = Search: All Documents, anything else Document.
 	if (KFC_DIAG_FAULT("qr-tab"))
 	{

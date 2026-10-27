@@ -115,8 +115,8 @@ public:
 	    any other list): a tier's heading names them after its name. */
 	virtual void GetNarrowWords(PMString& out) = 0;
 	/** = KFCResultModel::ListHoldsObjects (appended) - the list's rows are object rows (an Object tab search's, a
-	    Frames of These Matches list's): the heading's menu greys a text-only condition by it, and greys
-	    Search Text in These Objects over text rows. */
+	    QR Code tab search's, a Frames of These Matches list's): the heading's menu greys a text-only condition by it,
+	    and greys Search Text in These Objects over text rows. */
 	virtual bool ListHoldsObjects() = 0;
 	/** = KFCResultModel::ClearRows (appended) - Clear from Results: the rows taken off the list. Answers how many. */
 	virtual int32 ClearRows(const KFCRowsByChapter& rows) = 0;
@@ -125,15 +125,15 @@ public:
 	/** = KFCResultModel::IsHitItemGone (appended) - an object row whose item its document came back without: its UID
 	    may name another object by now, so the row's click and its Replace's selection take it for gone. A QR code list's
 	    row whose frame no longer holds a QR code (KFCQRSearch::RowHoldsQRCode - its document open) is gone too: its click
-	    marks it Missing (the QR design's Q15). */
+	    marks it Missing (QR-17). */
 	virtual bool IsHitItemGone(int32 chapterIdx, int32 hitIdx) = 0;
 	/** = KFCResultModel::IsFromAllDocuments (appended) - the list was searched over All Documents, whatever its scope says
 	    (a text list Search Text in These Objects made from one is kScopeInObjects): its document rows come up closed and a
 	    document with no window says so. */
 	virtual bool IsFromAllDocuments() = 0;
-	/** = KFCResultModel::ListIsQRCodes (appended - KFC 2.0's QR Code tab) - the live list is a QR code list: its rows are only
-	    gone to (Q13 - the heading's menu greys Narrow Down and Search Text in These Objects by it, kept per tier), and a row
-	    gone is a QR code no longer there. */
+	/** = KFCResultModel::ListIsQRCodes (appended - the QR Code tab) - the live list is a QR code list: its rows are
+	    only gone to (QR-18 - the heading's menu greys Narrow Down and Search Text in These Objects by it, kept per
+	    tier), and a row gone is a QR code no longer there. */
 	virtual bool ListIsQRCodes() = 0;
 };
 

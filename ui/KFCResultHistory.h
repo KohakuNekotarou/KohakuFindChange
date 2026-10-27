@@ -65,13 +65,14 @@ namespace KFCResultHistory
 	    heading draws "Objects" in the scope's place, WithScope). The list drawn again, the status line set. True = a new list. */
 	bool SearchTextInObjects(PMString& outSummary);
 
-	/** Are tier `tier`'s rows object rows - an Object tab search's, a Frames of These Matches list's (-1 = the live
-	    list, asked of the model; a grey one as its copy noted it)? The heading's Narrow Down greys a text-only
-	    condition by it, and its Search Text in These Objects is grey over text rows. */
+	/** Are tier `tier`'s rows object rows - an Object tab search's, a QR Code tab search's, a Frames of These Matches
+	    list's (-1 = the live list, asked of the model; a grey one as its copy noted it)? The heading's Narrow Down
+	    greys a text-only condition by it, and its Search Text in These Objects is grey over text rows (and over
+	    QR codes - TierHoldsQRCodes). */
 	bool TierHoldsObjects(int32 tier);
 
 	/** Are tier `tier`'s rows QR codes - a QR Code tab search's (-1 = the live list, asked of the model; a grey one as its
-	    copy noted it)? Its heading's Narrow Down and Search Text in These Objects are grey over it (the QR design's Q13: its
+	    copy noted it)? Its heading's Narrow Down and Search Text in These Objects are grey over it (QR-18: its
 	    rows are only gone to). */
 	bool TierHoldsQRCodes(int32 tier);
 

@@ -221,12 +221,15 @@
 //                hands only whole widths, and PMEllipsizeString's band (where it never comes back) lies between two -
 //                the way into it for the guard's own test
 //                (work\note-scripts\2026-10-25-kfc-full-run\green_ellipsize.ps1)
+//    qr-probe  KFCSearchEngine.cpp's RunSearch only reads the active document's QR codes into the trace - a QRPROBE
+//                line each: the frame's UID, the kind, the content (KFCQRCodes::DiagProbe; qr-probe-kinds)
 //    qr-tab  KFCQRSearch::IsTabCurrent takes KFC's QR Code tab for Find/Change's tab whatever the dialog shows - the panel's
 //                Find lists QR codes; the file's first line "all" = its Search: All Documents, anything else Document (the
-//                QR plan's Task 3 cases, made before the tab itself - work\kbs-regress\qr-cases.tsv, fault-qr-tab-*.jsx)
+//                model's cases, which need no dialog - work\kbs-regress\qr-cases.tsv, fault-qr-tab-*.jsx)
 //    qr-scope-unkept  (UI half) a landing with KFC's QR Code tab shown - a QR code Find Next's, a row's click
 //                (ui/KFCJump.cpp's ArmNativeScopeKeep) - keeps no Search: of InDesign's own tab: what the open dialog does
-//                to it when the landing selects (qr-findnext-native-scope-armed)
+//                to it when the landing selects (qr-findnext-native-scope-armed). Measured: it does nothing while
+//                the QR Code face is shown, so that case does not arm (work\kbs-regress\unarmed-qr-cases.tsv)
 //
 //  AND TIMERS: KFC_CLOCK / KFC_SPENT add up the milliseconds a stretch of code takes, and KFCDiagPhase
 //  writes "PHASE <name> begin" and "PHASE <name> end <ms>" around a scope - all of it nothing without KFC_DIAG.
