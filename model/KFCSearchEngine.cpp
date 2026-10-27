@@ -3152,7 +3152,7 @@ void AppendNothingToFind(PMString& io, int32 tab)
 
 }	// anonymous namespace
 
-bool KFCSearchEngine::ResolveRunScope(RunScope& out, PMString& outRefusal)
+bool KFCSearchEngine::ResolveRunScope(RunScope& out, PMString& outRefusal, bool forQueries)
 {
 	out = RunScope();
 	outRefusal.Clear();
@@ -3165,7 +3165,11 @@ bool KFCSearchEngine::ResolveRunScope(RunScope& out, PMString& outRefusal)
 	// read as Document ("the scope is never changed behind the user's back" - the rule the toggle has
 	// always kept). An unset Search: reads as Document (CurrentSearchScope); a list of stories is
 	// something only a script can set, and the dialog cannot show - refused too.
-	const int32 searchScope = KFCSearchEngine::CurrentSearchScope();
+	// A SAVED QUERY RUN READS INDESIGN'S OWN TAB'S (forQueries - the QR code re-check, 2026-10-28): the QR Code tab's Search:
+	// is its list's, and a query states its own tab. With the QR Code tab current and its Search: on All Documents, Run
+	// changed every open document while the Text tab said Document - and the dialog's Find, which steps the QR Code tab
+	// aside first, ran on Document (measured: qr-query-run-scope RED).
+	const int32 searchScope = forQueries ? KFCSearchEngine::FindChangeScope() : KFCSearchEngine::CurrentSearchScope();
 	const char* const scopeName = KFCSearchEngine::SearchScopeName(searchScope);	// "" = none this panel follows
 	// (asked of Search: as the selection makes it - what the dialog shows: Story with nothing selected IS
 	//  Document there, so it is no reason to refuse a book)
@@ -3248,7 +3252,7 @@ bool KFCSearchEngine::DescribeRunScope(PMString& outWords)
 	outWords.SetTranslatable(kFalse);
 	RunScope scope;
 	PMString refusal;
-	if (!ResolveRunScope(scope, refusal))
+	if (!ResolveRunScope(scope, refusal, true /*forQueries - the line is Run's*/))
 	{
 		outWords.Append("Cannot run: ");
 		outWords.Append(refusal);

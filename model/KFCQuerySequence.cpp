@@ -214,7 +214,7 @@ int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 		return 0;
 	}
 	KFCSearchEngine::RunScope scope;
-	if (!KFCSearchEngine::ResolveRunScope(scope, outSummary))
+	if (!KFCSearchEngine::ResolveRunScope(scope, outSummary, true /*forQueries - never the QR Code tab's Search:*/))
 		return 0;
 
 	// ===== THE COMMIT POINT. The list as it is now and its book are copied (RunRecorder - what a take-back or an Undo

@@ -152,8 +152,11 @@ namespace KFCSearchEngine
 
 	/** THE SCOPE DOORS SEARCHBOOK HAS ALWAYS ASKED, IN ONE PLACE (so the query run asks the same):
 	    Book Scope with a Search: other than Document, a Search: this panel cannot follow, no target book, an
-	    empty one, no active document. false = refused, outRefusal holds SearchBook's own sentence. Touches nothing. */
-	bool ResolveRunScope(RunScope& out, PMString& outRefusal);
+	    empty one, no active document. false = refused, outRefusal holds SearchBook's own sentence. Touches nothing.
+	    forQueries = a saved query run's scope (the query dialog's Run, and its Runs on: line): Search: as InDesign's own tab
+	    holds it (FindChangeScope) - never the QR Code tab's, which lists QR codes and runs no query. A saved query states its
+	    own tab: the dialog's Find steps the QR Code tab aside before it searches (KFCQRTab::YieldToSavedQuery). */
+	bool ResolveRunScope(RunScope& out, PMString& outRefusal, bool forQueries = false);
 
 	/** THE RUN'S TARGET DOORS - ResolveRunScope's last three, and the Object tab's
 	    (KFCObjectSearch::ResolveObjectRunScope), so both tabs refuse in the same sentences: Book Scope on with
@@ -289,7 +292,8 @@ namespace KFCSearchEngine
 
 	/** The Search: of InDesign's OWN tab (FindChangeMode's - the tab shown before the QR Code tab while that one is shown),
 	    read as CurrentSearchScope reads a tab of InDesign's; never the QR Code tab's. What a QR code Find Next's landing keeps
-	    (KFCJump - the open dialog re-picks it when the selection changes). -1 when the settings cannot be read. */
+	    (KFCJump - the open dialog re-picks it when the selection changes), and what a saved query run runs on
+	    (ResolveRunScope's forQueries). -1 when the settings cannot be read. */
 	int32 FindChangeScope();
 
 	/** Put Search: of tab 'mode' back to 'scope' (a WalkScopeType value, as CurrentSearchScope gives it) - the
