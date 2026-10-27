@@ -1,6 +1,6 @@
 # 18. QR コードの一覧（検索と置換の「QR Code」タブ・2.0）
 
-> コード地図での位置: `model/KFCQRCodes.*`（QR を集める・読む）・`model/KFCQRSearch.*`（タブが今のタブか・一覧・行・Find Next）・`ui/KFCQRTab.*`（タブの面）・`ui/KFCJump.cpp`（クリックと Find Next の着地）。コード地図（`kbs-file-map.md`）のブロック番号はまだ振っていない。
+> コード地図での位置: `model/KFCQRCodes.*`（QR を集める・読む）・`model/KFCQRSearch.*`（タブが今のタブか・一覧・行・Find Next）・`ui/KFCQRTab.*`（タブの面）・`ui/KFCJump.cpp`（クリックと Find Next の着地）。コード地図（`kbs-file-map.md`）ではブロック21（2026-10-27 に新設）。
 > 設計書 `docs/superpowers/specs/2026-10-27-kfc-qr-code-search-design.md`（Q1〜Q19・D1〜D8）・計画 `docs/superpowers/plans/2026-10-27-kfc-qr-code-tab.md`（Task 1〜8）・実測 `docs/ai-notes/kfc-qr-tab-measure-2026-10-27.md`（M1〜M10）。各項目の末尾の（Q<番号>）（D<番号>）は設計書の決定。回帰の表＝`work/kbs-regress/qr-cases.tsv`。
 > 訂正の書き方は [00-index.md](00-index.md)。
 
