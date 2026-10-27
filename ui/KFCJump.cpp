@@ -883,11 +883,43 @@ ScopeKeep gScopeKeep;
 // them with room - and a Search: the user picks again themselves after a click is put back for half as long.
 const long long kScopeKeepMs = 1000;
 
-void ArmNativeScopeKeep();
+// Arm for an activation about to happen - the tab and its Search: as read just before (native: InDesign's own tab under
+// KFC's QR Code tab; else the tab Find/Change is on); armable = false arms nothing. One INSIDE an armed window of the
+// same kind and tab keeps the value already held and only renews the window: the arrow walk's next row can come
+// between the dialog's write and ours, and would take the dialog's value as the one to keep.
+void ArmKeep(bool native, int32 mode, int32 scope, bool armable, const std::chrono::steady_clock::time_point& now)
+{
+	if (gScopeKeep.armed && gScopeKeep.native == native && mode == gScopeKeep.mode
+		&& std::chrono::duration_cast<std::chrono::milliseconds>(now - gScopeKeep.at).count() <= kScopeKeepMs)
+	{
+		gScopeKeep.at = now;
+		KFC_DIAG_LOG("SCOPEKEEP renewed%s mode=%d scope=%d", native ? " native" : "", (int)gScopeKeep.mode,
+			(int)gScopeKeep.scope);
+		return;
+	}
+	gScopeKeep.armed = (armable && mode >= 0 && scope >= 0);
+	gScopeKeep.native = native;
+	gScopeKeep.mode = mode;
+	gScopeKeep.scope = scope;
+	gScopeKeep.at = now;
+	KFC_DIAG_LOG("SCOPEKEEP armed=%d%s mode=%d scope=%d", gScopeKeep.armed ? 1 : 0, native ? " native" : "", (int)mode,
+		(int)scope);
+}
 
-// Arm for an activation about to happen. One INSIDE an armed window keeps the value already held and only renews the
-// window: the arrow walk's next row can come between the dialog's write and ours, and would take the dialog's value
-// as the one to keep.
+// ARMED FOR A LANDING WITH KFC'S QR CODE TAB SHOWN - a QR code Find Next's (KFCJump::LandOnQRCode) and a row's click
+// (ArmScopeKeep): the Search: of InDesign's OWN tab - the one shown before the QR Code tab, whose mode Find/Change keeps
+// (measured in KT) - as it is before the landing fronts a document or selects, put back as a row's click's is
+// (KeepSearchScopeAfterClick): the dialog's own Find Next leaves Search: alone, and so must the QR Code tab's.
+void ArmNativeScopeKeep()
+{
+	const std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+	int32 mode = -1, scope = -1;
+	KFCRuns()->FindChangeTabAndScope(mode, scope);
+	// (Fault switch qr-scope-unkept, a test build's only - KFCDiag.h: nothing armed - what the dialog does unkept.)
+	ArmKeep(true /*native*/, mode, scope, !KFC_DIAG_FAULT("qr-scope-unkept"), now);
+}
+
+// A row's activation (ActivateNode): the tab Find/Change is on, and its Search:.
 void ArmScopeKeep()
 {
 	const std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
@@ -900,46 +932,7 @@ void ArmScopeKeep()
 		ArmNativeScopeKeep();
 		return;
 	}
-	if (gScopeKeep.armed && !gScopeKeep.native && mode == gScopeKeep.mode
-		&& std::chrono::duration_cast<std::chrono::milliseconds>(now - gScopeKeep.at).count() <= kScopeKeepMs)
-	{
-		gScopeKeep.at = now;
-		KFC_DIAG_LOG("SCOPEKEEP renewed mode=%d scope=%d", (int)gScopeKeep.mode, (int)gScopeKeep.scope);
-		return;
-	}
-	const int32 scope = KFCRuns()->CurrentSearchScope();
-	gScopeKeep.armed = (mode >= 0 && scope >= 0);
-	gScopeKeep.native = false;
-	gScopeKeep.mode = mode;
-	gScopeKeep.scope = scope;
-	gScopeKeep.at = now;
-	KFC_DIAG_LOG("SCOPEKEEP armed=%d mode=%d scope=%d", gScopeKeep.armed ? 1 : 0, (int)mode, (int)scope);
-}
-
-// ARMED FOR A LANDING WITH KFC'S QR CODE TAB SHOWN - a QR code Find Next's (KFCJump::LandOnQRCode) and a row's click
-// (ArmScopeKeep): the Search: of InDesign's OWN tab - the one shown before the QR Code tab, whose mode Find/Change keeps
-// (measured in KT) - as it is before the landing fronts a document or selects, put back as a row's click's is
-// (KeepSearchScopeAfterClick): the dialog's own Find Next leaves Search: alone, and so must the QR Code tab's. A press
-// inside an armed window renews it alone, as ArmScopeKeep's.
-void ArmNativeScopeKeep()
-{
-	const std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
-	int32 mode = -1, scope = -1;
-	KFCRuns()->FindChangeTabAndScope(mode, scope);
-	if (gScopeKeep.armed && gScopeKeep.native && mode == gScopeKeep.mode
-		&& std::chrono::duration_cast<std::chrono::milliseconds>(now - gScopeKeep.at).count() <= kScopeKeepMs)
-	{
-		gScopeKeep.at = now;
-		KFC_DIAG_LOG("SCOPEKEEP renewed native mode=%d scope=%d", (int)gScopeKeep.mode, (int)gScopeKeep.scope);
-		return;
-	}
-	// (Fault switch qr-scope-unkept, a test build's only - KFCDiag.h: nothing armed - what the dialog does unkept.)
-	gScopeKeep.armed = (mode >= 0 && scope >= 0 && !KFC_DIAG_FAULT("qr-scope-unkept"));
-	gScopeKeep.native = true;
-	gScopeKeep.mode = mode;
-	gScopeKeep.scope = scope;
-	gScopeKeep.at = now;
-	KFC_DIAG_LOG("SCOPEKEEP armed=%d native mode=%d scope=%d", gScopeKeep.armed ? 1 : 0, (int)mode, (int)scope);
+	ArmKeep(false /*native*/, mode, KFCRuns()->CurrentSearchScope(), true, now);
 }
 
 // The Type tool, because a selected match is an invitation to EDIT - a click's: Edit > Find/Change's Find Next selects

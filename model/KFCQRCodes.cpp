@@ -12,7 +12,6 @@
 
 // Interface includes:
 #include "IDataBase.h"
-#include "IDocument.h"
 #include "IHierarchy.h"
 #include "IObjectWalker.h"
 #include "IPersistUIDData.h"
@@ -35,6 +34,7 @@
 #include "KFCQRCodes.h"
 #include "KFCDiag.h"
 #ifdef KFC_DIAG
+#include "IDocument.h"					// the probe's (DiagProbe) - test builds only
 #include "KFCBookScope.h"				// ActiveDocument - the probe's document
 #endif
 
@@ -42,8 +42,8 @@ namespace
 {
 
 // The QR code's EPS item for `item` - the item itself, or a frame's one child - or an invalid UIDRef: an EPS item whose
-// IID_IQRCODEDATAUID names a data boss (EPSID.h: only kEPSItem carries it).
-UIDRef QREpsOf(const UIDRef& item)
+// IID_IQRCODEDATAUID names a data boss (EPSID.h: only kEPSItem carries it). outData (when given) = that data boss.
+UIDRef QREpsOf(const UIDRef& item, UIDRef* outData = nil)
 {
 	IDataBase* const db = item.GetDataBase();
 	if (db == nil || item.GetUID() == kInvalidUID || !db->IsValidUID(item.GetUID()))
@@ -59,7 +59,11 @@ UIDRef QREpsOf(const UIDRef& item)
 			return UIDRef();
 	}
 	InterfacePtr<IPersistUIDData> data(eps, IID_IQRCODEDATAUID);
-	return (data != nil && data->GetUID() != kInvalidUID && db->IsValidUID(data->GetUID())) ? eps : UIDRef();
+	if (data == nil || data->GetUID() == kInvalidUID || !db->IsValidUID(data->GetUID()))
+		return UIDRef();
+	if (outData != nil)
+		*outData = UIDRef(db, data->GetUID());
+	return eps;
 }
 
 // `text` as one line: each line break (CR, LF, a CR LF pair) one space, the ends trimmed.
@@ -112,11 +116,9 @@ const char* KFCQRCodes::KindWord(Kind kind)
 
 bool KFCQRCodes::Read(const UIDRef& frameOrItem, Kind& outKind, PMString& outContent)
 {
-	const UIDRef eps = QREpsOf(frameOrItem);
-	if (eps.GetUID() == kInvalidUID)
+	UIDRef data;
+	if (QREpsOf(frameOrItem, &data).GetUID() == kInvalidUID)
 		return false;
-	InterfacePtr<IPersistUIDData> dataUID(eps, IID_IQRCODEDATAUID);
-	const UIDRef data(eps.GetDataBase(), dataUID->GetUID());
 
 	// THE KIND IS WHICH INTERFACE ANSWERS (no method returns IQRCodeStringData's kWebHyperlink .. kBusinessCard).
 	InterfacePtr<IQRHyperLinkData> web(data, UseDefaultIID());

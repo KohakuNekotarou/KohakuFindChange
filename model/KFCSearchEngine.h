@@ -55,8 +55,7 @@ namespace KFCResultModel { struct Hit; struct SearchedRange; }	// FileChapter
 class KFCForwardSearchScope
 {
 public:
-	KFCForwardSearchScope();
-	explicit KFCForwardSearchScope(bool wanted);
+	explicit KFCForwardSearchScope(bool wanted = true);
 	~KFCForwardSearchScope();
 private:
 	KFCForwardSearchScope(const KFCForwardSearchScope&);

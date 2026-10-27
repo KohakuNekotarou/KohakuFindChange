@@ -11,16 +11,15 @@
 #include "VCPlugInHeaders.h"
 
 // Interface includes:
-#include "IBooleanControlData.h"		// IID_IBOOLEANCONTROLDATA - Find Next's press
 #include "IControlView.h"
 #include "IDropDownListController.h"	// Search:'s entry
 #include "IPanelControlData.h"
 #include "ISelectableDialogSwitcher.h"	// the dialog's current face, asked of the face's own parent
-#include "IStringListControlData.h"		// IID_ISTRINGLISTCONTROLDATA - Search:'s change
 #include "ISubject.h"
 #include "ITextControlData.h"			// the face's line
 #include "IWalkerScopeFactoryUtils.h"	// kDocumentScope, kAllDocumentScope
 #include "IWidgetParent.h"
+#include "widgetid.h"					// IID_IBOOLEANCONTROLDATA / IID_ISTRINGLISTCONTROLDATA and their messages
 
 // General includes:
 #include "AbstractDialogObserver.h"		// a selectable dialog face's observer (its header says so)
@@ -164,8 +163,8 @@ public:
 };
 CREATE_PMINTERFACE(KFCQRTabPanelCreator, kKFCQRTabPanelCreatorImpl)
 
-/** The dialog's calls on the face: its Search: put in when it is first shown, nothing to check or apply (KFC's Find reads
-    the face as it stands), and - as the dialog closes - whether it closes on this face. */
+/** The dialog's calls on the face: its Search: put in when it is first shown, nothing to check or apply (the base's
+    own - KFC's Find reads the face as it stands), and - as the dialog closes - whether it closes on this face. */
 class KFCQRTabController : public CDialogController
 {
 public:
@@ -179,15 +178,6 @@ public:
 		InterfacePtr<IDropDownListController> list(QueryScopeList(this));
 		if (list != nil)
 			list->Select((gScope == IWalkerScopeFactoryUtils::kAllDocumentScope) ? kAllDocumentsEntry : kDocumentEntry, kTrue, kFalse);
-	}
-
-	virtual WidgetID ValidateDialogFields(IActiveContext* /*context*/)
-	{
-		return kNoInvalidWidgets;
-	}
-
-	virtual void ApplyDialogFields(IActiveContext* /*context*/, const WidgetID& /*widgetId*/)
-	{
 	}
 
 	virtual void ClosingDialog(IActiveContext* context)

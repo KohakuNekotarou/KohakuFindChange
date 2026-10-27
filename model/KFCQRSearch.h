@@ -27,7 +27,6 @@
 #include "KFCBookScope.h"		// ChapterDoc, SkippedChapter - a run's targets
 #include "KFCResultModel.h"		// Hit - a row
 #include "KFCSearchEngine.h"	// CollectTally - a walk's count
-#include "KFCQRCodes.h"			// Kind
 
 namespace KFCQRSearch
 {
@@ -47,7 +46,7 @@ namespace KFCQRSearch
 	    one at a time, as the Object tab's walk does (KFCObjectSearch::CollectTargets) - each target's rows filed as every
 	    walk's are (KFCSearchEngine::FileChapter: page order, the tally). Cancel is heard between documents. reserved = rows
 	    the list holds before the walk (a search again's kept rows); the object lists' limit counts the rest. */
-	void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBook, bool allDocuments,
+	void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBook,
 		std::vector<KFCBookScope::SkippedChapter>& unopenable, KFCSearchEngine::CollectTally& out, int32 reserved);
 
 	/** SEARCH THIS DOCUMENT AGAIN on a QR code list (KFCSearchEngine::SearchDocumentAgain): ONE open document walked whole,
@@ -55,10 +54,6 @@ namespace KFCQRSearch
 	    true = walked to its end; false = no walker, or Cancel was pressed (outCancelled) - the rows are not to be used. */
 	bool WalkOneDocument(const UIDRef& docRef, const PMString& name, size_t limit,
 		std::vector<KFCResultModel::Hit>& outHits, bool& outCapped, bool& outCancelled);
-
-	/** A QR CODE'S ROW: itemUID = the frame, matchText = "ID<uid>:<kind>  <content>" (the content cut short where a row's
-	    text is - the panel cuts it again to its width), its page and words as an object row's (ReadItemPlace). */
-	void BuildRow(const UIDRef& docRef, UID frame, KFCQRCodes::Kind kind, const PMString& content, KFCResultModel::Hit& out);
 
 	/** DOES THE ROW'S FRAME STILL HOLD A QR CODE (the design's Q15 - IKFCResults::IsHitItemGone asks it of a QR code list's
 	    rows)? Read in its document as it stands (KFCQRCodes::Read): false = no QR code there now - the frame gone, or holding

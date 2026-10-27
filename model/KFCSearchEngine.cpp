@@ -1789,11 +1789,6 @@ void PutSessionDirectionBack(bool16 backwards, int32 mode)
 }
 }	// anonymous namespace
 
-KFCForwardSearchScope::KFCForwardSearchScope() : fRestore(false), fMode(0)
-{
-	fRestore = TurnSessionDirection(kFalse, fMode);
-}
-
 KFCForwardSearchScope::KFCForwardSearchScope(bool wanted) : fRestore(false), fMode(0)
 {
 	if (wanted)
@@ -3834,7 +3829,7 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 			tally.gone += again->gone;
 		}
 		else if (qrTab)			// THE QR CODE TAB: every QR code, read by KFC's own object walker one document at a time.
-			KFCQRSearch::CollectTargets(targets, fromBook, allDocuments, unopenable, tally, reserved);
+			KFCQRSearch::CollectTargets(targets, fromBook, unopenable, tally, reserved);
 		else if (objectTab)		// THE OBJECT TAB: page items, walked by InDesign's own object search one document at a time.
 			KFCObjectSearch::CollectTargets(targets, fromBook, allDocuments, static_cast<int32>(selectionScope), unopenable, tally,
 				reserved, narrowFilter.Empty() ? nil : &narrowFilter);

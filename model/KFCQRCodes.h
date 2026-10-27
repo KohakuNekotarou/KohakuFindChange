@@ -39,7 +39,8 @@ namespace KFCQRCodes
 	    fields (the design's Q14 / D6: InDesign's hover text is the raw format with line breaks for an Email and a business
 	    card): Web = the URL; Text = the text; SMS = "<number>: <message>"; Email = "<address>  <subject>"; business card =
 	    "<first> <last>" (InDesign's own FN order) and " / <organisation>" when there is one. A line break is a space.
-	    false = not a QR code (no IID_IQRCODEDATAUID, or its data of no kind known here); out values as they were. */
+	    false = not a QR code (an item no longer there, no IID_IQRCODEDATAUID, or its data of no kind known here); out
+	    values as they were. */
 	bool Read(const UIDRef& frameOrItem, Kind& outKind, PMString& outContent);
 
 	/** EVERY QR CODE OF A DOCUMENT, as its frame's UID, in the walk's order (parent spreads first, then the spreads in

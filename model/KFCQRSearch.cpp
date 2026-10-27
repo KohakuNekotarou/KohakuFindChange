@@ -16,10 +16,9 @@
 // General includes:
 #include "TextChar.h"					// kTextChar_Ellipse
 
-#include <string>
-
 // Project includes:
 #include "KFCQRSearch.h"
+#include "KFCQRCodes.h"			// CollectFrames, Read, KindWord - a document's QR codes
 #include "IKFCUIServices.h"		// IsQRCodeTabCurrent - the tab is the UI half's (KFCQueryUIServices)
 #include "KFCModelTypes.h"		// kKFCQRReach* - what keeps a QR code Find Next found from being selected
 #include "KFCDiag.h"
@@ -35,6 +34,32 @@ const int32 kQRDocSpan = 100;
 
 // A row's content is kept to this many characters - the panel cuts it again to its width when it draws.
 const int32 kQRMaxContentChars = 200;
+
+// A QR CODE'S ROW: itemUID = the frame, matchText = "ID<uid>:<kind>  <content>" (the content cut short where a row's
+// text is - the panel cuts it again to its width), its page and words as an object row's (ReadItemPlace).
+void BuildRow(const UIDRef& docRef, UID frame, KFCQRCodes::Kind kind, const PMString& content, KFCResultModel::Hit& out)
+{
+	out.itemUID = frame;
+	// THE ROW'S TEXT (Q7 / Q14): "ID<uid>:<kind>  <content>" - the object rows' "ID<uid>:" head, then the kind and what the
+	// QR code holds. Cut where a row's text is kept short, never inside a character (KFCSafeCut); the panel's drawing
+	// cuts it again to the panel's width.
+	PMString text(content);
+	text.SetTranslatable(kFalse);
+	if (text.CharCount() > kQRMaxContentChars)
+	{
+		text.Remove(KFCSafeCut(text, kQRMaxContentChars), kMaxInt32);
+		text.AppendW(static_cast<UTF32TextChar>(kTextChar_Ellipse));
+	}
+	out.matchText = "ID";
+	out.matchText.AppendNumber(static_cast<int32>(frame.Get()));
+	out.matchText.Append(":");
+	out.matchText.Append(KFCQRCodes::KindWord(kind));
+	out.matchText.Append("  ");
+	out.matchText.Append(text);
+	out.matchText.SetTranslatable(kFalse);
+	// WHERE IT STANDS - its page and its words, read as an object row's.
+	(void)KFCObjectSearch::ReadItemPlace(docRef, frame, out);
+}
 
 // ONE DOCUMENT'S QR CODES AS ROWS, in the walk's order (FileChapter puts them in page order): at most `limit` (outCapped when
 // there were more). false = no walker.
@@ -56,7 +81,7 @@ bool WalkDoc(const UIDRef& docRef, size_t limit, std::vector<KFCResultModel::Hit
 			break;
 		}
 		KFCResultModel::Hit hit;
-		KFCQRSearch::BuildRow(docRef, frames[i], kind, content, hit);
+		BuildRow(docRef, frames[i], kind, content, hit);
 		outHits.push_back(hit);
 	}
 	return true;
@@ -104,10 +129,9 @@ const char* KFCQRSearch::NotChangedWords()
 	return "these rows are QR codes - nothing is changed from this list (click a row to go to its QR code).";
 }
 
-void KFCQRSearch::CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBook, bool allDocuments,
+void KFCQRSearch::CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBook,
 	std::vector<KFCBookScope::SkippedChapter>& unopenable, KFCSearchEngine::CollectTally& out, int32 reserved)
 {
-	(void)allDocuments;		// the targets already say it (KFCSearchEngine's targets for All Documents)
 	out = KFCSearchEngine::CollectTally();
 	PMString title(fromBook ? "Searching book..." : "Searching...");
 	title.SetTranslatable(kFalse);
@@ -179,31 +203,6 @@ bool KFCQRSearch::WalkOneDocument(const UIDRef& docRef, const PMString& name, si
 	return walked && !outCancelled;
 }
 
-void KFCQRSearch::BuildRow(const UIDRef& docRef, UID frame, KFCQRCodes::Kind kind, const PMString& content,
-	KFCResultModel::Hit& out)
-{
-	out.itemUID = frame;
-	// THE ROW'S TEXT (Q7 / Q14): "ID<uid>:<kind>  <content>" - the object rows' "ID<uid>:" head, then the kind and what the
-	// QR code holds. Cut where a row's text is kept short, never inside a character (KFCSafeCut); the panel's drawing
-	// cuts it again to the panel's width.
-	PMString text(content);
-	text.SetTranslatable(kFalse);
-	if (text.CharCount() > kQRMaxContentChars)
-	{
-		text.Remove(KFCSafeCut(text, kQRMaxContentChars), kMaxInt32);
-		text.AppendW(static_cast<UTF32TextChar>(kTextChar_Ellipse));
-	}
-	out.matchText = "ID";
-	out.matchText.AppendNumber(static_cast<int32>(frame.Get()));
-	out.matchText.Append(":");
-	out.matchText.Append(KFCQRCodes::KindWord(kind));
-	out.matchText.Append("  ");
-	out.matchText.Append(text);
-	out.matchText.SetTranslatable(kFalse);
-	// WHERE IT STANDS - its page and its words, read as an object row's.
-	(void)KFCObjectSearch::ReadItemPlace(docRef, frame, out);
-}
-
 bool KFCQRSearch::RowHoldsQRCode(int32 chapterIdx, int32 hitIdx)
 {
 	const UID frame = KFCResultModel::GetHitItem(chapterIdx, hitIdx);
@@ -213,12 +212,9 @@ bool KFCQRSearch::RowHoldsQRCode(int32 chapterIdx, int32 hitIdx)
 	IDFile file;
 	if (!KFCResultModel::GetChapterLocation(chapterIdx, docRef, file) || !KFCBookScope::IsDocStillOpen(docRef))
 		return true;		// not open now: cannot tell - the row's click opens it and asks again
-	IDataBase* const db = docRef.GetDataBase();
-	if (db == nil || !db->IsValidUID(frame))
-		return false;
 	KFCQRCodes::Kind kind = KFCQRCodes::kKindNone;
 	PMString content;
-	return KFCQRCodes::Read(UIDRef(db, frame), kind, content);
+	return KFCQRCodes::Read(UIDRef(docRef.GetDataBase(), frame), kind, content);
 }
 
 bool KFCQRSearch::Next(const UIDRef& last, UIDRef& outFrame, int32& outReach, PMString& outWords)
