@@ -88,7 +88,7 @@
   - 訂正:
 
 - **PNL-17** ★説明は、UI 言語が日本語なら日本語、それ以外は英語（2026-08-05 の決定＝featureSet ではなく UI 言語で決める）。
-  中身は10 ―― 免責／検索（Find in …）／検索範囲（Book Scope）／結果の見方／**複数の行をまとめて選ぶ・置換する**（1.4.0）／置換／**特殊操作（Special Operations）**（2026-10-18）／保存したクエリを順に実行（Run Saved Queries...）／ブックパネル（Remember Book Panel Placement）／アプリケーションバーの検索欄。
+  中身は11 ―― 免責／検索（Find in …）／検索範囲（Book Scope）／**QR コードの一覧（QR Code タブ）**（2.0.0）／結果の見方／**複数の行をまとめて選ぶ・置換する**（1.4.0）／置換／**特殊操作（Special Operations）**（2026-10-18）／保存したクエリを順に実行（Run Saved Queries...）／ブックパネル（Remember Book Panel Placement）／アプリケーションバーの検索欄。
   ★**2026-10-11 の作者の文面**（デスクトップの `KFC 1.4 How to Use（日本語）.txt` を一字一句そのまま・英語はその訳＝`f64e142`）＝検索できるタブは5つ（オブジェクトを含む）、「結果の見方」の右クリックの行は「右クリックメニュー」の一語、Shift＋リターンは「一つ下の置換できる行に移動」。
   それまでの下書きにあった Object タブの節・Book Scope: OFF の行・クリックとキーボードの枠の行・選べない一致の行は、作者の文面で外れた。（1.4.0）
   ★**日本語は作者の文面そのまま、英語はそれに1行ずつ合わせる**（2026-10-09 朝 `33fecee`＝Change Checked と Show Changes の節を外した。同じ日の夜、作者が書いた「保存したクエリを順に実行」の節を足した＝作者「HOWTOにクエリダイアログの件がのってなかったですね」）。
@@ -96,6 +96,7 @@
   - ⬜ How to Use に載っていない項目＝Change All in Book (No List)・Find/Change Selected Documents (Book)・Clear Results・Search This Story Again・Search This Document Again・Select All Rows（「結果の見方」は「右クリックメニュー」の一語）・Translucent／Minimizable の設定・Save Panel Settings（足すかは作者）。
   - ✅（2026-10-18 午後）**作者の文面に差し替えた**（デスクトップの `KFC-How-To-Use-ja.txt` を作者が直したもの＝Ctrl+Return・Narrow Down は短く、Copy Results の行を足し、Create Outlines と Frames の Replace の行は外した）。中身は10＝**特殊操作（Special Operations）**の節を足した（作者の依頼「Special Operations の項目を HowTo に」「簡素に」＝1行・私の下書きを作者が直した＝「（Create Outlines など）」を外した・同じ日 13:51 のデスクトップのファイル）。英語はそれに1行ずつ合わせた。
   - ✅（2026-10-18 夜）「保存したクエリを順に実行」の節に **Find** の行を足した＝クエリのダイアログの Find（QRY-29）だけが載っていなかった（ブロック1の不具合の回の観察）→作者「Find の簡素な説明を追加したのを」＝私の下書きを作者が直した（「結果をパネルの一番下に足します（置換はしません）」を外した）＝デスクトップの `KFC-How-To-Use-Queries-ja.txt` を一字一句そのまま・英語はそれに1行合わせた。
+  - ✅（2026-10-27 夜）**QR コードの一覧（QR Code タブ）**の節＝作者の文面（私の下書きをデスクトップの `KFC How to Use（日本語）.txt` に出し、作者が直したもの＝「全部」を外し、行のクリックの行を短く〈矢印キーと閉じた章の一言を外した〉、タブの Find Next と「QR コードの行は置換しない」の行を外した）＝一字一句そのまま・英語はそれに1行ずつ合わせた。
   - 訂正:
 
 - **PNL-18** スクリプトの窓が出せないときは、ふつうのアラートで同じ文を出す（先頭に `Kohaku Find/Change - How to Use` を付ける＝アラートには題が無いので）。
