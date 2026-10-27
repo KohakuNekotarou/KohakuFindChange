@@ -93,6 +93,9 @@
 #include "KFCQuerySequence.h"	// RunFromDiagSwitch - the test build's way into the query run
 #include "KFCChangeAll.h"		// CommandName - the limit's note names Change All in Book (No List)
 #include "KFCObjectSearch.h"	// the Object tab's listing, its Search: and its query
+#include "KFCQRCodes.h"			// the QR Code tab's reading (the test build's probe - RunSearch's head)
+#include "KFCQRSearch.h"		// the QR Code tab's listing, its Search: - and whether it is the tab now
+#include "KFCModelTypes.h"		// kKFCQRCodeSearchMode
 #include "KFCTextCut.h"			// KFCSafeCut - where a row's line may be cut (the rule the panel's own cuts follow)
 #include "KFCFindChangeCmds.h"	// the find/change settings' commands, one at a time
 #include "KFCQueryCopy.h"		// the query copied in memory - onto each new list (the tier switch); the spike (DiagProbe)
@@ -1791,6 +1794,12 @@ KFCForwardSearchScope::KFCForwardSearchScope() : fRestore(false), fMode(0)
 	fRestore = TurnSessionDirection(kFalse, fMode);
 }
 
+KFCForwardSearchScope::KFCForwardSearchScope(bool wanted) : fRestore(false), fMode(0)
+{
+	if (wanted)
+		fRestore = TurnSessionDirection(kFalse, fMode);
+}
+
 KFCForwardSearchScope::~KFCForwardSearchScope()
 {
 	if (fRestore)
@@ -3053,7 +3062,8 @@ const char* const kNoDocumentToSearch = "No open document to search.";
 //    this list, kept as a tier by a later search, is switched to. nil = none: a copy that could not be read is not put
 //    on - that tier then refuses a switch.
 void WriteListHeader(bool fromBook, bool allDocuments, KFCResultModel::SearchScopeKind scope,
-	const std::vector<KFCNarrowStep>& narrow, const PMString& bookName, const std::shared_ptr<const KFCQueryCopy>& copy)
+	const std::vector<KFCNarrowStep>& narrow, const PMString& bookName, const std::shared_ptr<const KFCQueryCopy>& copy,
+	int32 searchMode)		// the run's tab (RunSearch's - kKFCQRCodeSearchMode for a QR code list)
 {
 	KFCResultModel::SetFromBook(fromBook);
 	KFCResultModel::SetFromAllDocuments(allDocuments);
@@ -3061,7 +3071,7 @@ void WriteListHeader(bool fromBook, bool allDocuments, KFCResultModel::SearchSco
 	KFCResultModel::SetNarrowSteps(narrow);
 	KFCResultModel::NoteRun();
 	KFCResultModel::SetBookName(bookName);
-	KFCResultModel::SetSearchMode(KFCSearchEngine::CurrentSearchMode());
+	KFCResultModel::SetSearchMode(searchMode);
 	PMString walkSignature;
 	KFCSearchEngine::BuildWalkSignature(walkSignature);
 	KFCResultModel::SetWalkSignature(walkSignature);
@@ -3070,11 +3080,12 @@ void WriteListHeader(bool fromBook, bool allDocuments, KFCResultModel::SearchSco
 }
 
 // A LIST'S ROWS IN ITS SUMMARY'S WORDS (the narrow-down spec's N10): " frame(s)" for a Frames of These Matches list's -
-// its rows are frames - " hit(s)" for any other's. Said by the search's summary (RunSearch) and by a Narrow Down's over
-// part of a document (SearchPartsAgain).
+// its rows are frames - " QR code(s)" for a QR code list's (KFCQRSearch - read off the live list, whose header is written
+// before any summary asks), " hit(s)" for any other's. Said by the search's summary (RunSearch), by both searches again
+// (SayFoundAgain) and by a Narrow Down's over part of a document (SearchPartsAgain).
 const char* RowWords(bool frames)
 {
-	return frames ? " frame(s)" : " hit(s)";
+	return KFCResultModel::ListIsQRCodes() ? " QR code(s)" : frames ? " frame(s)" : " hit(s)";
 }
 
 // WHAT A NARROWED LIST'S WALKS OWE ITS SUMMARY (Narrow Down - nothing for any other list), said by the same two: the
@@ -3486,6 +3497,11 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	// says what came back (KFCQueryCopier::DiagProbe) - and searches nothing.
 	if (again == nil && KFCQueryCopier::DiagProbe(outSummary))
 		return 0;
+	// THE QR CODE TAB'S READING (docs/superpowers/plans/2026-10-27-kfc-qr-code-tab.md Task 2): while the fault switch
+	// qr-probe is on, the Find reads the active document's QR codes into the trace (QRPROBE lines - the regression case
+	// qr-probe-kinds) and searches nothing.
+	if (again == nil && KFC_DIAG_FAULT("qr-probe"))
+		return KFCQRCodes::DiagProbe(outSummary);
 #endif
 
 	// Last-resort re-entry stop. The panel's actions grey themselves out while a search runs, but
@@ -3529,7 +3545,11 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	// THE MENU GREYS THE COMMAND ON THESE TABS (the author's call) through the same
 	// question (CanSearchTab); this stays for a caller that never opened the menu - a script invoking
 	// the action by its ID reaches here whatever the menu says.
-	const int32 tab = KFCSearchEngine::CurrentSearchMode();
+	// A SEARCH AGAIN RUNS UNDER ITS LIST'S QUERY, stated into Find/Change first (KFCUnderListQuery): its tab is then InDesign's
+	// own mode (FindChangeMode) - not the QR Code tab the dialog may be showing, which changes no mode of InDesign's - and a
+	// QR code list's tab is its own, whatever Find/Change is on (InDesign has no QR mode to state back).
+	const int32 tab = (again == nil || again->freshQuery) ? KFCSearchEngine::CurrentSearchMode()
+		: KFCResultModel::ListIsQRCodes() ? static_cast<int32>(kKFCQRCodeSearchMode) : KFCSearchEngine::FindChangeMode();
 	if (!KFCSearchEngine::CanSearchTab(tab))
 	{
 		outSummary.Append("The Find/Change dialog is on the ");
@@ -3543,14 +3563,16 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 		return 0;
 	}
 	const bool objectTab = (tab == IFindChangeOptions::kObjectSearch);	// the Object tab - KFCObjectSearch
-	// SEARCH TEXT IN THESE OBJECTS walks text: on the Object tab it was refused before it came here
+	const bool qrTab = (tab == kKFCQRCodeSearchMode);					// KFC's QR Code tab - KFCQRSearch: every QR code
+	// SEARCH TEXT IN THESE OBJECTS walks text: on the Object tab (or the QR Code tab) it was refused before it came here
 	// (SearchTextInObjects), and a search again of its list runs under the list's own query, its tab stated first
 	// (KFCUnderListQuery) - this stays for a caller that did neither.
 	const bool inObjects = (again != nil && again->inObjects);
-	if (inObjects && objectTab)
+	if (inObjects && (objectTab || qrTab))
 	{
-		outSummary.Append("Search Text in These Objects: Find/Change is on the Object tab - switch it to Text, GREP, Glyph or"
-			" Transliterate.");
+		outSummary.Append("Search Text in These Objects: Find/Change is on the ");
+		outSummary.Append(KFCSearchEngine::TabName(tab));
+		outSummary.Append(" tab - switch it to Text, GREP, Glyph or Transliterate.");
 		return 0;
 	}
 
@@ -3564,7 +3586,8 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 
 	// (The Object tab always has a query: its Type, and Find Object Format when one is set - an empty one lists every
 	//  frame of the Type, the way InDesign's own Find Next walks them; the regression case obj-empty-find.)
-	if (!objectTab && !HasFindQuery())
+	// (The QR Code tab has no query at all - it lists every QR code: the author's call.)
+	if (!objectTab && !qrTab && !HasFindQuery())
 	{
 		AppendNothingToFind(outSummary, tab);
 		return 0;
@@ -3587,6 +3610,7 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 		runScope.allDocuments = again->allDocuments;
 		runScope.selectionScope = IWalkerScopeFactoryUtils::kDocumentScope;
 	}
+	// (The QR Code tab's through the text tabs': its Search: - Document or All Documents - is read by CurrentSearchScope.)
 	else if (!(objectTab ? KFCObjectSearch::ResolveObjectRunScope(runScope, outSummary)
 			: KFCSearchEngine::ResolveRunScope(runScope, outSummary)))
 		return 0;
@@ -3598,8 +3622,9 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 
 	// Forward, whatever the dialog says - and put back as the function ends. Turned here, past every
 	// refusal above, so a search that is turned away touches no setting at all, and still ahead of the
-	// mode commit below, in the order the two always had.
-	KFCForwardSearchScope forward;
+	// mode commit below, in the order the two always had. (Not for the QR Code tab: its walk is no walker of Find/Change's,
+	// and its search touches no setting at all - the design's section 5.)
+	KFCForwardSearchScope forward(!qrTab);
 
 	// State the tab before anything is walked. A walk runs in the mode last COMMITTED through
 	// kFindSearchModeCmdBoss - not in the one IFindChangeOptions merely reports - so without this a
@@ -3614,7 +3639,8 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	// which no text walker mode steers - CommitSearchMode states the text walker's tabs only and turns the Object tab
 	// away by design. Measured: KT's object walks found the Object tab's matches with no mode committed and the
 	// dialog's mode on Text (the object search plan's Task 1 M4 - docs/superpowers/plans/2026-10-09-kfc-object-search.md).
-	if (!objectTab && !KFCSearchEngine::CommitSearchMode())
+	// (Nor for the QR Code tab: its walk is KFC's own object walker, which no mode steers - KFCQRCodes.)
+	if (!objectTab && !qrTab && !KFCSearchEngine::CommitSearchMode())
 	{
 		outSummary.Append("The Find/Change tab could not be set - nothing was searched. Try reopening Edit > Find/Change.");
 		return 0;
@@ -3774,11 +3800,15 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	// side of CommitSearchMode). SEARCH THESE RESULTS AGAIN keeps the list's own copy: the tier keeps its name, and its
 	// query - whatever Change to the dialog holds. A NARROW DOWN's new list takes the copy of the list it narrows, for
 	// the same reason.
+	// (A QR CODE LIST's is the mode alone - KFCQueryCopier::CaptureQRCodes: no setting of Find/Change's steers its walk.)
 	std::shared_ptr<const KFCQueryCopy> listCopy(againCopy);
 	if (again == nil || again->freshQuery)
 	{
 		KFCQueryCopy copy;
-		KFCQueryCopier::Capture(copy);
+		if (qrTab)
+			KFCQueryCopier::CaptureQRCodes(copy);
+		else
+			KFCQueryCopier::Capture(copy);
 		if (copy.valid)
 			listCopy = std::make_shared<KFCQueryCopy>(copy);
 	}
@@ -3790,7 +3820,7 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 		: (selectionScope == IWalkerScopeFactoryUtils::kSelectionScope) ? KFCResultModel::kScopeSelection
 		: KFCResultModel::kScopeDocument;
 	WriteListHeader(fromBook, allDocuments, scopeKind, (again != nil) ? again->narrow : std::vector<KFCNarrowStep>(),
-		bookName, listCopy);
+		bookName, listCopy, tab);
 
 	CollectTally tally;
 	// A NARROWED LIST'S CONDITIONS, asked of every row the walk builds (KFCNarrow::Filter - empty, and asked nothing, for any
@@ -3803,6 +3833,8 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 			CollectObjectTexts(objectChapters, fromBook, unopenable, tally, reserved);
 			tally.gone += again->gone;
 		}
+		else if (qrTab)			// THE QR CODE TAB: every QR code, read by KFC's own object walker one document at a time.
+			KFCQRSearch::CollectTargets(targets, fromBook, allDocuments, unopenable, tally, reserved);
 		else if (objectTab)		// THE OBJECT TAB: page items, walked by InDesign's own object search one document at a time.
 			KFCObjectSearch::CollectTargets(targets, fromBook, allDocuments, static_cast<int32>(selectionScope), unopenable, tally,
 				reserved, narrowFilter.Empty() ? nil : &narrowFilter);
@@ -3892,7 +3924,7 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	// No matches: a plain, friendly line rather than "0 hit(s) in 0 chapter(s)".
 	if (tally.total == 0)
 	{
-		outSummary.Append("No matches");
+		outSummary.Append(qrTab ? "No QR codes" : "No matches");
 		if (fromBook && selection.selected > 0)
 		{
 			// the selected documents were all that was looked at (Find/Change Selected Documents (Book))
@@ -3988,12 +4020,17 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 		const bool objects = KFCResultModel::ListHoldsObjects();
 		outSummary.Append(" Stopped at the ");
 		outSummary.AppendNumber(KFCResultModel::ListLimit());
-		outSummary.Append(objects ? " limit - narrow the search (Narrow Down > Pages...), or use " : " limit - narrow the search, or use ");
-		if (fromBook)
-			outSummary.Append(KFCChangeAll::CommandName());				// Change All in Book (No List) - F18
+		if (qrTab)
+			outSummary.Append(" limit.");		// (a QR code list has no Change All and no Narrow Down to offer)
 		else
-			outSummary.Append("Change All in InDesign's Find/Change");	// a document's: InDesign's own (F18)
-		outSummary.Append(".");
+		{
+			outSummary.Append(objects ? " limit - narrow the search (Narrow Down > Pages...), or use " : " limit - narrow the search, or use ");
+			if (fromBook)
+				outSummary.Append(KFCChangeAll::CommandName());				// Change All in Book (No List) - F18
+			else
+				outSummary.Append("Change All in InDesign's Find/Change");	// a document's: InDesign's own (F18)
+			outSummary.Append(".");
+		}
 	}
 
 	AppendKeptStay(outSummary, keptStay);	// the row eye: what stayed of the list as it was
@@ -4005,19 +4042,31 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	//
 	// Last, after the warnings: it is an offer, not something that went wrong, and the status field
 	// truncates its tail when it has to.
-	outSummary.Append(" Replace a row with its right-click menu, or select it and press Return."
-		" Shift+Return replaces it and moves on to the next row.");
+	// A QR CODE LIST'S ROWS ARE NOT REPLACED (the author: "no replace") - a click goes to its QR code.
+	if (qrTab)
+		outSummary.Append(" Click a row to go to its QR code.");
+	else
+		outSummary.Append(" Replace a row with its right-click menu, or select it and press Return."
+			" Shift+Return replaces it and moves on to the next row.");
 	return tally.total;
 }
 
 bool KFCSearchEngine::HasFindQueryNow()
 {
+	// What Change All in Book's grey state and door ask - of the tab the panel's Find searches now (the QR Code tab's no).
+	return HasFindQueryForMode(CurrentSearchMode());
+}
+
+bool KFCSearchEngine::HasFindQueryForMode(int32 mode)
+{
+	if (mode == kKFCQRCodeSearchMode)
+		return false;		// the QR Code tab: nothing to change, and no query to run (Change All refuses it - KFCChangeAll)
 	// THE OBJECT TAB: its query is Find Object Format - IsThereSomethingToFind answers no there even with one set
-	// (measured in KT - the object search plan's Task 1 M7). What Change All in Book's grey state and door, and the query
-	// run, ask.
-	if (CurrentSearchMode() == IFindChangeOptions::kObjectSearch)
+	// (measured in KT - the object search plan's Task 1 M7). (The query run asks it of the tab its query turned
+	// Find/Change to - KFCQuerySequence.)
+	if (mode == IFindChangeOptions::kObjectSearch)
 		return KFCObjectSearch::HasFindObjectFormat();
-	return HasFindQuery();
+	return HasFindQuery();		// (a text tab - the one InDesign is on, which is `mode` for every caller)
 }
 
 KFCSearchEngine::WalkerStops::~WalkerStops()
@@ -4101,11 +4150,20 @@ const char* KFCSearchEngine::TabName(int32 mode)
 		case IFindChangeOptions::kObjectSearch:			return "Object";
 		case IFindChangeOptions::kTransliterateSearch:	return "Transliterate";
 		case IFindChangeOptions::kColorSearch:			return "Colour";
+		case kKFCQRCodeSearchMode:						return "QR Code";	// KFC's own tab (KFCQRSearch)
 		default:										return "";
 	}
 }
 
 int32 KFCSearchEngine::CurrentSearchMode()
+{
+	// The QR Code tab first: InDesign's own mode stays the tab shown before it (measured in KT), so only KFC can say it.
+	if (KFCQRSearch::IsTabCurrent())
+		return kKFCQRCodeSearchMode;
+	return FindChangeMode();
+}
+
+int32 KFCSearchEngine::FindChangeMode()
 {
 	// Stored on the results too, so the replace can refuse to re-walk in a different mode.
 	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
@@ -4114,6 +4172,11 @@ int32 KFCSearchEngine::CurrentSearchMode()
 
 int32 KFCSearchEngine::CurrentSearchScope()
 {
+	// THE QR CODE TAB'S Search: IS ITS OWN (KFCQRSearch - Document or All Documents): InDesign keeps none for a tab of KFC's,
+	// and its own mode is still the tab shown before it.
+	int32 qrScope = IWalkerScopeFactoryUtils::kDocumentScope;
+	if (KFCQRSearch::IsTabCurrent(&qrScope))
+		return qrScope;
 	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
 	if (opts == nil)
 		return -1;
@@ -4180,6 +4243,7 @@ const char* KFCSearchEngine::FindCommandName(bool bookScopeOn)
 	// what the search will make of Search: with this selection - the dialog's own display
 	// The Object tab's Search: is read its own way (KFCObjectSearch::ObjectSearchScope - page items, not text: Document,
 	// All Documents or Selection, which the names below cover).
+	// The QR Code tab's - Document or All Documents - is CurrentSearchScope's.
 	PMString note;
 	const int32 scope = (CurrentSearchMode() == IFindChangeOptions::kObjectSearch)
 		? KFCObjectSearch::ObjectSearchScope(note) : SearchScopeForSelection(CurrentSearchScope());
@@ -4207,8 +4271,8 @@ bool KFCSearchEngine::SetQuery(const PMString& text, int32 mode)
 bool KFCSearchEngine::CanSearchTab(int32 mode)
 {
 	// Colour searches swatch use, with a walker of its own, and finds no text and no frame this panel lists. The Object
-	// tab is searched (KFCObjectSearch). Every other value (including -1, settings unreadable) is left for the search to
-	// answer.
+	// tab is searched (KFCObjectSearch), and so is KFC's QR Code tab (KFCQRSearch). Every other value (including -1,
+	// settings unreadable) is left for the search to answer.
 	return mode != IFindChangeOptions::kColorSearch;
 }
 
@@ -4747,7 +4811,7 @@ void SayFoundAgain(PMString& outStatus, const char* what, int32 now, bool capped
 		outStatus.Append(".");
 	}
 	else
-		outStatus.Append("No matches.");
+		outStatus.Append(KFCResultModel::ListIsQRCodes() ? "No QR codes." : "No matches.");	// (RunSearch's words for each)
 	AppendKeptStay(outStatus, stayed);
 	if (capped)
 		outStatus.Append(kListLimitReached);
@@ -5038,7 +5102,8 @@ bool SearchPartsAgain(const PMString& lead, PMString& outStatus, const KFCSearch
 		KFCTierStore::ParkCurrent();
 		KFCBookScope::ReleaseHeldDocs(true /*close now*/);
 		KFCSearchEngine::DropResults();
-		WriteListHeader(false, false, scope, again.narrow, PMString(), copy);		// one document's part - no book, not All Documents
+		WriteListHeader(false, false, scope, again.narrow, PMString(), copy,		// one document's part - no book, not All Documents
+			KFCSearchEngine::FindChangeMode());		// (a text list's - its query stated into Find/Change: InDesign's own mode)
 		KFCSearchEngine::CollectTally tally;
 		for (size_t k = 0; k < chapters.size(); ++k)
 			if (!chapters[k].hits.empty())
@@ -5321,9 +5386,11 @@ bool KFCSearchEngine::SearchDocumentAgain(int32 chapterIdx, PMString& outStatus)
 	// A NARROWED LIST'S CONDITIONS, searched again with it and said with its rows (Search This Story Again's rule).
 	const KFCNarrow::Filter narrowFilter(KFCResultModel::GetNarrowSteps());
 	{
-		KFCForwardSearchScope forward;		// forward, as the search was
+		KFCForwardSearchScope forward(!KFCResultModel::ListIsQRCodes());		// forward, as the search was (RunSearch's rule)
 		const WalkFilterScope walkFilter(narrowFilter);
-		if (KFCResultModel::GetSearchMode() == IFindChangeOptions::kObjectSearch)
+		if (KFCResultModel::ListIsQRCodes())		// a QR code list: the document's QR codes read again (KFCQRSearch)
+			walked = KFCQRSearch::WalkOneDocument(docRef, name, limit, hits, capped, cancelled);
+		else if (KFCResultModel::GetSearchMode() == IFindChangeOptions::kObjectSearch)
 			walked = KFCObjectSearch::WalkOneDocument(docRef, name, limit, hits, capped, cancelled,
 				narrowFilter.Empty() ? nil : &narrowFilter);
 		else
@@ -5499,6 +5566,13 @@ bool SearchListOnceMore(const KFCNarrowStep* step, PMString& outStatus)
 	// spec's N8).
 	if (step != nil)
 	{
+		// A QR CODE LIST IS NOT NARROWED (the design's Q13 - the menu greys it): it lists every QR code.
+		if (KFCResultModel::ListIsQRCodes())
+		{
+			outStatus.Append(lead);
+			outStatus.Append("a list of QR codes is not narrowed - it lists every QR code.");
+			return false;
+		}
 		if (step->kind <= kKFCNarrowNone || step->kind >= kKFCNarrowKindCount)
 		{
 			outStatus.Append(lead);
@@ -5703,10 +5777,17 @@ bool KFCSearchEngine::SearchTextInObjects(PMString& outStatus)
 		outStatus.Append("these are text results - use it on a tier of objects.");
 		return false;
 	}
+	// A QR CODE LIST (the design's Q13 - the menu greys it): a QR code's frame holds no text.
+	if (KFCResultModel::ListIsQRCodes())
+	{
+		outStatus.Append(lead);
+		outStatus.Append("these are QR codes - their frames hold no text.");
+		return false;
+	}
 	// THE TAB FIND/CHANGE IS ON, asked when pressed (it can change after the menu opened): a text tab, with something to find
-	// - in Find's words.
+	// - in Find's words. (Not the QR Code tab: it has no text query.)
 	const int32 tab = CurrentSearchMode();
-	if (tab == IFindChangeOptions::kObjectSearch || !CanSearchTab(tab))
+	if (tab == IFindChangeOptions::kObjectSearch || tab == kKFCQRCodeSearchMode || !CanSearchTab(tab))
 	{
 		outStatus.Append(lead);
 		outStatus.Append("Find/Change is on the ");
@@ -5751,7 +5832,9 @@ void KFCSearchEngine::RestoreSearchScope(int32 mode, int32 scope)
 {
 	// kScopeCmdBoss with the tab beside it - how SnpFindAndReplace sets Search: (ProcessFindChangeCommandInt32) -
 	// scheduled (ScheduleFindChangeInt): the caller is inside the notification of the dialog's own command.
-	if (mode >= 0 && scope >= 0)
+	// NOT THE QR CODE TAB: its Search: is KFC's own (KFCQRSearch), and its mode is no mode of InDesign's - never handed to a
+	// command (KFCModelTypes.h).
+	if (mode >= 0 && mode != kKFCQRCodeSearchMode && scope >= 0)
 		(void)ScheduleFindChangeInt(kScopeCmdBoss, scope, mode);
 }
 

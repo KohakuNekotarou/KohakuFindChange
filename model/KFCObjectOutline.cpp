@@ -32,6 +32,7 @@
 #include "KFCObjectReplace.h"	// SayItemsWritten - what a write of object rows says
 #include "KFCObjectSearch.h"	// IsOnSpread, Fingerprint
 #include "KFCPageItemFacts.h"	// IsPageItemLockedForEdit, IsFrameOnLockedLayer
+#include "KFCQRSearch.h"		// NotChangedWords - a QR code list's rows are not outlined
 #include "KFCReplaceEngine.h"	// the write's undo step (WriteStep) and what its documents are left as (DocsAfterWrite)
 #include "KFCResultModel.h"
 #include "KFCRunGuard.h"
@@ -180,6 +181,9 @@ bool KFCObjectOutline::CanOutlineHit(int32 chapterIdx, int32 hitIdx)
 	const UID item = KFCResultModel::GetHitItem(chapterIdx, hitIdx);
 	if (item == kInvalidUID)
 		return false;
+	// A QR CODE LIST'S ROWS ARE NOT OUTLINED (the design's Q13): greyed - OutlineRows names it.
+	if (KFCResultModel::ListIsQRCodes())
+		return false;
 	KFCResultModel::RowDisplay row;
 	if (KFCResultModel::GetHitRow(chapterIdx, hitIdx, row) && row.outlined)
 		return false;
@@ -206,6 +210,12 @@ bool KFCObjectOutline::OutlineRows(const KFCRowsByChapter& rows, PMString& outSt
 	if (KFCRunGuard::IsAnyRunning())
 	{
 		outStatus.Append(KFCRunGuard::BusyMessage());
+		return false;
+	}
+	// A QR CODE LIST'S ROWS (CanOutlineHit's note): none of them, before anything is reached.
+	if (KFCResultModel::ListIsQRCodes())
+	{
+		Refuse(outStatus, KFCQRSearch::NotChangedWords());
 		return false;
 	}
 	const KFCReplaceEngine::WriteUnderWay writing;		// counted from the door to the hand-back (KFCRunGuard)

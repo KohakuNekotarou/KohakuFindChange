@@ -68,6 +68,7 @@
 #include "KFCBookScope.h"		// reopening a chapter the user closed since the search
 #include "KFCUndoFollow.h"		// every write recorded, so that the panel follows its Undo and Redo
 #include "KFCObjectReplace.h"	// an object row's Replace
+#include "KFCQRSearch.h"		// NotChangedWords - a QR code list's rows are never replaced
 #include "KFCCopyStore.h"		// the copies a row's Replace takes and its Restore from Copy puts back
 #ifdef KFC_DIAG
 #include "ITextFocusManager.h"	// how many foci a story carries while it is written (WALKSTEP) - test builds only
@@ -1149,15 +1150,24 @@ enum QueryCompared
 // RefuseChangedQuery's. The tab IS stated on the way (see below), which every walk after it needs.
 QueryCompared CompareQueryWithSearch()
 {
+	// ----- (0) A QR CODE LIST (KFCQRSearch) has no query to change: it lists every QR code, and no setting of Find/Change
+	// steers its walk - so nothing is asked of Find/Change and nothing is stated. Its searches again list its QR codes again
+	// whatever tab the dialog is on, and its rows are never replaced (CanReplaceHit).
+	if (KFCResultModel::ListIsQRCodes())
+		return kQueryUnchanged;
+
 	// ----- (1) the TAB the results were searched with -----
 	// The row's story is RE-WALKED, and a walk in another mode returns another set of matches - so the rows would be
 	// lined up with occurrences the user never saw. Asked first because it is the most specific thing that can be said,
-	// and because it does NOT cost the results: a tab is one click to put back. Read through the call the results were
-	// stamped with (KFCSearchEngine::CurrentSearchMode). (Not "is the searched tab one this panel walks at all": the
-	// tab on the results is one a search walked (KFCSearchEngine::RunSearch) - the four text tabs or the Object tab -
-	// so it would never answer no.)
+	// and because it does NOT cost the results: a tab is one click to put back. (Not "is the searched tab one this panel
+	// walks at all": the tab on the results is one a search walked (KFCSearchEngine::RunSearch) - the four text tabs or
+	// the Object tab - so it would never answer no.)
+	// READ AS INDESIGN'S OWN MODE (KFCSearchEngine::FindChangeMode) - what a text or Object list was stamped with, what the
+	// walk runs in, and what the list's query is stated into (KFCQueryScope) - not as the QR Code tab the dialog may be
+	// showing, which changes no mode of InDesign's: read so, a row's operation under its list's query would be refused
+	// every time the QR Code tab is shown.
 	const int32 searchedMode = KFCResultModel::GetSearchMode();
-	const int32 currentMode = KFCSearchEngine::CurrentSearchMode();
+	const int32 currentMode = KFCSearchEngine::FindChangeMode();
 	if (searchedMode >= 0 && currentMode >= 0 && currentMode != searchedMode)
 		return kQueryOtherTab;
 
@@ -1286,6 +1296,10 @@ bool KFCReplaceEngine::CanReplaceHit(int32 chapterIdx, int32 hitIdx)
 {
 	// Nothing greys it (WhyGreyed - the one place the reasons are asked: the menu's grey state and the rows a Replace of
 	// rows selected together leaves are the same question).
+	// A QR CODE LIST'S ROWS ARE NEVER REPLACED (the design's Q13 - the author: "no replace"): greyed whatever the row says
+	// - the doors that turn a press away name it (ReplaceHit, ReplaceHits, KFCObjectReplace).
+	if (KFCResultModel::ListIsQRCodes())
+		return false;
 	return WhyGreyed(chapterIdx, hitIdx) == kGreyedNot;
 }
 
@@ -2157,6 +2171,13 @@ bool KFCReplaceEngine::ReplaceHit(int32 chapterIdx, int32 hitIdx, PMString& outS
 	const KFCReplaceEngine::WriteUnderWay replacing;	// counted from the door to the hand-back (IsReplacing)
 	outStatus.Clear();
 	outStatus.SetTranslatable(kFalse);
+	if (KFCResultModel::ListIsQRCodes())
+	{
+		outStatus = "Replace: ";
+		outStatus.Append(KFCQRSearch::NotChangedWords());
+		outStatus.SetTranslatable(kFalse);
+		return false;
+	}
 	if (!CanReplaceHit(chapterIdx, hitIdx))
 	{
 		outStatus = "Replace: this row cannot be replaced (already replaced, locked, or not a match of Find/Change).";
@@ -2183,6 +2204,14 @@ bool KFCReplaceEngine::ReplaceHits(const KFCRowsByChapter& rowsByChapter, PMStri
 	const size_t total = KFCRowCount(rowsByChapter);
 	if (total == 1)
 		return ReplaceHit(firstChapter, firstHit, outStatus);
+	// A QR CODE LIST'S ROWS (CanReplaceHit's note): none of them.
+	if (KFCResultModel::ListIsQRCodes())
+	{
+		outStatus = "Replace: ";
+		outStatus.Append(KFCQRSearch::NotChangedWords());
+		outStatus.SetTranslatable(kFalse);
+		return false;
+	}
 	// OBJECT ROWS: InDesign's object replace, row by row (KFCObjectReplace::ReplaceRows - it asks each row).
 	if (KFCResultModel::GetHitItem(firstChapter, firstHit) != kInvalidUID)
 		return KFCObjectReplace::ReplaceRows(rowsByChapter, outStatus);
@@ -3540,7 +3569,8 @@ bool KFCReplaceEngine::PreviewHit(int32 chapterIdx, int32 hitIdx, PMString& outA
 		return false;		// an object row has no after-text (a GREP row's alone)
 	if (KFCRunGuard::IsAnyRunning() || !CanReplaceHit(chapterIdx, hitIdx))
 		return false;
-	if (KFCSearchEngine::CurrentSearchMode() != IFindChangeOptions::kGrepSearch || !QueryUnchangedSinceSearch())
+	// (InDesign's own mode - the list's query stated - not a QR Code tab the dialog may be showing: FindChangeMode.)
+	if (KFCSearchEngine::FindChangeMode() != IFindChangeOptions::kGrepSearch || !QueryUnchangedSinceSearch())
 		return false;
 	UIDRef docRef;
 	IDFile file;

@@ -73,8 +73,8 @@ namespace KFCResultHistory
 	/** A tier's name - the query Find/Change holds now, in the author's words (F and C rather than Find and Change):
 	    "[<tab>] F:"<find>" C:"<change>"", each side as the Application Bar's field would show it
 	    (KFCFindChangeQueryWords / KFCFindChangeChangeWords) and cut at 200 characters; "[<tab>]" alone for a tab with
-	    nothing to say in words (Object). The panel's Find names its tier by it; the query dialog's Find puts the
-	    query's place in the run order in front. */
+	    nothing to say in words (Object) and for KFC's QR Code tab, which has no query ("[QR Code]"). The panel's Find
+	    names its tier by it; the query dialog's Find puts the query's place in the run order in front. */
 	PMString QueryLabel();
 
 	/** A LIST MADE ANEW ELSEWHERE - a Run of the query dialog, Change All in Book (No List): the tiers go when the list the

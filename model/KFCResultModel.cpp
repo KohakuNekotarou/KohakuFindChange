@@ -26,6 +26,7 @@
 #include "KFCDiag.h"	// KFC_DIAG_LOG / KFC_DIAG_FAULT - a row's outcome as it is set, and the fault switches, in a test
 						// build (compiled out of a shipping one)
 #include "KFCPageItemFacts.h"	// ItemIsThere - asked of an object row's item where a chapter is bound again
+#include "KFCModelTypes.h"		// kKFCQRCodeSearchMode - ListIsQRCodes reads the list's search mode
 #include "KFCResultModel.h"
 #include "KFCRowFoci.h"	// the rows' text foci - attached where a chapter is bound, let go with the rows
 
@@ -428,9 +429,14 @@ int32 KFCResultModel::ListLimitFor(bool objectRows)
 
 bool KFCResultModel::ListHoldsObjects()
 {
-	// An Object tab search's list - its search mode (SetSearchMode keeps it as a plain int) - or a list a Frames of These
-	// Matches step made, found or empty (ListIsFrames).
-	return gHeader.searchMode == static_cast<int32>(IFindChangeOptions::kObjectSearch) || ListIsFrames();
+	// An Object tab search's list - its search mode (SetSearchMode keeps it as a plain int) - a QR Code tab search's (its rows
+	// are the QR codes' frames - ListIsQRCodes), or a list a Frames of These Matches step made, found or empty (ListIsFrames).
+	return gHeader.searchMode == static_cast<int32>(IFindChangeOptions::kObjectSearch) || ListIsQRCodes() || ListIsFrames();
+}
+
+bool KFCResultModel::ListIsQRCodes()
+{
+	return gHeader.searchMode == static_cast<int32>(kKFCQRCodeSearchMode);
 }
 
 void KFCResultModel::CloseChapter(int32 chapterIdx, const IDFile* closedFile)

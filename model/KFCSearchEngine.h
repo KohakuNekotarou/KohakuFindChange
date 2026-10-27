@@ -50,11 +50,13 @@ namespace KFCResultModel { struct Hit; struct SearchedRange; }	// FileChapter
     direction is forward; the user's own setting is put back by the destructor, whatever way the run
     ends (kSearchBackwardsSilentCmdBoss, measured) - over an error the run left standing as well. Create
     it OUTSIDE any command sequence: an aborted sequence would take the switch back and leave the restore
-    to set it a second time. */
+    to set it a second time. wanted = false: nothing turned (a walk no setting of Find/Change's steers - the QR Code
+    tab's, KFCQRSearch, which touches no setting at all). */
 class KFCForwardSearchScope
 {
 public:
 	KFCForwardSearchScope();
+	explicit KFCForwardSearchScope(bool wanted);
 	~KFCForwardSearchScope();
 private:
 	KFCForwardSearchScope(const KFCForwardSearchScope&);
@@ -178,8 +180,15 @@ namespace KFCSearchEngine
 	bool DescribeRunScope(PMString& outWords);
 
 	/** Is there anything to find on the tab Edit > Find/Change is on - a string, a glyph, a character type or a
-	    format? (HasFindQuery, which SearchBook asks before its commit point.) */
+	    format? (HasFindQuery, which SearchBook asks before its commit point.) = HasFindQueryForMode(CurrentSearchMode()):
+	    no on the QR Code tab (nothing to change, no query). */
 	bool HasFindQueryNow();
+
+	/** ...asked of one tab: `mode` an IFindChangeOptions::SearchMode value (the Object tab's Find Object Format, the text
+	    tabs' HasFindQuery - of the tab InDesign is on, which every caller passes) or kKFCQRCodeSearchMode (no). A query run
+	    asks it of the tab its query turned Find/Change to (FindChangeMode) - not of the QR Code tab the dialog may be
+	    showing. */
+	bool HasFindQueryForMode(int32 mode);
 
 	/** Is a search running right now? The progress bar pumps events while it is up, so a menu
 	    command could otherwise be dispatched INTO a running search. The panel's actions ask this
@@ -253,22 +262,30 @@ namespace KFCSearchEngine
 	          the query run, KFCQuerySequence.cpp's Run, states it for each query inside the run's sequence). */
 	bool CommitReplaceSide();
 
-	/** The Find/Change dialog's English name for a tab (an IFindChangeOptions::SearchMode value):
-	    "Text", "GREP", "Glyph", "Transliterate" ... - empty for a value outside the enum. The status
+	/** The Find/Change dialog's English name for a tab (an IFindChangeOptions::SearchMode value, or kKFCQRCodeSearchMode -
+	    "QR Code"): "Text", "GREP", "Glyph", "Transliterate" ... - empty for a value outside the enum. The status
 	    line and the panel's tab (KFCPanelTitle) both name the tab through this one table. */
 	const char* TabName(int32 mode);
 
-	/** The tab the Find/Change dialog is on NOW (the session's IFindChangeOptions), as an
-	    IFindChangeOptions::SearchMode value; -1 when the settings cannot be read. Held as a plain int
-	    so this header needs no text includes. */
+	/** THE TAB THE PANEL'S FIND SEARCHES NOW: kKFCQRCodeSearchMode while KFC's own QR Code tab is Find/Change's tab
+	    (KFCQRSearch::IsTabCurrent - KFCModelTypes.h); else the tab the Find/Change dialog is on (FindChangeMode). -1 when
+	    the settings cannot be read. Held as a plain int so this header needs no text includes. What a search, the panel's
+	    title and the menu's names follow - NOT what a list's row operation compares its list with (FindChangeMode:
+	    InDesign's own mode, which the QR Code tab leaves as it was). */
 	int32 CurrentSearchMode();
+
+	/** InDesign's OWN search mode now (the session's IFindChangeOptions::GetSearchMode) - never kKFCQRCodeSearchMode: showing
+	    the QR Code tab changes no mode of InDesign's (measured in KT). For what states or compares Find/Change's query - a
+	    replace's tab test, a GREP row's preview, a search again under its list's query, a query run's tab. -1 when the
+	    settings cannot be read. */
+	int32 FindChangeMode();
 
 	/** THE Search: OF THAT TAB (KFC follows it - the author's call). Edit > Find/Change's Search: - Document /
 	    All Documents / Story / To End of Story / Selection - as an IWalkerScopeFactoryUtils::WalkScopeType value
 	    (IFindChangeOptions::GetFindChangeScope of the current tab); -1 when the settings cannot be read. Each tab keeps
-	    a Search: of its own. kEmptyScope is answered as kDocumentScope: it is what a session reads before anything has
-	    set Search: (measured, straight after a launch), and a user who never opened the dialog has asked for nothing
-	    but the document. */
+	    a Search: of its own - the QR Code tab's is KFC's (KFCQRSearch::IsTabCurrent: Document or All Documents). kEmptyScope
+	    is answered as kDocumentScope: it is what a session reads before anything has set Search: (measured, straight
+	    after a launch), and a user who never opened the dialog has asked for nothing but the document. */
 	int32 CurrentSearchScope();
 
 	/** Put Search: of tab 'mode' back to 'scope' (a WalkScopeType value, as CurrentSearchScope gives it) - the
@@ -276,7 +293,7 @@ namespace KFCSearchEngine
 	    change by re-picking Search: (measured: to Document, or to Selection), which its own Find Next does not do. The
 	    UI half asks this the moment it hears the change (KFCJump::KeepSearchScopeAfterClick). SCHEDULED, not processed:
 	    it is asked from inside the notification of the dialog's own command. Measured: written back, the open dialog
-	    shows the value again and keeps it. */
+	    shows the value again and keeps it. Nothing for the QR Code tab (kKFCQRCodeSearchMode - its Search: is KFC's own). */
 	void RestoreSearchScope(int32 mode, int32 scope);
 
 	/** Read a story's first words again into its rows (KFCResultModel::SetStoryLead) - the story row's text - after a

@@ -187,6 +187,13 @@ struct KFCOversetLoc
 	KFCOversetLoc() : found(false), frameUID(kInvalidUID), outportPb(0.0, 0.0) {}
 };
 
+/** THE QR CODE TAB'S "SEARCH MODE" (docs/superpowers/specs/2026-10-27-kfc-qr-code-search-design.md - KFC's own tab in
+    Edit > Find/Change): what KFCSearchEngine::CurrentSearchMode answers - and a QR code list's header holds - while that
+    tab is Find/Change's tab (KFCQRSearch::IsTabCurrent). KFC'S ALONE: it is never handed to IFindChangeOptions, to
+    kFindSearchModeCmdBoss or to a saved query - InDesign has no such mode, and showing the tab changes none of its own
+    (measured in KT - GetSearchMode stays the tab shown before it). */
+enum { kKFCQRCodeSearchMode = 100 };
+
 /** What the UI half's alert handler does with an alert raised inside a walk of ours (IKFCRuns::AnswerAlert - the
     model's KFCHiddenSpreadAlert.h): a button to press, 1 to 3 - or one of these. */
 enum

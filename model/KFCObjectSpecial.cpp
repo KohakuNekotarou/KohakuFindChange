@@ -56,6 +56,7 @@
 #include "KFCObjectSearch.h"		// IsOnSpread, Fingerprint, ReadItemPlace
 #include "KFCObjectSpecial.h"
 #include "KFCPageItemFacts.h"		// IsPageItemLockedForEdit, IsFrameOnLockedLayer, StackIndex, ItemIsThere
+#include "KFCQRSearch.h"			// NotChangedWords - a QR code list's rows are not changed
 #include "KFCReplaceEngine.h"		// the write's undo step (WriteStep) and what its documents are left as (DocsAfterWrite)
 #include "KFCResultModel.h"
 #include "KFCRunGuard.h"
@@ -762,6 +763,9 @@ bool KFCObjectSpecial::CanSpecialHit(int32 op, int32 chapterIdx, int32 hitIdx)
 	const OpInfo* const info = FindOp(op);
 	if (info == nil)
 		return false;
+	// A QR CODE LIST'S ROWS ARE NOT CHANGED (the design's Q13): greyed - SpecialRows names it.
+	if (KFCResultModel::ListIsQRCodes())
+		return false;
 	UIDRef docRef;
 	UID item = kInvalidUID;
 	return CheckItem(*info, KFCSpecialParams(), chapterIdx, hitIdx, false, docRef, item) == kRefusedNone;
@@ -779,6 +783,12 @@ bool KFCObjectSpecial::SpecialRows(int32 op, const KFCRowsByChapter& rows, const
 	if (KFCRunGuard::IsAnyRunning())
 	{
 		outStatus.Append(KFCRunGuard::BusyMessage());
+		return false;
+	}
+	// A QR CODE LIST'S ROWS (CanSpecialHit's note): none of them, before anything is reached.
+	if (KFCResultModel::ListIsQRCodes())
+	{
+		Refuse(outStatus, info, PMString(KFCQRSearch::NotChangedWords()));
 		return false;
 	}
 	const KFCReplaceEngine::WriteUnderWay writing;		// counted from the door to the hand-back (KFCRunGuard)

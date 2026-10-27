@@ -331,8 +331,10 @@ int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 				break;
 			}
 			const bool loaded = KFCSavedQueries::LoadIntoFindChange(query.file);
-			const int32 mode = KFCSearchEngine::CurrentSearchMode();		// the tab the query turned Find/Change to
-			if (!loaded || !KFCSearchEngine::CanSearchTab(mode) || !KFCSearchEngine::HasFindQueryNow())
+			// The tab the query turned Find/Change to: InDesign's own mode - not the QR Code tab the dialog may be showing
+			// (it changes no mode of InDesign's - KFCSearchEngine::FindChangeMode).
+			const int32 mode = KFCSearchEngine::FindChangeMode();
+			if (!loaded || !KFCSearchEngine::CanSearchTab(mode) || !KFCSearchEngine::HasFindQueryForMode(mode))
 			{
 				skip(loaded ? kSkipNothingToFind : kSkipUnread);
 				continue;

@@ -32,6 +32,7 @@
 #include "KFCModelNotify.h"	// KFCNotifyStatus - Find/Change not put back after a Frames list's write
 #include "KFCQueryCopy.h"		// a Frames list's Replace: the Object tab read, stated for the write, put back
 #include "KFCQueryScope.h"		// KFCFindChangeNotPutBack - the sentence every failed put-back says
+#include "KFCQRSearch.h"		// NotChangedWords - a QR code list's rows are never replaced
 #include "KFCReplaceEngine.h"	// RefuseChangedQuery, CanReplaceHit, WhyGreyed; the write's undo step (WriteStep) and
 								// what its documents are left as (DocsAfterWrite)
 #include "KFCResultModel.h"
@@ -143,6 +144,12 @@ void SayNoneReplaceable(PMString& out, size_t total, const int32 (&counts)[kRefu
 // reads that tab whichever one Find/Change shows), which the write uses (FramesObjectQuery).
 bool CheckSettings(PMString& outStatus)
 {
+	// A QR CODE LIST'S ROWS ARE NEVER REPLACED (KFCReplaceEngine::CanReplaceHit's note) - before any setting is asked.
+	if (KFCResultModel::ListIsQRCodes())
+	{
+		Refuse(outStatus, KFCQRSearch::NotChangedWords());
+		return false;
+	}
 	if (KFCResultModel::ListIsFrames())
 	{
 		if (!KFCObjectSearch::HasChangeObjectFormat())
@@ -231,6 +238,12 @@ Refusal GreyedRefusal(int32 chapterIdx, int32 hitIdx)
 bool CheckRow(int32 chapterIdx, int32 hitIdx, PMString& outStatus, UIDRef& outDoc, UID& outItem)
 {
 	outItem = kInvalidUID;
+	// A QR CODE LIST'S ROW in CheckSettings' words, not a greyed row's (RowIsReplaceable answers no for it too).
+	if (KFCResultModel::ListIsQRCodes())
+	{
+		Refuse(outStatus, KFCQRSearch::NotChangedWords());
+		return false;
+	}
 	if (!RowIsReplaceable(chapterIdx, hitIdx))
 	{
 		Refuse(outStatus, RowSentence(kRefusedRow));

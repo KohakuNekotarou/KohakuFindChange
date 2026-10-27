@@ -33,7 +33,8 @@ class IDataBase;
 
 struct KFCQueryCopy
 {
-	int32		mode;					// IFindChangeOptions::SearchMode (-1 = nothing read)
+	int32		mode;					// IFindChangeOptions::SearchMode (-1 = nothing read) - or kKFCQRCodeSearchMode, a QR code
+										// list's (CaptureQRCodes: the mode alone)
 	int32		changeMode;				// IFindChangeOptions::ChangeMode
 	PMString	findString;				// the tab's Find what (Text / GREP)
 	PMString	replaceString;			// the tab's Change to (Text / GREP)
@@ -86,17 +87,21 @@ namespace KFCQueryCopier
 	    another is shown, read so it can be put back after a list's query of that tab was stated over it (KFCQueryScope).
 	    Stated back by Apply, which turns to that tab. out.valid is false when the settings cannot be read. */
 	void CaptureMode(KFCQueryCopy& out, int32 mode);
+	/** A QR CODE LIST'S QUERY (KFCQRSearch - the QR Code tab lists every QR code): the mode alone, kKFCQRCodeSearchMode -
+	    nothing of Find/Change's is read, and nothing is stated back (Apply) or compared (Matches). Valid: the list keeps a
+	    query of its own, so its searches again go through (SearchListOnceMore's door). */
+	void CaptureQRCodes(KFCQueryCopy& out);
 
 	/** State `copy` back into Find/Change: the tab, then every field that differs from what the dialog holds now, with the
 	    dialog's own commands (KFCFindChangeCmds; the formats with kClearFindFormatCmdBoss / kClearChangeFormatCmdBoss and
 	    kFindChangeFormatCmdBoss). False = a command failed - outWhat names the field; the ones before it went through
 	    (putting everything back is the caller's - KFCQueryScope). Call it outside any command sequence unless the caller
-	    means to abort that sequence on a failure. */
+	    means to abort that sequence on a failure. A QR code list's copy states nothing (true): InDesign has no such mode. */
 	bool Apply(const KFCQueryCopy& copy, PMString& outWhat);
 
 	/** Does Find/Change hold `copy` now - every field the copy's tab uses? False = outWhat names the first that differs.
 	    "Cannot tell" (the settings unreadable, a format list in another database) is "differs": this is the door before a
-	    write, so it fails closed. */
+	    write, so it fails closed. A QR code list's copy uses no field of Find/Change's: true. */
 	bool Matches(const KFCQueryCopy& copy, PMString& outWhat);
 
 #ifdef KFC_DIAG

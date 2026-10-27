@@ -414,10 +414,13 @@ namespace KFCResultModel
 	/** The steps in words, as a tier's heading draws them after its name and the status line names them: "In Tables /
 	    Pages 1-5" - empty for none. */
 	PMString NarrowWords();
-	/** ARE THE LIST'S ROWS OBJECT ROWS - an Object tab search's, or a Frames of These Matches list's? The heading's menu greys
-	    a condition that only text rows can meet, and Search Text in These Objects over text rows - which
-	    KFCSearchEngine::SearchTextInObjects refuses too. */
+	/** ARE THE LIST'S ROWS OBJECT ROWS - an Object tab search's, a QR Code tab search's (ListIsQRCodes), or a Frames of These
+	    Matches list's? The heading's menu greys a condition that only text rows can meet, and Search Text in These Objects
+	    over text rows - which KFCSearchEngine::SearchTextInObjects refuses too. */
 	bool ListHoldsObjects();
+	/** Is the list a QR CODE LIST - KFC's QR Code tab's (KFCQRSearch: its search mode kKFCQRCodeSearchMode)? Its rows are only
+	    gone to (the design's Q13): nothing is replaced, outlined or changed from it, and it is not narrowed. */
+	bool ListIsQRCodes();
 	/** Is the list a FRAMES OF THESE MATCHES list - object rows found by a text search, not by the Object tab's (its
 	    Replace writes with the Object tab's Change Object Format alone - KFCObjectReplace, the narrow-down
 	    spec's N6)? */

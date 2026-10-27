@@ -602,8 +602,13 @@ PMString KFCResultHistory::QueryLabel()
 {
 	PMString label("[");
 	label.SetTranslatable(kFalse);
-	label.Append(KFCRuns()->TabName(KFCRuns()->CurrentSearchMode()));
+	const int32 mode = KFCRuns()->CurrentSearchMode();
+	label.Append(KFCRuns()->TabName(mode));
 	label.Append("]");
+	// THE QR CODE TAB HAS NO QUERY (it lists every QR code - KFCModelTypes.h): "[QR Code]" alone - Find/Change's words are
+	// another tab's, the one InDesign's mode still is.
+	if (mode == kKFCQRCodeSearchMode)
+		return label;
 	PMString findWords, changeWords;
 	if (KFCFindChangeQueryWords(findWords))
 	{

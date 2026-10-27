@@ -39,6 +39,7 @@
 
 // Project includes:
 #include "KFCChangeAll.h"
+#include "KFCModelTypes.h"		// kKFCQRCodeSearchMode - the QR Code tab is refused
 #include "KFCBookScope.h"
 #include "KFCDiag.h"
 #include "KFCDiagWrittenDocs.h"	// the test build's written-document check (nothing in a shipping one)
@@ -291,6 +292,14 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 	if (!KFCSearchEngine::CanSearchTab(KFCSearchEngine::CurrentSearchMode()))
 	{
 		outSummary.Append("Change All: the Colour tab is not supported.");
+		return 0;
+	}
+	// THE QR CODE TAB (KFCQRSearch): it lists QR codes and changes nothing (the author: "no replace"). (The menu greys the
+	// item there - HasFindQueryNow; this door is for a caller that never went through the menu.)
+	if (KFCSearchEngine::CurrentSearchMode() == kKFCQRCodeSearchMode)
+	{
+		outSummary.Append("Change All: the Find/Change dialog is on the QR Code tab. This panel lists QR codes there - nothing"
+			" to change.");
 		return 0;
 	}
 	// THE OBJECT TAB (the object search spec's O13): InDesign's object Change All over each chapter. Refused with
