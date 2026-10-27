@@ -53,7 +53,7 @@
 - **QR-08** ★**含める範囲のスイッチは無い**＝親ページ・ペーストボード・ロックした物・非表示の物・非表示のスプレッド・あふれた文字の中・グループやアンカー付きの枠の中の QR も全部並び、行の状態の語で見分ける。（Q6）回帰 `qr-list-places`・`qr-click-nest`・`qr-click-locked`
   - 訂正:
 
-- **QR-09** 集め方＝**KFC 自身の object walker**（含める範囲を全部 ON・種類＝すべてのフレーム）で文書の枠を歩き、**枠のただ1つの子が QR の EPS**（`IID_IQRCODEDATAUID` を持つ `kEPSItem`）なら QR。本体の Object タブの設定も、本体の検索が使う共有の walker も使わない＝選択・画面・「変更あり」は動かず、アラートも出ない（実測 M8）。（D7）回帰 `qr-probe-kinds`・`qr-readonly`
+- **QR-09** 集め方＝**KFC 自身の object walker**（含める範囲を全部 ON・種類＝すべてのフレーム）で文書の枠を歩き、**枠のただ1つの子が QR の EPS**（本体の `IBarcodeFacade::IsQRCode` が QR と答える `kEPSItem`＝枠ではなく中の EPS を渡す・中身は `IID_IQRCODEDATAUID` の先＝10-28 の監査で寄せた）なら QR。本体の Object タブの設定も、本体の検索が使う共有の walker も使わない＝選択・画面・「変更あり」は動かず、アラートも出ない（実測 M8）。（D7）回帰 `qr-probe-kinds`・`qr-readonly`
   - 訂正:
 
 - **QR-10** ★**読むだけ**＝一覧の検索は文書を「変更あり」にせず、本体の検索と置換の設定（どのタブも）を変えず、選択と画面も動かさない。（設計書 5章）回帰 `qr-readonly`

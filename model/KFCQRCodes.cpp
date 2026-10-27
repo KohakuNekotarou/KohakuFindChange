@@ -11,6 +11,7 @@
 #include "VCPlugInHeaders.h"
 
 // Interface includes:
+#include "IBarcodeFacade.h"				// IsQRCode - InDesign's own answer to "is this EPS item a QR code"
 #include "IDataBase.h"
 #include "IHierarchy.h"
 #include "IObjectWalker.h"
@@ -26,6 +27,7 @@
 #include "ObjectWalkerScopeOptions.h"
 #include "TextChar.h"					// kTextChar_CR, kTextChar_LF
 #include "TextWalkerServiceProviderID.h"	// kObjectWalkerBoss
+#include "Utils.h"
 #include "WideString.h"
 
 #include <set>
@@ -41,8 +43,14 @@
 namespace
 {
 
-// The QR code's EPS item for `item` - the item itself, or a frame's one child - or an invalid UIDRef: an EPS item whose
-// IID_IQRCODEDATAUID names a data boss (EPSID.h: only kEPSItem carries it). outData (when given) = that data boss.
+// The QR code's EPS item for `item` - the item itself, or a frame's one child - or an invalid UIDRef: an EPS item InDesign's
+// own Facade::IBarcodeFacade::IsQRCode calls a QR code, whose IID_IQRCODEDATAUID names the data boss Read reads (EPSID.h:
+// only kEPSItem carries it). outData (when given) = that data boss.
+// IsQRCode TAKES THE EPS ITEM, NOT ITS FRAME (measured 2026-10-28 in KT - docs/ai-notes/kfc-qr-api-audit-2026-10-28.md:
+// false for every frame; for the EPS, true exactly where the test of IID_IQRCODEDATAUID alone was, 17 of 17, and false for a
+// placed EPS that holds no QR code). Asked of EPS items only - the input measured (a facade is not safe to ask of every item:
+// memory facade-not-safe-for-every-item). The facade is EPS Page Item's, a model plug-in's (kEPSPrefix; the QR dialogs are
+// EPS UI's, kEPSUIPrefix).
 UIDRef QREpsOf(const UIDRef& item, UIDRef* outData = nil)
 {
 	IDataBase* const db = item.GetDataBase();
@@ -58,6 +66,9 @@ UIDRef QREpsOf(const UIDRef& item, UIDRef* outData = nil)
 		if (db->GetClass(eps.GetUID()) != kEPSItem)
 			return UIDRef();
 	}
+	Utils<Facade::IBarcodeFacade> barcode;
+	if (!barcode || barcode->IsQRCode(eps) == kFalse)
+		return UIDRef();
 	InterfacePtr<IPersistUIDData> data(eps, IID_IQRCODEDATAUID);
 	if (data == nil || data->GetUID() == kInvalidUID || !db->IsValidUID(data->GetUID()))
 		return UIDRef();

@@ -203,6 +203,9 @@ public:
 
 	virtual void AutoAttach()
 	{
+		// The base first, as the SDK's face on a dialog of InDesign's does (xdocbookworkflowui's XDocBkUIDialogObserver) -
+		// CObserver's, a no-op today.
+		AbstractDialogObserver::AutoAttach();
 		// THE FACE IS SHOWN: the QR Code tab is Find/Change's now, whatever was kept - a close on it, or a saved query's
 		// own tab (YieldToSavedQuery) - until it is hidden.
 		gShown = true;
@@ -229,6 +232,7 @@ public:
 		// HIDDEN - by another face, or by the dialog's close (after its ClosingDialog). Only let go of the widgets: nothing is
 		// walked here and nothing of KFC's is run from here (the header's hazard). A switch to InDesign's own face writes the
 		// panel's title through Find/Change's own notifications.
+		AbstractDialogObserver::AutoDetach();		// (the base first, as AutoAttach's)
 		gShown = false;
 		KFC_DIAG_LOG("QRTAB hidden");
 		InterfacePtr<IPanelControlData> panel(this, UseDefaultIID());
