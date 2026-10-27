@@ -103,6 +103,7 @@ namespace
 		virtual int32 GetObjectRowHit(int32, int32) { return -1; }
 		virtual bool IsHitItemGone(int32, int32) { return false; }
 		virtual bool IsFromAllDocuments() { return false; }
+		virtual bool ListIsQRCodes() { return false; }
 	};
 
 	class KFCRunsStandInImpl : public IKFCRuns
@@ -165,6 +166,14 @@ namespace
 			return kKFCAlertLeaveToDefault;
 		}
 		virtual bool SearchTextInObjects(PMString& outStatus) { SayWhy(outStatus); return false; }
+		virtual bool QRCodeNext(const UIDRef&, UIDRef& outFrame, int32& outReach, PMString& outWords)
+		{
+			outFrame = UIDRef();
+			outReach = 0;
+			SayWhy(outWords);
+			return false;
+		}
+		virtual void FindChangeTabAndScope(int32& outMode, int32& outScope) { outMode = -1; outScope = -1; }
 	};
 
 	class KFCChaptersStandInImpl : public IKFCChapters

@@ -112,6 +112,8 @@ DECLARE_PMID(kClassIDSpace, kKFCAlertAnswerBoss, kKFCUIPrefix + 31)
 // The value dialogs - Move..., Scale..., Rotate..., Shear... and Narrow Down's Pages... (KFCSpecialDialogs.cpp): one
 // boss for the five, each its own view. + 32: the next after the highest spent.
 DECLARE_PMID(kClassIDSpace, kKFCValueDialogBoss, kKFCUIPrefix + 32)
+// The QR Code tab's face in InDesign's Find/Change dialog (KFCQRTab.cpp - docs/superpowers/specs/2026-10-27-kfc-qr-code-search-design.md).
+DECLARE_PMID(kClassIDSpace, kKFCQRTabPanelBoss, kKFCUIPrefix + 33)
 
 
 // InterfaceIDs:
@@ -233,6 +235,10 @@ DECLARE_PMID(kImplementationIDSpace, kKFCQueryScopeObserverImpl, kKFCUIPrefix + 
 // The value dialogs' controller and observer (KFCSpecialDialogs.cpp). + 59 and + 60: the next after the highest spent.
 DECLARE_PMID(kImplementationIDSpace, kKFCValueDialogControllerImpl, kKFCUIPrefix + 59)
 DECLARE_PMID(kImplementationIDSpace, kKFCValueDialogObserverImpl, kKFCUIPrefix + 60)
+// The QR Code tab's face (KFCQRTab.cpp): what describes it, what hears its widgets, what the dialog's protocol calls.
+DECLARE_PMID(kImplementationIDSpace, kKFCQRTabPanelCreatorImpl, kKFCUIPrefix + 61)
+DECLARE_PMID(kImplementationIDSpace, kKFCQRTabObserverImpl, kKFCUIPrefix + 62)
+DECLARE_PMID(kImplementationIDSpace, kKFCQRTabControllerImpl, kKFCUIPrefix + 63)
 
 
 // ActionIDs:
@@ -547,6 +553,13 @@ DECLARE_PMID(kWidgetIDSpace, kKFCValueAxisVerticalWidgetID, kKFCUIPrefix + 54)
 DECLARE_PMID(kWidgetIDSpace, kKFCValuePagesWidgetID, kKFCUIPrefix + 55)
 DECLARE_PMID(kWidgetIDSpace, kKFCValuePositionLabelWidgetID, kKFCUIPrefix + 56)
 DECLARE_PMID(kWidgetIDSpace, kKFCValueAxisLabelWidgetID, kKFCUIPrefix + 57)
+// The QR Code tab's face (KFCQRTab.cpp): the face itself (the switcher names it), its Search:, its Find Next and its two
+// lines - what Find Next found, and why it could not select it (each a line of its own: a long content cuts only its own).
+DECLARE_PMID(kWidgetIDSpace, kKFCQRTabPanelWidgetID, kKFCUIPrefix + 58)
+DECLARE_PMID(kWidgetIDSpace, kKFCQRTabScopeWidgetID, kKFCUIPrefix + 59)
+DECLARE_PMID(kWidgetIDSpace, kKFCQRTabFindNextWidgetID, kKFCUIPrefix + 60)
+DECLARE_PMID(kWidgetIDSpace, kKFCQRTabStatusWidgetID, kKFCUIPrefix + 61)
+DECLARE_PMID(kWidgetIDSpace, kKFCQRTabNoteWidgetID, kKFCUIPrefix + 62)
 
 
 // "About Plug-ins" sub-menu:
@@ -714,6 +727,12 @@ DECLARE_PMID(kWidgetIDSpace, kKFCValueAxisLabelWidgetID, kKFCUIPrefix + 57)
 #define kKFCValueNoPagesKey				kKFCStringPrefix "kKFCValueNoPagesKey"
 // "Find/Change Selected Documents (Book)" - the toggle under Book Scope.
 #define kKFCSelectedDocumentsMenuKey	kKFCStringPrefix "kKFCSelectedDocumentsMenuKey"
+// The QR Code tab's face in Find/Change (KFCQRTab.cpp): its tab's label, its Search: and its two entries, its button.
+#define kKFCQRTabTitleKey				kKFCStringPrefix "kKFCQRTabTitleKey"
+#define kKFCQRTabSearchKey				kKFCStringPrefix "kKFCQRTabSearchKey"
+#define kKFCQRTabAllDocumentsKey		kKFCStringPrefix "kKFCQRTabAllDocumentsKey"
+#define kKFCQRTabDocumentKey			kKFCStringPrefix "kKFCQRTabDocumentKey"
+#define kKFCQRTabFindNextKey			kKFCStringPrefix "kKFCQRTabFindNextKey"
 
 // Other StringKeys:
 #define kKFCAboutBoxStringKey	kKFCStringPrefix "kKFCAboutBoxStringKey"
@@ -916,6 +935,11 @@ DECLARE_PMID(kWidgetIDSpace, kKFCValueAxisLabelWidgetID, kKFCUIPrefix + 57)
 #define kKFCRotateDialogRsrcID				(kSDKDefDialogResourceID + 14)
 #define kKFCShearDialogRsrcID				(kSDKDefDialogResourceID + 16)
 #define kKFCPagesDialogRsrcID				(kSDKDefDialogResourceID + 18)
+// The QR Code tab's face (KFCQRTab.cpp): its view (a LocaleIndex here, its body at + index_enUS - clear of the result rows'
+// and the query row's, + 20 to + 23), and its offer to Find/Change (IDList / IDListPair - the id
+// IPanelCreator::GetPanelRsrcID hands back).
+#define kKFCQRTabRsrcID						(kSDKDefPanelResourceID + 30)
+#define kKFCQRTabIDListRsrcID				(kSDKDefPanelResourceID + 32)
 #define kKFCValueFieldWidth					84
 // One row of the query dialog's lists: KCM's book comparison dialog's row height (kKCMBookRowHeight), the one other
 // list the Kohaku plug-ins draw in a dialog's font. Read by the row resource, the lists' scroll increments

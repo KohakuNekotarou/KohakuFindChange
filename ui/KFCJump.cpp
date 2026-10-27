@@ -867,19 +867,23 @@ void ClearSelection()
 // open dialog shows the value again and keeps it. A change later than that is the user's own; one inside it is put
 // back too - who made it cannot be told. A row's Replace leaves Search: as it is (measured: replace-keeps-scope), so
 // nothing arms for it.
+// A QR code Find Next's landing (KFCJump::LandOnQRCode) is kept the same way, for InDesign's own tab (ArmNativeScopeKeep).
 struct ScopeKeep
 {
 	bool	armed;
+	bool	native;		// armed for InDesign's own tab under KFC's QR Code tab - read without it (IKFCRuns::FindChangeTabAndScope)
 	int32	mode;
 	int32	scope;
 	std::chrono::steady_clock::time_point at;
-	ScopeKeep() : armed(false), mode(-1), scope(-1) {}
+	ScopeKeep() : armed(false), native(false), mode(-1), scope(-1) {}
 };
 ScopeKeep gScopeKeep;
 // ONE SECOND (the author's call - it was two): the dialog's writes came about 0.2 s after the click, and
 // again about 0.35 s after it (measured - the note above, and KeepSearchScopeAfterClick's), so one second still covers
 // them with room - and a Search: the user picks again themselves after a click is put back for half as long.
 const long long kScopeKeepMs = 1000;
+
+void ArmNativeScopeKeep();
 
 // Arm for an activation about to happen. One INSIDE an armed window keeps the value already held and only renews the
 // window: the arrow walk's next row can come between the dialog's write and ours, and would take the dialog's value
@@ -888,7 +892,15 @@ void ArmScopeKeep()
 {
 	const std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 	const int32 mode = KFCRuns()->CurrentSearchMode();
-	if (gScopeKeep.armed && mode == gScopeKeep.mode
+	// ON KFC'S QR CODE TAB the Search: a click can move is InDesign's own tab's - the one shown before it, which the open
+	// dialog re-picks as it does under its own tabs: kept as a QR code Find Next's landing keeps it (ArmNativeScopeKeep).
+	// The QR Code tab's own Search: is KFC's (KFCQRTab), and no selection moves it.
+	if (mode == kKFCQRCodeSearchMode)
+	{
+		ArmNativeScopeKeep();
+		return;
+	}
+	if (gScopeKeep.armed && !gScopeKeep.native && mode == gScopeKeep.mode
 		&& std::chrono::duration_cast<std::chrono::milliseconds>(now - gScopeKeep.at).count() <= kScopeKeepMs)
 	{
 		gScopeKeep.at = now;
@@ -897,10 +909,37 @@ void ArmScopeKeep()
 	}
 	const int32 scope = KFCRuns()->CurrentSearchScope();
 	gScopeKeep.armed = (mode >= 0 && scope >= 0);
+	gScopeKeep.native = false;
 	gScopeKeep.mode = mode;
 	gScopeKeep.scope = scope;
 	gScopeKeep.at = now;
 	KFC_DIAG_LOG("SCOPEKEEP armed=%d mode=%d scope=%d", gScopeKeep.armed ? 1 : 0, (int)mode, (int)scope);
+}
+
+// ARMED FOR A LANDING WITH KFC'S QR CODE TAB SHOWN - a QR code Find Next's (KFCJump::LandOnQRCode) and a row's click
+// (ArmScopeKeep): the Search: of InDesign's OWN tab - the one shown before the QR Code tab, whose mode Find/Change keeps
+// (measured in KT) - as it is before the landing fronts a document or selects, put back as a row's click's is
+// (KeepSearchScopeAfterClick): the dialog's own Find Next leaves Search: alone, and so must the QR Code tab's. A press
+// inside an armed window renews it alone, as ArmScopeKeep's.
+void ArmNativeScopeKeep()
+{
+	const std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+	int32 mode = -1, scope = -1;
+	KFCRuns()->FindChangeTabAndScope(mode, scope);
+	if (gScopeKeep.armed && gScopeKeep.native && mode == gScopeKeep.mode
+		&& std::chrono::duration_cast<std::chrono::milliseconds>(now - gScopeKeep.at).count() <= kScopeKeepMs)
+	{
+		gScopeKeep.at = now;
+		KFC_DIAG_LOG("SCOPEKEEP renewed native mode=%d scope=%d", (int)gScopeKeep.mode, (int)gScopeKeep.scope);
+		return;
+	}
+	// (Fault switch qr-scope-unkept, a test build's only - KFCDiag.h: nothing armed - what the dialog does unkept.)
+	gScopeKeep.armed = (mode >= 0 && scope >= 0 && !KFC_DIAG_FAULT("qr-scope-unkept"));
+	gScopeKeep.native = true;
+	gScopeKeep.mode = mode;
+	gScopeKeep.scope = scope;
+	gScopeKeep.at = now;
+	KFC_DIAG_LOG("SCOPEKEEP armed=%d native mode=%d scope=%d", gScopeKeep.armed ? 1 : 0, (int)mode, (int)scope);
 }
 
 // The Type tool, because a selected match is an invitation to EDIT - a click's: Edit > Find/Change's Find Next selects
@@ -1503,7 +1542,10 @@ bool JumpToObject(int32 chapterIdx, int32 hitIdx, UID item)
 			KFCResults()->SetHitOutcome(chapterIdx, hitIdx, KFCResultModel::kOutcomeMissing);
 			KFCResultTree::RefreshRows();
 		}
-		KFCResultTree::ShowStatus("Not found - the object is no longer in the document. Search again.");
+		// (A QR code list's row: its frame gone, or holding no QR code now - IKFCResults::IsHitItemGone, the QR design's Q15.)
+		KFCResultTree::ShowStatus(KFCResults()->ListIsQRCodes()
+			? "Not found - the QR code is no longer in the document. Search again."
+			: "Not found - the object is no longer in the document. Search again.");
 		return false;
 	}
 	// AN ITEM IN OVERSET TEXT - no spread holds it (the model's KFCObjectSearch::IsOnSpread): nothing of
@@ -1528,6 +1570,49 @@ bool JumpToObject(int32 chapterIdx, int32 hitIdx, UID item)
 void KFCJump::ClearFrontSelection()
 {
 	ClearSelection();
+}
+
+bool KFCJump::LandOnQRCode(const UIDRef& frameRef, int32 reach, PMString& outNote)
+{
+	outNote.Clear();
+	outNote.SetTranslatable(kFalse);
+	if (gActivating)
+		return false;		// a landing still under way (gActivating) - the next press lands
+	IDataBase* const db = frameRef.GetDataBase();
+	if (db == nil || frameRef.GetUID() == kInvalidUID || !db->IsValidUID(frameRef.GetUID()))
+		return false;
+	const ActivationGuard activating;
+	const MarkerUnlessRaised marker;	// it raises none: a text row's marker still up goes (JumpToObject's rule)
+	// ON A HIDDEN SPREAD NOTHING MOVES - an object row's rule (JumpToObject), and InDesign's Find Next's.
+	if ((reach & kKFCQRReachHiddenSpread) != 0)
+	{
+		outNote.Append("That QR code is on a hidden spread - not shown, not selected.");
+		return false;
+	}
+	// Search: of InDesign's own tab as it is BEFORE this landing fronts a document or selects - put back if Edit > Find/Change
+	// re-picks it in answer (ScopeKeep, above JumpToHit).
+	ArmNativeScopeKeep();
+	IDataBase::SaveRestoreModifiedState dirtyGuard(db);
+	// Its document in front - no previous chapter hidden: Find Next walks open documents, not a book's list.
+	if (!FrontChapter(UIDRef(db, db->GetRootUID()), false))
+		return false;
+	if ((reach & kKFCQRReachOverset) != 0)
+	{
+		ClearSelection();
+		ShowOversetAnchorInView(frameRef);
+		outNote.Append("That QR code is in overset text - not selected.");
+		return false;
+	}
+	ShowItemInView(frameRef);
+	if ((reach & (kKFCQRReachLocked | kKFCQRReachHidden)) != 0)
+	{
+		ClearSelection();
+		outNote.Append(((reach & kKFCQRReachLocked) != 0) ? "That QR code is locked - not selected."
+			: "That QR code is hidden - not selected.");
+		return true;
+	}
+	SelectItem(frameRef);
+	return true;
 }
 
 void KFCJump::PutViewOnSpread(IControlView* view, IDataBase* db, UID spread)
@@ -1612,8 +1697,18 @@ void KFCJump::KeepSearchScopeAfterClick()
 		return;
 	const long long ms = std::chrono::duration_cast<std::chrono::milliseconds>(
 		std::chrono::steady_clock::now() - gScopeKeep.at).count();
+	// The tab and its Search: as the keep was armed for: a row's click's, the tab Find/Change is on; a QR code Find Next's,
+	// InDesign's own tab under the QR Code tab (ArmNativeScopeKeep).
+	int32 mode = -1, now = -1;
+	if (gScopeKeep.native)
+		KFCRuns()->FindChangeTabAndScope(mode, now);
+	else
+	{
+		mode = KFCRuns()->CurrentSearchMode();
+		now = KFCRuns()->CurrentSearchScope();
+	}
 	// Too late to be the click's doing, or a setting of another tab: let go.
-	if (ms > kScopeKeepMs || KFCRuns()->CurrentSearchMode() != gScopeKeep.mode)
+	if (ms > kScopeKeepMs || mode != gScopeKeep.mode)
 	{
 		gScopeKeep.armed = false;
 		return;
@@ -1628,7 +1723,6 @@ void KFCJump::KeepSearchScopeAfterClick()
 	// Document always; Story, To End of Story and Selection only with a selection that gives them). One it does not
 	// offer - Story after a click that could not select, which leaves nothing selected - is one the dialog cannot show
 	// either, and it stays as the dialog made it, as when the user takes a selection away themselves.
-	const int32 now = KFCRuns()->CurrentSearchScope();
 	const bool offered = (KFCRuns()->SearchScopeForSelection(gScopeKeep.scope) == gScopeKeep.scope);
 	KFC_DIAG_LOG("SCOPEKEEP heard ms=%d scope now=%d kept=%d offered=%d", (int)ms, (int)now, (int)gScopeKeep.scope,
 		offered ? 1 : 0);

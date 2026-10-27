@@ -98,3 +98,7 @@ REGISTER_PMINTERFACE(KFCAlertAnswerService, kKFCAlertAnswerServiceImpl)
 // (KFCSpecialDialogs.cpp).
 REGISTER_PMINTERFACE(KFCValueDialogController, kKFCValueDialogControllerImpl)
 REGISTER_PMINTERFACE(KFCValueDialogObserver, kKFCValueDialogObserverImpl)
+// The QR Code tab's face in InDesign's Find/Change dialog: its creator, its observer and its controller (KFCQRTab.cpp).
+REGISTER_PMINTERFACE(KFCQRTabPanelCreator, kKFCQRTabPanelCreatorImpl)
+REGISTER_PMINTERFACE(KFCQRTabObserver, kKFCQRTabObserverImpl)
+REGISTER_PMINTERFACE(KFCQRTabController, kKFCQRTabControllerImpl)

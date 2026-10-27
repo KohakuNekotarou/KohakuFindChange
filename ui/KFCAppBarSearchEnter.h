@@ -15,6 +15,8 @@
 //      only, the field's text put into that tab first when it differs (KFCSearchEngine::SetQuery). On the
 //      other tabs Return is still stopped but nothing is searched; the status line says so while the panel
 //      is up (the author's call at the first live check - not the dialog's query searched there).
+//    . On KFC's own QR Code tab (KFCQRTab - the design's Q17) the field shows nothing, and Return - an empty field's
+//      too - lists the QR codes; what was typed is not used and nothing is put into Find/Change.
 //  (The triangle does not choose the tab - a design tried and dropped.)
 //  OFF by default; OFF = the field is not touched at all.
 //
@@ -69,13 +71,19 @@ void	KFCShutdownAppBarSearchEnter();
 
 // THE QUERY OF THE TAB FIND/CHANGE IS ON, AS WORDS - what the field shows while the link is on (Text / GREP: the find
 // string; Glyph: the glyph, its id and its font; Transliterate: the character type, in InDesign's own words) and the Find
-// part of a tier's name (KFCResultHistory::QueryLabel). false for a tab with nothing to say in words (Object, Colour) - and
-// on Mac, where none of this is built. Whether the link is on or not.
+// part of a tier's name (KFCResultHistory::QueryLabel). false for a tab with nothing to say in words (Object, Colour) -
+// and on Mac, where none of this is built. Whether the link is on or not. The tab is InDesign's own - the mode Find/Change
+// is in, also while KFC's QR Code tab is shown (the callers ask about that tab first: it has no words).
 bool	KFCFindChangeQueryWords(PMString& outWords);
 
 // ...AND ITS CHANGE SIDE, the same words for what the tab changes to (Text / GREP: the change string; Glyph: the change
 // glyph; Transliterate: the character type changed to) - the Change part of a tier's name. Empty words for an empty
 // Change box (a change that deletes the match). false where KFCFindChangeQueryWords is false.
 bool	KFCFindChangeChangeWords(PMString& outWords);
+
+// THE FIELD WRITTEN AGAIN FROM THE TAB FIND/CHANGE IS ON, NOW - for a change of tab that sends no notification of
+// Find/Change's settings: KFC's QR Code face shown (KFCQRTab, whose field shows nothing - the design's Q17). Nothing while
+// the link is off.
+void	KFCMirrorAppBarFieldNow();
 
 #endif // __KFCAppBarSearchEnter_h__

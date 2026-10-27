@@ -32,9 +32,10 @@
 namespace KFCQRSearch
 {
 	/** IS THE QR CODE TAB FIND/CHANGE'S TAB NOW (the design's D1), and the tab's Search: in outScope (when given) -
-	    IWalkerScopeFactoryUtils::kDocumentScope or kAllDocumentScope. A TEST BUILD asks its fault switch qr-tab first (the
-	    plan's Task 3 cases, before the tab itself exists): on = the QR Code tab, its file's first line "all" = All
-	    Documents, anything else Document. false = not the QR Code tab. */
+	    IWalkerScopeFactoryUtils::kDocumentScope or kAllDocumentScope. Asked of the UI half, which keeps it from the face's
+	    own calls (IKFCUIServices::IsQRCodeTabCurrent - ui/KFCQRTab.h); no UI half = not the QR Code tab. A TEST BUILD asks
+	    its fault switch qr-tab first (the model's cases, which need no dialog): on = the QR Code tab, its file's first line
+	    "all" = All Documents, anything else Document. false = not the QR Code tab. */
 	bool IsTabCurrent(int32* outScope = nil);
 
 	/** A QR CODE LIST'S ROWS ARE ONLY GONE TO (the design's Q13 - the author: "no replace"): the words an operation that would
@@ -58,6 +59,22 @@ namespace KFCQRSearch
 	/** A QR CODE'S ROW: itemUID = the frame, matchText = "ID<uid>:<kind>  <content>" (the content cut short where a row's
 	    text is - the panel cuts it again to its width), its page and words as an object row's (ReadItemPlace). */
 	void BuildRow(const UIDRef& docRef, UID frame, KFCQRCodes::Kind kind, const PMString& content, KFCResultModel::Hit& out);
+
+	/** DOES THE ROW'S FRAME STILL HOLD A QR CODE (the design's Q15 - IKFCResults::IsHitItemGone asks it of a QR code list's
+	    rows)? Read in its document as it stands (KFCQRCodes::Read): false = no QR code there now - the frame gone, or holding
+	    a picture or nothing since. A document not open now cannot tell: true (the row's click opens it and asks again).
+	    What the QR code holds is not compared - a row keeps the text it was found with (Q15). */
+	bool RowHoldsQRCode(int32 chapterIdx, int32 hitIdx);
+
+	/** FIND NEXT ON THE QR CODE TAB (the design's Q10, Task 1's D5 - the tab's button, ui/KFCQRTab): the QR code after `last` -
+	    the one Find Next found before; an invalid UIDRef, or one of a document not in the range now or no longer holding it =
+	    from the start - in the list's own order: the tab's Search: (the active document, or every open one in the order
+	    All Documents lists them - KFCBookScope::ListOpenDocuments), each document's QR codes in page order
+	    (KFCResultModel::OrderHitsByPage). After the last, the first again, silently (InDesign's own Find Next). The selection is
+	    not asked (Task 1's ruling). outReach = what keeps it from being selected (kKFCQRReach* bits, KFCModelTypes.h); outWords
+	    = what the tab's line says of it: its kind and content, and where. false = no QR code at all there (outWords says so).
+	    Read only. */
+	bool Next(const UIDRef& last, UIDRef& outFrame, int32& outReach, PMString& outWords);
 }
 
 #endif // __KFCQRSearch_h__

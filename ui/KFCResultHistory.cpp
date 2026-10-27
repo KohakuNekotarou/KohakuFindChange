@@ -75,8 +75,11 @@ namespace
 												// its heading's Narrow Down greys a text-only condition and
 												// Search Text in These Objects is grey over text rows
 												// (TierHoldsObjects)
+		bool					holdsQRCodes;	// ...QR codes (IKFCResults::ListIsQRCodes when it was kept) - its heading's
+												// Narrow Down and Search Text in These Objects grey (TierHoldsQRCodes - the
+												// QR design's Q13)
 
-		KeptTier() : set(0), open(false), holdsObjects(false) {}
+		KeptTier() : set(0), open(false), holdsObjects(false), holdsQRCodes(false) {}
 	};
 
 	/** THE LIVE TIER'S NAME and the list it names: the model's result set it was given to (0 = none - the model counts its
@@ -214,6 +217,7 @@ namespace
 		out.open = (treeMgr != nil && KFCResultHistory::IsStacking())
 			? (treeMgr->IsNodeExpanded(KFCResultNodeID::CreateLiveTier()) != kFalse) : true;
 		out.holdsObjects = KFCResults()->ListHoldsObjects();
+		out.holdsQRCodes = KFCResults()->ListIsQRCodes();
 		CopyRows(treeMgr, KFCResultNodeID::CreateLiveTier(), -1, out);
 		return true;
 	}
@@ -536,6 +540,13 @@ bool KFCResultHistory::TierHoldsObjects(int32 tier)
 	return tier < static_cast<int32>(gKept.size()) && gKept[static_cast<size_t>(tier)].holdsObjects;
 }
 
+bool KFCResultHistory::TierHoldsQRCodes(int32 tier)
+{
+	if (tier < 0)
+		return KFCResults()->ListIsQRCodes();
+	return tier < static_cast<int32>(gKept.size()) && gKept[static_cast<size_t>(tier)].holdsQRCodes;
+}
+
 namespace
 {
 	// One side of a tier's name: the words, cut at kLabelWordsMax where a character may be cut (KFCSafeCut).
@@ -598,30 +609,48 @@ namespace
 	}
 }
 
+namespace
+{
+	// A tier's name for tab `mode` - QueryLabel's and HeldQueryLabel's words.
+	PMString LabelForTab(int32 mode)
+	{
+		PMString label("[");
+		label.SetTranslatable(kFalse);
+		label.Append(KFCRuns()->TabName(mode));
+		label.Append("]");
+		// THE QR CODE TAB HAS NO QUERY (it lists every QR code - KFCModelTypes.h): "[QR Code]" alone - Find/Change's words
+		// are another tab's, the one InDesign's mode still is.
+		if (mode == kKFCQRCodeSearchMode)
+			return label;
+		// (The words are InDesign's own tab's - KFCFindChangeQueryWords reads the mode Find/Change is in, which `mode` is for
+		// every tab but the QR Code tab.)
+		PMString findWords, changeWords;
+		if (KFCFindChangeQueryWords(findWords))
+		{
+			// F and C, not Find and Change (the author's call): the row has the panel's width to fill.
+			label.Append(" F:\"");
+			AppendQueryWords(label, findWords);
+			label.Append("\"");
+			(void)KFCFindChangeChangeWords(changeWords);		// the same tab, so it answers as the find side did
+			label.Append(" C:\"");
+			AppendQueryWords(label, changeWords);
+			label.Append("\"");
+		}
+		return label;
+	}
+}	// anonymous namespace
+
 PMString KFCResultHistory::QueryLabel()
 {
-	PMString label("[");
-	label.SetTranslatable(kFalse);
-	const int32 mode = KFCRuns()->CurrentSearchMode();
-	label.Append(KFCRuns()->TabName(mode));
-	label.Append("]");
-	// THE QR CODE TAB HAS NO QUERY (it lists every QR code - KFCModelTypes.h): "[QR Code]" alone - Find/Change's words are
-	// another tab's, the one InDesign's mode still is.
-	if (mode == kKFCQRCodeSearchMode)
-		return label;
-	PMString findWords, changeWords;
-	if (KFCFindChangeQueryWords(findWords))
-	{
-		// F and C, not Find and Change (the author's call): the row has the panel's width to fill.
-		label.Append(" F:\"");
-		AppendQueryWords(label, findWords);
-		label.Append("\"");
-		(void)KFCFindChangeChangeWords(changeWords);		// the same tab, so it answers as the find side did
-		label.Append(" C:\"");
-		AppendQueryWords(label, changeWords);
-		label.Append("\"");
-	}
-	return label;
+	return LabelForTab(KFCRuns()->CurrentSearchMode());
+}
+
+PMString KFCResultHistory::HeldQueryLabel()
+{
+	// InDesign's own tab - also while KFC's QR Code tab is shown, whose mode is still the tab shown before it.
+	int32 mode = -1, scope = -1;
+	KFCRuns()->FindChangeTabAndScope(mode, scope);
+	return LabelForTab(mode);
 }
 
 void KFCResultHistory::DropStackIfRemade(uint32 setBefore)
@@ -885,7 +914,7 @@ bool KFCResultHistory::QueryReadsAsTier(uint32 set, PMString& outName)
 		outName.SetTranslatable(kFalse);
 		if (gLive.label.IsEmpty())
 			return false;
-		return (WithoutQueryPlace(gLive.label) == QueryLabel()) != kFalse;
+		return (WithoutQueryPlace(gLive.label) == HeldQueryLabel()) != kFalse;
 	}
 	const int32 tier = TierOfSet(set);
 	if (tier < 0)
@@ -896,8 +925,9 @@ bool KFCResultHistory::QueryReadsAsTier(uint32 set, PMString& outName)
 	if (kept.name.IsEmpty())
 		return false;		// no search here named that list: nothing to read the query against
 	// Word for word - PMString's == compares the buffers -: the name as the search made it, the dialog's place in the
-	// run order taken off, against the name made again from the query Find/Change holds now.
-	return (WithoutQueryPlace(kept.name) == QueryLabel()) != kFalse;
+	// run order taken off, against the name made again from the query Find/Change holds now (HeldQueryLabel: InDesign's own
+	// tab's - the query stated for the operation is one of its tabs', KFC's QR Code tab shown or not).
+	return (WithoutQueryPlace(kept.name) == HeldQueryLabel()) != kFalse;
 }
 
 bool KFCResultHistory::ClearTier(int32 tier)
@@ -1042,7 +1072,7 @@ void KFCResultHistory::RenameLiveFromQuery(uint32 set)
 	const PMString words(WithoutQueryPlace(gLive.label));
 	PMString renamed(gLive.label);
 	renamed.Truncate(words.CharCount());	// Truncate takes off that many from the end: the place alone is left
-	renamed.Append(QueryLabel());
+	renamed.Append(HeldQueryLabel());		// (the replace's query - InDesign's own tab's, the QR Code tab shown or not)
 	renamed.SetTranslatable(kFalse);
 	KFC_DIAG_LOG("STACK live renamed set=%u", set);
 	gLive.label = renamed;

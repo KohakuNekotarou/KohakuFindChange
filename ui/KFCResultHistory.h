@@ -70,12 +70,23 @@ namespace KFCResultHistory
 	    condition by it, and its Search Text in These Objects is grey over text rows. */
 	bool TierHoldsObjects(int32 tier);
 
+	/** Are tier `tier`'s rows QR codes - a QR Code tab search's (-1 = the live list, asked of the model; a grey one as its
+	    copy noted it)? Its heading's Narrow Down and Search Text in These Objects are grey over it (the QR design's Q13: its
+	    rows are only gone to). */
+	bool TierHoldsQRCodes(int32 tier);
+
 	/** A tier's name - the query Find/Change holds now, in the author's words (F and C rather than Find and Change):
 	    "[<tab>] F:"<find>" C:"<change>"", each side as the Application Bar's field would show it
 	    (KFCFindChangeQueryWords / KFCFindChangeChangeWords) and cut at 200 characters; "[<tab>]" alone for a tab with
 	    nothing to say in words (Object) and for KFC's QR Code tab, which has no query ("[QR Code]"). The panel's Find
 	    names its tier by it; the query dialog's Find puts the query's place in the run order in front. */
 	PMString QueryLabel();
+
+	/** The same name for the query Find/Change HOLDS now, on InDesign's own tab - also while KFC's QR Code tab is shown,
+	    whose mode is still the tab shown before it (IKFCRuns::FindChangeTabAndScope): what a list's name is read against once
+	    its query is stated for a row operation (QueryReadsAsTier), and what the live tier is renamed to after a replace
+	    (RenameLiveFromQuery). QueryLabel's own answer whenever the QR Code tab is not shown. */
+	PMString HeldQueryLabel();
 
 	/** A LIST MADE ANEW ELSEWHERE - a Run of the query dialog, Change All in Book (No List): the tiers go when the list the
 	    model holds is not the one it held before (`setBefore` = KFCResults()->GetResultSetId() before it ran). A run turned
@@ -190,7 +201,7 @@ namespace KFCResultHistory
 
 	/** THE THIRD CHECK OF A LIST'S QUERY STATED FOR A ROW OPERATION, ANSWERED HERE (IKFCUIServices::QueryReadsAsTier - the
 	    model's KFCQueryScope asks it after the query is stated): does the query Find/Change holds now read, word for word,
-	    as list `set`'s name - the live list's, or a kept tier's - QueryLabel() against the name, the query dialog's place in
+	    as list `set`'s name - the live list's, or a kept tier's - HeldQueryLabel() against the name, the query dialog's place in
 	    the run order ("<n>  ") taken off it? outName = that name as the list's row shows it. False = it does not, or there
 	    is no list of that set, or no search here named it. */
 	bool QueryReadsAsTier(uint32 set, PMString& outName);

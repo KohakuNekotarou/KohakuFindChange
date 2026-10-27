@@ -392,10 +392,13 @@ static bool MirrorFindChangeIntoField()
 {
 	if (sShutdown || !sAppBarSearchEnter)
 		return false;
+	// THE QR CODE TAB (KFCQRTab - the design's Q17): the field shows nothing - the tab has no query in words, and a Return
+	// there lists the QR codes whatever is typed (RunPendingSearch).
+	const bool qrTab = (KFCRuns()->CurrentSearchMode() == kKFCQRCodeSearchMode);
 	PMString query;
-	if (!KFCFindChangeQueryWords(query))
+	if (!qrTab && !KFCFindChangeQueryWords(query))
 		return false;	// Object, Colour: not this panel's
-	const std::wstring text = WideOf(query);
+	const std::wstring text = qrTab ? std::wstring() : WideOf(query);
 	const HWND field = AppBarField();
 	if (field == nullptr || FieldText(field) == text)
 		return false;
@@ -448,18 +451,24 @@ static uint32 RunPendingSearch(void* /*refPtr*/)
 {
 	std::wstring text;
 	text.swap(sPendingText);
-	if (sShutdown || !sAppBarSearchEnter || text.empty())
+	if (sShutdown || !sAppBarSearchEnter)
+		return IIdleTask::kEndOfTime;
+	// THE QR CODE TAB (the design's Q17): its Return lists the QR codes - the field's text is not used (it shows nothing
+	// there), so an empty field searches too, and nothing is put into Find/Change. (Asked after the shutdown test: the
+	// model is not asked anything once the session is going.)
+	const bool qrTab = (KFCRuns()->CurrentSearchMode() == kKFCQRCodeSearchMode);
+	if (text.empty() && !qrTab)
 		return IIdleTask::kEndOfTime;
 
 	// Return searches on the Text and GREP tabs only - the author's call at the first live check (not the dialog's
 	// own query searched on every other tab). On the others the Return is still stopped (no
 	// browser) and nothing runs; the status line says why - only while the panel is up: ShowStatus also keeps
 	// the line for the panel's next show, where it would stand in place of the last search's report. The panel
-	// is not opened for it.
+	// is not opened for it. (And on KFC's QR Code tab, above.)
 	InterfacePtr<IPanelMgr> panelMgr(KFCBookPanelLookup::QueryPanelManager());
 	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
 	const IFindChangeOptions::SearchMode mode = (opts != nil) ? opts->GetSearchMode() : IFindChangeOptions::kTextSearch;
-	if (mode != IFindChangeOptions::kTextSearch && mode != IFindChangeOptions::kGrepSearch)
+	if (!qrTab && mode != IFindChangeOptions::kTextSearch && mode != IFindChangeOptions::kGrepSearch)
 	{
 		if (panelMgr != nil && panelMgr->IsPanelWithWidgetIDShown(kKFCPanelWidgetID))
 		{
@@ -474,8 +483,8 @@ static uint32 RunPendingSearch(void* /*refPtr*/)
 		panelMgr->ShowPanelByWidgetID(kKFCPanelWidgetID, kFalse);
 
 	// The field's text goes into the dialog only when it differs from what the tab already holds (the field
-	// shows that, so an untouched field changes nothing).
-	if (opts == nil || WideOf(opts->GetFindString(mode)) != text)
+	// shows that, so an untouched field changes nothing). Never on the QR Code tab (above).
+	if (!qrTab && (opts == nil || WideOf(opts->GetFindString(mode)) != text))
 	{
 		// No key: the wchar_t constructor makes a string Translate leaves alone (PMString.h - for strings that are not
 		// keys; wchar_t is UTF-16 here), the header's form in place of SetTranslatable(kFalse).
@@ -513,7 +522,8 @@ static LRESULT CALLBACK AppBarGetMsgProc(int code, WPARAM wParam, LPARAM lParam)
 			&& IsAppBarSearchField(m->hwnd))
 		{
 			const std::wstring text = FieldText(m->hwnd);
-			if (!text.empty())
+			// (an empty field too on KFC's QR Code tab, whose Return lists the QR codes - the design's Q17)
+			if (!text.empty() || KFCRuns()->CurrentSearchMode() == kKFCQRCodeSearchMode)
 			{
 				m->message = WM_NULL;
 				const bool repeat = (m->lParam & 0x40000000) != 0;	// the previous key state: already down
@@ -575,6 +585,9 @@ static bool TabWords(PMString& outWords, bool changeSide)
 	outWords.Clear();
 	outWords.SetTranslatable(kFalse);
 #ifdef WINDOWS
+	// InDesign's OWN tab - the mode Find/Change is in, also while KFC's QR Code tab is shown (its mode is still the tab shown
+	// before it): the callers ask about the QR Code tab themselves (the field shows nothing there; a tier is named [QR Code]),
+	// and a list's name is read against the query held on InDesign's tab (KFCResultHistory::HeldQueryLabel).
 	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
 	if (opts == nil)
 		return false;
@@ -610,6 +623,17 @@ bool KFCFindChangeQueryWords(PMString& outWords)
 bool KFCFindChangeChangeWords(PMString& outWords)
 {
 	return TabWords(outWords, true);
+}
+
+void KFCMirrorAppBarFieldNow()
+{
+#ifdef WINDOWS
+	// What the observer below does for Find/Change's own notifications - a switch to KFC's QR Code face sends none.
+	if (sShutdown || !sAppBarSearchEnter)
+		return;
+	sGuard.held = false;
+	MirrorFindChangeIntoField();
+#endif
 }
 
 // The observer that keeps the field following the dialog. An AddIn onto kActiveContextBoss under its own IID

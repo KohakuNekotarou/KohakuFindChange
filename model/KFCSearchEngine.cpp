@@ -4177,6 +4177,11 @@ int32 KFCSearchEngine::CurrentSearchScope()
 	int32 qrScope = IWalkerScopeFactoryUtils::kDocumentScope;
 	if (KFCQRSearch::IsTabCurrent(&qrScope))
 		return qrScope;
+	return FindChangeScope();
+}
+
+int32 KFCSearchEngine::FindChangeScope()
+{
 	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
 	if (opts == nil)
 		return -1;

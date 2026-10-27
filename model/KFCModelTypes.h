@@ -194,6 +194,16 @@ struct KFCOversetLoc
     (measured in KT - GetSearchMode stays the tab shown before it). */
 enum { kKFCQRCodeSearchMode = 100 };
 
+/** WHAT KEEPS A QR CODE FIND NEXT FOUND FROM BEING SELECTED (IKFCRuns::QRCodeNext's outReach - KFCQRSearch::Next; the UI half's
+    landing says it on the tab's line - KFCJump::LandOnQRCode): its row's own words (KFCObjectSearch::ReadItemPlace), as bits. */
+enum
+{
+	kKFCQRReachLocked		= 1,	// locked (Object > Lock, or a locked layer) - shown, not selected
+	kKFCQRReachHidden		= 2,	// hidden (Object > Hide, or a hidden layer) - shown, not selected
+	kKFCQRReachHiddenSpread	= 4,	// on a hidden spread - nothing moves
+	kKFCQRReachOverset		= 8		// in overset text - the view on its "+", not selected
+};
+
 /** What the UI half's alert handler does with an alert raised inside a walk of ours (IKFCRuns::AnswerAlert - the
     model's KFCHiddenSpreadAlert.h): a button to press, 1 to 3 - or one of these. */
 enum

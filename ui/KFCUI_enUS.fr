@@ -166,6 +166,13 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCValueCancelKey,				"Cancel",
                 kKFCValueNotZeroKey,			"Type a percentage other than 0.",
                 kKFCValueNoPagesKey,			"Type the pages - for example 1-5, 8.",
+                // The QR Code tab's face in InDesign's Find/Change dialog (KFCQRTab.cpp): the tab's label, Search: and its
+                // two entries (Find/Change's own words, as the other tabs' Search: menus say them), the button.
+                kKFCQRTabTitleKey,				"QR Code",
+                kKFCQRTabSearchKey,				"Search:",
+                kKFCQRTabAllDocumentsKey,		"All Documents",
+                kKFCQRTabDocumentKey,			"Document",
+                kKFCQRTabFindNextKey,			"Find Next",
                 // The message line as a freshly opened panel shows it - the plug-in has no search
                 // box of its own, so the first thing to say is where the query is typed.
                 // Read through InitialMessage (KFCResultListWidgetMgr.cpp) whenever the message line falls

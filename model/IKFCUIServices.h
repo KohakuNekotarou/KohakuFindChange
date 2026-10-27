@@ -160,6 +160,12 @@ public:
 	    is passed over. */
 	virtual void				SnapshotViewPlaces() = 0;
 	virtual void				RestoreViewPlaces() = 0;
+	/** IS KFC'S QR CODE TAB FIND/CHANGE'S TAB NOW (appended - docs/superpowers/specs/2026-10-27-kfc-qr-code-search-design.md
+	    D1; KFCQRSearch::IsTabCurrent asks it): the dialog open with the QR Code face shown, or closed with it shown last -
+	    the face the dialog opens on again - unless a saved query loaded since has stated a tab of its own. outScope = the
+	    tab's Search: (IWalkerScopeFactoryUtils::kDocumentScope or kAllDocumentScope), answered either way. Kept by the UI
+	    half from the face's own calls (KFCQRTab.h): no window is walked to answer. */
+	virtual bool				IsQRCodeTabCurrent(int32& outScope) = 0;
 };
 
 /** HOW THE MODEL HALF ASKS FOR IKFCUIServices - the only way. IKFCUIServices has no kDefaultIID, so a Query of its

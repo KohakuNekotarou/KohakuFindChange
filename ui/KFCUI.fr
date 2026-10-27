@@ -41,6 +41,9 @@
 #include "TipsID.h"			// IID_ITIP - the tooltips on the panel's illustration and on the query dialog's rows
 #include "XMLParserID.h"	// IID_ISAXCONTENTHANDLER - the query dialog's reading of a saved query's file
 #include "DragDropID.h"		// IID_IDRAGDROPSOURCE / IID_IDRAGDROPTARGET / IID_IDATAEXCHANGEHANDLER - the row eye's trace
+#include "IDList.fh"		// the QR Code tab's offer to Find/Change (IDList / IDListPair - KFCQRTab.cpp)
+#include "IDListPair.fh"
+#include "FindChangeID.h"	// kFindChangeMiniTabbedDialogService - the dialog the QR Code tab is offered to
 
 // Project includes:
 #include "KFCUIID.h"
@@ -586,6 +589,24 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 		kStaticTextWidgetBoss,
 		{
 			IID_IEVEINFO, kFixedSizeEVEInfoImpl,
+		}
+	},
+
+	/*
+	 * THE QR CODE TAB'S FACE in InDesign's Find/Change dialog (KFCQRTab.cpp - docs/superpowers/specs/
+	 * 2026-10-27-kfc-qr-code-search-design.md D3): the shape of InDesign's own faces (kFindMiniTabbedDialogTextPanelBoss and
+	 * its siblings, the 20.5 dump - KT's face of the same four measured on 2026-10-27): the dialog panel service that offers
+	 * it, a creator that names its resource, an observer for its widgets and a controller for the dialog's calls.
+	 */
+	Class
+	{
+		kKFCQRTabPanelBoss,
+		kPrimaryResourcePanelWidgetBoss,
+		{
+			IID_IK2SERVICEPROVIDER, kDialogPanelServiceImpl,
+			IID_IPANELCREATOR, kKFCQRTabPanelCreatorImpl,
+			IID_IOBSERVER, kKFCQRTabObserverImpl,
+			IID_IDIALOGCONTROLLER, kKFCQRTabControllerImpl,
 		}
 	},
 
@@ -3417,6 +3438,158 @@ resource KFCValueDialogWidget (kKFCPagesDialogRsrcID + index_enUS)
 	},
 
 	kEVEArrangeChildrenInRow | kEVERegularMargin,
+};
+
+/*
+ * THE QR CODE TAB'S OFFER TO FIND/CHANGE (KFCQRTab.cpp): IDList names the dialog (its service - FindChangeID.h); IDListPair
+ * the same, with the view to build and the plug-in that owns it. Both under the id the face's IPanelCreator hands back.
+ */
+resource IDList (kKFCQRTabIDListRsrcID)
+{
+	{
+		kFindChangeMiniTabbedDialogService,
+	},
+};
+
+resource IDListPair (kKFCQRTabIDListRsrcID)
+{
+	{
+		kFindChangeMiniTabbedDialogService,	// the dialog (InDesign's)
+		kKFCQRTabRsrcID,					// the view to add (ours)
+		kKFCUIPluginID						// the plug-in that owns it (ours)
+	},
+};
+
+type KFCQRTabPanelWidget (kViewRsrcType) : PrimaryResourcePanelWidget (ClassID = kKFCQRTabPanelBoss)
+{
+	WidgetEveInfo;
+};
+
+resource LocaleIndex (kKFCQRTabRsrcID)
+{
+	kViewRsrcType,
+	{
+		kWildFS, k_Wild, kKFCQRTabRsrcID + index_enUS
+	}
+};
+
+/*
+ * THE FACE (the design's Q4): Search: with its two entries, Find Next, and the two lines Find Next speaks on (the panel's
+ * own line is the panel's - Find Next says what it found where the person is looking): what it found, then why it could not
+ * select it - one line each, as a static text is one line and cut at its end: a long content cuts its own line only. Each
+ * line is the query dialog's fixed-size text, so a long sentence does not grow the dialog. No Done: the dialog's frame has
+ * one on every tab (Q11 - measured).
+ * LAID OUT AS INDESIGN'S OWN FACES (the author's call, 10-27 night: "match the Object tab's button sizes and positions" -
+ * measured on its Object tab, the face 486 x 356): a margin of 15 all round; the left part 330 wide - here "Search:" (55)
+ * and its list (170) in one row, 5 apart, as the faces' Search: row - and 10 to the buttons' column, whose buttons are
+ * 116 x 26 from the top right (15 + 330 + 10 + 116 + 15 = 486, the face's width).
+ */
+resource KFCQRTabPanelWidget (kKFCQRTabRsrcID + index_enUS)
+{
+	__FILE__, __LINE__,					// Localization macro
+	kKFCQRTabPanelWidgetID,				// WidgetId - the face the dialog's switcher names
+	kPMRsrcID_None,						// RsrcId
+	kBindNone,							// Frame binding (EVE decides the frame)
+	Frame(0, 0, 0, 0),					// Frame
+	kTrue,								// Visible
+	kTrue,								// Enabled
+	kKFCQRTabTitleKey,					// Panel name - the tab's label
+	{
+		// ----- the left part: Search: and Find Next's two lines -----
+		EVEGenericPanelWidget
+		(
+			kInvalidWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+			kBindNone,							// Frame binding
+			Frame(0, 0, 330, 0)					// Frame
+			kTrue, kTrue,						// Visible, Enabled
+			kEVEAlignLeft | kEVELargeSpaceAfter | kEVEArrangeChildrenInColumn | kEVENoMargin,
+			{
+				// Search: [Document] - one row, as the faces' "Search: [Document]"
+				EVEGenericPanelWidget
+				(
+					kInvalidWidgetID, kPMRsrcID_None,
+					kBindNone,
+					Frame(0, 0, 230, 21)
+					kTrue, kTrue,
+					kEVEAlignLeft | kEVELargeSpaceAfter | kEVEArrangeChildrenInRow | kEVENoMargin,
+					{
+						EVEStaticTextWidget
+						(
+							kInvalidWidgetID,			// WidgetId
+							kSysStaticTextPMRsrcId,		// RsrcId
+							kBindNone,					// Frame binding
+							Frame(0, 0, 55, 21)			// Frame - the faces' label (their "Search (S) :")
+							kTrue, kTrue,				// Visible, Enabled
+							kAlignLeft,					// Alignment
+							kDontEllipsize, kTrue,		// Ellipsize style, convert ampersands
+							kKFCQRTabSearchKey,			// "Search:"
+							0,							// No associated widget
+							kEVERegularSpaceAfter,
+						),
+						EVEDropDownListWidget
+						(
+							kKFCQRTabScopeWidgetID,		// WidgetId
+							kSysDropDownPMRsrcId,		// RsrcId
+							kBindNone,					// Frame binding
+							Frame(0, 0, 170, 21)		// Frame - the faces' Search: list
+							kTrue, kTrue,				// Visible, Enabled
+							{{
+								kKFCQRTabAllDocumentsKey,
+								kKFCQRTabDocumentKey,
+							}}
+							kEVENoSpaceAfter,
+						),
+					}
+				),
+				KFCQueryFixedTextWidget
+				(
+					kKFCQRTabStatusWidgetID,	// WidgetId - what Find Next found (KFCQRTab.cpp)
+					kSysStaticTextPMRsrcId,		// RsrcId
+					kBindNone,					// Frame binding
+					Frame(0, 0, 330, 20)		// Frame - the size it gets, not a floor (kKFCQueryFixedTextWidgetBoss)
+					kTrue, kTrue, kAlignLeft,	// Visible, Enabled, Alignment
+					kEllipsizeEnd, kFalse,		// Ellipsize style (a sentence is read from the front), Convert ampersands
+					"",							// Text (Find Next fills it; empty at every launch)
+					kInvalidWidgetID			// Associated control (none)
+					kEVEAlignFill | kEVENoSpaceAfter,
+				),
+				KFCQueryFixedTextWidget
+				(
+					kKFCQRTabNoteWidgetID,		// WidgetId - why Find Next could not select it (KFCQRTab.cpp)
+					kSysStaticTextPMRsrcId,		// RsrcId
+					kBindNone,					// Frame binding
+					Frame(0, 0, 330, 20)		// Frame
+					kTrue, kTrue, kAlignLeft,	// Visible, Enabled, Alignment
+					kEllipsizeEnd, kFalse,		// Ellipsize style, Convert ampersands
+					"",							// Text (empty when it was selected)
+					kInvalidWidgetID			// Associated control (none)
+					kEVEAlignFill | kEVENoSpaceAfter,
+				),
+			}
+		),
+		// ----- the buttons' column: Find Next, as the faces' Find Next (116 x 26, top right) -----
+		EVEGenericPanelWidget
+		(
+			kInvalidWidgetID, kPMRsrcID_None,
+			kBindNone,
+			Frame(0, 0, 116, 26)
+			kTrue, kTrue,
+			kEVEAlignLeft | kEVENoSpaceAfter | kEVEArrangeChildrenInColumn | kEVENoMargin,
+			{
+				EVEButtonWidget
+				(
+					kKFCQRTabFindNextWidgetID,	// WidgetId
+					kSysButtonPMRsrcId,			// RsrcId
+					kBindNone,					// Frame binding
+					Frame(0, 0, 116, 26)		// Frame
+					kTrue, kTrue,				// Visible, Enabled
+					kKFCQRTabFindNextKey,		// "Find Next"
+					kEVENoSpaceAfter,
+				),
+			}
+		),
+	}
+	kEVEArrangeChildrenInRow | kEVELargeMargin,
 };
 #endif // __ODFRC__
 

@@ -288,6 +288,11 @@ namespace KFCSearchEngine
 	    after a launch), and a user who never opened the dialog has asked for nothing but the document. */
 	int32 CurrentSearchScope();
 
+	/** The Search: of InDesign's OWN tab (FindChangeMode's - the tab shown before the QR Code tab while that one is shown),
+	    read as CurrentSearchScope reads a tab of InDesign's; never the QR Code tab's. What a QR code Find Next's landing keeps
+	    (KFCJump - the open dialog re-picks it when the selection changes). -1 when the settings cannot be read. */
+	int32 FindChangeScope();
+
 	/** Put Search: of tab 'mode' back to 'scope' (a WalkScopeType value, as CurrentSearchScope gives it) - the
 	    author's call: a row's click selects its match, and Edit > Find/Change, open, answers a selection
 	    change by re-picking Search: (measured: to Document, or to Selection), which its own Find Next does not do. The

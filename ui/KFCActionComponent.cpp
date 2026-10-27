@@ -1110,8 +1110,10 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 				// menu (SET-11). Its other refusals (Find/Change's tab, nothing to find, no object left, a document or
 				// book not open) said on the status line when pressed - the tab can change after the menu opened (the
 				// text-in-objects spec's T2).
+				// (Grey over a tier of QR codes too - their frames hold no text: the QR design's Q13.)
 				int32 tier = -1;
-				const bool enable = RightClickedTier(widget, tier) && KFCResultHistory::TierHoldsObjects(tier);
+				const bool enable = RightClickedTier(widget, tier) && KFCResultHistory::TierHoldsObjects(tier)
+					&& !KFCResultHistory::TierHoldsQRCodes(tier);
 				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 				break;
 			}
@@ -1182,9 +1184,11 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 				const int32 narrow = NarrowKindOf(action);
 				if (narrow != kKFCNarrowNone)
 				{
+					// (Every condition grey over a tier of QR codes - it lists every QR code, and is not narrowed: Q13.)
 					int32 tier = -1;
 					PMString layer;
 					const bool enable = RightClickedTier(widget, tier)
+						&& !KFCResultHistory::TierHoldsQRCodes(tier)
 						&& !(NarrowIsTextOnly(narrow) && KFCResultHistory::TierHoldsObjects(tier))
 						&& (narrow != kKFCNarrowOnLayer || ActiveLayerName(ac, layer));
 					listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);

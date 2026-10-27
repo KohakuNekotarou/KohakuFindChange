@@ -31,6 +31,7 @@
 #include "KFCObjectOutline.h"		// OutlineRows - an object row's Special Operations > Create Outlines
 #include "KFCObjectSpecial.h"		// SpecialRows - an object row's other Special Operations
 #include "KFCOversetLocator.h"
+#include "KFCQRSearch.h"		// RowHoldsQRCode - a QR code list's row gone once its frame holds no QR code
 #include "KFCQueryScope.h"		// KFCUnderListQuery - a row operation under its own list's query; PreviewHit
 #include "KFCQuerySequence.h"
 #include "KFCReplaceEngine.h"
@@ -83,9 +84,12 @@ public:
 	virtual int32 GetObjectRowHit(int32 chapterIdx, int32 nth) { return KFCResultModel::GetObjectRowHit(chapterIdx, nth); }
 	virtual bool IsHitItemGone(int32 chapterIdx, int32 hitIdx)
 	{
-		return KFCResultModel::IsHitItemGone(chapterIdx, hitIdx);
+		// (A QR code list's row whose frame holds no QR code now is gone too - KFCQRSearch::RowHoldsQRCode, the design's Q15.)
+		return KFCResultModel::IsHitItemGone(chapterIdx, hitIdx)
+			|| (KFCResultModel::ListIsQRCodes() && !KFCQRSearch::RowHoldsQRCode(chapterIdx, hitIdx));
 	}
 	virtual bool IsFromAllDocuments() { return KFCResultModel::IsFromAllDocuments(); }
+	virtual bool ListIsQRCodes() { return KFCResultModel::ListIsQRCodes(); }
 };
 
 CREATE_PMINTERFACE(KFCResultsSession, kKFCResultsImpl)
@@ -163,6 +167,16 @@ public:
 	// (Not under the list's query - KFCUnderListQuery: it searches with Find/Change's own, as Find does -
 	// docs/superpowers/specs/2026-10-21-kfc-text-in-object-results-design.md T4.)
 	virtual bool SearchTextInObjects(PMString& outStatus) { return KFCSearchEngine::SearchTextInObjects(outStatus); }
+	// (Not under the list's query either: the QR Code tab has none - KFCQRSearch.)
+	virtual bool QRCodeNext(const UIDRef& last, UIDRef& outFrame, int32& outReach, PMString& outWords)
+	{
+		return KFCQRSearch::Next(last, outFrame, outReach, outWords);
+	}
+	virtual void FindChangeTabAndScope(int32& outMode, int32& outScope)
+	{
+		outMode = KFCSearchEngine::FindChangeMode();
+		outScope = KFCSearchEngine::FindChangeScope();
+	}
 };
 
 CREATE_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)

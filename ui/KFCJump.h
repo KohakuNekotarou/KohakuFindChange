@@ -85,6 +85,13 @@ namespace KFCJump
 	    clearing, for the object search's "nothing was selected" given back (IKFCUIServices::ClearSelection). */
 	void ClearFrontSelection();
 
+	/** THE QR CODE TAB'S FIND NEXT LANDS (KFCQRTab - the design's Q10 / D5): a QR code's frame no list holds, landed on as an
+	    object row's click lands (JumpToObject - the spec map's OBJ-09): its document in front, the view on it, the frame
+	    selected. `reach` = what keeps it from being selected (kKFCQRReach* bits, KFCModelTypes.h - IKFCRuns::QRCodeNext):
+	    locked or hidden = shown, not selected; in overset text = the view on its "+"; on a hidden spread = nothing moves.
+	    outNote = the tab's line when it could not be selected (no alert - Task 1's ruling). True when it was shown. */
+	bool LandOnQRCode(const UIDRef& frameRef, int32 reach, PMString& outNote);
+
 	/** A layout view put on ONE SPREAD the way a row's jump puts it there (kSetSpreadCmdBoss - the view's own document
 	    only, the caller's error state kept): for a view put back where it stood before an object walk
 	    (IKFCUIServices::RestoreViewPlaces). Nothing for kInvalidUID, or a view on that spread already. */

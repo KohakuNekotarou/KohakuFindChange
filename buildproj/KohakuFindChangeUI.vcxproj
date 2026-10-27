@@ -232,6 +232,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCHitMarkerView.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCHowTo.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCSpecialDialogs.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCQRTab.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCCopyResults.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCIconTip.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCJump.cpp"/>
@@ -273,6 +274,7 @@
    </ItemGroup>
    <ItemGroup>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\IKFCStatusTextData.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCQRTab.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCBookPanelLookup.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCQueryOrder.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCQueryOrderFile.h"/>
