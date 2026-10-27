@@ -72,6 +72,7 @@
 - **BAR-12** ★検索するのは、検索と置換のタブが**テキストか正規表現のときだけ**（2026-10-03・最初の実機確認での作者の決定）。
   ほかのタブでは、Return は止めるが**何も検索しない**。パネルが開いていれば、メッセージ欄に
   `Application Bar link: Return searches on the Text and GREP tabs only - nothing was searched.`（パネルは開かない）
+  （2.0 から：KFC の「QR Code」タブのときだけは別で、欄は空を映し、Return は欄が空でも QR コードの一覧（打った文字は使わない）＝第18章 QR-22。）
   - 訂正:
 
 - **BAR-13** テキスト・正規表現のときの順番 ――

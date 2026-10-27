@@ -41,6 +41,7 @@
   `The Find/Change dialog is on the Colour tab. This panel does not search by colour - use InDesign's own Find/Change.` と断る。（1.4.0・17-objects.md）
   （1.3 まで：検索できるのは Text・GREP・Glyph・Transliterate の4つのタブで、Object・Colour のタブでは灰色・押されたら
   `The Find/Change dialog is on the Object tab. This panel lists text - use InDesign's own Find/Change.` と断っていた。）
+  （2.0 から：KFC が足した **「QR Code」タブ**が今のタブのときは、Find in … が範囲の中の QR コードの一覧になる＝第18章 QR-01・QR-04。）
   - 訂正:
 
 - **FIND-08** ★文字種変換（Transliterate）のタブも、ほかのタブと同じに検索・置換する（2026-08-05 の決定＝本体のパネルの設定どおりに）。
