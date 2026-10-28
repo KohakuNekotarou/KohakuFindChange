@@ -91,6 +91,7 @@
   中身は11 ―― 免責／検索（Find in …）／検索範囲（Book Scope）／**QR コードの一覧（QR Code タブ）**（2.0.0）／結果の見方／**複数の行をまとめて選ぶ・置換する**（1.4.0）／置換／**特殊操作（Special Operations）**（2026-10-18）／保存したクエリを順に実行（Run Saved Queries...）／ブックパネル（Remember Book Panel Placement）／アプリケーションバーの検索欄。
   ★**2026-10-11 の作者の文面**（デスクトップの `KFC 1.4 How to Use（日本語）.txt` を一字一句そのまま・英語はその訳＝`f64e142`）＝検索できるタブは5つ（オブジェクトを含む）、「結果の見方」の右クリックの行は「右クリックメニュー」の一語、Shift＋リターンは「一つ下の置換できる行に移動」。
   それまでの下書きにあった Object タブの節・Book Scope: OFF の行・クリックとキーボードの枠の行・選べない一致の行は、作者の文面で外れた。（1.4.0）
+  ★**2026-10-28 の作者の文面**（デスクトップの `KFC How to Use（日本語）.txt` 13:10・検索の節の1行）＝検索できるタブに「QR Code（KohakuFindChange）」を足した（「の5つのタブ」→「のタブ」）・英語はその訳。作者の綴り「KohakuFindChage」は n を足して直した（作者に伝えた）。アプリケーションバーの検索欄の行（QR Code タブでは欄が空＝QR-22）は作者の文面のまま触っていない。（2.0.0）
   ★**日本語は作者の文面そのまま、英語はそれに1行ずつ合わせる**（2026-10-09 朝 `33fecee`＝Change Checked と Show Changes の節を外した。同じ日の夜、作者が書いた「保存したクエリを順に実行」の節を足した＝作者「HOWTOにクエリダイアログの件がのってなかったですね」）。
   （2026-10-06 の英語だけの書き直し（行の Replace・Change All in Book・Clear Results・300件）は、10-09 朝に日本語に合わせたときに無くなった。）
   - ⬜ How to Use に載っていない項目＝Change All in Book (No List)・Find/Change Selected Documents (Book)・Clear Results・Search This Story Again・Search This Document Again・Select All Rows（「結果の見方」は「右クリックメニュー」の一語）・Translucent／Minimizable の設定・Save Panel Settings（足すかは作者）。
