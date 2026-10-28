@@ -22,7 +22,8 @@
 //       replaces it and goes on to the next row below that can be replaced (the author's call -
 //       InDesign's own Change/Find for the list) - see GoOnToNextReplaceableRow.
 //       Rows selected together are replaced together. CTRL+RETURN takes them off the list instead
-//       (Clear from Results) and lands on the row below - see ClearThenLand.
+//       (Clear from Results) and lands on the row below - see ClearThenLand. A Return on any other row - a story,
+//       document or book row - is taken and does nothing, so the list keeps the keyboard - see TakeReturn.
 //    4. SHIFT+DOWN / SHIFT+UP GROW OR SHRINK A RUN OF HIT ROWS selected together, the page
 //       following - see HandleUpDownKey and KFCResultTreeController.cpp.
 //    5. CTRL+C ON THE HIT ROWS SELECTED COPIES THEM as text, as their Copy Rows does (KFCCopyResults) - the key taken
@@ -313,8 +314,9 @@ bool IsReturnKey(const VirtualKey& key)
 // RETURN ON THE SELECTED HIT ROW (the no-track-change-all spec's F17), one place for the two that take it: the list's
 // own KeyDown and the Return filter below. Return or the keypad's Enter, no modifier, HIT rows selected (one, or
 // several together): they are replaced through the right-click Replace's own door (KFCResultTree::ReplaceRows - nothing
-// happens when none can be replaced), the list keeps the keyboard, and the key is taken whole. kFalse = not a Return
-// this list acts on: the caller passes it on.
+// happens when none can be replaced), the list keeps the keyboard, and the key is taken whole. A Return with NO hit row
+// selected (a story, document or book row) is taken whole all the same and does nothing (below). kFalse = not a Return
+// of ours (Alt, or Ctrl with Shift), or no list: the caller passes it on.
 // WITH SHIFT, the same, and then - only when the row was written - on to the next row below that can be
 // replaced (GoOnToNextReplaceableRow); with none below, the status line says so after its own sentence.
 // WITH CTRL, the rows are taken off the list instead - Clear from Results - and the row below landed on (ClearThenLand -
@@ -346,7 +348,18 @@ bool16 TakeReturn(IEvent* e, ITreeViewController* controller)
 	// the tree draws).
 	KFCRowsByChapter rows;
 	if (!KFCResultTree::GetSelectedHitRows(rows))
-		return kFalse;
+	{
+		// A RETURN WITH NO HIT ROW SELECTED IS TAKEN WHOLE AND DOES NOTHING: a story, document or book row - selected by a
+		// click or by an arrow - has nothing to replace or clear, and passed on, the Return reached the widget layer, which
+		// handed the keyboard to the document, where a hit row's click had just selected the match - the next letter typed
+		// replaced it (measured: "cat one cat two" became "x one cat two" - regression cases ret-branch-doc-type and
+		// ret-branch-up-type). The list keeps the keyboard, as after a Return that writes. KCM's Story Edits list takes such
+		// a Return the same way (KCMStoryTreeEH.cpp's TakeReturn).
+		Utils<IEventUtils>()->RemoveNextKeyCmd(e);
+		HoldAfterReturn();
+		KFC_DIAG_LOG("RETFOCUS Return with no hit row selected taken - nothing done focus=%s", KFCResultTree::DiagKeyFocus().c_str());
+		return kTrue;
+	}
 	const NodeID last(KFCResultNodeID::Create(rows.back().chapter, rows.back().hits.back()));
 	Utils<IEventUtils>()->RemoveNextKeyCmd(e);
 	KFC_DIAG_LOG("RETFOCUS Return taken focus=%s repeat=%d", KFCResultTree::DiagKeyFocus().c_str(), e->IsRepeatKey() ? 1 : 0);
@@ -805,9 +818,9 @@ bool16 KFCResultTreeEH::StockMoveThenLand(IEvent* e, const VirtualKey& key)
 // RETURN REPLACES THE SELECTED ROW (docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md F17 - the
 // author's call: walk the rows with the arrows and replace with Return where the match is right, the keyboard alone). Return or
 // the keypad's Enter, no modifier, HIT rows selected: they are replaced through the right-click Replace's own door
-// (KFCResultTree::ReplaceRows - nothing happens when none can be replaced). Any other key, a modified Return, or
-// Return on a story / document / book row goes to the stock handler. Only while the TREE holds the keyboard - typing
-// in a document never comes here.
+// (KFCResultTree::ReplaceRows - nothing happens when none can be replaced); Return on a story / document / book row is
+// taken and does nothing, so the list keeps the keyboard (TakeReturn). Any other key, and a Return with Alt (or with Ctrl
+// and Shift), goes to the stock handler. Only while the TREE holds the keyboard - typing in a document never comes here.
 // CTRL+C ON THE SELECTED ROWS (docs/superpowers/specs/2026-10-18-kfc-copy-results-progress-share-design.md): the hit rows
 // selected copied as text, as their Copy Rows copies them (KFCCopyResults::CopyLiveRows) - and the key taken whole, as a
 // Return is (TakeReturn): its KeyCmd removed (RemoveNextKeyCmd), so InDesign's own Edit > Copy - which would copy the
@@ -865,8 +878,9 @@ bool16 KFCResultTreeEH::KeyDown(IEvent* e)
 	return TreeViewEventHandler::KeyDown(e);
 }
 
-/** THE RETURN FILTER - see gReturnFilter. Takes one thing: a Return or Enter on a selected hit row while the result
-    list holds the keyboard - and that Return's KeyCmd and KeyUp with it, so no part of it reaches the widget layer,
+/** THE RETURN FILTER - see gReturnFilter. Takes a Return or Enter while the result list holds the keyboard (TakeReturn:
+    on a selected hit row it writes, on any other row it does nothing - and Ctrl+C on hit rows, TakeCopy) - and that
+    key's KeyCmd and KeyUp with it, so no part of it reaches the widget layer,
     whose DVEventHandler gives the keyboard back to the document after a key it delivered (RestoreFocusOnDocument -
     what moved the page item). Everything else is passed on untouched: CEventHandler answers kFalse to every event. */
 class KFCReturnFilterEH : public CEventHandler

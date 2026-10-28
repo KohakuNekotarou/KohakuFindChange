@@ -334,8 +334,8 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	 * list handled was followed by InDesign's own DVEventHandler::RestoreFocusOnDocument, which handed the keyboard to
 	 * the document - and the down arrow then moved a page item. This handler is pushed on the application's
 	 * IEventDispatcher (whose stack sees an event before anything below it) while the list holds the keyboard, and
-	 * takes a Return on a selected hit row there. A boss of its own, created once and released at shutdown, so its life
-	 * is not a widget's.
+	 * takes the list's Return there - on a selected hit row it writes, on any other row it does nothing. A boss of its
+	 * own, created once and released at shutdown, so its life is not a widget's.
 	 */
 	Class
 	{
