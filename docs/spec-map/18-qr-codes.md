@@ -35,7 +35,7 @@
 
 - **QR-05** 保存したクエリを Run Saved Queries... のダイアログの **Find** で読み込むと、QR のタブは**身を引く**＝人が QR の面をもう一度見せるまで、KFC の Find は読み込んだクエリのタブで探す（保存したクエリは自分のタブを持つ）。
   検索と置換を QR のタブで閉じていたとき（そのままでは KFC の Find が QR の一覧のまま）も、開いて QR の面を見せているときも同じ。
-  ⚠開いているダイアログは、クエリのタブが本体の今のモードと**同じなら QR の面のまま動かない**（Text のクエリ＝実測 10-27 夜）＝画面は QR Code タブ、KFC のパネルのタイトルはクエリのタブ（身を引いているので）。モードが違えば本体のタブへ移る。（計画 Task 4 の決まり）回帰 `qr-query-yield-closed`・`qr-query-yield-open`
+  ⚠開いているダイアログは、クエリのタブが本体の今のモードと**同じなら QR の面のまま動かない**（Text のクエリ＝実測 10-27 夜）＝画面は QR Code タブ、KFC のパネルのタイトルはクエリのタブ（身を引いているので）。モードが違えば本体のタブへ移る。（計画 Task 4 の決まり＝✅2026-10-28 作者の判断「おすすめで」＝QR の面を見せたままでも身を引くのは今のまま〈次のパネルの Find はクエリのタブで探す・QR の一覧に戻すには面を一度ほかへ切り替えて戻す〉）回帰 `qr-query-yield-closed`・`qr-query-yield-open`
   - 訂正:
 
 - **QR-06** KFC のパネルのタイトル＝`Kohaku Find/Change - QR Code - Document`（Search: が All Documents なら `All Documents`・Book Scope ON なら `Book`）。面の Search: を変えるとすぐ付き直す。（設計書 4-2）回帰 `qr-tab-switch-back`
