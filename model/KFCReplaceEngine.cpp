@@ -2643,8 +2643,10 @@ bool PutLinksBack(ITextModel* model, const UIDRef& storyRef, TextIndex at, int32
 	for (int32 i = 0; i < table->GetHyperlinkCount(); ++i)
 	{
 		InterfacePtr<IHyperlink> link(db, table->GetNthHyperlink(i), UseDefaultIID());
-		if (link != nil)
-			named.insert(link->GetDestinationUID());
+		// The destination as a UIDRef (IHyperlink.h: GetDestinationUID is deprecated - "USE SAFER
+		// GetDestinationUIDRef"); a link to another document (IsExternalDestination) names none of this one's.
+		if (link != nil && !link->IsExternalDestination())
+			named.insert(link->GetDestinationUIDRef().GetUID());
 	}
 	UIDList unnamed(db);
 	for (std::set<UID>::const_iterator d = destinationsNow.begin(); d != destinationsNow.end(); ++d)

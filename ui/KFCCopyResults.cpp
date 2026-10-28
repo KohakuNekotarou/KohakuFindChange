@@ -303,8 +303,11 @@ namespace
 		}
 		if (!PutOnClipboard(lines.text))
 		{
+			// PrepareForCopy has emptied InDesign's clipboard by then (IClipboardController.h) - said, so nobody pastes
+			// expecting what it held before.
 			outStatus.Append(lead);
-			outStatus.Append(": the clipboard could not be written - nothing was copied.");
+			outStatus.Append(": the clipboard could not be written - nothing was copied, and InDesign's clipboard is now "
+				"empty.");
 			return false;
 		}
 		outStatus.Append("Copied ");
