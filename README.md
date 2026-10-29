@@ -42,8 +42,8 @@ published row is never removed.
 | 1.2.0 | KohakuFindChangeUI.pln | `63e26563546682660977e6eaef67d69332354b7f709fd4aeb6576570195621f4` |
 | 1.3.0 | KohakuFindChange.pln | `dac995dabbdb34f21cb4ad7c6d5c791e1a2ea8562b39c818a7c2b6caabebfb2a` |
 | 1.3.0 | KohakuFindChangeUI.pln | `e440d3a08949e3c5f249ecfbf24d830bc53d39addcb18ec9164b50b8181bc5e2` |
-| 2.0.0 | KohakuFindChange.pln | `5cab0799357f01c67612357235341dd9b79952c3e115914593a27838e2500e9d` |
-| 2.0.0 | KohakuFindChangeUI.pln | `060a070ccf6b6c58c7839bed5dcc31fe7edc0a39265588d761344976de889053` |
+| 2.1.0 | KohakuFindChange.pln | `d66240029a8ed66cbc4c17e2e3ac4c0bd8e558adad6a2e561708b488e609d793` |
+| 2.1.0 | KohakuFindChangeUI.pln | `864c17d8ccc8661aa1e72787bd948b90ec34a8b2173e6d696c0d0784ca161c3b` |
 
 Verify / 照合方法 (PowerShell):
 
