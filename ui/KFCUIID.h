@@ -856,13 +856,17 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQRTabNoteWidgetID, kKFCUIPrefix + 62)
 // holding a few of them, comes out in abc order whichever it is (a hit, object, story, document or book row; a tier
 // heading) - and no rules between them. Each submenu is in abc order within itself. This replaces the order the specs
 // give (the searches first and the one that takes away last under a rule; Special Operations in the Object menu's order).
+// ONE EXCEPTION, REPLACE (2.1.1, the author's call of 2026-10-29: the replace item of a found row's right-click menu at
+// the very top): first in a hit row's menu and in an object row's, ahead of the abc order, which the rest keeps. Still
+// one number for both, and still no rule under it.
+#define kKFCReplaceHitMenuItemPosition			0.5		// Replace (a hit row's) - first, ahead of the abc order (2.1.1)
+#define kKFCObjectReplaceMenuItemPosition		0.5		// Replace (an object row's - the same action) - first as well
 #define kKFCClearFromResultsMenuItemPosition	1.0		// Clear from Results
 #define kKFCClearTheseResultsMenuItemPosition	2.0		// Clear These Results
 #define kKFCCopyRowsMenuItemPosition			3.0		// Copy Rows
 #define kKFCCopyTheseResultsMenuItemPosition	4.0		// Copy These Results
 #define kKFCNarrowDownSubmenuPosition			5.0		// Narrow Down >
-#define kKFCReplaceHitMenuItemPosition			6.0		// Replace (a hit row's)
-#define kKFCObjectReplaceMenuItemPosition		6.0		// Replace (an object row's - the same action)
+// (6.0 was Replace's place in the abc order until 2.1.1.)
 #define kKFCRestoreOriginalMenuItemPosition		7.0		// Restore from Copy
 #define kKFCSearchTextInObjectsMenuItemPosition	7.5		// Search Text in These Objects
 #define kKFCSearchTierAgainMenuItemPosition		8.0		// Search These Results Again

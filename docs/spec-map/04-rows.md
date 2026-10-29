@@ -152,17 +152,17 @@
 - **ROW-31** メッセージ欄の `&` は**そのまま**出る（手で描いているので、`A&B.indd` が `AB.indd` にならない・2026-09-29 から）。
   - 訂正:
 
-- **ROW-32** ★右クリックのメニューは**4種類の行それぞれにある**（2026-10-11 の形）。★**どのメニューも項目は abc 順で、区切り線は無い**（2026-10-18 作者「パネルの行などにでるパネルメニュー、abc順にならべかえておいてほしい」＝同じ名前の項目はどのメニューでも同じ位置・サブメニューの中もそれぞれ abc 順＝ここまで私の判断・パネルのフライアウト〈SET-01〉はそのまま）――
+- **ROW-32** ★右クリックのメニューは**4種類の行それぞれにある**（2026-10-11 の形）。★**どのメニューも項目は abc 順で、区切り線は無い**（2026-10-18 作者「パネルの行などにでるパネルメニュー、abc順にならべかえておいてほしい」＝同じ名前の項目はどのメニューでも同じ位置・サブメニューの中もそれぞれ abc 順＝ここまで私の判断・パネルのフライアウト〈SET-01〉はそのまま）。★**ただし Replace だけは abc 順の外で一番上**（2.1.1・2026-10-29 作者「Ver２．１．１として、検索された行の右クリックの置換の部分のメニューを一番上にしておいてほしい」＝ヒットの行と物の行の両方・区切り線は無いまま・残りは abc 順のまま）――
 
   ```
-  ヒットの行       Clear from Results（2026-10-18＝ROW-47）
+  ヒットの行       Replace（2.1.1 から一番上）
+                   Clear from Results（2026-10-18＝ROW-47）
                    Copy Rows（2026-10-18＝ROW-48）
-                   Replace
                    Restore from Copy（2026-10-17＝REP-38・最初の名前 Restore Original）
                    Special Operations ▸ Create Outlines（文字の行・2026-10-18＝REP-39）
-  （物の行）       Clear from Results
+  （物の行）       Replace（2.1.1 から一番上）
+                   Clear from Results
                    Copy Rows
-                   Replace
                    Special Operations ▸ Arrange ▸・Clear Object Style Overrides・Create Outlines（OBJ-19）・Delete・Fitting ▸・
                                         Hide・Lock・Move to Active Layer・Show・Transform ▸・Unlock（OBJ-20）
   ストーリーの行   Clear from Results
@@ -182,7 +182,7 @@
                    Search These Results Again（ROW-44）
   ```
 
-  （2026-10-18 午後の abc 順の前は、探す系を上に、一覧から外す Clear from Results を一番下の区切り線の後に、特殊操作は本体の Object メニューの並びと区切り線で並べていた。）
+  （2026-10-18 午後の abc 順の前は、探す系を上に、一覧から外す Clear from Results を一番下の区切り線の後に、特殊操作は本体の Object メニューの並びと区切り線で並べていた。2.1.0 までは Replace も abc 順の中＝Copy Rows の後だった。）
 
   （ヒットの行の Replace＝2026-10-06・F16／ストーリーの行＝2026-10-09＝REP-35／文書の行の Search This Document Again＝2026-10-10＝REP-37／Select All Rows とブックの行のメニュー＝2026-10-11＝ROW-38。どれも作者の依頼。）
   ヒットの行の Replace は、その行が**まとめて選んだ行の1つなら選んだ行すべて**、そうでなければその1行を置換する（REP-36）。選んだ行のどれも置換できないとき灰色で、メニューは灰色の Replace を見せて開く（SET-11・2026-10-17 から。それまでは開かなかった）。
