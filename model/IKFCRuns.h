@@ -186,6 +186,9 @@ public:
 	/** = KFCReplaceEngine::CanClearOverridesHit (appended) - can Clear Overrides be offered on the row, read off the row
 	    alone (the menu's grey - the spec's B6). */
 	virtual bool CanClearOverridesHit(int32 chapterIdx, int32 hitIdx) = 0;
+	/** = KFCTableSearch::IsTabCurrent (appended - docs/superpowers/specs/2026-10-31-kfc-table-tab-design.md): is KFC's Table tab
+	    Find/Change's tab now, and what it asks (a test build's fault switch table-tab answers first) - what a tier's name says. */
+	virtual bool TableConditions(KFCTableConditions& outConditions) = 0;
 };
 
 #endif // __IKFCRuns_h__

@@ -140,6 +140,9 @@ public:
 	virtual bool ListIsRunList() = 0;
 	/** = KFCResultModel::RunNames (appended) - a query run's list's queries, as its tier's heading names them. */
 	virtual void GetRunNames(PMString& out) = 0;
+	/** = KFCResultModel::ListIsTables (appended - the Table tab) - the live list is a table list: its rows are written by the Table
+	    tab's Change side alone, and it is not narrowed (the heading's menu and the rows' grey by it, kept per tier). */
+	virtual bool ListIsTables() = 0;
 };
 
 #endif // __IKFCResults_h__

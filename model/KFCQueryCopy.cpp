@@ -36,7 +36,7 @@ KFCQueryCopy::KFCQueryCopy()
 	  replaceGlyph(kInvalidGlyphID), objectType(0), findParaStyle(kInvalidUID), findCharStyle(kInvalidUID),
 	  changeParaStyle(kInvalidUID), changeCharStyle(kInvalidUID), objectFindStyle(kInvalidUID),
 	  objectChangeStyle(kInvalidUID), attrDB(nil), changeConditionsMode(0), useFindROS(kFalse), useReplaceROS(kFalse),
-	  valid(false)
+	  valid(false), tableOverridesOnly(false)
 {
 }
 
@@ -276,6 +276,16 @@ void KFCQueryCopier::CaptureQRCodes(KFCQueryCopy& out)
 	out.valid = true;
 }
 
+void KFCQueryCopier::CaptureTables(KFCQueryCopy& out, const PMString& findStyle, bool overridesOnly)
+{
+	out = KFCQueryCopy();
+	out.mode = static_cast<int32>(kKFCTableSearchMode);
+	out.tableFindStyle = findStyle;
+	out.tableFindStyle.SetTranslatable(kFalse);
+	out.tableOverridesOnly = overridesOnly;
+	out.valid = true;
+}
+
 void KFCQueryCopier::CaptureRunList(KFCQueryCopy& out)
 {
 	out = KFCQueryCopy();
@@ -290,8 +300,9 @@ bool KFCQueryCopier::Apply(const KFCQueryCopy& copy, PMString& outWhat)
 	if (!copy.valid)
 		return Failed(outWhat, "there is no query to put back");
 	// A QR CODE LIST'S COPY STATES NOTHING: InDesign has no such mode to state (KFCModelTypes.h - never handed to a command),
-	// and no setting of Find/Change's steers its walk (KFCQRSearch). Nor a query run's list's: it has no query (KFCRunList).
-	if (copy.mode == kKFCQRCodeSearchMode || copy.mode == kKFCRunListSearchMode)
+	// and no setting of Find/Change's steers its walk (KFCQRSearch). Nor a query run's list's: it has no query (KFCRunList). Nor a
+	// table list's: what it asks is the Table tab's (KFCTableSearch).
+	if (copy.mode == kKFCQRCodeSearchMode || copy.mode == kKFCRunListSearchMode || copy.mode == kKFCTableSearchMode)
 		return true;
 	using namespace KFCFindChangeCmds;
 	const int32 mode = copy.mode;
@@ -422,8 +433,8 @@ bool KFCQueryCopier::Matches(const KFCQueryCopy& copy, PMString& outWhat)
 	outWhat.SetTranslatable(kFalse);
 	if (!copy.valid)
 		return Failed(outWhat, "there is no query to compare");
-	if (copy.mode == kKFCQRCodeSearchMode || copy.mode == kKFCRunListSearchMode)
-		return true;		// a QR code list's copy, a query run's list's: no field of Find/Change's is its (Apply's note)
+	if (copy.mode == kKFCQRCodeSearchMode || copy.mode == kKFCRunListSearchMode || copy.mode == kKFCTableSearchMode)
+		return true;		// a QR code list's copy, a query run's list's, a table list's: no field of Find/Change's is its (Apply's note)
 	KFCQueryCopy now;
 	Capture(now);
 	const char* const differs = FirstDifference(copy, now);

@@ -22,7 +22,9 @@
 #include "IDFile.h"			// KFCSavedQuery
 #include "PMPoint.h"		// PBPMPoint - KFCOversetLoc
 #include "PMString.h"
+#include "TextChar.h"		// kTextChar_StyleGroupPathSeparator - KFCStylePathWords
 #include "UIDRef.h"
+#include "WideString.h"		// KFCStylePathSwapped
 
 #include <vector>
 
@@ -170,6 +172,9 @@ enum KFCSpecialOp
 	// A TEXT row's Special Operations > Clear Overrides (docs/superpowers/specs/2026-10-30-kfc-next-overrides-restore-design.md
 	// B4): its mark alone - the row reads "Cleared". Written by KFCReplaceEngine::ClearOverridesHits, never by SpecialRows.
 	kKFCSpecialClearTextOverrides,
+	// A table row's Replace (the Table tab - docs/superpowers/specs/2026-10-31-kfc-table-tab-design.md T9): its mark alone - the row reads
+	// "Styled". Written by KFCReplaceEngine's table rows, never by SpecialRows.
+	kKFCSpecialTableStyle,
 	kKFCSpecialOpCount
 };
 
@@ -208,6 +213,47 @@ enum { kKFCQRCodeSearchMode = 100 };
     header of the list a saved query run leaves holds (KFCResultModel::ListIsRunList). No tab is on it, no search made it and
     it has no query to search or write with: KFC'S ALONE, as kKFCQRCodeSearchMode is - never handed to InDesign. */
 enum { kKFCRunListSearchMode = 101 };
+
+/** THE TABLE TAB'S "SEARCH MODE" (docs/superpowers/specs/2026-10-31-kfc-table-tab-design.md - KFC's own tab in Edit > Find/Change, as
+    the QR Code tab is): what KFCSearchEngine::CurrentSearchMode answers - and a table list's header holds - while that tab is
+    Find/Change's tab (KFCTableSearch::IsTabCurrent). KFC'S ALONE: never handed to InDesign. */
+enum { kKFCTableSearchMode = 102 };
+
+/** A style path with one character swapped for another - KFCStylePathWords' way, and the test build's fault switch's the other way. */
+inline PMString KFCStylePathSwapped(const PMString& path, textchar from, textchar to)
+{
+	const WideString raw(path);
+	WideString swapped;
+	for (WideString::const_iterator at = raw.begin(); at != raw.end(); ++at)
+	{
+		const uint32 c = static_cast<uint32>(*at);
+		swapped.Append(UTF32TextChar((c == static_cast<uint32>(from)) ? static_cast<uint32>(to) : c));
+	}
+	PMString out(swapped);
+	out.SetTranslatable(kFalse);
+	return out;
+}
+
+/** A STYLE'S FULL PATH AS A PERSON READS IT: IStyleGroupHierarchy::GetFullPath joins a group and its style with
+    kTextChar_StyleGroupPathSeparator, a private-use character drawn as nothing ("GTS1" - measured), not the ":" its header's example shows. */
+inline PMString KFCStylePathWords(const PMString& path)
+{
+	return KFCStylePathSwapped(path, kTextChar_StyleGroupPathSeparator, kTextChar_Colon);
+}
+
+/** WHAT THE TABLE TAB ASKS (the face's - KFCTableTab, read by IKFCUIServices::TableTabConditions; a table list keeps its find side
+    in its query copy, so its searches again ask what its search asked). A table style is named by its full path, untranslated
+    (GetFullPath(kFalse) - its group's separator in it; KFCStylePathWords reads it out): its UID means nothing in a book's other chapter. */
+struct KFCTableConditions
+{
+	PMString	findStyle;		// the style looked for; empty = any
+	bool		overridesOnly;	// only tables with overrides of their own
+	PMString	changeStyle;	// the style a row's Replace gives its table; empty = it keeps its own
+	bool		clearOverrides;	// ...and its Replace clears its table's overrides
+	int32		scope;			// its Search: - IWalkerScopeFactoryUtils::kDocumentScope (at launch) or kAllDocumentScope
+
+	KFCTableConditions() : overridesOnly(false), clearOverrides(false), scope(0) {}
+};
 
 /** WHAT KEEPS A QR CODE FIND NEXT FOUND FROM BEING SELECTED (IKFCRuns::QRCodeNext's outReach - KFCQRSearch::Next; the UI half's
     landing says it on the tab's line - KFCJump::LandOnQRCode): its row's own words (KFCObjectSearch::ReadItemPlace), as bits. */

@@ -39,6 +39,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCCreateOutlinesStepKey,		"Create Outlines",
                 kKFCRestoreOriginalStepKey,		"Restore from Copy",
                 kKFCClearOverridesStepKey,		"Clear Overrides",
+                kKFCTableStyleStepKey,			"Apply Table Style",
                 // An object row's other Special Operations (KFCObjectSpecial) - InDesign's own English command names.
                 kKFCFillFramePropStepKey,			"Fill Frame Proportionally",
                 kKFCFitContentPropStepKey,			"Fit Content Proportionally",

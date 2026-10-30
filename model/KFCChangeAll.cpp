@@ -317,6 +317,12 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 			" to change.");
 		return 0;
 	}
+	// THE TABLE TAB (KFCTableSearch - the table tab spec's T12): its rows are written one list at a time, with the list up.
+	if (KFCSearchEngine::CurrentSearchMode() == kKFCTableSearchMode)
+	{
+		outSummary.Append("Change All: the Find/Change dialog is on the Table tab. List the tables and Replace their rows.");
+		return 0;
+	}
 	// THE OBJECT TAB (the object search spec's O13): InDesign's object Change All over each chapter. Refused with
 	// nothing to find - an empty Find Object Format would change every frame of the Type in the book - or nothing to
 	// change to. (The menu greys the item with nothing to find - HasFindQueryNow - so that door is for a caller that

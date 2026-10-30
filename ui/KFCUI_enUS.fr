@@ -177,6 +177,15 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCQRTabAllDocumentsKey,		"All Documents",
                 kKFCQRTabDocumentKey,			"Document",
                 kKFCQRTabFindNextKey,			"Find Next",
+                kKFCTableTabTitleKey,			"Table",
+                kKFCTableTabFindStyleKey,		"Find Table Style:",
+                kKFCTableTabAnyStyleKey,		"[Any Table Style]",
+                kKFCTableTabOverridesOnlyKey,	"With Overrides Only",
+                kKFCTableTabChangeStyleKey,		"Change to Table Style:",
+                kKFCTableTabLeaveStyleKey,		"[Leave As It Is]",
+                kKFCTableTabClearOverridesKey,	"Clear Overrides",
+                kKFCTableTabGuideFindKey,		"Find: the Find button of the Kohaku Find/Change panel lists the tables.",
+                kKFCTableTabGuideReplaceKey,	"Replace: a row's right-click menu, or Return, applies the Change side.",
                 // The message line as a freshly opened panel shows it - the plug-in has no search
                 // box of its own, so the first thing to say is where the query is typed.
                 // Read through InitialMessage (KFCResultListWidgetMgr.cpp) whenever the message line falls

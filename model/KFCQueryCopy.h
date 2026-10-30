@@ -76,6 +76,9 @@ struct KFCQueryCopy
 	PMString	replaceROSRegistry;
 	PMString	replaceROSOrdering;
 	bool		valid;					// false = the settings could not be read; never stated back
+	// A TABLE LIST'S (CaptureTables): what it looked for - what its searches again ask, whatever the face shows then.
+	PMString	tableFindStyle;
+	bool		tableOverridesOnly;
 
 	KFCQueryCopy();
 };
@@ -95,6 +98,8 @@ namespace KFCQueryCopier
 	/** A QUERY RUN'S LIST'S (KFCRunList): the mode alone, kKFCRunListSearchMode, for the same reasons - it has no query of its
 	    own to state or compare, and a tier without a copy could not be switched back to. */
 	void CaptureRunList(KFCQueryCopy& out);
+	/** A TABLE LIST'S (KFCTableSearch): the mode, kKFCTableSearchMode, and its find side - nothing of Find/Change's, nothing stated back. */
+	void CaptureTables(KFCQueryCopy& out, const PMString& findStyle, bool overridesOnly);
 
 	/** State `copy` back into Find/Change: the tab, then every field that differs from what the dialog holds now, with the
 	    dialog's own commands (KFCFindChangeCmds; the formats with kClearFindFormatCmdBoss / kClearChangeFormatCmdBoss and

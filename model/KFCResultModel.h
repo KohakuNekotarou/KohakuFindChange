@@ -433,6 +433,9 @@ namespace KFCResultModel
 	    a, b"). Kept with the list, so an Undo and a Redo of the run bring it with it - empty for any other list. */
 	void SetRunNames(const PMString& names);
 	PMString RunNames();
+	/** Is the list A TABLE LIST - KFC's Table tab's (KFCTableSearch: its search mode kKFCTableSearchMode)? Text rows standing on each
+	    table's character. Its Replace is a table style's (KFCReplaceEngine); it is not narrowed (the table tab spec's T11). */
+	bool ListIsTables();
 	/** Is the list a FRAMES OF THESE MATCHES list - object rows found by a text search, not by the Object tab's (its
 	    Replace writes with the Object tab's Change Object Format alone - KFCObjectReplace, the narrow-down
 	    spec's N6)? */
@@ -808,6 +811,10 @@ namespace KFCResultModel
 	    characters are the same - a Replace or a Restore from Copy still goes through, and takes the mark off: MarkHitReplaced,
 	    MarkHitRestored). Backed up first, as every change a write makes, so an Undo takes the mark off again. */
 	void MarkHitSpecial(int32 chapterIdx, int32 hitIdx, int32 op);
+
+	/** A TABLE ROW ITS REPLACE WROTE (the table tab spec's T9): MarkHitSpecial's marks (kKFCSpecialTableStyle - the row reads "Styled"), and
+	    what it draws for its table as the write left it (Hit::runChain). Backed up first, so an Undo puts both back. */
+	void MarkHitTableStyled(int32 chapterIdx, int32 hitIdx, const PMString& words);
 
 	/** A chapter's document binding and file. The replace pass works chapter at a time, so it
 	    needs this without going through a hit. false = index out of range. */

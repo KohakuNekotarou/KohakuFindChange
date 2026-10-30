@@ -106,6 +106,7 @@ namespace
 		virtual bool ListIsQRCodes() { return false; }
 		virtual bool ListIsRunList() { return false; }
 		virtual void GetRunNames(PMString& out) { out.Clear(); }
+		virtual bool ListIsTables() { return false; }
 	};
 
 	class KFCRunsStandInImpl : public IKFCRuns
@@ -178,6 +179,7 @@ namespace
 		virtual void FindChangeTabAndScope(int32& outMode, int32& outScope) { outMode = -1; outScope = -1; }
 		virtual bool ClearOverridesRows(const KFCRowsByChapter&, PMString& outStatus) { SayWhy(outStatus); return false; }
 		virtual bool CanClearOverridesHit(int32, int32) { return false; }
+		virtual bool TableConditions(KFCTableConditions& outConditions) { outConditions = KFCTableConditions(); return false; }
 	};
 
 	class KFCChaptersStandInImpl : public IKFCChapters

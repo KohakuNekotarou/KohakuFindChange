@@ -11,6 +11,8 @@
 #include "VCPlugInHeaders.h"
 
 // Interface includes:
+#include "ITableModel.h"			// Fingerprint - a table row's table
+#include "ITableStylesFacade.h"
 #include "IAnchoredObjectData.h"	// inline or anchored - where an item inside text stands (O8)
 #include "IDataBase.h"
 #include "IDocument.h"
@@ -702,6 +704,22 @@ bool KFCObjectSearch::Fingerprint(const UIDRef& item, uint64& outHash, uint32& o
 #endif
 	IDataBase::SaveRestoreModifiedState dirtyGuard(db);	// SaveAll reads; the flag is put back all the same
 	Print print;
+	// A TABLE (a table row's Replace - KFCReplaceEngine's ReplaceTableRows): what that write changes, as the facade reads it - its style and
+	// whether it has overrides. NOT its bytes: a Redo did not bring them back to what they were after the write (measured - the same
+	// length, another print; an Undo did: composing a table is outside the undo steps, the object's bytes hold it).
+	InterfacePtr<ITableModel> table(db, item.GetUID(), UseDefaultIID());
+	Utils<Facade::ITableStylesFacade> tableStyles;
+	if (table != nil && tableStyles)
+	{
+		UID style = kInvalidUID;
+		if (tableStyles->GetTableStyle(item, style) != kSuccess)
+			return false;
+		print.AddNumber(style.Get());
+		print.AddNumber(tableStyles->HasLocalOverrides(item) != kFalse ? 1 : 0);
+		outHash = print.Hash();
+		outLength = print.Length();
+		return true;
+	}
 	if (!PrintTree(db, item.GetUID(), print))
 		return false;
 	PrintAnchor(db, item.GetUID(), print);

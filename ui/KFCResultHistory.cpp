@@ -78,10 +78,12 @@ namespace
 		bool					holdsQRCodes;	// ...QR codes (IKFCResults::ListIsQRCodes when it was kept) - its heading's
 												// Narrow Down and Search Text in These Objects grey (TierHoldsQRCodes -
 												// QR-18)
+		bool					holdsTables;	// ...a table list (IKFCResults::ListIsTables when it was kept) - its heading's Narrow Down
+												// greys (TierHoldsTables)
 		bool					holdsRunList;	// ...a query run's list (IKFCResults::ListIsRunList when it was kept) - its heading's
 												// Narrow Down and Search These Results Again grey (TierHoldsRunList)
 
-		KeptTier() : set(0), open(false), holdsObjects(false), holdsQRCodes(false), holdsRunList(false) {}
+		KeptTier() : set(0), open(false), holdsObjects(false), holdsQRCodes(false), holdsTables(false), holdsRunList(false) {}
 	};
 
 	/** THE LIVE TIER'S NAME and the list it names: the model's result set it was given to (0 = none - the model counts its
@@ -223,6 +225,7 @@ namespace
 			? (treeMgr->IsNodeExpanded(KFCResultNodeID::CreateLiveTier()) != kFalse) : true;
 		out.holdsObjects = KFCResults()->ListHoldsObjects();
 		out.holdsQRCodes = KFCResults()->ListIsQRCodes();
+		out.holdsTables = KFCResults()->ListIsTables();
 		out.holdsRunList = KFCResults()->ListIsRunList();
 		CopyRows(treeMgr, KFCResultNodeID::CreateLiveTier(), -1, out);
 		return true;
@@ -553,6 +556,13 @@ bool KFCResultHistory::TierHoldsQRCodes(int32 tier)
 	return tier < static_cast<int32>(gKept.size()) && gKept[static_cast<size_t>(tier)].holdsQRCodes;
 }
 
+bool KFCResultHistory::TierHoldsTables(int32 tier)
+{
+	if (tier < 0)
+		return KFCResults()->ListIsTables();
+	return tier < static_cast<int32>(gKept.size()) && gKept[static_cast<size_t>(tier)].holdsTables;
+}
+
 bool KFCResultHistory::TierHoldsRunList(int32 tier)
 {
 	if (tier < 0)
@@ -635,6 +645,18 @@ namespace
 		// are another tab's, the one InDesign's mode still is.
 		if (mode == kKFCQRCodeSearchMode)
 			return label;
+		// THE TABLE TAB'S WORDS ARE ITS OWN FACE'S (KFCTableTab): F:"TS1", with a + for With Overrides Only - as its rows mark an override.
+		if (mode == kKFCTableSearchMode)
+		{
+			KFCTableConditions asked;
+			(void)KFCRuns()->TableConditions(asked);
+			label.Append(" F:\"");
+			label.Append(asked.findStyle.IsEmpty() ? PMString("[Any Table Style]") : KFCStylePathWords(asked.findStyle));
+			if (asked.overridesOnly)
+				label.Append(" +");
+			label.Append("\"");
+			return label;
+		}
 		// (The words are InDesign's own tab's - KFCFindChangeQueryWords reads the mode Find/Change is in, which `mode` is for
 		// every tab but the QR Code tab.)
 		PMString findWords, changeWords;

@@ -420,7 +420,7 @@ bool KFCResultModel::ListIsFrames()
 
 int32 KFCResultModel::ListLimit()
 {
-	return ListLimitFor(ListHoldsObjects());
+	return ListLimitFor(ListHoldsObjects() || ListIsTables());		// (a table list's are text rows, one a table: the object lists' number)
 }
 
 int32 KFCResultModel::ListLimitFor(bool objectRows)
@@ -443,6 +443,11 @@ bool KFCResultModel::ListIsQRCodes()
 bool KFCResultModel::ListIsRunList()
 {
 	return gHeader.searchMode == static_cast<int32>(kKFCRunListSearchMode);
+}
+
+bool KFCResultModel::ListIsTables()
+{
+	return gHeader.searchMode == static_cast<int32>(kKFCTableSearchMode);
 }
 
 void KFCResultModel::SetRunNames(const PMString& names)
@@ -1308,6 +1313,16 @@ void KFCResultModel::MarkHitSpecial(int32 chapterIdx, int32 hitIdx, int32 op)
 	h.special = op;		// the row reads the operation's word first (the UI half's SpecialRowWord - "Cleared")
 	h.kept = true;		// ...and its eye on (a row KFC wrote stays through a search again)
 	h.outcome = kOutcomeNone;	// the write has just found its text there
+}
+
+void KFCResultModel::MarkHitTableStyled(int32 chapterIdx, int32 hitIdx, const PMString& words)
+{
+	Hit* hp = HitAt(chapterIdx, hitIdx);
+	if (hp == nil)
+		return;
+	MarkHitSpecial(chapterIdx, hitIdx, kKFCSpecialTableStyle);		// (its backup taken there - before this change too)
+	hp->runChain = words;
+	hp->runChain.SetTranslatable(kFalse);
 }
 
 void KFCResultModel::MarkHitOutlined(int32 chapterIdx, int32 hitIdx, UID storyUID, TextIndex start, TextIndex end,

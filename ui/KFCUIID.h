@@ -114,6 +114,7 @@ DECLARE_PMID(kClassIDSpace, kKFCAlertAnswerBoss, kKFCUIPrefix + 31)
 DECLARE_PMID(kClassIDSpace, kKFCValueDialogBoss, kKFCUIPrefix + 32)
 // The QR Code tab's face in InDesign's Find/Change dialog (KFCQRTab.cpp - docs/superpowers/specs/2026-10-27-kfc-qr-code-search-design.md).
 DECLARE_PMID(kClassIDSpace, kKFCQRTabPanelBoss, kKFCUIPrefix + 33)
+DECLARE_PMID(kClassIDSpace, kKFCTableTabPanelBoss, kKFCUIPrefix + 34)
 
 
 // InterfaceIDs:
@@ -239,6 +240,9 @@ DECLARE_PMID(kImplementationIDSpace, kKFCValueDialogObserverImpl, kKFCUIPrefix +
 DECLARE_PMID(kImplementationIDSpace, kKFCQRTabPanelCreatorImpl, kKFCUIPrefix + 61)
 DECLARE_PMID(kImplementationIDSpace, kKFCQRTabObserverImpl, kKFCUIPrefix + 62)
 DECLARE_PMID(kImplementationIDSpace, kKFCQRTabControllerImpl, kKFCUIPrefix + 63)
+DECLARE_PMID(kImplementationIDSpace, kKFCTableTabPanelCreatorImpl, kKFCUIPrefix + 64)
+DECLARE_PMID(kImplementationIDSpace, kKFCTableTabObserverImpl, kKFCUIPrefix + 65)
+DECLARE_PMID(kImplementationIDSpace, kKFCTableTabControllerImpl, kKFCUIPrefix + 66)
 
 
 // ActionIDs:
@@ -571,6 +575,12 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQRTabScopeWidgetID, kKFCUIPrefix + 59)
 DECLARE_PMID(kWidgetIDSpace, kKFCQRTabFindNextWidgetID, kKFCUIPrefix + 60)
 DECLARE_PMID(kWidgetIDSpace, kKFCQRTabStatusWidgetID, kKFCUIPrefix + 61)
 DECLARE_PMID(kWidgetIDSpace, kKFCQRTabNoteWidgetID, kKFCUIPrefix + 62)
+DECLARE_PMID(kWidgetIDSpace, kKFCTableTabPanelWidgetID, kKFCUIPrefix + 63)
+DECLARE_PMID(kWidgetIDSpace, kKFCTableTabScopeWidgetID, kKFCUIPrefix + 64)
+DECLARE_PMID(kWidgetIDSpace, kKFCTableTabFindStyleWidgetID, kKFCUIPrefix + 65)
+DECLARE_PMID(kWidgetIDSpace, kKFCTableTabOverridesOnlyWidgetID, kKFCUIPrefix + 66)
+DECLARE_PMID(kWidgetIDSpace, kKFCTableTabChangeStyleWidgetID, kKFCUIPrefix + 67)
+DECLARE_PMID(kWidgetIDSpace, kKFCTableTabClearOverridesWidgetID, kKFCUIPrefix + 68)
 
 
 // "About Plug-ins" sub-menu:
@@ -750,6 +760,15 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQRTabNoteWidgetID, kKFCUIPrefix + 62)
 #define kKFCQRTabAllDocumentsKey		kKFCStringPrefix "kKFCQRTabAllDocumentsKey"
 #define kKFCQRTabDocumentKey			kKFCStringPrefix "kKFCQRTabDocumentKey"
 #define kKFCQRTabFindNextKey			kKFCStringPrefix "kKFCQRTabFindNextKey"
+#define kKFCTableTabTitleKey			kKFCStringPrefix "kKFCTableTabTitleKey"
+#define kKFCTableTabFindStyleKey		kKFCStringPrefix "kKFCTableTabFindStyleKey"
+#define kKFCTableTabAnyStyleKey			kKFCStringPrefix "kKFCTableTabAnyStyleKey"
+#define kKFCTableTabOverridesOnlyKey	kKFCStringPrefix "kKFCTableTabOverridesOnlyKey"
+#define kKFCTableTabChangeStyleKey		kKFCStringPrefix "kKFCTableTabChangeStyleKey"
+#define kKFCTableTabLeaveStyleKey		kKFCStringPrefix "kKFCTableTabLeaveStyleKey"
+#define kKFCTableTabClearOverridesKey	kKFCStringPrefix "kKFCTableTabClearOverridesKey"
+#define kKFCTableTabGuideFindKey		kKFCStringPrefix "kKFCTableTabGuideFindKey"
+#define kKFCTableTabGuideReplaceKey		kKFCStringPrefix "kKFCTableTabGuideReplaceKey"
 
 // Other StringKeys:
 #define kKFCAboutBoxStringKey	kKFCStringPrefix "kKFCAboutBoxStringKey"
@@ -967,6 +986,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQRTabNoteWidgetID, kKFCUIPrefix + 62)
 // IPanelCreator::GetPanelRsrcID hands back).
 #define kKFCQRTabRsrcID						(kSDKDefPanelResourceID + 30)
 #define kKFCQRTabIDListRsrcID				(kSDKDefPanelResourceID + 32)
+#define kKFCTableTabRsrcID					(kSDKDefPanelResourceID + 33)
+#define kKFCTableTabIDListRsrcID			(kSDKDefPanelResourceID + 35)
 #define kKFCValueFieldWidth					84
 // One row of the query dialog's lists: KCM's book comparison dialog's row height (kKCMBookRowHeight), the one other
 // list the Kohaku plug-ins draw in a dialog's font. Read by the row resource, the lists' scroll increments

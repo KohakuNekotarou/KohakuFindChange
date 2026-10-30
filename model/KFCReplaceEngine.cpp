@@ -70,6 +70,8 @@
 #include "KFCObjectReplace.h"	// an object row's Replace
 #include "KFCQRSearch.h"		// NotChangedWords - a QR code list's rows are never replaced
 #include "KFCCopyStore.h"		// the copies a row's Replace takes and its Restore from Copy puts back
+#include "KFCTableSearch.h"		// a table row's Replace - the Table tab's Change side
+#include "ITableModel.h"
 #include "KFCTextOverrides.h"	// ClearOverrides - a text row's Special Operations > Clear Overrides
 #ifdef KFC_DIAG
 #include "ITextFocusManager.h"	// how many foci a story carries while it is written (WALKSTEP) - test builds only
@@ -1154,8 +1156,9 @@ QueryCompared CompareQueryWithSearch()
 	// ----- (0) A QR CODE LIST (KFCQRSearch) has no query to change: it lists every QR code, and no setting of Find/Change
 	// steers its walk - so nothing is asked of Find/Change and nothing is stated. Its searches again list its QR codes again
 	// whatever tab the dialog is on, and its rows are never replaced (CanReplaceHit). A query run's list has none either: no
-	// search made it, and its rows are not written again (RefuseRunListRow).
-	if (KFCResultModel::ListIsQRCodes() || KFCResultModel::ListIsRunList())
+	// search made it, and its rows are not written again (RefuseRunListRow). Nor a table list: what it asks is the Table tab's, and
+	// its Replace reads that tab as it stands (ReplaceTableRows).
+	if (KFCResultModel::ListIsQRCodes() || KFCResultModel::ListIsRunList() || KFCResultModel::ListIsTables())
 		return kQueryUnchanged;
 
 	// ----- (1) the TAB the results were searched with -----
@@ -1306,6 +1309,21 @@ static bool RefuseRunListRow(const char* what, PMString& outStatus)
 	outStatus.SetTranslatable(kFalse);
 	return true;
 }
+
+// A TABLE LIST'S ROWS ARE WRITTEN BY THEIR REPLACE ALONE (the table tab spec's T11 - the Table tab's Change side): its row's character is the
+// table's, which no other write of a text row means anything to. The menu greys them; these doors are for a press that never went through it.
+static bool RefuseTableRow(const char* what, PMString& outStatus)
+{
+	if (!KFCResultModel::ListIsTables())
+		return false;
+	outStatus = what;
+	outStatus.Append(": this row is a table - only its Replace writes it.");
+	outStatus.SetTranslatable(kFalse);
+	return true;
+}
+
+// The Table tab's Replace (below - ClearOverridesHits' neighbour).
+static bool ReplaceTableRows(const KFCRowsByChapter& rowsByChapter, PMString& outStatus);
 
 bool KFCReplaceEngine::CanReplaceHit(int32 chapterIdx, int32 hitIdx)
 {
@@ -2205,6 +2223,13 @@ bool KFCReplaceEngine::ReplaceHit(int32 chapterIdx, int32 hitIdx, PMString& outS
 	}
 	if (RefuseRunListRow("Replace", outStatus))
 		return false;
+	if (KFCResultModel::ListIsTables())
+	{
+		KFCRowsByChapter one(1);
+		one[0].chapter = chapterIdx;
+		one[0].hits.push_back(hitIdx);
+		return ReplaceTableRows(one, outStatus);
+	}
 	if (!CanReplaceHit(chapterIdx, hitIdx))
 	{
 		outStatus = "Replace: this row cannot be replaced (already replaced, locked, or not a match of Find/Change).";
@@ -2241,6 +2266,8 @@ bool KFCReplaceEngine::ReplaceHits(const KFCRowsByChapter& rowsByChapter, PMStri
 	}
 	if (RefuseRunListRow("Replace", outStatus))
 		return false;
+	if (KFCResultModel::ListIsTables())
+		return ReplaceTableRows(rowsByChapter, outStatus);
 	// OBJECT ROWS: InDesign's object replace, row by row (KFCObjectReplace::ReplaceRows - it asks each row).
 	if (KFCResultModel::GetHitItem(firstChapter, firstHit) != kInvalidUID)
 		return KFCObjectReplace::ReplaceRows(rowsByChapter, outStatus);
@@ -2902,6 +2929,8 @@ bool RestoreInChapter(RestoreChapter& chapter, int32 (&counts)[kRestoreRefusalCo
 // locked, a hyperlink in the way, the paragraph style deleted - the doors say when it is pressed.
 bool KFCReplaceEngine::CanRestoreHit(int32 chapterIdx, int32 hitIdx)
 {
+	if (KFCResultModel::ListIsTables())
+		return false;		// (RefuseTableRow's note)
 	KFCResultModel::HitCopy copy;
 	return RestoreRowRefusal(chapterIdx, hitIdx, copy) == kRestoreOk;
 }
@@ -2911,7 +2940,7 @@ bool KFCReplaceEngine::RestoreHits(const KFCRowsByChapter& rowsByChapter, PMStri
 	KFC_DIAG_WRITTEN_DOCS_CHECK("restore-rows");	// (test builds: after DocsAfterWrite, below - KFCDiagWrittenDocs.h)
 	outStatus.Clear();
 	outStatus.SetTranslatable(kFalse);
-	if (RefuseRunListRow("Restore from Copy", outStatus))
+	if (RefuseRunListRow("Restore from Copy", outStatus) || RefuseTableRow("Restore from Copy", outStatus))
 		return false;
 	if (KFCRunGuard::IsAnyRunning())
 	{
@@ -3376,8 +3405,8 @@ bool OutlineInChapter(OutlineChapter& chapter, int32 (&counts)[kOutlineRefusalCo
 
 bool KFCReplaceEngine::CanOutlineHit(int32 chapterIdx, int32 hitIdx)
 {
-	if (KFCResultModel::ListIsRunList())
-		return false;		// (RefuseRunListRow's note)
+	if (KFCResultModel::ListIsRunList() || KFCResultModel::ListIsTables())
+		return false;		// (RefuseRunListRow's and RefuseTableRow's notes)
 	return OutlineRowRefusal(chapterIdx, hitIdx) == kOutlineOk;
 }
 
@@ -3386,7 +3415,7 @@ bool KFCReplaceEngine::OutlineHits(const KFCRowsByChapter& rowsByChapter, PMStri
 	KFC_DIAG_WRITTEN_DOCS_CHECK("outline-text-rows");	// (test builds: after DocsAfterWrite, below - KFCDiagWrittenDocs.h)
 	outStatus.Clear();
 	outStatus.SetTranslatable(kFalse);
-	if (RefuseRunListRow("Create Outlines", outStatus))
+	if (RefuseRunListRow("Create Outlines", outStatus) || RefuseTableRow("Create Outlines", outStatus))
 		return false;
 	if (KFCRunGuard::IsAnyRunning())
 	{
@@ -3758,8 +3787,8 @@ bool ClearInChapter(ClearChapter& chapter, int32 (&counts)[kClearRefusalCount])
 
 bool KFCReplaceEngine::CanClearOverridesHit(int32 chapterIdx, int32 hitIdx)
 {
-	if (KFCResultModel::ListIsRunList())
-		return false;		// (RefuseRunListRow's note)
+	if (KFCResultModel::ListIsRunList() || KFCResultModel::ListIsTables())
+		return false;		// (RefuseRunListRow's and RefuseTableRow's notes)
 	return ClearRowRefusal(chapterIdx, hitIdx) == kClearOk;
 }
 
@@ -3768,7 +3797,7 @@ bool KFCReplaceEngine::ClearOverridesHits(const KFCRowsByChapter& rowsByChapter,
 	KFC_DIAG_WRITTEN_DOCS_CHECK("clear-overrides-rows");	// (test builds: after DocsAfterWrite, below - KFCDiagWrittenDocs.h)
 	outStatus.Clear();
 	outStatus.SetTranslatable(kFalse);
-	if (RefuseRunListRow("Clear Overrides", outStatus))
+	if (RefuseRunListRow("Clear Overrides", outStatus) || RefuseTableRow("Clear Overrides", outStatus))
 		return false;
 	if (KFCRunGuard::IsAnyRunning())
 	{
@@ -3965,6 +3994,317 @@ bool KFCReplaceEngine::ClearOverridesHits(const KFCRowsByChapter& rowsByChapter,
 	PMString leftWords;
 	AppendCountsByWhy(leftWords, counts, ClearWords);
 	SayRowsWritten(outStatus, "Cleared overrides on", "matches", RowsDone(chapters), total, leftWords);
+	return true;
+}
+
+// ======================================================================================================
+// A TABLE ROW'S REPLACE (the Table tab - docs/superpowers/specs/2026-10-31-kfc-table-tab-design.md T8 - T10). Its table is given what the
+// tab's Change side says NOW - a text row's Change To's rule: a Replace is always the settings as they stand - by the style's NAME, read in
+// the row's own document (a book's chapters each have their own styles; one without it turns the row away, counted). Nothing written
+// moves text, so no row is carried. ONE undo step ("Apply Table Style"), KFC's mark in it, each table recorded for the panel's following
+// of its Ctrl+Z and Redo (StepRecorder::RecordItem: a table's write need not move its story's version). Each written row marked
+// (KFCResultModel::MarkHitTableStyled - "Styled", what it draws read again).
+// ======================================================================================================
+namespace
+{
+// WHY A TABLE ROW IS NOT WRITTEN - said in full for one row (TableRefusalSentence), counted for several (TableRefusalWords).
+enum TableRefusal
+{
+	kTableOk = 0,
+	kTableMissing,		// no such row
+	kTableLocked,		// locked
+	kTableNoDoc,		// its document could not be found
+	kTableNotOpened,	// ...or not opened
+	kTableNotFollowed,	// its story changed in a way its foci could not follow
+	kTableEdited,		// its character has been edited since, or holds no table now
+	kTableNoStyle,		// its document has no table style of the Change side's name
+	kTableAsAsked,		// it already reads as the Change side asks: counted, not written
+	kTableRefusalCount
+};
+
+const char* TableRefusalWords(TableRefusal why)
+{
+	switch (why)
+	{
+		case kTableMissing:		return "not found";
+		case kTableLocked:		return "locked";
+		case kTableNoDoc:		return "document not found";
+		case kTableNotOpened:	return "document not opened";
+		case kTableNotFollowed:	return "not followed";
+		case kTableEdited:		return "edited since";
+		case kTableNoStyle:		return "no such table style";
+		case kTableAsAsked:		return "already as asked";
+		default:				return "";
+	}
+}
+
+// One row's refusal, after "Replace: ".
+const char* TableRefusalSentence(TableRefusal why)
+{
+	switch (why)
+	{
+		case kTableMissing:		return "this row is no longer in the list.";
+		case kTableLocked:		return "this table is locked.";
+		case kTableNoDoc:		return "the document of this row could not be found.";
+		case kTableNotOpened:	return "the document of this row could not be opened.";
+		case kTableNotFollowed:	return "this row's story has changed in a way its row could not follow.";
+		case kTableEdited:		return "this row's table has been edited since the search.";
+		case kTableNoStyle:		return "this document has no table style of that name.";
+		case kTableAsAsked:		return "this table already reads as the Table tab asks.";
+		default:				return "this row cannot be replaced.";
+	}
+}
+
+// One row to write, as the doors found it.
+struct TableRow
+{
+	int32			hit;
+	UID				story;
+	TextIndex		start;		// its table's character: [start, end)
+	TextIndex		end;
+	UID				table;
+	bool			done;
+	TableRefusal	why;
+	TableRow() : hit(-1), story(kInvalidUID), start(kInvalidTextIndex), end(kInvalidTextIndex), table(kInvalidUID), done(false), why(kTableOk) {}
+};
+
+// One document's rows in the write.
+struct TableChapter
+{
+	int32					chapterIdx;
+	UIDRef					docRef;
+	UID						style;		// the Change side's style in this document; kInvalidUID = it keeps its own
+	std::vector<TableRow>	rows;		// the rows that passed the doors
+	std::set<UID>			stories;	// their stories
+	int32					written;
+	TableChapter() : chapterIdx(-1), style(kInvalidUID), written(0) {}
+};
+
+// THE TABLES OF ONE DOCUMENT, inside the write's step. Each row's table read again just before its command: what the doors saw - nothing
+// this write does moves one - and, written, what the row draws read again. False = InDesign would not write a table: the caller takes
+// the step back.
+bool WriteTablesInChapter(TableChapter& chapter, bool clearOverrides, int32 (&counts)[kTableRefusalCount])
+{
+	IDataBase* const db = chapter.docRef.GetDataBase();
+	if (db == nil)
+		return false;
+	for (size_t k = 0; k < chapter.rows.size(); ++k)
+	{
+		TableRow& row = chapter.rows[k];
+		InterfacePtr<ITableModel> table(db, row.table, UseDefaultIID());
+		if (table == nil)
+		{
+			row.why = kTableEdited;
+			++counts[kTableEdited];
+			continue;
+		}
+		if (KFCTableSearch::Write(table, chapter.style, clearOverrides) != kSuccess)
+			return false;
+		KFC_DIAG_LOG("TABLESTYLE chapter=%d row=%d story=%u at=%d table=%u", chapter.chapterIdx, row.hit, row.story.Get(),
+			(int)row.start, row.table.Get());
+		row.done = true;
+		++chapter.written;
+		KFCResultModel::MarkHitTableStyled(chapter.chapterIdx, row.hit, KFCTableSearch::TableWords(table));
+	}
+	return true;
+}
+}	// anonymous namespace
+
+static bool ReplaceTableRows(const KFCRowsByChapter& rowsByChapter, PMString& outStatus)
+{
+	KFC_DIAG_WRITTEN_DOCS_CHECK("table-style-rows");	// (test builds: after DocsAfterWrite, below - KFCDiagWrittenDocs.h)
+	outStatus.Clear();
+	outStatus.SetTranslatable(kFalse);
+	// (The run guard is the callers' - ReplaceRows in the UI half: ReplaceHit and ReplaceHits count this write as a run themselves.)
+	const size_t total = KFCRowCount(rowsByChapter);
+	if (total == 0)
+		return false;
+	// THE CHANGE SIDE AS IT STANDS (T8): nothing on it is said when pressed - the face changes while the rows stay.
+	KFCTableConditions asked;
+	(void)KFCTableSearch::IsTabCurrent(&asked);
+	if (asked.changeStyle.IsEmpty() && !asked.clearOverrides)
+	{
+		outStatus.Append("Replace: nothing to change on the Table tab - choose Change to Table Style or Clear Overrides in Edit > Find/Change.");
+		return false;
+	}
+
+	// THE DOORS, ROW BY ROW (ClearOverridesHits' shape): nothing written yet.
+	int32 counts[kTableRefusalCount] = {};
+	TableRefusal lastWhy = kTableOk;
+	std::vector<TableChapter> chapters;
+	KFCReplaceEngine::DocsAfterWrite docsAfter;
+	size_t toWrite = 0;
+	for (size_t c = 0; c < rowsByChapter.size(); ++c)
+	{
+		TableChapter chapter;
+		chapter.chapterIdx = rowsByChapter[c].chapter;
+		// The row's own flags first: a chapter with nothing to write is not opened.
+		std::vector<TableRow> candidates;
+		const std::vector<int32>& hits = rowsByChapter[c].hits;
+		for (size_t k = 0; k < hits.size(); ++k)
+		{
+			TableRow row;
+			row.hit = hits[k];
+			const KFCReplaceEngine::GreyedReason greyed = KFCReplaceEngine::WhyGreyed(chapter.chapterIdx, row.hit);
+			const TableRefusal why = (greyed == KFCReplaceEngine::kGreyedNot) ? kTableOk
+				: (greyed == KFCReplaceEngine::kGreyedLocked) ? kTableLocked : kTableMissing;
+			if (why != kTableOk)
+			{
+				++counts[why];
+				lastWhy = why;
+				continue;
+			}
+			candidates.push_back(row);
+		}
+		if (candidates.empty())
+			continue;
+		// Its document, by its file first: a closed chapter is reopened windowless and held, as a Replace reaches it.
+		IDFile file;
+		TableRefusal docWhy = kTableOk;
+		if (!KFCResultModel::GetChapterLocation(chapter.chapterIdx, chapter.docRef, file))
+			docWhy = kTableNoDoc;
+		else if (!KFCBookScope::ReachChapterDoc(file, chapter.docRef))
+			docWhy = kTableNotOpened;
+		if (docWhy != kTableOk)
+		{
+			counts[docWhy] += static_cast<int32>(candidates.size());
+			lastWhy = docWhy;
+			continue;
+		}
+		KFCResultModel::RebindChapterDoc(chapter.chapterIdx, chapter.docRef);
+		IDataBase* const db = chapter.docRef.GetDataBase();
+		// THE STYLE, BY ITS NAME, IN THIS DOCUMENT (T3, T8): none of that name turns its rows away.
+		chapter.style = asked.changeStyle.IsEmpty() ? kInvalidUID : KFCTableSearch::StyleNamed(db, asked.changeStyle);
+		const bool noStyle = !asked.changeStyle.IsEmpty() && chapter.style == kInvalidUID;
+		// THE ROWS OF EACH STORY FOLLOW THEIR FOCI FIRST (a Replace's way), once per story - then each row's place.
+		std::map<UID, KFCSearchEngine::FollowResult> followed;
+		FollowStoriesOf(chapter.chapterIdx, db, candidates, followed);
+		for (size_t k = 0; k < candidates.size(); ++k)
+		{
+			TableRow& row = candidates[k];
+			const PlaceFollowed place = RowPlaceFollowed(chapter.chapterIdx, row.hit, db, followed, row.story, row.start, row.end);
+			TableRefusal why = (place == kPlaceNotFollowed) ? kTableNotFollowed : (place == kPlaceEdited) ? kTableEdited : kTableOk;
+			if (why == kTableOk && !KFCSearchEngine::RowReadsAsFound(chapter.chapterIdx, row.hit, db))
+				why = kTableEdited;
+			if (why == kTableOk)
+			{
+				const UIDRef storyRef(db, row.story);
+				InterfacePtr<ITableModel> table(KFCTableSearch::QueryTableAt(storyRef, row.start));
+				if (table == nil)
+					why = kTableEdited;
+				else if (!KFCSearchEngine::IsFrameEditable(storyRef, KFCSearchEngine::EditableFrameForMatch(storyRef, row.start)))
+					why = kTableLocked;
+				else if (noStyle)
+					why = kTableNoStyle;
+				else if (!KFCTableSearch::WouldChange(table, chapter.style, asked.clearOverrides))
+					why = kTableAsAsked;
+				else
+					row.table = ::GetUID(table);
+			}
+			if (why != kTableOk)
+			{
+				++counts[why];
+				lastWhy = why;
+				continue;
+			}
+			chapter.rows.push_back(row);
+			chapter.stories.insert(row.story);
+		}
+		docsAfter.Reached(chapter.docRef, !chapter.rows.empty());
+		toWrite += chapter.rows.size();
+		if (!chapter.rows.empty())
+			chapters.push_back(chapter);
+	}
+	if (toWrite == 0)
+	{
+		outStatus.Append("Replace: ");
+		if (total == 1)
+			outStatus.Append(TableRefusalSentence(lastWhy));
+		else
+		{
+			outStatus.Append("none of the ");
+			outStatus.AppendNumber(static_cast<int32>(total));
+			outStatus.Append(" selected tables can be written - ");
+			AppendCountsByWhy(outStatus, counts, TableRefusalWords);
+			outStatus.Append(".");
+		}
+		return false;
+	}
+	// EVERY DOCUMENT TO WRITE STILL OPEN once the last is reached (a Replace's rule).
+	const bool acrossDocuments = chapters.size() > 1;
+	for (size_t c = 0; acrossDocuments && c < chapters.size(); ++c)
+	{
+		if (!KFCBookScope::IsDocStillOpen(chapters[c].docRef))
+		{
+			outStatus.Append("Replace: a document of the selected rows has been closed - nothing was changed.");
+			return false;
+		}
+	}
+
+	// RECORDED FOR THE PANEL'S FOLLOWING OF UNDO: one step for every document of it - the stories' versions, and each table.
+	std::vector<int32> chapterIdxs;
+	for (size_t c = 0; c < chapters.size(); ++c)
+		chapterIdxs.push_back(chapters[c].chapterIdx);
+	KFCUndoFollow::StepRecorder recorder(chapterIdxs);
+	recorder.SetName("Apply Table Style");
+	for (size_t c = 0; c < chapters.size(); ++c)
+		for (size_t k = 0; k < chapters[c].rows.size(); ++k)
+			recorder.RecordItem(chapters[c].chapterIdx, chapters[c].rows[k].table);
+	bool ok = false;
+	bool failed = false;
+	int32 writtenRows = 0;
+	{
+		KFCReplaceEngine::WriteStep step;
+		if (!KFCReplaceEngine::BeginWriteStep(acrossDocuments, step, kKFCTableStyleStepKey, "KFC Apply Table Style"))
+		{
+			outStatus.Append(acrossDocuments ? "Replace: InDesign would not start an undoable step - nothing was changed."
+				: "Replace: InDesign would not start a command sequence - nothing was changed.");
+			return false;
+		}
+		for (size_t c = 0; c < chapters.size() && !failed; ++c)
+		{
+			if (!WriteTablesInChapter(chapters[c], asked.clearOverrides, counts))
+				failed = true;
+			writtenRows += chapters[c].written;
+		}
+		// THE ERROR STATE AT THE END (a Replace's rule): anything standing here is a failure nothing reported.
+		ok = !failed && writtenRows > 0 && ErrorUtils::PMGetGlobalErrorCode() == kSuccess;
+		if (ok)
+			for (size_t c = 0; c < chapters.size(); ++c)
+				if (chapters[c].written > 0)
+					KFCUndoFollow::MarkWrite(chapters[c].docRef.GetDataBase());	// in this step, so its Undo / Redo is heard
+		// THE STORIES' FOCI ON THE ROWS, IN THIS STEP (the row-focus plan's D7 - as every write from the list).
+		if (ok)
+			for (size_t c = 0; c < chapters.size(); ++c)
+				for (std::set<UID>::const_iterator s = chapters[c].stories.begin(); s != chapters[c].stories.end(); ++s)
+					KFCRowFoci::ReanchorStory(chapters[c].chapterIdx, *s, true);
+		KFCReplaceEngine::EndWriteStep(step, ok);
+	}
+	if (!ok)
+	{
+		KFCResultModel::RollBackRows();
+		for (size_t c = 0; c < chapters.size(); ++c)
+			for (std::set<UID>::const_iterator s = chapters[c].stories.begin(); s != chapters[c].stories.end(); ++s)
+				KFCRowFoci::ReanchorStory(chapters[c].chapterIdx, *s);
+		outStatus.Append(failed ? "Replace: InDesign would not write a table - nothing was changed."
+			: "Replace: no table was written.");
+		return false;
+	}
+	for (size_t c = 0; c < chapters.size(); ++c)
+		NoteStoryVersions(chapters[c].chapterIdx, chapters[c].docRef.GetDataBase(), chapters[c].stories);	// as KFC left them
+	recorder.Keep();
+	for (size_t c = 0; c < chapters.size(); ++c)
+	{
+		if (chapters[c].written == 0)
+			continue;
+		docsAfter.Wrote(chapters[c].docRef);
+		KFC_DIAG_NOTE_WRITE(chapters[c].docRef);
+	}
+
+	// WHAT IT DID (SayRowsWritten): "Styled ID:262 #3." / "Styled 2 of 3 tables: ID:262 #1, ID:262 #3. Left as they were: 1 locked."
+	PMString leftWords;
+	AppendCountsByWhy(leftWords, counts, TableRefusalWords);
+	SayRowsWritten(outStatus, "Styled", "tables", RowsDone(chapters), total, leftWords);
 	return true;
 }
 

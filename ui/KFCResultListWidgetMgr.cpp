@@ -1362,6 +1362,7 @@ const char* KFCResultTree::SpecialRowWord(int32 op)
 		case kKFCSpecialShear:					return "Sheared";
 		case kKFCSpecialClearStyleOverrides:	return "Cleared";
 		case kKFCSpecialClearTextOverrides:		return "Cleared";	// a text row's Clear Overrides - the same word
+		case kKFCSpecialTableStyle:				return "Styled";	// a table row's Replace (the table tab spec's T9)
 		case kKFCSpecialDelete:					return "Deleted";
 		default:								return "";
 	}

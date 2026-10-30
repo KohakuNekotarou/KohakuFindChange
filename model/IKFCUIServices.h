@@ -56,6 +56,7 @@
 
 #include <vector>
 
+#include "KFCModelTypes.h"		// KFCTableConditions
 #include "IKFCBoundary.h"		// KFCOtherHalfIsThisBuild - KFCQueryUIServices
 #include "KFCBoundaryID.h"		// IID_IKFCUISERVICES
 
@@ -166,6 +167,11 @@ public:
 	    tab's Search: (IWalkerScopeFactoryUtils::kDocumentScope or kAllDocumentScope), answered either way. Kept by the UI
 	    half from the face's own calls (KFCQRTab.h): no window is walked to answer. */
 	virtual bool				IsQRCodeTabCurrent(int32& outScope) = 0;
+	/** IS KFC'S TABLE TAB FIND/CHANGE'S TAB NOW (appended - docs/superpowers/specs/2026-10-31-kfc-table-tab-design.md; KFCTableSearch::
+	    IsTabCurrent asks it) - IsQRCodeTabCurrent's answer for its own face. outConditions = the face's as they stand, answered
+	    either way: a row's Replace reads its Change side whichever tab is shown. Kept by the UI half from the face's own calls
+	    (KFCTableTab.h): no window is walked to answer. */
+	virtual bool				TableTabConditions(KFCTableConditions& outConditions) = 0;
 };
 
 /** HOW THE MODEL HALF ASKS FOR IKFCUIServices - the only way. IKFCUIServices has no kDefaultIID, so a Query of its

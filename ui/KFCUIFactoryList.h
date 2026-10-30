@@ -102,3 +102,7 @@ REGISTER_PMINTERFACE(KFCValueDialogObserver, kKFCValueDialogObserverImpl)
 REGISTER_PMINTERFACE(KFCQRTabPanelCreator, kKFCQRTabPanelCreatorImpl)
 REGISTER_PMINTERFACE(KFCQRTabObserver, kKFCQRTabObserverImpl)
 REGISTER_PMINTERFACE(KFCQRTabController, kKFCQRTabControllerImpl)
+// The Table tab's face in the same dialog (KFCTableTab.cpp).
+REGISTER_PMINTERFACE(KFCTableTabPanelCreator, kKFCTableTabPanelCreatorImpl)
+REGISTER_PMINTERFACE(KFCTableTabObserver, kKFCTableTabObserverImpl)
+REGISTER_PMINTERFACE(KFCTableTabController, kKFCTableTabControllerImpl)
