@@ -37,6 +37,7 @@
 #include "KFCDiag.h"			// NARROWFACT - a test build's trace of the facts read
 #include "KFCNarrow.h"
 #include "KFCPageItemFacts.h"	// DocLayerOf / DocLayerNamed - On Active Layer's layer, Move to Active Layer's reading
+#include "KFCTextOverrides.h"	// HasOverrides - With Overrides' test
 
 void KFCNarrow::ReadTextPlace(const UIDRef& storyRef, TextIndex at, KFCResultModel::Hit& io)
 {
@@ -140,7 +141,7 @@ UID KFCNarrow::FrameOwner(IDataBase* db, UID matchFrame)
 bool KFCNarrow::IsTextOnly(int32 kind)
 {
 	return kind == kKFCNarrowInTables || kind == kKFCNarrowInFootnotes || kind == kKFCNarrowInEndnotes
-		|| kind == kKFCNarrowFrames;
+		|| kind == kKFCNarrowFrames || kind == kKFCNarrowWithOverrides;
 }
 
 PMString KFCNarrow::StepWords(const KFCNarrowStep& step)
@@ -156,6 +157,7 @@ PMString KFCNarrow::StepWords(const KFCNarrowStep& step)
 		case kKFCNarrowOnPasteboard:	words.Append("On Pasteboard"); break;
 		case kKFCNarrowFrames:			words.Append("Frames of These Matches"); break;
 		case kKFCNarrowOnLayer:			words.Append("On Active Layer (\""); words.Append(step.layer); words.Append("\")"); break;
+		case kKFCNarrowWithOverrides:	words.Append("With Overrides"); break;
 		default:						words.Append("?"); break;
 	}
 	return words;
@@ -290,6 +292,15 @@ bool KFCNarrow::Filter::Meets(size_t k, const KFCResultModel::Hit& hit, bool obj
 			if (want == kInvalidUID)
 				return false;
 			return objectRow ? (KFCPageItemFacts::DocLayerOf(db, hit.itemUID) == want) : (hit.frameLayer == want);
+		}
+		// THE MATCH'S TEXT OVERRIDDEN, as InDesign says it (the next-overrides-restore spec's B0/B1 - KFCTextOverrides): read
+		// in the walk, where the match stands now.
+		case kKFCNarrowWithOverrides:
+		{
+			if (objectRow || db == nil || hit.storyUID == kInvalidUID)
+				return false;
+			InterfacePtr<ITextModel> model(db, hit.storyUID, UseDefaultIID());
+			return model != nil && KFCTextOverrides::HasOverrides(model, hit.textStart, hit.textEnd);
 		}
 		default:						return true;	// (Frames is a turn, not a test)
 	}

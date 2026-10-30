@@ -63,7 +63,8 @@ namespace KFCResultModel
 	{
 		kCopyNone = 0,			// no Replace of the list has written the row (or one restored it since)
 		kCopyKept,				// a copy is kept (HitCopy::store / story)
-		kCopyOutsideMainText,	// its match is in a table cell, a footnote or a note - outside the story's primary thread
+		kCopyOutsideMainText,	// its match is outside a thread a copy is kept in - a note's, or run across threads (KFCCopyStore::
+								// CopyableThread: the story's text, a table cell's and a footnote's are - since 2026-10-30)
 		kCopyTouchesHyperlink,	// what it copies holds a hyperlink source the paste would replace whole - the match
 								// itself, one in the run-on rest, one at the match's edge (setting it again crashed
 								// InDesign) - or touches a CROSS-REFERENCE source (its text is made by InDesign). Other
@@ -789,6 +790,13 @@ namespace KFCResultModel
 	    (RereadRowText). */
 	void MarkHitOutlined(int32 chapterIdx, int32 hitIdx, UID storyUID, TextIndex start, TextIndex end, const PMString& original,
 		const PMString& written);
+
+	/** A TEXT ROW A SPECIAL OPERATION WROTE without moving its text (KFCReplaceEngine::ClearOverridesHits - Clear Overrides,
+	    docs/superpowers/specs/2026-10-30-kfc-next-overrides-restore-design.md B4): its special mark (op, a KFCSpecialOp - the
+	    row reads its word first, "Cleared"), its eye on, its outcome cleared; its place, text and Replace as they were (the
+	    characters are the same - a Replace or a Restore from Copy still goes through, and takes the mark off: MarkHitReplaced,
+	    MarkHitRestored). Backed up first, as every change a write makes, so an Undo takes the mark off again. */
+	void MarkHitSpecial(int32 chapterIdx, int32 hitIdx, int32 op);
 
 	/** A chapter's document binding and file. The replace pass works chapter at a time, so it
 	    needs this without going through a hit. false = index out of range. */

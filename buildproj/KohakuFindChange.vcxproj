@@ -266,6 +266,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCObjectOutline.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCObjectSpecial.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCCopyStore.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCTextOverrides.cpp"/>
    </ItemGroup>
    <ItemGroup>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\IKFCBoundary.h"/>

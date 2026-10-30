@@ -1294,6 +1294,18 @@ bool KFCResultTree::CanOutlineAny(const KFCRowsByChapter& rows)
 	return AnyRowCan(rows, [](int32 chapter, int32 hit) { return KFCRuns()->CanOutlineHit(chapter, hit); });
 }
 
+bool KFCResultTree::ClearOverridesRows(const KFCRowsByChapter& rows)
+{
+	// Drawn again after it (WriteRowsInPlace): each written row reads Cleared (SpecialRowWord), RefreshRows keeping what the
+	// person had opened and closed.
+	return WriteRowsInPlace(rows, [&](PMString& status) { return KFCRuns()->ClearOverridesRows(rows, status); });
+}
+
+bool KFCResultTree::CanClearOverridesAny(const KFCRowsByChapter& rows)
+{
+	return AnyRowCan(rows, [](int32 chapter, int32 hit) { return KFCRuns()->CanClearOverridesHit(chapter, hit); });
+}
+
 bool KFCResultTree::SpecialRows(int32 op, const KFCRowsByChapter& rows, const KFCSpecialParams& params)
 {
 	// Drawn again after it (WriteRowsInPlace): each written row reads the operation's word, its place read again,
@@ -1337,6 +1349,7 @@ const char* KFCResultTree::SpecialRowWord(int32 op)
 		case kKFCSpecialScale:					return "Scaled";
 		case kKFCSpecialShear:					return "Sheared";
 		case kKFCSpecialClearStyleOverrides:	return "Cleared";
+		case kKFCSpecialClearTextOverrides:		return "Cleared";	// a text row's Clear Overrides - the same word
 		case kKFCSpecialDelete:					return "Deleted";
 		default:								return "";
 	}

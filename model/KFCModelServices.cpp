@@ -177,6 +177,9 @@ public:
 		outMode = KFCSearchEngine::FindChangeMode();
 		outScope = KFCSearchEngine::FindChangeScope();
 	}
+	// (Not under the list's query - KFCUnderListQuery: Clear Overrides walks no story, as Create Outlines walks none.)
+	virtual bool ClearOverridesRows(const KFCRowsByChapter& rows, PMString& outStatus) { return KFCReplaceEngine::ClearOverridesHits(rows, outStatus); }
+	virtual bool CanClearOverridesHit(int32 chapterIdx, int32 hitIdx) { return KFCReplaceEngine::CanClearOverridesHit(chapterIdx, hitIdx); }
 };
 
 CREATE_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)

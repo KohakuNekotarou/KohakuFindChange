@@ -402,6 +402,7 @@ PMString KFCResultModel::NarrowWords()
 			case kKFCNarrowOnPasteboard:	words.Append("On Pasteboard"); break;
 			case kKFCNarrowFrames:			words.Append("Frames"); break;
 			case kKFCNarrowOnLayer:			words.Append("Layer: "); words.Append(step.layer); break;
+			case kKFCNarrowWithOverrides:	words.Append("With Overrides"); break;
 			default:						words.Append("?"); break;
 		}
 	}
@@ -1193,6 +1194,7 @@ void KFCResultModel::MarkHitReplaced(int32 chapterIdx, int32 hitIdx, UID newStor
 	h.textEnd = newEnd;
 	h.replaced = true;
 	h.kept = true;		// ...and its eye on (the row eye, E2 - the author's call)
+	h.special = 0;		// its last write is this Replace - no special operation's word over "Changed" (MarkHitSpecial)
 	// (The locator is not built again: nothing it says is changed by a replace - the page, the ordinal, overset,
 	// hidden and locked come from the search, and an outcome is set where the replace sets one.)
 }
@@ -1265,6 +1267,7 @@ void KFCResultModel::MarkHitRestored(int32 chapterIdx, int32 hitIdx, UID storyUI
 	// (RereadRowText), the page words kept as the Replace kept them (MarkHitReplaced).
 	h.replaced = false;
 	h.outlined = false;
+	h.special = 0;		// (a special operation's word too - the row is as the search found it)
 	h.kept = false;
 	h.replacedText.Clear();
 	h.copy = HitCopy();
@@ -1273,6 +1276,18 @@ void KFCResultModel::MarkHitRestored(int32 chapterIdx, int32 hitIdx, UID storyUI
 	h.textEnd = end;
 	h.outcome = kOutcomeNone;
 	BuildHitLocator(h);
+}
+
+void KFCResultModel::MarkHitSpecial(int32 chapterIdx, int32 hitIdx, int32 op)
+{
+	Hit* hp = HitAt(chapterIdx, hitIdx);
+	if (hp == nil || hp->itemUID != kInvalidUID)
+		return;		// a text row's - an object row's are MarkItemSpecial's
+	Hit& h = *hp;
+	BackUpRow(chapterIdx, hitIdx, h);
+	h.special = op;		// the row reads the operation's word first (the UI half's SpecialRowWord - "Cleared")
+	h.kept = true;		// ...and its eye on (a row KFC wrote stays through a search again)
+	h.outcome = kOutcomeNone;	// the write has just found its text there
 }
 
 void KFCResultModel::MarkHitOutlined(int32 chapterIdx, int32 hitIdx, UID storyUID, TextIndex start, TextIndex end,

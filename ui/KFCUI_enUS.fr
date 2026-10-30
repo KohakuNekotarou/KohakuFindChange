@@ -69,6 +69,8 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCCopyResultsMenuKey,			"Copy Results",
                 kKFCCopyRowsMenuKey,			"Copy Rows",
                 kKFCCopyTierResultsMenuKey,		"Copy These Results",
+                kKFCNextResultMenuKey,			"Next Result",
+                kKFCPreviousResultMenuKey,		"Previous Result",
                 kKFCNarrowDownSubmenuKey,		"Narrow Down",
                 kKFCNarrowInTablesMenuKey,		"In Tables",
                 kKFCNarrowInFootnotesMenuKey,	"In Footnotes",
@@ -77,6 +79,8 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCNarrowOnPasteboardMenuKey,	"On Pasteboard",
                 kKFCNarrowFramesMenuKey,		"Frames of These Matches",
                 kKFCNarrowOnLayerMenuKey,		"On Active Layer",
+                kKFCNarrowWithOverridesMenuKey,	"With Overrides",
+                kKFCClearTextOverridesMenuKey,	"Clear Overrides",
                 // An object row's other Special Operations - InDesign's own English command names.
                 kKFCFillFramePropMenuKey,			"Fill Frame Proportionally",
                 kKFCContentProportionalMenuKey,		"Fit Content Proportionally",

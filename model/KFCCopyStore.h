@@ -14,8 +14,10 @@
 //  never having been saved (no row can reach that document again).
 //  THE COPY ROAD, as measured in KT (memory copy-mechanism-research): ITextUtils' story copies - a new story of the
 //  store, the range copied to its end; put back with one command that replaces a range. The ranges are text model
-//  positions (a table is 0x16 + 0x17), checked here against the story's PRIMARY thread (GetPrimaryStoryThreadSpan - a
-//  range into a table cell's or a footnote's thread crashed InDesign), since the commands check nothing.
+//  positions (a table is 0x16 + 0x17), checked here to lie inside ONE thread, short of its closing character
+//  (CopyableThread - a range run across threads crashed InDesign), since the commands check nothing: the story's own
+//  text, a table cell's or a footnote's (each measured in KT 2026-10-24 to copy and come back whole - memory
+//  copy-mechanism-research; until 2026-10-30 the primary thread alone was taken - the next-overrides-restore spec's C).
 //  The main thread only: a row's Replace and its Restore from Copy run there.
 //
 //========================================================================================
@@ -26,6 +28,7 @@
 #include "UIDRef.h"
 
 class IDataBase;
+class ITextModel;
 
 namespace KFCCopyStore
 {
@@ -37,10 +40,16 @@ namespace KFCCopyStore
 		CopyRef() : store(0), story(kInvalidUID) {}
 	};
 
+	/** THE THREAD A COPY MAY BE TAKEN AND PUT BACK IN at `at` (the next-overrides-restore spec's C1): the story's own text
+	    (its primary thread), a table cell's or a footnote's - the threads measured; any other (a note's - unmeasured) is
+	    not one. True: outFirst = the thread's first position, outLast = its closing character's - a copy and a paste stay
+	    in [outFirst, outLast]. False: not one (the outs left as they were). */
+	bool CopyableThread(ITextModel* model, TextIndex at, TextIndex& outFirst, TextIndex& outLast);
+
 	/** [start, end) of `story` (a document's text model) copied into a new story of its document's store - made now when
 	    the document has none. False = refused or failed, outCopy left empty: an error already standing (no command is
-	    processed over one), a range outside the story's primary thread (0 <= start <= end <= span - 1), no store could
-	    be made, the copy did not come out as long as the range (a test build's fault switch copy-fail too). Writes the
+	    processed over one), a range outside one copyable thread (CopyableThread: first <= start <= end <= last), no store
+	    could be made, the copy did not come out as long as the range (a test build's fault switch copy-fail too). Writes the
 	    store only, never the document; the error state is left as it was found. Outside any command sequence of the
 	    document's. */
 	bool Take(const UIDRef& story, TextIndex start, TextIndex end, CopyRef& outCopy);
@@ -50,8 +59,8 @@ namespace KFCCopyStore
 
 	/** The copy put over [start, end) of `story` - one command, inside the caller's command sequence: ITextUtils'
 	    QueryCopyStoryCommand, or, for a copy with no text, the range deleted (ITextModelCmds::DeleteCmd). False = not held,
-	    a range outside the primary thread, or the command did not go through (the error state is left for the caller's
-	    step to decide by). */
+	    a range outside one copyable thread (CopyableThread), or the command did not go through (the error state is left for
+	    the caller's step to decide by). */
 	bool PasteOver(const CopyRef& copy, const UIDRef& story, TextIndex start, TextIndex end);
 
 	/** A DOCUMENT IS CLOSING (KFCCloseDocResponder): its store lets go of the address - one of a document never saved is

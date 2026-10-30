@@ -102,6 +102,8 @@ enum KFCNarrowKind
 	kKFCNarrowOnPasteboard,		// the item, or the match's frame, out on the pasteboard
 	kKFCNarrowFrames,			// the frames holding the matches, one object row each
 	kKFCNarrowOnLayer,			// the item, or the match's frame, on a layer of a name (`layer` - On Active Layer)
+	kKFCNarrowWithOverrides,	// the match's text overridden - by its own attributes or its paragraphs' - as InDesign says it
+								// (KFCTextOverrides::HasOverrides - docs/superpowers/specs/2026-10-30-kfc-next-overrides-restore-design.md B1)
 	kKFCNarrowKindCount
 };
 
@@ -160,6 +162,9 @@ enum KFCSpecialOp
 	kKFCSpecialRotate,
 	kKFCSpecialShear,
 	// (No "Run Script on the rows' objects": dropped - the author's call, E13 of the spec named above.)
+	// A TEXT row's Special Operations > Clear Overrides (docs/superpowers/specs/2026-10-30-kfc-next-overrides-restore-design.md
+	// B4): its mark alone - the row reads "Cleared". Written by KFCReplaceEngine::ClearOverridesHits, never by SpecialRows.
+	kKFCSpecialClearTextOverrides,
 	kKFCSpecialOpCount
 };
 

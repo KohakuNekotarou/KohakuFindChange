@@ -70,6 +70,7 @@
 #include "KFCObjectReplace.h"	// an object row's Replace
 #include "KFCQRSearch.h"		// NotChangedWords - a QR code list's rows are never replaced
 #include "KFCCopyStore.h"		// the copies a row's Replace takes and its Restore from Copy puts back
+#include "KFCTextOverrides.h"	// ClearOverrides - a text row's Special Operations > Clear Overrides
 #ifdef KFC_DIAG
 #include "ITextFocusManager.h"	// how many foci a story carries while it is written (WALKSTEP) - test builds only
 #include "IFrameList.h"			// whether its frames stand damaged around a find (WALKSTEP) - test builds only
@@ -1723,9 +1724,12 @@ KFCResultModel::HitCopy TakeRowCopy(const UIDRef& storyRef, TextIndex start, Tex
 {
 	KFCResultModel::HitCopy copy;
 	InterfacePtr<ITextModel> model(storyRef, UseDefaultIID());
-	// The primary thread's text: [0, primary) - its last return, the story's, stands at `primary`.
-	const int32 primary = (model != nil) ? model->GetPrimaryStoryThreadSpan() - 1 : -1;
-	if (model == nil || start < 0 || end < start || end > primary)
+	// THE THREAD THE MATCH STANDS IN (KFCCopyStore::CopyableThread - the story's own text, a table cell's, a footnote's: the
+	// next-overrides-restore spec's C1): [threadFirst, threadLast) - its closing character stands at `threadLast`. A note's
+	// keeps no copy, nor a range run across threads.
+	TextIndex threadFirst = kInvalidTextIndex, threadLast = kInvalidTextIndex;
+	if (model == nil || start < 0 || end < start || !KFCCopyStore::CopyableThread(model, start, threadFirst, threadLast)
+		|| end > threadLast)
 	{
 		copy.whyNot = KFCResultModel::kCopyOutsideMainText;
 		return copy;
@@ -1784,6 +1788,13 @@ KFCResultModel::HitCopy TakeRowCopy(const UIDRef& storyRef, TextIndex start, Tex
 			return copy;
 		}
 		copyEnd = paraStart + paraLength - 1;		// its return
+		// ...in the match's thread (a cell's last paragraph ends on the thread's closing character - the copy stops short
+		// of it: the spec's C2).
+		if (copyEnd > threadLast)
+		{
+			copy.whyNot = KFCResultModel::kCopyOutsideMainText;
+			return copy;
+		}
 		TextIterator it(model, end);
 		for (TextIndex i = end; i < copyEnd && !it.IsNull(); ++i, ++it)
 		{
@@ -2319,7 +2330,7 @@ const char* RestoreSentence(RestoreRefusal why, int32 whyNoCopy)
 			switch (whyNoCopy)
 			{
 				case KFCResultModel::kCopyOutsideMainText:
-					return "no copy was kept when this row was replaced - its match is in a table cell, a footnote or a note.";
+					return "no copy was kept when this row was replaced - its match is in a note, or runs out of the text it stands in.";
 				case KFCResultModel::kCopyTouchesHyperlink:
 					return "no copy was kept when this row was replaced - its match is a hyperlink's whole text or touches a cross-reference, or the rest of its paragraph holds a hyperlink: a copy put back would break the link.";
 				case KFCResultModel::kCopyRestHoldsObject:
@@ -2484,12 +2495,15 @@ bool MoveLinksOutOfPaste(ITextModel* model, const UIDRef& storyRef, TextIndex at
 	const std::vector<KFCResultModel::HitLink>& kept, const std::vector<LinkAt>& before, bool& outInTheWay)
 {
 	outInTheWay = false;
-	// The characters beside the paste, in the order they are offered - each to one source at most.
-	const int32 primary = model->GetPrimaryStoryThreadSpan() - 1;
+	// The characters beside the paste, in the order they are offered - each to one source at most: in the paste's own
+	// thread (KFCCopyStore::CopyableThread - a table cell's or a footnote's too, the next-overrides-restore spec's C3), never
+	// its closing character nor the character before its start.
+	TextIndex threadFirst = 0, threadLast = model->GetPrimaryStoryThreadSpan() - 1;
+	(void)KFCCopyStore::CopyableThread(model, at, threadFirst, threadLast);		// (left as the story's text when not one)
 	std::vector<TextIndex> beside;
-	if (pasteEnd < primary)
+	if (pasteEnd < threadLast)
 		beside.push_back(pasteEnd);
-	if (at > 0)
+	if (at > threadFirst)
 		beside.push_back(at - 1);
 	size_t offered = 0;
 	// Each kept source to move, and the character it stands on while the paste goes in.
@@ -2764,19 +2778,22 @@ bool RestoreInChapter(RestoreChapter& chapter, int32 (&counts)[kRestoreRefusalCo
 			const int32 written = rowNow[static_cast<size_t>(row.hit)].length;
 			const UIDRef storyRef(db, row.story);
 			InterfacePtr<ITextModel> model(storyRef, UseDefaultIID());
-			const int32 primary = (model != nil) ? model->GetPrimaryStoryThreadSpan() - 1 : -1;
 			const TextIndex pasteEnd = at + written + row.copy.rest;
+			// The paste inside the thread it stands in (the next-overrides-restore spec's C3).
+			TextIndex threadFirst = kInvalidTextIndex, threadLast = kInvalidTextIndex;
+			const bool inThread = model != nil && KFCCopyStore::CopyableThread(model, at, threadFirst, threadLast)
+				&& pasteEnd <= threadLast;
 			// What its Replace wrote, at its place now.
-			if (model == nil || pasteEnd > primary || KFCSearchEngine::ReadText(storyRef, at, written) != row.written)
+			if (!inThread || KFCSearchEngine::ReadText(storyRef, at, written) != row.written)
 			{
 				row.why = kRestoreEdited;
 				continue;
 			}
-			// Its run-on rest as it was copied, the paragraph's return (or the story's end) right after it.
+			// Its run-on rest as it was copied, the paragraph's return (or its thread's closing character) right after it.
 			if (row.copy.rest > 0)
 			{
 				bool asCopied = (KFCSearchEngine::TextHash(model, at + written, pasteEnd) == row.copy.restHash);
-				if (asCopied && pasteEnd < primary)
+				if (asCopied && pasteEnd < threadLast)
 				{
 					TextIterator it(model, pasteEnd);
 					asCopied = !it.IsNull() && (*it).GetValue() == kTextChar_CR;
@@ -2954,12 +2971,14 @@ bool KFCReplaceEngine::RestoreHits(const KFCRowsByChapter& rowsByChapter, PMStri
 			if (why == kRestoreOk && (!KFCResultModel::GetHitWrittenText(chapter.chapterIdx, row.hit, row.written)
 				|| KFCSearchEngine::ReadText(UIDRef(db, row.story), row.start, row.end - row.start) != row.written))
 				why = kRestoreEdited;
-			// The range the paste covers, inside the primary thread (KFCCopyStore asks it again: the commands check nothing).
+			// The range the paste covers, inside the thread it stands in - the story's text, a table cell's, a footnote's
+			// (KFCCopyStore::CopyableThread, which asks it again: the commands check nothing - the spec's C3).
 			if (why == kRestoreOk)
 			{
 				InterfacePtr<ITextModel> model(db, row.story, UseDefaultIID());
-				const int32 primary = (model != nil) ? model->GetPrimaryStoryThreadSpan() - 1 : -1;
-				if (row.end + row.copy.rest > primary)
+				TextIndex threadFirst = kInvalidTextIndex, threadLast = kInvalidTextIndex;
+				if (model == nil || !KFCCopyStore::CopyableThread(model, row.start, threadFirst, threadLast)
+					|| row.end + row.copy.rest > threadLast)
 					why = kRestoreRestChanged;
 			}
 			// Not locked since (a Replace's own question - IsFrameEditable).
@@ -3545,6 +3564,379 @@ bool KFCReplaceEngine::OutlineHits(const KFCRowsByChapter& rowsByChapter, PMStri
 	PMString leftWords;
 	AppendCountsByWhy(leftWords, counts, OutlineWords);
 	SayRowsWritten(outStatus, "Outlined", "matches", RowsDone(chapters), total, leftWords);
+	return true;
+}
+
+// ======================================================================================================
+// A TEXT ROW'S SPECIAL OPERATIONS > CLEAR OVERRIDES (docs/superpowers/specs/2026-10-30-kfc-next-overrides-restore-design.md
+// B2 - B7): Create Outlines' doors and step (OutlineHits, above) - the overrides of the matches taken off where they stand
+// (KFCTextOverrides::ClearOverrides). Only attributes change: no row moves, so none is carried.
+// ======================================================================================================
+
+namespace
+{
+
+// WHY A ROW IS NOT CLEARED - said in full for one row (ClearSentence), counted for several (ClearWords).
+enum ClearRefusal
+{
+	kClearOk = 0,
+	kClearNotText,		// an object row (its own is Clear Object Style Overrides - KFCObjectSpecial)
+	kClearOutlined,		// written as outlines: its match is inline outlines now, no text to clear
+	kClearEmpty,		// a match of no characters (GREP's ^, $)
+	kClearNoDoc,		// its document could not be found
+	kClearNotOpened,	// ...or not opened
+	kClearNotFollowed,	// its story changed in a way its foci could not follow
+	kClearEdited,		// its text has been edited since
+	kClearLocked,		// locked
+	kClearNone,			// InDesign calls its text not overridden: counted, not written (the spec's B3)
+	kClearRefusalCount
+};
+
+const char* ClearWords(ClearRefusal why)
+{
+	switch (why)
+	{
+		case kClearNotText:		return "not a text row";
+		case kClearOutlined:	return "outlined";
+		case kClearEmpty:		return "no characters";
+		case kClearNoDoc:		return "document not found";
+		case kClearNotOpened:	return "document not opened";
+		case kClearNotFollowed:	return "not followed";
+		case kClearEdited:		return "edited since";
+		case kClearLocked:		return "locked";
+		case kClearNone:		return "had no overrides";
+		default:				return "";
+	}
+}
+
+// One row's refusal, after "Clear Overrides: ".
+const char* ClearSentence(ClearRefusal why)
+{
+	switch (why)
+	{
+		case kClearNotText:		return "this row is not a text row.";
+		case kClearOutlined:	return "this row's match is outlines now - there is no text to clear.";
+		case kClearEmpty:		return "this row's match has no characters to clear.";
+		case kClearNoDoc:		return "the document of this row could not be found.";
+		case kClearNotOpened:	return "the document of this row could not be opened.";
+		case kClearNotFollowed:	return "the story of this row has changed in a way KohakuFindChange cannot follow - left as it is.";
+		case kClearEdited:		return "the text of this row has been edited since - left as it is.";
+		case kClearLocked:		return "the text is locked (a locked layer or story) - left as it is.";
+		case kClearNone:		return "the match has no overrides to clear - left as it is.";
+		default:				return "";
+	}
+}
+
+// A CLEAR OVERRIDES THAT CLEARED NOTHING: one row's reason in full (ClearSentence), several rows' counted by reason.
+void SayNoneCleared(PMString& out, size_t total, ClearRefusal oneWhy, const int32 (&counts)[kClearRefusalCount])
+{
+	out = "Clear Overrides: ";
+	if (total == 1)
+		out.Append(ClearSentence(oneWhy));
+	else
+	{
+		out.Append("none of the ");
+		out.AppendNumber(static_cast<int32>(total));
+		out.Append(" selected rows can be cleared - ");
+		AppendCountsByWhy(out, counts, ClearWords);
+		out.Append(".");
+	}
+	out.SetTranslatable(kFalse);
+}
+
+// CAN THE ROW BE CLEARED, BY THE ROW ALONE - asked in one place: the menu greys Clear Overrides by it
+// (CanClearOverridesHit), and ClearOverridesHits' first door counts a row by it. A text row not outlined, not locked, not
+// of zero width - one reason a row, in that order. (Overset text is cleared: nothing has to be composed - the spec's B3.)
+ClearRefusal ClearRowRefusal(int32 chapterIdx, int32 hitIdx)
+{
+	KFCResultModel::RowDisplay look;
+	bool replaced = false, locked = false;
+	UID story = kInvalidUID;
+	TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
+	uint64 hash = 0;
+	if (KFCResultModel::GetHitItem(chapterIdx, hitIdx) != kInvalidUID)
+		return kClearNotText;
+	if (!KFCResultModel::GetHitRow(chapterIdx, hitIdx, look) || look.outlined)
+		return kClearOutlined;
+	if (!KFCResultModel::GetHitFlags(chapterIdx, hitIdx, replaced, locked) || locked)
+		return kClearLocked;
+	if (!KFCResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, story, start, end, hash) || end <= start)
+		return kClearEmpty;
+	return kClearOk;
+}
+
+// One row to clear, as the doors found it.
+struct ClearRow
+{
+	int32			hit;
+	UID				story;
+	TextIndex		start;		// its match: [start, end)
+	TextIndex		end;
+	PMString		original;	// the characters there, read by the doors - checked again before the write
+	bool			done;
+	ClearRefusal	why;
+	ClearRow() : hit(-1), story(kInvalidUID), start(kInvalidTextIndex), end(kInvalidTextIndex), done(false), why(kClearOk) {}
+};
+
+// One document's rows in the write.
+struct ClearChapter
+{
+	int32					chapterIdx;
+	UIDRef					docRef;
+	std::vector<ClearRow>	rows;		// the rows that passed the doors
+	std::set<UID>			stories;	// their stories - the ones the write changes
+	int32					cleared;
+	ClearChapter() : chapterIdx(-1), cleared(0) {}
+};
+
+// THE OVERRIDES OF ONE DOCUMENT, inside the write's step: each row checked again just before its command - its characters
+// where the doors read them (nothing this write does moves text) - then cleared (KFCTextOverrides::ClearOverrides, which
+// writes nothing where InDesign calls the text not overridden: kClearNone, counted). The cleared rows marked
+// (MarkHitSpecial - "Cleared"). False = InDesign would not clear a match: the caller takes the step back.
+bool ClearInChapter(ClearChapter& chapter, int32 (&counts)[kClearRefusalCount])
+{
+	IDataBase* const db = chapter.docRef.GetDataBase();
+	if (db == nil)
+		return false;
+	for (size_t k = 0; k < chapter.rows.size(); ++k)
+	{
+		ClearRow& row = chapter.rows[k];
+		const UIDRef storyRef(db, row.story);
+		if (KFCSearchEngine::ReadText(storyRef, row.start, row.end - row.start) != row.original)
+		{
+			row.why = kClearEdited;
+			continue;
+		}
+		bool hadAny = false;
+		if (KFCTextOverrides::ClearOverrides(storyRef, row.start, row.end, hadAny) != kSuccess)
+			return false;
+		KFC_DIAG_LOG("CLEAROVERRIDES chapter=%d row=%d story=%u at=%d..%d hadAny=%d", chapter.chapterIdx, row.hit,
+			row.story.Get(), (int)row.start, (int)row.end, hadAny ? 1 : 0);
+		if (!hadAny)
+		{
+			row.why = kClearNone;
+			continue;
+		}
+		row.done = true;
+		row.why = kClearOk;
+		++chapter.cleared;
+	}
+	for (size_t k = 0; k < chapter.rows.size(); ++k)
+		if (!chapter.rows[k].done)
+			++counts[chapter.rows[k].why != kClearOk ? chapter.rows[k].why : kClearEdited];
+	for (size_t k = 0; k < chapter.rows.size(); ++k)
+		if (chapter.rows[k].done)
+			KFCResultModel::MarkHitSpecial(chapter.chapterIdx, chapter.rows[k].hit, kKFCSpecialClearTextOverrides);
+	return true;
+}
+
+}	// anonymous namespace
+
+bool KFCReplaceEngine::CanClearOverridesHit(int32 chapterIdx, int32 hitIdx)
+{
+	return ClearRowRefusal(chapterIdx, hitIdx) == kClearOk;
+}
+
+bool KFCReplaceEngine::ClearOverridesHits(const KFCRowsByChapter& rowsByChapter, PMString& outStatus)
+{
+	KFC_DIAG_WRITTEN_DOCS_CHECK("clear-overrides-rows");	// (test builds: after DocsAfterWrite, below - KFCDiagWrittenDocs.h)
+	outStatus.Clear();
+	outStatus.SetTranslatable(kFalse);
+	if (KFCRunGuard::IsAnyRunning())
+	{
+		outStatus.Append(KFCRunGuard::BusyMessage());
+		return false;
+	}
+	const KFCReplaceEngine::WriteUnderWay replacing;	// counted from the door to the hand-back (IsReplacing)
+	const size_t total = KFCRowCount(rowsByChapter);
+	if (total == 0)
+		return false;
+
+	// THE DOORS, ROW BY ROW - Create Outlines' (OutlineHits): nothing written yet. What each document is left as is
+	// DocsAfterWrite's, on every way out.
+	int32 counts[kClearRefusalCount] = {};
+	ClearRefusal lastWhy = kClearOk;
+	std::vector<ClearChapter> chapters;
+	KFCReplaceEngine::DocsAfterWrite docsAfter;
+	size_t toWrite = 0;
+	for (size_t c = 0; c < rowsByChapter.size(); ++c)
+	{
+		ClearChapter chapter;
+		chapter.chapterIdx = rowsByChapter[c].chapter;
+		// The row's own flags first: a chapter with nothing to clear is not opened.
+		std::vector<ClearRow> candidates;
+		const std::vector<int32>& hits = rowsByChapter[c].hits;
+		for (size_t k = 0; k < hits.size(); ++k)
+		{
+			ClearRow row;
+			row.hit = hits[k];
+			const ClearRefusal why = ClearRowRefusal(chapter.chapterIdx, row.hit);		// the menu's question
+			if (why != kClearOk)
+			{
+				++counts[why];
+				lastWhy = why;
+				continue;
+			}
+			candidates.push_back(row);
+		}
+		if (candidates.empty())
+			continue;
+		// Its document, by its file first: a closed chapter is reopened windowless and held, as a Replace reaches it.
+		IDFile file;
+		ClearRefusal docWhy = kClearOk;
+		if (!KFCResultModel::GetChapterLocation(chapter.chapterIdx, chapter.docRef, file))
+			docWhy = kClearNoDoc;
+		else if (!KFCBookScope::ReachChapterDoc(file, chapter.docRef))
+			docWhy = kClearNotOpened;
+		if (docWhy != kClearOk)
+		{
+			counts[docWhy] += static_cast<int32>(candidates.size());
+			lastWhy = docWhy;
+			continue;
+		}
+		KFCResultModel::RebindChapterDoc(chapter.chapterIdx, chapter.docRef);
+		IDataBase* const db = chapter.docRef.GetDataBase();
+		// THE ROWS OF EACH STORY FOLLOW THEIR FOCI FIRST (a Replace's way), once per story - then each row's place.
+		std::map<UID, KFCSearchEngine::FollowResult> followed;
+		FollowStoriesOf(chapter.chapterIdx, db, candidates, followed);
+		for (size_t k = 0; k < candidates.size(); ++k)
+		{
+			ClearRow& row = candidates[k];
+			const PlaceFollowed place = RowPlaceFollowed(chapter.chapterIdx, row.hit, db, followed, row.story,
+				row.start, row.end);
+			ClearRefusal why = kClearOk;
+			if (place == kPlaceNotFollowed)
+				why = kClearNotFollowed;
+			else if (place == kPlaceEdited)
+				why = kClearEdited;
+			// ITS TEXT AS THE ROW HOLDS IT: what its Replace wrote for a replaced row (a replaced row can be cleared - the
+			// spec's B4), the match as it was found for any other (RowReadsAsFound).
+			if (why == kClearOk)
+			{
+				bool replaced = false, locked = false;
+				PMString written;
+				const UIDRef storyRef(db, row.story);
+				if (KFCResultModel::GetHitFlags(chapter.chapterIdx, row.hit, replaced, locked) && replaced)
+				{
+					if (!KFCResultModel::GetHitWrittenText(chapter.chapterIdx, row.hit, written)
+						|| KFCSearchEngine::ReadText(storyRef, row.start, row.end - row.start) != written)
+						why = kClearEdited;
+				}
+				else if (!KFCSearchEngine::RowReadsAsFound(chapter.chapterIdx, row.hit, db))
+					why = kClearEdited;
+				if (why == kClearOk)
+				{
+					row.original = KFCSearchEngine::ReadText(storyRef, row.start, row.end - row.start);
+					row.original.SetTranslatable(kFalse);
+					if (!KFCSearchEngine::IsFrameEditable(storyRef, KFCSearchEngine::EditableFrameForMatch(storyRef, row.start)))
+						why = kClearLocked;
+				}
+			}
+			if (why != kClearOk)
+			{
+				++counts[why];
+				lastWhy = why;
+				continue;
+			}
+			chapter.rows.push_back(row);
+			chapter.stories.insert(row.story);
+		}
+		docsAfter.Reached(chapter.docRef, !chapter.rows.empty());
+		toWrite += chapter.rows.size();
+		if (!chapter.rows.empty())
+			chapters.push_back(chapter);
+	}
+	if (toWrite == 0)
+	{
+		SayNoneCleared(outStatus, total, lastWhy, counts);
+		return false;
+	}
+	// EVERY DOCUMENT TO WRITE STILL OPEN once the last is reached (a Replace's rule).
+	const bool acrossDocuments = chapters.size() > 1;
+	for (size_t c = 0; acrossDocuments && c < chapters.size(); ++c)
+	{
+		if (!KFCBookScope::IsDocStillOpen(chapters[c].docRef))
+		{
+			outStatus = "Clear Overrides: a document of the selected rows has been closed - nothing was changed.";
+			outStatus.SetTranslatable(kFalse);
+			return false;
+		}
+	}
+
+	// RECORDED FOR THE PANEL'S FOLLOWING OF UNDO (the spec's B5): one step for every document of it.
+	std::vector<int32> chapterIdxs;
+	for (size_t c = 0; c < chapters.size(); ++c)
+		chapterIdxs.push_back(chapters[c].chapterIdx);
+	KFCUndoFollow::StepRecorder recorder(chapterIdxs);
+	recorder.SetName("Clear Overrides");
+	bool ok = false;
+	bool failed = false;
+	int32 clearedRows = 0;
+	{
+		KFCReplaceEngine::WriteStep step;
+		if (!KFCReplaceEngine::BeginWriteStep(acrossDocuments, step, kKFCClearOverridesStepKey, "KFC Clear Overrides"))
+		{
+			outStatus = acrossDocuments ? "Clear Overrides: InDesign would not start an undoable step - nothing was changed."
+				: "Clear Overrides: InDesign would not start a command sequence - nothing was changed.";
+			outStatus.SetTranslatable(kFalse);
+			return false;
+		}
+		for (size_t c = 0; c < chapters.size() && !failed; ++c)
+		{
+			if (!ClearInChapter(chapters[c], counts))
+				failed = true;
+			clearedRows += chapters[c].cleared;
+		}
+		// THE ERROR STATE AT THE END (a Replace's rule): anything standing here is a failure nothing reported.
+		ok = !failed && clearedRows > 0 && ErrorUtils::PMGetGlobalErrorCode() == kSuccess;
+		if (ok)
+			for (size_t c = 0; c < chapters.size(); ++c)
+				if (chapters[c].cleared > 0)
+					KFCUndoFollow::MarkWrite(chapters[c].docRef.GetDataBase());	// in this step, so its Undo / Redo is heard
+		// THE STORIES' FOCI ON THE ROWS, IN THIS STEP (the row-focus plan's D7 - as every write from the list).
+		if (ok)
+			for (size_t c = 0; c < chapters.size(); ++c)
+				for (std::set<UID>::const_iterator s = chapters[c].stories.begin(); s != chapters[c].stories.end(); ++s)
+					KFCRowFoci::ReanchorStory(chapters[c].chapterIdx, *s, true);
+		KFCReplaceEngine::EndWriteStep(step, ok);
+	}
+	if (!ok)
+	{
+		KFCResultModel::RollBackRows();
+		for (size_t c = 0; c < chapters.size(); ++c)
+			for (std::set<UID>::const_iterator s = chapters[c].stories.begin(); s != chapters[c].stories.end(); ++s)
+				KFCRowFoci::ReanchorStory(chapters[c].chapterIdx, *s);
+		if (failed)
+		{
+			outStatus = "Clear Overrides: InDesign would not clear a match's overrides - nothing was changed.";
+			outStatus.SetTranslatable(kFalse);
+			return false;
+		}
+		// No row was cleared - each one's reason from the step (several are counted): "had no overrides", edited since.
+		ClearRefusal why = kClearNone;
+		for (size_t c = 0; c < chapters.size(); ++c)
+			for (size_t k = 0; k < chapters[c].rows.size(); ++k)
+				if (chapters[c].rows[k].why != kClearOk)
+					why = chapters[c].rows[k].why;
+		SayNoneCleared(outStatus, total, why, counts);
+		return false;
+	}
+	for (size_t c = 0; c < chapters.size(); ++c)
+		NoteStoryVersions(chapters[c].chapterIdx, chapters[c].docRef.GetDataBase(), chapters[c].stories);	// as KFC left them
+	recorder.Keep();
+	for (size_t c = 0; c < chapters.size(); ++c)
+	{
+		if (chapters[c].cleared == 0)
+			continue;
+		docsAfter.Wrote(chapters[c].docRef);
+		KFC_DIAG_NOTE_WRITE(chapters[c].docRef);
+	}
+
+	// WHAT IT DID (the spec's B7 - SayRowsWritten): "Cleared overrides on ID:262 #3." /
+	// "Cleared overrides on 2 of 3 matches: ID:262 #1, ID:262 #3. Left as they were: 1 had no overrides."
+	PMString leftWords;
+	AppendCountsByWhy(leftWords, counts, ClearWords);
+	SayRowsWritten(outStatus, "Cleared overrides on", "matches", RowsDone(chapters), total, leftWords);
 	return true;
 }
 

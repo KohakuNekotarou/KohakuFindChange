@@ -174,6 +174,8 @@ namespace
 			return false;
 		}
 		virtual void FindChangeTabAndScope(int32& outMode, int32& outScope) { outMode = -1; outScope = -1; }
+		virtual bool ClearOverridesRows(const KFCRowsByChapter&, PMString& outStatus) { SayWhy(outStatus); return false; }
+		virtual bool CanClearOverridesHit(int32, int32) { return false; }
 	};
 
 	class KFCChaptersStandInImpl : public IKFCChapters

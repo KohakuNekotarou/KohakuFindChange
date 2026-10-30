@@ -466,6 +466,17 @@ DECLARE_PMID(kActionIDSpace, kKFCNarrowOnLayerActionID, kKFCUIPrefix + 106)
 // heading's item - the text inside a tier of objects searched with Find/Change's query, into a new tier
 // (KFCResultHistory::SearchTextInObjects). + 107.
 DECLARE_PMID(kActionIDSpace, kKFCSearchTextInObjectsActionID, kKFCUIPrefix + 107)
+// NEXT RESULT / PREVIOUS RESULT (docs/superpowers/specs/2026-10-30-kfc-next-overrides-restore-design.md A): the panel
+// menu's - the live tier's next / previous hit row selected and landed on, as an arrow key in the list lands, from
+// wherever the keyboard is (KFCResultStep). + 108, + 109.
+DECLARE_PMID(kActionIDSpace, kKFCNextResultActionID, kKFCUIPrefix + 108)
+DECLARE_PMID(kActionIDSpace, kKFCPreviousResultActionID, kKFCUIPrefix + 109)
+// NARROW DOWN > WITH OVERRIDES (the next-overrides-restore spec's B1): a text tier's rows kept to the matches whose text
+// InDesign calls overridden (KFCTextOverrides::HasOverrides, the model's). + 110.
+DECLARE_PMID(kActionIDSpace, kKFCNarrowWithOverridesActionID, kKFCUIPrefix + 110)
+// SPECIAL OPERATIONS > CLEAR OVERRIDES (the spec's B2): a TEXT row's - the overrides of its match taken off, as the paragraph
+// styles panel's Clear Overrides takes them off a selection (KFCReplaceEngine::ClearOverridesHits). + 111.
+DECLARE_PMID(kActionIDSpace, kKFCClearTextOverridesActionID, kKFCUIPrefix + 111)
 
 
 // WidgetIDs:
@@ -626,11 +637,17 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQRTabNoteWidgetID, kKFCUIPrefix + 62)
 #define kKFCNarrowOnPasteboardMenuKey	kKFCStringPrefix "kKFCNarrowOnPasteboardMenuKey"
 #define kKFCNarrowFramesMenuKey			kKFCStringPrefix "kKFCNarrowFramesMenuKey"
 #define kKFCNarrowOnLayerMenuKey		kKFCStringPrefix "kKFCNarrowOnLayerMenuKey"		// "On Active Layer"
+// ...With Overrides, and a text row's Special Operations > Clear Overrides (measured against every other key - key_collisions.py).
+#define kKFCNarrowWithOverridesMenuKey	kKFCStringPrefix "kKFCNarrowWithOverridesMenuKey"	// "With Overrides"
+#define kKFCClearTextOverridesMenuKey	kKFCStringPrefix "kKFCClearTextOverridesMenuKey"	// "Clear Overrides"
 // ...and Copy Results: the panel menu's, a row's Copy Rows, a tier heading's Copy These Results (measured against every
 // other key - key_collisions.py).
 #define kKFCCopyResultsMenuKey			kKFCStringPrefix "kKFCCopyResultsMenuKey"
 #define kKFCCopyRowsMenuKey				kKFCStringPrefix "kKFCCopyRowsMenuKey"
 #define kKFCCopyTierResultsMenuKey		kKFCStringPrefix "kKFCCopyTierResultsMenuKey"
+// ...and Next Result / Previous Result - the panel menu's (measured against every other key - key_collisions.py).
+#define kKFCNextResultMenuKey			kKFCStringPrefix "kKFCNextResultMenuKey"
+#define kKFCPreviousResultMenuKey		kKFCStringPrefix "kKFCPreviousResultMenuKey"
 // ...and an object row's other Special Operations - InDesign's own English command names ("Degrees" for the degree sign: the
 // string table is ASCII) (measured against every other key - key_collisions.py).
 #define kKFCFillFramePropMenuKey			kKFCStringPrefix "kKFCFillFramePropMenuKey"
@@ -815,6 +832,10 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQRTabNoteWidgetID, kKFCUIPrefix + 62)
 // Open Find/Change... leads the block: open the dialog, type the query, then search.
 #define kKFCOpenFindChangeMenuItemPosition	0.5
 #define kKFCSearchBookMenuItemPosition		1.0
+// Next Result / Previous Result under the search, no rule between: the live tier's next / previous hit row, the keys
+// assignable (the next-overrides-restore spec's A1).
+#define kKFCNextResultMenuItemPosition		1.05
+#define kKFCPreviousResultMenuItemPosition	1.07
 // Change All in Book (No List) under Find, then Clear Results (the spec's section 4).
 #define kKFCChangeAllMenuItemPosition		1.1
 #define kKFCClearResultsMenuItemPosition	1.25
@@ -885,9 +906,11 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQRTabNoteWidgetID, kKFCUIPrefix + 62)
 #define kKFCNarrowOnLayerMenuItemPosition		5.0		// On Active Layer
 #define kKFCNarrowOnPasteboardMenuItemPosition	6.0		// On Pasteboard
 #define kKFCNarrowPagesMenuItemPosition			7.0		// Pages...
-// Special Operations, in abc order (an object row's whole; a text row's holds Create Outlines alone).
+#define kKFCNarrowWithOverridesMenuItemPosition	8.0		// With Overrides
+// Special Operations, in abc order (an object row's whole; a text row's holds Clear Overrides and Create Outlines).
 #define kKFCArrangeSubmenuPosition				1.0		// Arrange >
 #define kKFCClearStyleOverridesMenuItemPosition	2.0		// Clear Object Style Overrides
+#define kKFCClearTextOverridesMenuItemPosition	2.0		// Clear Overrides (a text row's menu - its own path, so no clash with the 2.0 above)
 #define kKFCCreateOutlinesMenuItemPosition		3.0		// Create Outlines
 #define kKFCDeleteMenuItemPosition				4.0		// Delete
 #define kKFCFittingSubmenuPosition				5.0		// Fitting >

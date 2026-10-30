@@ -16,6 +16,7 @@
 #include "IDataExchangeController.h"
 #include "ITextModel.h"
 #include "ITextModelCmds.h"		// DeleteCmd - a copy with no text put back
+#include "ITextStoryThread.h"	// GetDictUID - a thread's owner (CopyableThread)
 #include "ITextUtils.h"			// CreateNewStory, QueryCopyStoryToEndCommand, QueryCopyStoryCommand
 
 // General includes:
@@ -26,7 +27,10 @@
 #include "ErrorUtils.h"
 #include "FileUtils.h"			// IsEqual - a reopened chapter's store found by its file
 #include "IDFile.h"
+#include "PersistUtils.h"		// ::GetDataBase - a text model's database (CopyableThread)
 #include "RangeData.h"			// StoryRange
+#include "TablesID.h"			// kTableModelBoss - a table's cells are threads of its model (CopyableThread)
+#include "TextID.h"				// kFootnoteReferenceBoss - a footnote's text a thread of its reference
 #include "Utils.h"
 
 #include <map>
@@ -196,6 +200,34 @@ int32 PrimaryLength(const UIDRef& story)
 }
 }	// anonymous namespace
 
+bool KFCCopyStore::CopyableThread(ITextModel* model, TextIndex at, TextIndex& outFirst, TextIndex& outLast)
+{
+	if (model == nil || at < 0 || at >= model->TotalLength())
+		return false;
+	TextIndex first = kInvalidTextIndex;
+	int32 span = 0;
+	InterfacePtr<ITextStoryThread> thread(model->QueryStoryThread(at, &first, &span));
+	if (thread == nil || first < 0 || span <= 0)
+		return false;
+	// THE STORY'S OWN TEXT - its primary thread, from 0 - or A TABLE CELL'S OR A FOOTNOTE'S: the thread's owner
+	// (KFCNarrow::ReadTextPlace's reading - a table's cells are threads of its table model, a footnote's text a thread of
+	// its reference). Those three were measured in KT (2026-10-24: a nested table's cell too - copied and put back, every
+	// character and attribute the same, the threads' order unchanged); a note's thread was not, and is not one.
+	bool copyable = (first == 0);
+	if (!copyable)
+	{
+		IDataBase* const db = ::GetDataBase(model);
+		const UID dict = thread->GetDictUID();
+		const ClassID owner = (db != nil && dict != kInvalidUID && db->IsValidUID(dict)) ? db->GetClass(dict) : kInvalidClass;
+		copyable = (owner == kTableModelBoss || owner == kFootnoteReferenceBoss);
+	}
+	if (!copyable)
+		return false;
+	outFirst = first;
+	outLast = first + span - 1;		// its closing character - a copy stops short of it
+	return true;
+}
+
 bool KFCCopyStore::Take(const UIDRef& story, TextIndex start, TextIndex end, CopyRef& outCopy)
 {
 	outCopy = CopyRef();
@@ -212,10 +244,11 @@ bool KFCCopyStore::Take(const UIDRef& story, TextIndex start, TextIndex end, Cop
 		return false;
 	}
 #endif
-	// THE RANGE MUST LIE IN THE STORY'S PRIMARY THREAD: the copy command checks nothing - [1, 2) of an empty story, and
-	// a range run into a table cell's thread, crashed InDesign in KT.
-	const int32 span = PrimaryLength(story);
-	if (span < 0 || start < 0 || end < start || end > span)
+	// THE RANGE MUST LIE IN ONE THREAD, short of its closing character (CopyableThread): the copy command checks nothing -
+	// [1, 2) of an empty story, and a range run from the story's text into a table cell's thread, crashed InDesign in KT.
+	InterfacePtr<ITextModel> model(story, UseDefaultIID());
+	TextIndex first = kInvalidTextIndex, last = kInvalidTextIndex;
+	if (start < 0 || end < start || !CopyableThread(model, start, first, last) || end > last)
 		return false;
 	const uint32 number = StoreFor(db);
 	IDataBase* const sdb = StoreDB(number);
@@ -257,12 +290,13 @@ bool KFCCopyStore::PasteOver(const CopyRef& copy, const UIDRef& story, TextIndex
 {
 	const int32 len = Length(copy);
 	InterfacePtr<ITextModel> model(story, UseDefaultIID());
-	// The same check as the copy's: the commands check nothing.
-	const int32 span = (model != nil) ? model->GetPrimaryStoryThreadSpan() - 1 : -1;
-	if (len < 0 || span < 0 || start < 0 || end < start || end > span || ErrorUtils::PMGetGlobalErrorCode() != kSuccess)
+	// The same check as the copy's (one thread, short of its closing character): the commands check nothing.
+	TextIndex first = kInvalidTextIndex, last = kInvalidTextIndex;
+	const bool inThread = start >= 0 && end >= start && CopyableThread(model, start, first, last) && end <= last;
+	if (len < 0 || !inThread || ErrorUtils::PMGetGlobalErrorCode() != kSuccess)
 	{
-		KFC_DIAG_LOG("COPY paste refused store=%u copy=%u len=%d story=%u at=%d over=%d span=%d", (unsigned)copy.store,
-			copy.story.Get(), (int)len, story.GetUID().Get(), (int)start, (int)(end - start), (int)span);
+		KFC_DIAG_LOG("COPY paste refused store=%u copy=%u len=%d story=%u at=%d over=%d thread=%d..%d", (unsigned)copy.store,
+			copy.story.Get(), (int)len, story.GetUID().Get(), (int)start, (int)(end - start), (int)first, (int)last);
 		return false;
 	}
 	ErrorCode result = kSuccess;

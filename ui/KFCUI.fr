@@ -657,6 +657,18 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCSearchBookMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// Next Result / Previous Result (the next-overrides-restore spec's A1): the live tier's next / previous hit row
+		// selected and landed on, as the list's arrow keys land (KFCResultStep) - with a key of the person's own, from the text.
+		kKFCNextResultActionID,
+		kKFCTargetMenuPath
+		kKFCNextResultMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCPreviousResultActionID,
+		kKFCTargetMenuPath
+		kKFCPreviousResultMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 		// Change All in Book (No List): InDesign's own Change All over the book's chapters, no list (KFCChangeAll).
 		// Greyed with Book Scope off (F18 - a document's Change All is InDesign's own dialog's).
 		kKFCChangeAllActionID,
@@ -815,6 +827,15 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCCreateOutlinesMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// ...and Clear Overrides (docs/superpowers/specs/2026-10-30-kfc-next-overrides-restore-design.md B2): the overrides of
+		// the row's match - or the rows' selected together - taken off, as the paragraph styles panel's Clear Overrides takes
+		// them off a selection (KFCReplaceEngine::ClearOverridesHits). A text row's alone (an object row has Clear Object
+		// Style Overrides). Above Create Outlines - the abc order.
+		kKFCClearTextOverridesActionID,
+		kKFCHitSpecialOpsSubmenuPath
+		kKFCClearTextOverridesMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 		// ----- A story row's right-click menu -----
 		// Popped by KFCResultNodeEH::RButtonDn over a story row: Search This Story Again walks that story alone with
 		// the search's query and puts its rows back (KFCSearchEngine::SearchStoryAgain).
@@ -928,6 +949,13 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCNarrowOnLayerActionID,
 		kKFCNarrowDownSubmenuPath
 		kKFCNarrowOnLayerMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		// With Overrides (the next-overrides-restore spec's B1): the tier's rows kept to the matches whose text InDesign calls
+		// overridden (KFCNarrow - KFCTextOverrides::HasOverrides). Last in the abc order.
+		kKFCNarrowWithOverridesActionID,
+		kKFCNarrowDownSubmenuPath
+		kKFCNarrowWithOverridesMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// ----- Clear from Results: the hit, object, story and document rows' menus (docs/superpowers/specs/2026-10-18-kfc-clear-from-results-design.md K2) -----
@@ -1223,6 +1251,27 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKFCActionComponentBoss,
 		kKFCSearchBookActionID,
 		kKFCSearchBookMenuKey,			// "Search" (renamed at run time to carry the scope)
+		kKFCPanelMenuActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefVisibleInKBSCEditorFlag,
+
+		// Next Result / Previous Result (the next-overrides-restore spec's A1): in the Keyboard Shortcuts editor under Palette
+		// Menus, as Find is - no shortcut of their own (the person picks one). kCustomEnabling: grey with no hit row in the
+		// live tier, or the panel closed (KFCResultStep::CanStep - the spec's A6).
+		kKFCActionComponentBoss,
+		kKFCNextResultActionID,
+		kKFCNextResultMenuKey,			// "Next Result"
+		kKFCPanelMenuActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefVisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCPreviousResultActionID,
+		kKFCPreviousResultMenuKey,		// "Previous Result"
 		kKFCPanelMenuActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
@@ -1816,6 +1865,28 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKFCActionComponentBoss,
 		kKFCNarrowOnLayerActionID,
 		kKFCNarrowOnLayerMenuKey,	// "On Active Layer"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// With Overrides (the next-overrides-restore spec's B1). kCustomEnabling: greyed over a tier of object rows (a text-only
+		// condition - NarrowIsTextOnly), kept on the menu.
+		kKFCActionComponentBoss,
+		kKFCNarrowWithOverridesActionID,
+		kKFCNarrowWithOverridesMenuKey,	// "With Overrides"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// Clear Overrides - a text row's Special Operations (the spec's B2). kCustomEnabling: grey when none of the rows can be
+		// written (CanClearOverridesAny - their doors, read only).
+		kKFCActionComponentBoss,
+		kKFCClearTextOverridesActionID,
+		kKFCClearTextOverridesMenuKey,	// "Clear Overrides"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,

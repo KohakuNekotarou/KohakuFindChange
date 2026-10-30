@@ -19,6 +19,7 @@
   2026-10-17 夜から**物の行のほかの特殊操作**（OBJ-20＝Fitting・Arrange・Transform・Lock／Unlock・Hide／Show・Move to Active Layer・Clear Object Style Overrides・Delete）も ―― 物の指紋の前・後で見分ける（Delete は Create Outlines と同じく「物がまた無くなったか」）。**Arrange だけは指紋が動かない**（重なり順は物でなく親が持つ）ので、その段に限って物の**重なりの位置**（親の子の中の何番目か）の前・後も見る。メッセージ欄は `Undo: <操作名> - the rows are back as they were before it.`（例 `Undo: Send to Back - ...`）。文書をまたいだ1段（ブックの章）は、どちらの章の Ctrl+Z でも本体が両方を戻し、行も全部戻る（2026-10-17 実測）。
   2026-10-17 から**文字の行の Restore from Copy**（REP-38・最初の名前 Restore Original）も ―― 取り消すと行は `Changed` に戻り（写しの印も戻る＝もう一度戻せる）、やり直すと戻した姿。メッセージ欄は `Undo: Restore from Copy - the rows are back as they were before it.`／`Redo: Restore from Copy - ...`。
   2026-10-18 から**文字の行の Create Outlines**（REP-39）も ―― 1つの段（文書をまたいでも1段）。取り消すと行は書く前に戻り、やり直すと `Outlined`（2026-10-18 実測＝置換していない行で。⬜置換済みの行をアウトラインにした段の取り消しは未測）。
+  2026-10-30 から**文字の行の Clear Overrides**（REP-40）も ―― 1つの段（文書をまたいでも1段・Edit メニューの名前 `Clear Overrides`）。取り消すと上書きが戻り、行の `Cleared` と目玉が外れる。やり直すとまた `Cleared`（回帰 `overrides-clear-undo`）。
   **一覧から行を外す**（Clear from Results・Ctrl+Return＝ROW-47）と **Narrow Down**（ROW-46）は文書を変えないので、取り消しの段にならない＝外した行は取り消しでもやり直しでも戻らない。
   Change All in Book (No List) は一覧が無いときだけ走り、一覧を作らないので、追いかけるものが無い（文書は Ctrl+Z で戻る）。
   （Change Checked・ストーリーと文書の行の Replace・Replace Again・Reject Change・Accept Change・Accept All Changes by KohakuFindChange は 2026-10-06 に外した。）

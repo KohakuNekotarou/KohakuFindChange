@@ -151,6 +151,19 @@ namespace KFCReplaceEngine
 	    document can tell is said when it is pressed. */
 	bool CanOutlineHit(int32 chapterIdx, int32 hitIdx);
 
+	/** A TEXT ROW'S SPECIAL OPERATIONS > CLEAR OVERRIDES (docs/superpowers/specs/2026-10-30-kfc-next-overrides-restore-design.md
+	    B2 - B7): the overrides of the rows' matches taken off as the paragraph styles panel's Clear Overrides takes them off a
+	    selection - the characters' own and their paragraphs' (KFCTextOverrides::ClearOverrides) - each checked again just
+	    before it is written; a match InDesign calls not overridden is counted, not written ("had no overrides"). The text does
+	    not move: no row is carried. ONE undo step ("Clear Overrides"), KFC's mark in it: the panel follows its Ctrl+Z and
+	    Redo. Each written row marked (KFCResultModel::MarkHitSpecial - "Cleared"). Refused rows counted by why (Create
+	    Outlines' doors - overset text is cleared: nothing has to be composed). True = something written; outStatus says what. */
+	bool ClearOverridesHits(const KFCRowsByChapter& rows, PMString& outStatus);
+
+	/** Can Clear Overrides be offered on a text row - a text row, not outlined, not locked, not zero-width? Read off the row
+	    alone (nothing opened, no override read): the menu greys the item by it (the spec's B6). */
+	bool CanClearOverridesHit(int32 chapterIdx, int32 hitIdx);
+
 	/** ONE UNDO STEP FOR A WRITE FROM THE LIST, the one rule for every such write - its callers are the list (a row's
 	    Replace of text or object rows, Restore from Copy, Create Outlines, the Special Operations), each naming its
 	    step by stepKey ("Replace" - kKFCReplaceStepKey - by default):

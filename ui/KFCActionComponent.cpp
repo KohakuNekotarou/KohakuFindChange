@@ -53,6 +53,7 @@
 #include "KFCQueryDialog.h"		// "Run Saved Queries..." - the query dialog
 #include "KFCSpecialDialogs.h"	// Move... / Scale... / Rotate... / Shear... - their values asked first
 #include "KFCCopyResults.h"		// Copy Results / Copy Rows / Copy These Results - the rows as text on the clipboard
+#include "KFCResultStep.h"		// Next Result / Previous Result - the live tier's next / previous hit row landed on
 #include "KFCDiagHiddenDocs.h"		// the hidden-document check after an action - test builds only
 #include "KFCDiag.h"				// KFC_DIAG_LOG - test builds only (the menu states asked for inside a landing)
 
@@ -306,6 +307,7 @@ const struct NarrowAction
 	{ kKFCNarrowOnPasteboardActionID, kKFCNarrowOnPasteboard },
 	{ kKFCNarrowFramesActionID, kKFCNarrowFrames },
 	{ kKFCNarrowOnLayerActionID, kKFCNarrowOnLayer },		// On Active Layer (Find Objects on Active Layer moved here)
+	{ kKFCNarrowWithOverridesActionID, kKFCNarrowWithOverrides },	// With Overrides (the next-overrides-restore spec's B1)
 };
 
 bool ActiveLayerName(IActiveContext* ac, PMString& outName);	// (below - Move to Active Layer's reading, On Active Layer's too)
@@ -319,13 +321,13 @@ int32 NarrowKindOf(const ActionID& action)
 	return kKFCNarrowNone;
 }
 
-// Is it a condition only a text row can meet (In Tables, In Footnotes, In Endnotes, Frames of These Matches - the
-// narrow-down spec's N2: greyed over a tier of object rows, kept on the menu)? (The model's own question is
+// Is it a condition only a text row can meet (In Tables, In Footnotes, In Endnotes, Frames of These Matches, With
+// Overrides - the narrow-down spec's N2: greyed over a tier of object rows, kept on the menu)? (The model's own question is
 // KFCNarrow::IsTextOnly - the UI half does not link the model's code.)
 bool NarrowIsTextOnly(int32 kind)
 {
 	return kind == kKFCNarrowInTables || kind == kKFCNarrowInFootnotes || kind == kKFCNarrowInEndnotes
-		|| kind == kKFCNarrowFrames;
+		|| kind == kKFCNarrowFrames || kind == kKFCNarrowWithOverrides;
 }
 
 // A TIER HEADING'S NARROW DOWN: the tier right-clicked - a grey one switched to first, as Search These Results Again
@@ -746,6 +748,18 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			break;
 		}
 
+		case kKFCClearTextOverridesActionID:
+		{
+			// A TEXT row's Special Operations > Clear Overrides (docs/superpowers/specs/2026-10-30-kfc-next-overrides-restore-design.md
+			// B2): the row it was popped over - or the rows selected together, when it is one of them (RowsOfRightClick, as
+			// Replace) - their matches' overrides taken off where they stand (KFCResultTree::ClearOverridesRows). No hit row
+			// (the action pressed by its ActionID): do nothing.
+			int32 chapter = -1, hit = -1;
+			if (RightClickedHit(widget, chapter, hit))
+				(void)KFCResultTree::ClearOverridesRows(KFCResultTree::RowsOfRightClick(chapter, hit));
+			break;
+		}
+
 		case kKFCRestoreOriginalActionID:
 		{
 			// A TEXT row's Restore from Copy (docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md): the
@@ -766,6 +780,16 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			KFCRowsByChapter rows;
 			if (ClearTargetRows(widget, rows))
 				(void)KFCResultTree::ClearRows(rows);
+			break;
+		}
+
+		case kKFCNextResultActionID:
+		case kKFCPreviousResultActionID:
+		{
+			// Next Result / Previous Result (docs/superpowers/specs/2026-10-30-kfc-next-overrides-restore-design.md A): the
+			// live tier's next / previous hit row selected and landed on, from wherever the keyboard is (KFCResultStep - grey
+			// when no step can be taken, below). Nothing to undo: it selects.
+			(void)KFCResultStep::Step(actionID == kKFCNextResultActionID);
 			break;
 		}
 
@@ -1129,6 +1153,17 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 				break;
 			}
+			case kKFCClearTextOverridesActionID:
+			{
+				// A text row's menu: Clear Overrides while the row - or one of the rows selected together with it - can take it
+				// (CanClearOverridesAny - its doors, read only: the spec's B6; a run standing greys everything, above). Whether
+				// a match has overrides at all is read when it is pressed - a row with none is counted then, not greyed now.
+				int32 chapter = -1, hit = -1;
+				const bool enable = RightClickedHit(widget, chapter, hit)
+					&& KFCResultTree::CanClearOverridesAny(KFCResultTree::RowsOfRightClick(chapter, hit));
+				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
+				break;
+			}
 			case kKFCRestoreOriginalActionID:
 			{
 				// A text row's menu: Restore from Copy while the row - or one of the rows selected together with it -
@@ -1147,6 +1182,15 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 				// run standing greys everything, above) - a document row Search This Document Again left at (0/0) has none.
 				KFCRowsByChapter rows;
 				const bool enable = ClearTargetRows(widget, rows);
+				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
+				break;
+			}
+			case kKFCNextResultActionID:
+			case kKFCPreviousResultActionID:
+			{
+				// The panel menu's Next / Previous Result: while the panel is open and the live tier has a hit row to land on
+				// (KFCResultStep::CanStep - the spec's A6; a run standing greys everything, above).
+				const bool enable = KFCResultStep::CanStep();
 				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 				break;
 			}

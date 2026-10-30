@@ -263,6 +263,16 @@ namespace KFCResultTree
 	    read only)? The question the object row menu greys it by (the author's call). */
 	bool CanOutlineAny(const KFCRowsByChapter& rows);
 
+	/** A TEXT ROW'S SPECIAL OPERATIONS > CLEAR OVERRIDES (docs/superpowers/specs/2026-10-30-kfc-next-overrides-restore-design.md
+	    B2): the overrides of the rows' matches taken off where they stand, by the model (KFCRuns()->ClearOverridesRows,
+	    KFCReplaceEngine::ClearOverridesHits), with no landing: nothing is brought forward. The rows drawn again - each one
+	    written reads "Cleared" - and the status line. Not under a landing or a run. True = written. */
+	bool ClearOverridesRows(const KFCRowsByChapter& rows);
+
+	/** Can Clear Overrides be offered on these rows - can any of them take it (KFCRuns()->CanClearOverridesHit - its doors,
+	    read only)? The question the text row menu greys it by (the spec's B6). */
+	bool CanClearOverridesAny(const KFCRowsByChapter& rows);
+
 	/** AN OBJECT ROW'S OTHER SPECIAL OPERATIONS (docs/superpowers/specs/2026-10-17-kfc-object-special-operations-design.md):
 	    the rows' objects written where they stand - across spreads and documents - by InDesign's own Object menu commands
 	    (op, a KFCSpecialOp, with params - Move to Active Layer's layer name), by the model (KFCRuns()->SpecialRows,

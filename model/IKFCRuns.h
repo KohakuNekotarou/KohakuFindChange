@@ -179,6 +179,13 @@ public:
 	/** = KFCSearchEngine::FindChangeMode and FindChangeScope (appended - the QR Code tab): InDesign's OWN tab and its
 	    Search:, never the QR Code tab's - what a QR code Find Next's landing keeps (KFCJump). -1 for what cannot be read. */
 	virtual void FindChangeTabAndScope(int32& outMode, int32& outScope) = 0;
+	/** = KFCReplaceEngine::ClearOverridesHits (appended - docs/superpowers/specs/2026-10-30-kfc-next-overrides-restore-design.md
+	    B2) - a text row's Special Operations > Clear Overrides: the rows' matches' overrides taken off in one undoable step.
+	    True = something written; outStatus says what. */
+	virtual bool ClearOverridesRows(const KFCRowsByChapter& rows, PMString& outStatus) = 0;
+	/** = KFCReplaceEngine::CanClearOverridesHit (appended) - can Clear Overrides be offered on the row, read off the row
+	    alone (the menu's grey - the spec's B6). */
+	virtual bool CanClearOverridesHit(int32 chapterIdx, int32 hitIdx) = 0;
 };
 
 #endif // __IKFCRuns_h__

@@ -193,6 +193,9 @@ DECLARE_PMID(kImplementationIDSpace, kKFCCopyStoreImpl, kKFCPrefix + 47)
 #define kKFCCreateOutlinesStepKey	kKFCStringPrefix "kKFCCreateOutlinesStepKey"
 // The Edit menu's name of a text row's Restore from Copy step (KFCReplaceEngine::RestoreHits - the copies put back).
 #define kKFCRestoreOriginalStepKey	kKFCStringPrefix "kKFCRestoreOriginalStepKey"
+// The Edit menu's name of a text row's Clear Overrides step (KFCReplaceEngine::ClearOverridesHits - the next-overrides-restore
+// spec's B5; measured against every other key - key_collisions.py).
+#define kKFCClearOverridesStepKey	kKFCStringPrefix "kKFCClearOverridesStepKey"
 // The Edit menu's names of an object row's other Special Operations (KFCObjectSpecial - one per KFCSpecialOp, InDesign's
 // own English command names; "Degrees" for the degree sign, the string table being ASCII).
 #define kKFCFillFramePropStepKey			kKFCStringPrefix "kKFCFillFramePropStepKey"
