@@ -436,6 +436,11 @@ namespace KFCResultModel
 	/** Is the list A TABLE LIST - KFC's Table tab's (KFCTableSearch: its search mode kKFCTableSearchMode)? Text rows standing on each
 	    table's character. Its Replace is a table style's (KFCReplaceEngine); it is not narrowed (the table tab spec's T11). */
 	bool ListIsTables();
+	/** Is the list A RUBY LIST - KFC's Ruby tab's (KFCRubySearch: its search mode kKFCRubySearchMode)? Text rows on each ruby's run. */
+	bool ListIsRuby();
+	/** IS THE LIST ONE OF A TAB OF KFC'S THAT HAS A CHANGE SIDE - Table, Ruby? Its rows are text rows standing for something no text row's other write means anything to: a
+	    Replace is that tab's (KFCReplaceEngine's WriteOwnTabRows), and the list is not narrowed. */
+	bool ListHasOwnChangeTab();
 	/** Is the list a FRAMES OF THESE MATCHES list - object rows found by a text search, not by the Object tab's (its
 	    Replace writes with the Object tab's Change Object Format alone - KFCObjectReplace, the narrow-down
 	    spec's N6)? */
@@ -812,9 +817,9 @@ namespace KFCResultModel
 	    MarkHitRestored). Backed up first, as every change a write makes, so an Undo takes the mark off again. */
 	void MarkHitSpecial(int32 chapterIdx, int32 hitIdx, int32 op);
 
-	/** A TABLE ROW ITS REPLACE WROTE (the table tab spec's T9): MarkHitSpecial's marks (kKFCSpecialTableStyle - the row reads "Styled"), and
-	    what it draws for its table as the write left it (Hit::runChain). Backed up first, so an Undo puts both back. */
-	void MarkHitTableStyled(int32 chapterIdx, int32 hitIdx, const PMString& words);
+	/** A ROW ITS OWN TAB'S REPLACE WROTE (the table tab spec's T9, the ruby tab spec's R8): MarkHitSpecial's marks (op - its word), and what it draws as the write left it
+	    (Hit::runChain - empty: its own text). Backed up first, so an Undo puts both back. */
+	void MarkHitOwnChange(int32 chapterIdx, int32 hitIdx, int32 op, const PMString& words);
 
 	/** A chapter's document binding and file. The replace pass works chapter at a time, so it
 	    needs this without going through a hit. false = index out of range. */

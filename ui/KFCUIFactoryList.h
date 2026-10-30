@@ -106,3 +106,7 @@ REGISTER_PMINTERFACE(KFCQRTabController, kKFCQRTabControllerImpl)
 REGISTER_PMINTERFACE(KFCTableTabPanelCreator, kKFCTableTabPanelCreatorImpl)
 REGISTER_PMINTERFACE(KFCTableTabObserver, kKFCTableTabObserverImpl)
 REGISTER_PMINTERFACE(KFCTableTabController, kKFCTableTabControllerImpl)
+// The Ruby tab's face in the same dialog (KFCRubyTab.cpp).
+REGISTER_PMINTERFACE(KFCRubyTabPanelCreator, kKFCRubyTabPanelCreatorImpl)
+REGISTER_PMINTERFACE(KFCRubyTabObserver, kKFCRubyTabObserverImpl)
+REGISTER_PMINTERFACE(KFCRubyTabController, kKFCRubyTabControllerImpl)

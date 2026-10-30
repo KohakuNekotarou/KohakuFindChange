@@ -323,6 +323,11 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 		outSummary.Append("Change All: the Find/Change dialog is on the Table tab. List the tables and Replace their rows.");
 		return 0;
 	}
+	if (KFCSearchEngine::CurrentSearchMode() == kKFCRubySearchMode)		// (the Ruby tab's the same - its spec's R10)
+	{
+		outSummary.Append("Change All: the Find/Change dialog is on the Ruby tab. List the ruby and Replace its rows.");
+		return 0;
+	}
 	// THE OBJECT TAB (the object search spec's O13): InDesign's object Change All over each chapter. Refused with
 	// nothing to find - an empty Find Object Format would change every frame of the Type in the book - or nothing to
 	// change to. (The menu greys the item with nothing to find - HasFindQueryNow - so that door is for a caller that

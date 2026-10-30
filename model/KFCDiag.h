@@ -233,6 +233,7 @@
 //                what it asks - find=<style>, overrides=1, change=<style>, clear=1, scope=all (the model's cases, which need no dialog -
 //                work\kbs-regress\tb-cases.tsv)
 //    table-cap  KFCTableSearch::CollectTargets lists at most 2 tables (tb-cap)
+//    ruby-tab  KFCRubySearch::IsTabCurrent the same for KFC's Ruby tab; the file's lines kind=without, base=, ruby=, change=, remove=1, scope=all (work\kbs-regress\rb-cases.tsv)
 //    qr-scope-unkept  (UI half) a landing with KFC's QR Code tab shown - a QR code Find Next's, a row's click
 //                (ui/KFCJump.cpp's ArmNativeScopeKeep) - keeps no Search: of InDesign's own tab: what the open dialog does
 //                to it when the landing selects (qr-findnext-native-scope-armed). Measured: it does nothing while

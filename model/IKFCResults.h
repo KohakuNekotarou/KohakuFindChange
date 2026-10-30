@@ -140,9 +140,9 @@ public:
 	virtual bool ListIsRunList() = 0;
 	/** = KFCResultModel::RunNames (appended) - a query run's list's queries, as its tier's heading names them. */
 	virtual void GetRunNames(PMString& out) = 0;
-	/** = KFCResultModel::ListIsTables (appended - the Table tab) - the live list is a table list: its rows are written by the Table
-	    tab's Change side alone, and it is not narrowed (the heading's menu and the rows' grey by it, kept per tier). */
-	virtual bool ListIsTables() = 0;
+	/** = KFCResultModel::ListHasOwnChangeTab (appended - the Table and Ruby tabs) - the live list is one of a tab of KFC's with a Change side: its rows are written by that side
+	    alone, and it is not narrowed (the heading's menu and the rows' grey by it, kept per tier). */
+	virtual bool ListHasOwnChangeTab() = 0;
 };
 
 #endif // __IKFCResults_h__

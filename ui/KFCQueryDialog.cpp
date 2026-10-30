@@ -56,6 +56,7 @@
 #include "KFCQueryOrder.h"
 #include "KFCQueryOrderFile.h"		// KFCChooseOrderFileToSave / ToLoad - Save Order... / Load Order...'s file
 #include "KFCTableTab.h"			// YieldToSavedQuery - the Table tab steps aside the same
+#include "KFCRubyTab.h"				// ...and the Ruby tab
 #include "KFCQRTab.h"				// YieldToSavedQuery - a loaded query states its own tab over the QR Code tab
 #include "KFCResultHistory.h"		// Find - a query searched as a new tier; the same query twice in a row; a Run's drop
 #include "KFCResultTree.h"			// Rebuild / ShowStatus - the panel, told of a run as Find tells it
@@ -293,6 +294,7 @@ namespace
 		// (KFCQRTab) - the grey state below and the Find search what the query says.
 		KFCQRTab::YieldToSavedQuery();
 		KFCTableTab::YieldToSavedQuery();
+		KFCRubyTab::YieldToSavedQuery();
 		// NOTHING TO FIND: a tab this panel does not search (Colour), or - but on the Object tab, whose search lists every
 		// frame of its type with no format set - nothing set to find (the query run's own question - KFCQuerySequence).
 		const int32 mode = KFCRuns()->CurrentSearchMode();

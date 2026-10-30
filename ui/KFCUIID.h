@@ -115,6 +115,7 @@ DECLARE_PMID(kClassIDSpace, kKFCValueDialogBoss, kKFCUIPrefix + 32)
 // The QR Code tab's face in InDesign's Find/Change dialog (KFCQRTab.cpp - docs/superpowers/specs/2026-10-27-kfc-qr-code-search-design.md).
 DECLARE_PMID(kClassIDSpace, kKFCQRTabPanelBoss, kKFCUIPrefix + 33)
 DECLARE_PMID(kClassIDSpace, kKFCTableTabPanelBoss, kKFCUIPrefix + 34)
+DECLARE_PMID(kClassIDSpace, kKFCRubyTabPanelBoss, kKFCUIPrefix + 35)
 
 
 // InterfaceIDs:
@@ -243,6 +244,9 @@ DECLARE_PMID(kImplementationIDSpace, kKFCQRTabControllerImpl, kKFCUIPrefix + 63)
 DECLARE_PMID(kImplementationIDSpace, kKFCTableTabPanelCreatorImpl, kKFCUIPrefix + 64)
 DECLARE_PMID(kImplementationIDSpace, kKFCTableTabObserverImpl, kKFCUIPrefix + 65)
 DECLARE_PMID(kImplementationIDSpace, kKFCTableTabControllerImpl, kKFCUIPrefix + 66)
+DECLARE_PMID(kImplementationIDSpace, kKFCRubyTabPanelCreatorImpl, kKFCUIPrefix + 67)
+DECLARE_PMID(kImplementationIDSpace, kKFCRubyTabObserverImpl, kKFCUIPrefix + 68)
+DECLARE_PMID(kImplementationIDSpace, kKFCRubyTabControllerImpl, kKFCUIPrefix + 69)
 
 
 // ActionIDs:
@@ -581,6 +585,13 @@ DECLARE_PMID(kWidgetIDSpace, kKFCTableTabFindStyleWidgetID, kKFCUIPrefix + 65)
 DECLARE_PMID(kWidgetIDSpace, kKFCTableTabOverridesOnlyWidgetID, kKFCUIPrefix + 66)
 DECLARE_PMID(kWidgetIDSpace, kKFCTableTabChangeStyleWidgetID, kKFCUIPrefix + 67)
 DECLARE_PMID(kWidgetIDSpace, kKFCTableTabClearOverridesWidgetID, kKFCUIPrefix + 68)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyTabPanelWidgetID, kKFCUIPrefix + 69)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyTabScopeWidgetID, kKFCUIPrefix + 70)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyTabKindWidgetID, kKFCUIPrefix + 71)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyTabBaseWidgetID, kKFCUIPrefix + 72)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyTabReadingWidgetID, kKFCUIPrefix + 73)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyTabChangeWidgetID, kKFCUIPrefix + 74)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyTabRemoveWidgetID, kKFCUIPrefix + 75)
 
 
 // "About Plug-ins" sub-menu:
@@ -769,6 +780,15 @@ DECLARE_PMID(kWidgetIDSpace, kKFCTableTabClearOverridesWidgetID, kKFCUIPrefix + 
 #define kKFCTableTabClearOverridesKey	kKFCStringPrefix "kKFCTableTabClearOverridesKey"
 #define kKFCTableTabGuideFindKey		kKFCStringPrefix "kKFCTableTabGuideFindKey"
 #define kKFCTableTabGuideReplaceKey		kKFCStringPrefix "kKFCTableTabGuideReplaceKey"
+#define kKFCRubyTabTitleKey				kKFCStringPrefix "kKFCRubyTabTitleKey"
+#define kKFCRubyTabFindKey				kKFCStringPrefix "kKFCRubyTabFindKey"
+#define kKFCRubyTabWithKey				kKFCStringPrefix "kKFCRubyTabWithKey"
+#define kKFCRubyTabWithoutKey			kKFCStringPrefix "kKFCRubyTabWithoutKey"
+#define kKFCRubyTabBaseKey				kKFCStringPrefix "kKFCRubyTabBaseKey"
+#define kKFCRubyTabReadingKey			kKFCStringPrefix "kKFCRubyTabReadingKey"
+#define kKFCRubyTabChangeKey			kKFCStringPrefix "kKFCRubyTabChangeKey"
+#define kKFCRubyTabTakeOffKey			kKFCStringPrefix "kKFCRubyTabTakeOffKey"
+#define kKFCRubyTabGuideFindKey			kKFCStringPrefix "kKFCRubyTabGuideFindKey"
 
 // Other StringKeys:
 #define kKFCAboutBoxStringKey	kKFCStringPrefix "kKFCAboutBoxStringKey"
@@ -988,6 +1008,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCTableTabClearOverridesWidgetID, kKFCUIPrefix + 
 #define kKFCQRTabIDListRsrcID				(kSDKDefPanelResourceID + 32)
 #define kKFCTableTabRsrcID					(kSDKDefPanelResourceID + 33)
 #define kKFCTableTabIDListRsrcID			(kSDKDefPanelResourceID + 35)
+#define kKFCRubyTabRsrcID					(kSDKDefPanelResourceID + 36)
+#define kKFCRubyTabIDListRsrcID				(kSDKDefPanelResourceID + 38)
 #define kKFCValueFieldWidth					84
 // One row of the query dialog's lists: KCM's book comparison dialog's row height (kKCMBookRowHeight), the one other
 // list the Kohaku plug-ins draw in a dialog's font. Read by the row resource, the lists' scroll increments

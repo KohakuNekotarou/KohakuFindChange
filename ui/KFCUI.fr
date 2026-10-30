@@ -626,6 +626,21 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 		}
 	},
 
+	/*
+	 * THE RUBY TAB'S FACE in the same dialog (KFCRubyTab.cpp - docs/superpowers/specs/2026-10-31-kfc-ruby-tab-design.md): the QR Code tab's four.
+	 */
+	Class
+	{
+		kKFCRubyTabPanelBoss,
+		kPrimaryResourcePanelWidgetBoss,
+		{
+			IID_IK2SERVICEPROVIDER, kDialogPanelServiceImpl,
+			IID_IPANELCREATOR, kKFCRubyTabPanelCreatorImpl,
+			IID_IOBSERVER, kKFCRubyTabObserverImpl,
+			IID_IDIALOGCONTROLLER, kKFCRubyTabControllerImpl,
+		}
+	},
+
 }}};
 
 /*  
@@ -3844,6 +3859,259 @@ resource KFCTableTabPanelWidget (kKFCTableTabRsrcID + index_enUS)
 			kTrue, kTrue, kAlignLeft,
 			kEllipsizeEnd, kFalse,
 			kKFCTableTabGuideFindKey,
+			kInvalidWidgetID
+			kEVEAlignFill | kEVENoSpaceAfter,
+		),
+		KFCQueryFixedTextWidget
+		(
+			kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone,
+			Frame(0, 0, 456, 20)
+			kTrue, kTrue, kAlignLeft,
+			kEllipsizeEnd, kFalse,
+			kKFCTableTabGuideReplaceKey,
+			kInvalidWidgetID
+			kEVEAlignFill | kEVENoSpaceAfter,
+		),
+	}
+	kEVEArrangeChildrenInColumn | kEVELargeMargin,
+};
+
+/*
+ * THE RUBY TAB'S OFFER TO FIND/CHANGE (KFCRubyTab.cpp): the QR Code tab's two lists, its own ids.
+ */
+resource IDList (kKFCRubyTabIDListRsrcID)
+{
+	{
+		kFindChangeMiniTabbedDialogService,
+	},
+};
+
+resource IDListPair (kKFCRubyTabIDListRsrcID)
+{
+	{
+		kFindChangeMiniTabbedDialogService,	// the dialog (InDesign's)
+		kKFCRubyTabRsrcID,					// the view to add (ours)
+		kKFCUIPluginID						// the plug-in that owns it (ours)
+	},
+};
+
+type KFCRubyTabPanelWidget (kViewRsrcType) : PrimaryResourcePanelWidget (ClassID = kKFCRubyTabPanelBoss)
+{
+	WidgetEveInfo;
+};
+
+resource LocaleIndex (kKFCRubyTabRsrcID)
+{
+	kViewRsrcType,
+	{
+		kWildFS, k_Wild, kKFCRubyTabRsrcID + index_enUS
+	}
+};
+
+/*
+ * THE FACE: the Table face's column. The text fields notify at every key stroke: the panel's Find may be pressed with one still focused (KFCRubyTab.h).
+ */
+resource KFCRubyTabPanelWidget (kKFCRubyTabRsrcID + index_enUS)
+{
+	__FILE__, __LINE__,					// Localization macro
+	kKFCRubyTabPanelWidgetID,			// WidgetId - the face the dialog's switcher names
+	kPMRsrcID_None,						// RsrcId
+	kBindNone,							// Frame binding (EVE decides the frame)
+	Frame(0, 0, 0, 0),					// Frame
+	kTrue,								// Visible
+	kTrue,								// Enabled
+	kKFCRubyTabTitleKey,				// Panel name - the tab's label
+	{
+		// Search: [Document]
+		EVEGenericPanelWidget
+		(
+			kInvalidWidgetID, kPMRsrcID_None,
+			kBindNone,
+			Frame(0, 0, 456, 21)
+			kTrue, kTrue,
+			kEVEAlignLeft | kEVERegularSpaceAfter | kEVEArrangeChildrenInRow | kEVENoMargin,
+			{
+				EVEStaticTextWidget
+				(
+					kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone,
+					Frame(0, 0, 110, 21)
+					kTrue, kTrue, kAlignLeft,
+					kDontEllipsize, kTrue,
+					kKFCQRTabSearchKey,				// "Search:"
+					0,
+					kEVERegularSpaceAfter,
+				),
+				EVEDropDownListWidget
+				(
+					kKFCRubyTabScopeWidgetID, kSysDropDownPMRsrcId, kBindNone,
+					Frame(0, 0, 170, 21)
+					kTrue, kTrue,
+					{{
+						kKFCQRTabAllDocumentsKey,
+						kKFCQRTabDocumentKey,
+					}}
+					kEVENoSpaceAfter,
+				),
+			}
+		),
+		// Find: [Text With Ruby]
+		EVEGenericPanelWidget
+		(
+			kInvalidWidgetID, kPMRsrcID_None,
+			kBindNone,
+			Frame(0, 0, 456, 21)
+			kTrue, kTrue,
+			kEVEAlignLeft | kEVERegularSpaceAfter | kEVEArrangeChildrenInRow | kEVENoMargin,
+			{
+				EVEStaticTextWidget
+				(
+					kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone,
+					Frame(0, 0, 110, 21)
+					kTrue, kTrue, kAlignLeft,
+					kDontEllipsize, kTrue,
+					kKFCRubyTabFindKey,
+					0,
+					kEVERegularSpaceAfter,
+				),
+				EVEDropDownListWidget
+				(
+					kKFCRubyTabKindWidgetID, kSysDropDownPMRsrcId, kBindNone,
+					Frame(0, 0, 170, 21)
+					kTrue, kTrue,
+					{{
+						kKFCRubyTabWithKey,
+						kKFCRubyTabWithoutKey,
+					}}
+					kEVENoSpaceAfter,
+				),
+			}
+		),
+		// Base Text: [ ]
+		EVEGenericPanelWidget
+		(
+			kInvalidWidgetID, kPMRsrcID_None,
+			kBindNone,
+			Frame(0, 0, 456, 21)
+			kTrue, kTrue,
+			kEVEAlignLeft | kEVERegularSpaceAfter | kEVEArrangeChildrenInRow | kEVENoMargin,
+			{
+				EVEStaticTextWidget
+				(
+					kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone,
+					Frame(0, 0, 110, 21)
+					kTrue, kTrue, kAlignLeft,
+					kDontEllipsize, kTrue,
+					kKFCRubyTabBaseKey,
+					0,
+					kEVERegularSpaceAfter,
+				),
+				EVETextEditBoxWidget
+				(
+					kKFCRubyTabBaseWidgetID, kSysEditBoxPMRsrcId, kBindNone,
+					Frame(0, 0, 300, 0)		// a height of 0: the field's own
+					kTrue, kTrue,
+					kInvalidWidgetID,		// Nudge control (none)
+					1.0, 10.0,				// Small / large nudge
+					0,						// Max chars (no limit)
+					kFalse,					// Read only
+					kTrue,					// Notify every key stroke
+					kFalse,					// Range checking
+					kTrue,					// Blank entry allowed
+					0, 0,					// Upper / lower limits
+					"",						// Initial text (the face fills it)
+					kEVENoSpaceAfter,
+				),
+			}
+		),
+		// Ruby: [ ]
+		EVEGenericPanelWidget
+		(
+			kInvalidWidgetID, kPMRsrcID_None,
+			kBindNone,
+			Frame(0, 0, 456, 21)
+			kTrue, kTrue,
+			kEVEAlignLeft | kEVELargeSpaceAfter | kEVEArrangeChildrenInRow | kEVENoMargin,
+			{
+				EVEStaticTextWidget
+				(
+					kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone,
+					Frame(0, 0, 110, 21)
+					kTrue, kTrue, kAlignLeft,
+					kDontEllipsize, kTrue,
+					kKFCRubyTabReadingKey,
+					0,
+					kEVERegularSpaceAfter,
+				),
+				EVETextEditBoxWidget
+				(
+					kKFCRubyTabReadingWidgetID, kSysEditBoxPMRsrcId, kBindNone,
+					Frame(0, 0, 300, 0)
+					kTrue, kTrue,
+					kInvalidWidgetID,
+					1.0, 10.0,
+					0,
+					kFalse,
+					kTrue,
+					kFalse,
+					kTrue,
+					0, 0,
+					"",
+					kEVENoSpaceAfter,
+				),
+			}
+		),
+		// Change Ruby To: [ ]
+		EVEGenericPanelWidget
+		(
+			kInvalidWidgetID, kPMRsrcID_None,
+			kBindNone,
+			Frame(0, 0, 456, 21)
+			kTrue, kTrue,
+			kEVEAlignLeft | kEVERegularSpaceAfter | kEVEArrangeChildrenInRow | kEVENoMargin,
+			{
+				EVEStaticTextWidget
+				(
+					kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone,
+					Frame(0, 0, 110, 21)
+					kTrue, kTrue, kAlignLeft,
+					kDontEllipsize, kTrue,
+					kKFCRubyTabChangeKey,
+					0,
+					kEVERegularSpaceAfter,
+				),
+				EVETextEditBoxWidget
+				(
+					kKFCRubyTabChangeWidgetID, kSysEditBoxPMRsrcId, kBindNone,
+					Frame(0, 0, 300, 0)
+					kTrue, kTrue,
+					kInvalidWidgetID,
+					1.0, 10.0,
+					0,
+					kFalse,
+					kTrue,
+					kFalse,
+					kTrue,
+					0, 0,
+					"",
+					kEVENoSpaceAfter,
+				),
+			}
+		),
+		EVECheckBoxWidget
+		(
+			kKFCRubyTabRemoveWidgetID, kSysCheckBoxPMRsrcId, kBindNone,
+			Frame(0, 0, 200, 19)
+			kTrue, kTrue, kAlignLeft,
+			kKFCRubyTabTakeOffKey,
+			kEVELargeSpaceAfter,
+		),
+		KFCQueryFixedTextWidget
+		(
+			kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone,
+			Frame(0, 0, 456, 20)
+			kTrue, kTrue, kAlignLeft,
+			kEllipsizeEnd, kFalse,
+			kKFCRubyTabGuideFindKey,
 			kInvalidWidgetID
 			kEVEAlignFill | kEVENoSpaceAfter,
 		),

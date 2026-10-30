@@ -172,6 +172,8 @@ public:
 	    either way: a row's Replace reads its Change side whichever tab is shown. Kept by the UI half from the face's own calls
 	    (KFCTableTab.h): no window is walked to answer. */
 	virtual bool				TableTabConditions(KFCTableConditions& outConditions) = 0;
+	/** IS KFC'S RUBY TAB FIND/CHANGE'S TAB NOW (appended - docs/superpowers/specs/2026-10-31-kfc-ruby-tab-design.md; KFCRubySearch::IsTabCurrent asks it) - the same for its face. */
+	virtual bool				RubyTabConditions(KFCRubyConditions& outConditions) = 0;
 };
 
 /** HOW THE MODEL HALF ASKS FOR IKFCUIServices - the only way. IKFCUIServices has no kDefaultIID, so a Query of its

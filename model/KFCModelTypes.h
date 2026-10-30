@@ -175,6 +175,8 @@ enum KFCSpecialOp
 	// A table row's Replace (the Table tab - docs/superpowers/specs/2026-10-31-kfc-table-tab-design.md T9): its mark alone - the row reads
 	// "Styled". Written by KFCReplaceEngine's table rows, never by SpecialRows.
 	kKFCSpecialTableStyle,
+	// A ruby row's Replace (the Ruby tab - its spec's R8): the same - the row reads "Changed", and can be written again.
+	kKFCSpecialRubyChange,
 	kKFCSpecialOpCount
 };
 
@@ -218,6 +220,22 @@ enum { kKFCRunListSearchMode = 101 };
     the QR Code tab is): what KFCSearchEngine::CurrentSearchMode answers - and a table list's header holds - while that tab is
     Find/Change's tab (KFCTableSearch::IsTabCurrent). KFC'S ALONE: never handed to InDesign. */
 enum { kKFCTableSearchMode = 102 };
+
+/** THE RUBY TAB'S "SEARCH MODE" (docs/superpowers/specs/2026-10-31-kfc-ruby-tab-design.md): the Table tab's for its own tab (KFCRubySearch::IsTabCurrent). KFC'S ALONE. */
+enum { kKFCRubySearchMode = 103 };
+
+/** WHAT THE RUBY TAB ASKS (the face's - KFCRubyTab, read by IKFCUIServices::RubyTabConditions; a ruby list keeps its find side in its query copy). */
+struct KFCRubyConditions
+{
+	bool		withoutRuby;	// Find: Text Without Ruby - the occurrences of base with none on them; else the text with ruby
+	PMString	base;			// its base contains this; empty = any (Text Without Ruby: what it looks for - refused empty)
+	PMString	reading;		// its reading contains this; empty = any (Text With Ruby alone)
+	PMString	changeTo;		// the reading a row's Replace gives it; empty = none given
+	bool		removeRuby;		// ...or its Replace takes the ruby off - over changeTo
+	int32		scope;			// its Search: - IWalkerScopeFactoryUtils::kDocumentScope (at launch) or kAllDocumentScope
+
+	KFCRubyConditions() : withoutRuby(false), removeRuby(false), scope(0) {}
+};
 
 /** A style path with one character swapped for another - KFCStylePathWords' way, and the test build's fault switch's the other way. */
 inline PMString KFCStylePathSwapped(const PMString& path, textchar from, textchar to)

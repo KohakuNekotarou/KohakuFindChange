@@ -704,7 +704,7 @@ bool KFCObjectSearch::Fingerprint(const UIDRef& item, uint64& outHash, uint32& o
 #endif
 	IDataBase::SaveRestoreModifiedState dirtyGuard(db);	// SaveAll reads; the flag is put back all the same
 	Print print;
-	// A TABLE (a table row's Replace - KFCReplaceEngine's ReplaceTableRows): what that write changes, as the facade reads it - its style and
+	// A TABLE (a table row's Replace - KFCReplaceEngine's WriteOwnTabRows): what that write changes, as the facade reads it - its style and
 	// whether it has overrides. NOT its bytes: a Redo did not bring them back to what they were after the write (measured - the same
 	// length, another print; an Undo did: composing a table is outside the undo steps, the object's bytes hold it).
 	InterfacePtr<ITableModel> table(db, item.GetUID(), UseDefaultIID());

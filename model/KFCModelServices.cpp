@@ -40,6 +40,7 @@
 #include "KFCSavedQueries.h"
 #include "KFCSearchEngine.h"
 #include "KFCTableSearch.h"			// IsTabCurrent - the Table tab, and what it asks
+#include "KFCRubySearch.h"			// IsTabCurrent - the Ruby tab, and what it asks
 #include "KFCTierStore.h"
 
 class KFCResultsSession : public CPMUnknown<IKFCResults>
@@ -93,7 +94,7 @@ public:
 	virtual bool ListIsQRCodes() { return KFCResultModel::ListIsQRCodes(); }
 	virtual bool ListIsRunList() { return KFCResultModel::ListIsRunList(); }
 	virtual void GetRunNames(PMString& out) { out = KFCResultModel::RunNames(); }
-	virtual bool ListIsTables() { return KFCResultModel::ListIsTables(); }
+	virtual bool ListHasOwnChangeTab() { return KFCResultModel::ListHasOwnChangeTab(); }
 };
 
 CREATE_PMINTERFACE(KFCResultsSession, kKFCResultsImpl)
@@ -185,6 +186,7 @@ public:
 	virtual bool ClearOverridesRows(const KFCRowsByChapter& rows, PMString& outStatus) { return KFCReplaceEngine::ClearOverridesHits(rows, outStatus); }
 	virtual bool CanClearOverridesHit(int32 chapterIdx, int32 hitIdx) { return KFCReplaceEngine::CanClearOverridesHit(chapterIdx, hitIdx); }
 	virtual bool TableConditions(KFCTableConditions& outConditions) { return KFCTableSearch::IsTabCurrent(&outConditions); }
+	virtual bool RubyConditions(KFCRubyConditions& outConditions) { return KFCRubySearch::IsTabCurrent(&outConditions); }
 };
 
 CREATE_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)

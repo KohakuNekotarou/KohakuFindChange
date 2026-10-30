@@ -80,8 +80,8 @@ namespace KFCResultHistory
 	    Narrow Down and Search These Results Again are grey over it: no search made it (the run list spec's R12). */
 	bool TierHoldsRunList(int32 tier);
 
-	/** Does the tier (-1 = the live list) hold a table list (IKFCResults::ListIsTables when it was kept)? Its heading's Narrow Down greys. */
-	bool TierHoldsTables(int32 tier);
+	/** Does the tier (-1 = the live list) hold a list of a tab of KFC's with a Change side (IKFCResults::ListHasOwnChangeTab when it was kept)? Its heading's Narrow Down greys. */
+	bool TierHoldsOwnChangeTab(int32 tier);
 
 	/** A tier's name - the query Find/Change holds now, in the author's words (F and C rather than Find and Change):
 	    "[<tab>] F:"<find>" C:"<change>"", each side as the Application Bar's field would show it

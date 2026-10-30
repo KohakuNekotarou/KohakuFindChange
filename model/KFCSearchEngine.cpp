@@ -97,6 +97,7 @@
 #include "KFCQRSearch.h"		// the QR Code tab's listing, its Search: - and whether it is the tab now
 #include "KFCModelTypes.h"		// kKFCQRCodeSearchMode
 #include "KFCTableSearch.h"		// the Table tab's walk and its conditions
+#include "KFCRubySearch.h"		// the Ruby tab's
 #include "KFCTextCut.h"			// KFCSafeCut - where a row's line may be cut (the rule the panel's own cuts follow)
 #include "KFCFindChangeCmds.h"	// the find/change settings' commands, one at a time
 #include "KFCQueryCopy.h"		// the query copied in memory - onto each new list (the tier switch); the spike (DiagProbe)
@@ -3569,7 +3570,8 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	// QR code list's tab is its own, whatever Find/Change is on (InDesign has no QR mode to state back).
 	const int32 tab = (again == nil || again->freshQuery) ? KFCSearchEngine::CurrentSearchMode()
 		: KFCResultModel::ListIsQRCodes() ? static_cast<int32>(kKFCQRCodeSearchMode)
-		: KFCResultModel::ListIsTables() ? static_cast<int32>(kKFCTableSearchMode) : KFCSearchEngine::FindChangeMode();
+		: KFCResultModel::ListIsTables() ? static_cast<int32>(kKFCTableSearchMode)
+		: KFCResultModel::ListIsRuby() ? static_cast<int32>(kKFCRubySearchMode) : KFCSearchEngine::FindChangeMode();
 	if (!KFCSearchEngine::CanSearchTab(tab))
 	{
 		outSummary.Append("The Find/Change dialog is on the ");
@@ -3585,11 +3587,12 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	const bool objectTab = (tab == IFindChangeOptions::kObjectSearch);	// the Object tab - KFCObjectSearch
 	const bool qrTab = (tab == kKFCQRCodeSearchMode);					// KFC's QR Code tab - KFCQRSearch: every QR code
 	const bool tableTab = (tab == kKFCTableSearchMode);					// KFC's Table tab - KFCTableSearch: tables by their style
+	const bool rubyTab = (tab == kKFCRubySearchMode);					// KFC's Ruby tab - KFCRubySearch: text by its ruby
 	// SEARCH TEXT IN THESE OBJECTS walks text: on the Object tab (or the QR Code tab) it was refused before it came here
 	// (SearchTextInObjects), and a search again of its list runs under the list's own query, its tab stated first
 	// (KFCUnderListQuery) - this stays for a caller that did neither.
 	const bool inObjects = (again != nil && again->inObjects);
-	if (inObjects && (objectTab || qrTab || tableTab))
+	if (inObjects && (objectTab || qrTab || tableTab || rubyTab))
 	{
 		outSummary.Append("Search Text in These Objects: Find/Change is on the ");
 		outSummary.Append(KFCSearchEngine::TabName(tab));
@@ -3609,10 +3612,21 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	//  frame of the Type, the way InDesign's own Find Next walks them; the regression case obj-empty-find.)
 	// (The QR Code tab has no query at all - it lists every QR code: the author's call. The Table tab's is its own face's: no
 	//  condition lists every table.)
-	if (!objectTab && !qrTab && !tableTab && !HasFindQuery())
+	if (!objectTab && !qrTab && !tableTab && !rubyTab && !HasFindQuery())
 	{
 		AppendNothingToFind(outSummary, tab);
 		return 0;
+	}
+	// THE RUBY TAB'S ONE QUERY THAT NEEDS WORDS: the text with no ruby on it (the ruby tab spec's R3). What a search again asks is its list's - that list had them.
+	if (rubyTab && (again == nil || again->freshQuery))
+	{
+		KFCRubyConditions asking;
+		(void)KFCRubySearch::IsTabCurrent(&asking);
+		if (asking.withoutRuby && asking.base.IsEmpty())
+		{
+			outSummary.Append("Text Without Ruby looks for a text: type it in Base Text on the Ruby tab in Edit > Find/Change.");
+			return 0;
+		}
 	}
 
 	// Is there anything for the CURRENT scope to run on? Asked HERE, ahead of the commit point, so a
@@ -3646,7 +3660,7 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	// refusal above, so a search that is turned away touches no setting at all, and still ahead of the
 	// mode commit below, in the order the two always had. (Not for the QR Code tab: its walk is no walker of Find/Change's,
 	// and its search touches no setting at all - QR-10. Nor for the Table tab: KFCTableSearch reads each story's own table list.)
-	KFCForwardSearchScope forward(!qrTab && !tableTab);
+	KFCForwardSearchScope forward(!qrTab && !tableTab && !rubyTab);
 
 	// State the tab before anything is walked. A walk runs in the mode last COMMITTED through
 	// kFindSearchModeCmdBoss - not in the one IFindChangeOptions merely reports - so without this a
@@ -3662,7 +3676,7 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	// away by design. Measured: KT's object walks found the Object tab's matches with no mode committed and the
 	// dialog's mode on Text (the object search plan's Task 1 M4 - docs/superpowers/plans/2026-10-09-kfc-object-search.md).
 	// (Nor for the QR Code tab: its walk is KFC's own object walker, which no mode steers - KFCQRCodes. Nor for the Table tab.)
-	if (!objectTab && !qrTab && !tableTab && !KFCSearchEngine::CommitSearchMode())
+	if (!objectTab && !qrTab && !tableTab && !rubyTab && !KFCSearchEngine::CommitSearchMode())
 	{
 		outSummary.Append("The Find/Change tab could not be set - nothing was searched. Try reopening Edit > Find/Change.");
 		return 0;
@@ -3840,6 +3854,18 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 		tableFindStyle = conditions.findStyle;
 		tableOverridesOnly = conditions.overridesOnly;
 	}
+	KFCRubyConditions rubyAsked;
+	if (rubyTab)
+	{
+		if (againCopy != nil && again != nil && !again->freshQuery)
+		{
+			rubyAsked.withoutRuby = againCopy->rubyWithout;
+			rubyAsked.base = againCopy->rubyBase;
+			rubyAsked.reading = againCopy->rubyReading;
+		}
+		else
+			(void)KFCRubySearch::IsTabCurrent(&rubyAsked);
+	}
 	if (again == nil || again->freshQuery)
 	{
 		KFCQueryCopy copy;
@@ -3847,6 +3873,8 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 			KFCQueryCopier::CaptureQRCodes(copy);
 		else if (tableTab)
 			KFCQueryCopier::CaptureTables(copy, tableFindStyle, tableOverridesOnly);
+		else if (rubyTab)
+			KFCQueryCopier::CaptureRuby(copy, rubyAsked.withoutRuby, rubyAsked.base, rubyAsked.reading);
 		else
 			KFCQueryCopier::Capture(copy);
 		if (copy.valid)
@@ -3877,6 +3905,8 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 			KFCQRSearch::CollectTargets(targets, fromBook, unopenable, tally, reserved);
 		else if (tableTab)		// THE TABLE TAB: the tables its conditions name, read from each story's own table list.
 			KFCTableSearch::CollectTargets(targets, fromBook, unopenable, tally, reserved, tableFindStyle, tableOverridesOnly);
+		else if (rubyTab)		// THE RUBY TAB: each story's ruby strand, or its text with none on it.
+			KFCRubySearch::CollectTargets(targets, fromBook, unopenable, tally, reserved, rubyAsked);
 		else if (objectTab)		// THE OBJECT TAB: page items, walked by InDesign's own object search one document at a time.
 			KFCObjectSearch::CollectTargets(targets, fromBook, allDocuments, static_cast<int32>(selectionScope), unopenable, tally,
 				reserved, narrowFilter.Empty() ? nil : &narrowFilter);
@@ -4062,8 +4092,8 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 		const bool objects = KFCResultModel::ListHoldsObjects();
 		outSummary.Append(" Stopped at the ");
 		outSummary.AppendNumber(KFCResultModel::ListLimit());
-		if (qrTab || tableTab)
-			outSummary.Append(" limit.");		// (a QR code list, a table list, has no Change All and no Narrow Down to offer)
+		if (qrTab || tableTab || rubyTab)
+			outSummary.Append(" limit.");		// (a QR code, table or ruby list has no Change All and no Narrow Down to offer)
 		else
 		{
 			outSummary.Append(objects ? " limit - narrow the search (Narrow Down > Pages...), or use " : " limit - narrow the search, or use ");
@@ -4089,6 +4119,8 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 		outSummary.Append(" Click a row to go to its QR code.");
 	else if (tableTab)
 		outSummary.Append(" Click a row to go to its table. Replace gives it the Table tab's Change side.");
+	else if (rubyTab)
+		outSummary.Append(" Click a row to go to its text. Replace gives it the Ruby tab's Change side.");
 	else
 		outSummary.Append(" Replace a row with its right-click menu, or select it and press Return."
 			" Shift+Return replaces it and moves on to the next row.");
@@ -4103,8 +4135,8 @@ bool KFCSearchEngine::HasFindQueryNow()
 
 bool KFCSearchEngine::HasFindQueryForMode(int32 mode)
 {
-	if (mode == kKFCQRCodeSearchMode || mode == kKFCTableSearchMode)
-		return false;		// the QR Code tab, the Table tab: no query to run in Find/Change (Change All refuses them - KFCChangeAll)
+	if (mode == kKFCQRCodeSearchMode || mode == kKFCTableSearchMode || mode == kKFCRubySearchMode)
+		return false;		// KFC's own tabs: no query to run in Find/Change (Change All refuses them - KFCChangeAll)
 	// THE OBJECT TAB: its query is Find Object Format - IsThereSomethingToFind answers no there even with one set
 	// (measured in KT - the object search plan's Task 1 M7). (The query run asks it of the tab its query turned
 	// Find/Change to - KFCQuerySequence.)
@@ -4196,6 +4228,7 @@ const char* KFCSearchEngine::TabName(int32 mode)
 		case IFindChangeOptions::kColorSearch:			return "Colour";
 		case kKFCQRCodeSearchMode:						return "QR Code";	// KFC's own tab (KFCQRSearch)
 		case kKFCTableSearchMode:						return "Table";		// KFC's own tab (KFCTableSearch)
+		case kKFCRubySearchMode:						return "Ruby";		// KFC's own tab (KFCRubySearch)
 		default:										return "";
 	}
 }
@@ -4207,6 +4240,8 @@ int32 KFCSearchEngine::CurrentSearchMode()
 		return kKFCQRCodeSearchMode;
 	if (KFCTableSearch::IsTabCurrent())
 		return kKFCTableSearchMode;
+	if (KFCRubySearch::IsTabCurrent())
+		return kKFCRubySearchMode;
 	return FindChangeMode();
 }
 
@@ -4227,6 +4262,9 @@ int32 KFCSearchEngine::CurrentSearchScope()
 	KFCTableConditions table;		// (the Table tab's is its own too)
 	if (KFCTableSearch::IsTabCurrent(&table))
 		return table.scope;
+	KFCRubyConditions ruby;		// (and the Ruby tab's)
+	if (KFCRubySearch::IsTabCurrent(&ruby))
+		return ruby.scope;
 	return FindChangeScope();
 }
 
@@ -5242,10 +5280,10 @@ bool KFCSearchEngine::SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMStrin
 		outStatus.Append(kRunListHasNoSearch);
 		return false;
 	}
-	// A TABLE LIST IS SEARCHED AGAIN WHOLE OR BY DOCUMENT (the table tab spec's T11 - the menu greys this one too).
-	if (KFCResultModel::ListIsTables())
+	// A LIST OF A TAB OF KFC'S IS SEARCHED AGAIN WHOLE OR BY DOCUMENT (the table tab spec's T11, the ruby tab spec's R9 - the menu greys this one too).
+	if (KFCResultModel::ListHasOwnChangeTab())
 	{
-		outStatus.Append("a list of tables is searched again by document.");
+		outStatus.Append("this list is searched again by document.");
 		return false;
 	}
 	const UID story = KFCResultModel::GetGroupStory(chapterIdx, groupIdx);
@@ -5464,7 +5502,7 @@ bool KFCSearchEngine::SearchDocumentAgain(int32 chapterIdx, PMString& outStatus)
 	// A NARROWED LIST'S CONDITIONS, searched again with it and said with its rows (Search This Story Again's rule).
 	const KFCNarrow::Filter narrowFilter(KFCResultModel::GetNarrowSteps());
 	{
-		KFCForwardSearchScope forward(!KFCResultModel::ListIsQRCodes() && !KFCResultModel::ListIsTables());		// forward, as the search was (RunSearch's rule)
+		KFCForwardSearchScope forward(!KFCResultModel::ListIsQRCodes() && !KFCResultModel::ListHasOwnChangeTab());		// forward, as the search was (RunSearch's rule)
 		const WalkFilterScope walkFilter(narrowFilter);
 		if (KFCResultModel::ListIsQRCodes())		// a QR code list: the document's QR codes read again (KFCQRSearch)
 			walked = KFCQRSearch::WalkOneDocument(docRef, name, limit, hits, capped, cancelled);
@@ -5473,6 +5511,18 @@ bool KFCSearchEngine::SearchDocumentAgain(int32 chapterIdx, PMString& outStatus)
 			const std::shared_ptr<const KFCQueryCopy> asked(KFCResultModel::GetQueryCopy());
 			walked = KFCTableSearch::WalkOneDocument(docRef, name, limit, (asked != nil) ? asked->tableFindStyle : PMString(),
 				asked != nil && asked->tableOverridesOnly, hits, storyVersions, capped, cancelled);
+		}
+		else if (KFCResultModel::ListIsRuby())		// a ruby list: the same (KFCRubySearch)
+		{
+			const std::shared_ptr<const KFCQueryCopy> asked(KFCResultModel::GetQueryCopy());
+			KFCRubyConditions listAsked;
+			if (asked != nil)
+			{
+				listAsked.withoutRuby = asked->rubyWithout;
+				listAsked.base = asked->rubyBase;
+				listAsked.reading = asked->rubyReading;
+			}
+			walked = KFCRubySearch::WalkOneDocument(docRef, name, limit, listAsked, hits, storyVersions, capped, cancelled);
 		}
 		else if (KFCResultModel::GetSearchMode() == IFindChangeOptions::kObjectSearch)
 			walked = KFCObjectSearch::WalkOneDocument(docRef, name, limit, hits, capped, cancelled,
@@ -5665,11 +5715,11 @@ bool SearchListOnceMore(const KFCNarrowStep* step, PMString& outStatus)
 			outStatus.Append("a list of QR codes is not narrowed - it lists every QR code.");
 			return false;
 		}
-		// NOR A TABLE LIST (the table tab spec's T11 - the menu greys it): its conditions are the Table tab's.
-		if (KFCResultModel::ListIsTables())
+		// NOR A LIST OF A TAB OF KFC'S WITH A CHANGE SIDE (the table tab spec's T11, the ruby tab spec's R9 - the menu greys it): its conditions are its tab's.
+		if (KFCResultModel::ListHasOwnChangeTab())
 		{
 			outStatus.Append(lead);
-			outStatus.Append("a list of tables is not narrowed - use the Table tab's conditions.");
+			outStatus.Append("this list is not narrowed - use its tab's conditions.");
 			return false;
 		}
 		if (step->kind <= kKFCNarrowNone || step->kind >= kKFCNarrowKindCount)
@@ -5886,7 +5936,7 @@ bool KFCSearchEngine::SearchTextInObjects(PMString& outStatus)
 	// THE TAB FIND/CHANGE IS ON, asked when pressed (it can change after the menu opened): a text tab, with something to find
 	// - in Find's words. (Not the QR Code tab: it has no text query.)
 	const int32 tab = CurrentSearchMode();
-	if (tab == IFindChangeOptions::kObjectSearch || tab == kKFCQRCodeSearchMode || tab == kKFCTableSearchMode || !CanSearchTab(tab))
+	if (tab == IFindChangeOptions::kObjectSearch || tab == kKFCQRCodeSearchMode || tab == kKFCTableSearchMode || tab == kKFCRubySearchMode || !CanSearchTab(tab))
 	{
 		outStatus.Append(lead);
 		outStatus.Append("Find/Change is on the ");
@@ -5933,7 +5983,7 @@ void KFCSearchEngine::RestoreSearchScope(int32 mode, int32 scope)
 	// scheduled (ScheduleFindChangeInt): the caller is inside the notification of the dialog's own command.
 	// NOT THE QR CODE TAB: its Search: is KFC's own (KFCQRSearch), and its mode is no mode of InDesign's - never handed to a
 	// command (KFCModelTypes.h).
-	if (mode >= 0 && mode != kKFCQRCodeSearchMode && mode != kKFCTableSearchMode && scope >= 0)
+	if (mode >= 0 && mode != kKFCQRCodeSearchMode && mode != kKFCTableSearchMode && mode != kKFCRubySearchMode && scope >= 0)
 		(void)ScheduleFindChangeInt(kScopeCmdBoss, scope, mode);
 }
 

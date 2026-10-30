@@ -420,7 +420,7 @@ bool KFCResultModel::ListIsFrames()
 
 int32 KFCResultModel::ListLimit()
 {
-	return ListLimitFor(ListHoldsObjects() || ListIsTables());		// (a table list's are text rows, one a table: the object lists' number)
+	return ListLimitFor(ListHoldsObjects() || ListHasOwnChangeTab());		// (a table or ruby list's are text rows, one a thing: the object lists' number)
 }
 
 int32 KFCResultModel::ListLimitFor(bool objectRows)
@@ -448,6 +448,16 @@ bool KFCResultModel::ListIsRunList()
 bool KFCResultModel::ListIsTables()
 {
 	return gHeader.searchMode == static_cast<int32>(kKFCTableSearchMode);
+}
+
+bool KFCResultModel::ListIsRuby()
+{
+	return gHeader.searchMode == static_cast<int32>(kKFCRubySearchMode);
+}
+
+bool KFCResultModel::ListHasOwnChangeTab()
+{
+	return ListIsTables() || ListIsRuby();
 }
 
 void KFCResultModel::SetRunNames(const PMString& names)
@@ -1315,12 +1325,12 @@ void KFCResultModel::MarkHitSpecial(int32 chapterIdx, int32 hitIdx, int32 op)
 	h.outcome = kOutcomeNone;	// the write has just found its text there
 }
 
-void KFCResultModel::MarkHitTableStyled(int32 chapterIdx, int32 hitIdx, const PMString& words)
+void KFCResultModel::MarkHitOwnChange(int32 chapterIdx, int32 hitIdx, int32 op, const PMString& words)
 {
 	Hit* hp = HitAt(chapterIdx, hitIdx);
 	if (hp == nil)
 		return;
-	MarkHitSpecial(chapterIdx, hitIdx, kKFCSpecialTableStyle);		// (its backup taken there - before this change too)
+	MarkHitSpecial(chapterIdx, hitIdx, op);		// (its backup taken there - before this change too)
 	hp->runChain = words;
 	hp->runChain.SetTranslatable(kFalse);
 }

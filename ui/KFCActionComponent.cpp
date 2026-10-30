@@ -1081,7 +1081,7 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 				// rather than greying the item, so the user learns why (KFCSearchEngine::SearchStoryAgain).
 				// (Grey over a query run's list: no search made it - the run list spec's R12.)
 				int32 chapter = -1, group = -1;
-				const bool enable = RightClickedStory(widget, chapter, group) && !KFCResults()->ListIsRunList() && !KFCResults()->ListIsTables();
+				const bool enable = RightClickedStory(widget, chapter, group) && !KFCResults()->ListIsRunList() && !KFCResults()->ListHasOwnChangeTab();
 				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 				break;
 			}
@@ -1237,7 +1237,7 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 					const bool enable = RightClickedTier(widget, tier)
 						&& !KFCResultHistory::TierHoldsQRCodes(tier)
 						&& !KFCResultHistory::TierHoldsRunList(tier)
-						&& !KFCResultHistory::TierHoldsTables(tier)		// (its conditions are the Table tab's - the table tab spec's T11)
+						&& !KFCResultHistory::TierHoldsOwnChangeTab(tier)		// (its conditions are its tab's - the table tab spec's T11)
 						&& !(NarrowIsTextOnly(narrow) && KFCResultHistory::TierHoldsObjects(tier))
 						&& (narrow != kKFCNarrowOnLayer || ActiveLayerName(ac, layer));
 					listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);

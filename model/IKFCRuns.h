@@ -189,6 +189,8 @@ public:
 	/** = KFCTableSearch::IsTabCurrent (appended - docs/superpowers/specs/2026-10-31-kfc-table-tab-design.md): is KFC's Table tab
 	    Find/Change's tab now, and what it asks (a test build's fault switch table-tab answers first) - what a tier's name says. */
 	virtual bool TableConditions(KFCTableConditions& outConditions) = 0;
+	/** = KFCRubySearch::IsTabCurrent (appended - docs/superpowers/specs/2026-10-31-kfc-ruby-tab-design.md): the same for KFC's Ruby tab. */
+	virtual bool RubyConditions(KFCRubyConditions& outConditions) = 0;
 };
 
 #endif // __IKFCRuns_h__

@@ -186,6 +186,15 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCTableTabClearOverridesKey,	"Clear Overrides",
                 kKFCTableTabGuideFindKey,		"Find: the Find button of the Kohaku Find/Change panel lists the tables.",
                 kKFCTableTabGuideReplaceKey,	"Replace: a row's right-click menu, or Return, applies the Change side.",
+                kKFCRubyTabTitleKey,			"Ruby",
+                kKFCRubyTabFindKey,				"Find:",
+                kKFCRubyTabWithKey,				"Text With Ruby",
+                kKFCRubyTabWithoutKey,			"Text Without Ruby",
+                kKFCRubyTabBaseKey,				"Base Text:",
+                kKFCRubyTabReadingKey,			"Ruby:",
+                kKFCRubyTabChangeKey,			"Change Ruby To:",
+                kKFCRubyTabTakeOffKey,			"Remove Ruby",
+                kKFCRubyTabGuideFindKey,		"Find: the Find button of the Kohaku Find/Change panel lists the text.",
                 // The message line as a freshly opened panel shows it - the plug-in has no search
                 // box of its own, so the first thing to say is where the query is typed.
                 // Read through InitialMessage (KFCResultListWidgetMgr.cpp) whenever the message line falls

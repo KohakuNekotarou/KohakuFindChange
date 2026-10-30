@@ -78,12 +78,12 @@ namespace
 		bool					holdsQRCodes;	// ...QR codes (IKFCResults::ListIsQRCodes when it was kept) - its heading's
 												// Narrow Down and Search Text in These Objects grey (TierHoldsQRCodes -
 												// QR-18)
-		bool					holdsTables;	// ...a table list (IKFCResults::ListIsTables when it was kept) - its heading's Narrow Down
-												// greys (TierHoldsTables)
+		bool					holdsOwnChangeTab;	// ...a list of a tab of KFC's with a Change side (IKFCResults::ListHasOwnChangeTab when it was kept) - its
+												// heading's Narrow Down greys (TierHoldsOwnChangeTab)
 		bool					holdsRunList;	// ...a query run's list (IKFCResults::ListIsRunList when it was kept) - its heading's
 												// Narrow Down and Search These Results Again grey (TierHoldsRunList)
 
-		KeptTier() : set(0), open(false), holdsObjects(false), holdsQRCodes(false), holdsTables(false), holdsRunList(false) {}
+		KeptTier() : set(0), open(false), holdsObjects(false), holdsQRCodes(false), holdsOwnChangeTab(false), holdsRunList(false) {}
 	};
 
 	/** THE LIVE TIER'S NAME and the list it names: the model's result set it was given to (0 = none - the model counts its
@@ -225,7 +225,7 @@ namespace
 			? (treeMgr->IsNodeExpanded(KFCResultNodeID::CreateLiveTier()) != kFalse) : true;
 		out.holdsObjects = KFCResults()->ListHoldsObjects();
 		out.holdsQRCodes = KFCResults()->ListIsQRCodes();
-		out.holdsTables = KFCResults()->ListIsTables();
+		out.holdsOwnChangeTab = KFCResults()->ListHasOwnChangeTab();
 		out.holdsRunList = KFCResults()->ListIsRunList();
 		CopyRows(treeMgr, KFCResultNodeID::CreateLiveTier(), -1, out);
 		return true;
@@ -556,11 +556,11 @@ bool KFCResultHistory::TierHoldsQRCodes(int32 tier)
 	return tier < static_cast<int32>(gKept.size()) && gKept[static_cast<size_t>(tier)].holdsQRCodes;
 }
 
-bool KFCResultHistory::TierHoldsTables(int32 tier)
+bool KFCResultHistory::TierHoldsOwnChangeTab(int32 tier)
 {
 	if (tier < 0)
-		return KFCResults()->ListIsTables();
-	return tier < static_cast<int32>(gKept.size()) && gKept[static_cast<size_t>(tier)].holdsTables;
+		return KFCResults()->ListHasOwnChangeTab();
+	return tier < static_cast<int32>(gKept.size()) && gKept[static_cast<size_t>(tier)].holdsOwnChangeTab;
 }
 
 bool KFCResultHistory::TierHoldsRunList(int32 tier)
@@ -654,6 +654,29 @@ namespace
 			label.Append(asked.findStyle.IsEmpty() ? PMString("[Any Table Style]") : KFCStylePathWords(asked.findStyle));
 			if (asked.overridesOnly)
 				label.Append(" +");
+			label.Append("\"");
+			return label;
+		}
+		// THE RUBY TAB'S THE SAME: F:"base<reading>" as its rows draw it; F:"base" (no ruby) for Text Without Ruby; [Any Ruby] with nothing asked.
+		if (mode == kKFCRubySearchMode)
+		{
+			KFCRubyConditions asked;
+			(void)KFCRuns()->RubyConditions(asked);
+			label.Append(" F:\"");
+			if (asked.withoutRuby)
+			{
+				label.Append(asked.base);
+				label.Append(" (no ruby)");
+			}
+			else if (asked.base.IsEmpty() && asked.reading.IsEmpty())
+				label.Append("[Any Ruby]");
+			else
+			{
+				label.Append(asked.base);
+				label.AppendW(UTF32TextChar(0x300A));
+				label.Append(asked.reading);
+				label.AppendW(UTF32TextChar(0x300B));
+			}
 			label.Append("\"");
 			return label;
 		}

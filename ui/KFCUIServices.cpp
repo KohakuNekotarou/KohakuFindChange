@@ -57,6 +57,7 @@
 #include "KFCJump.h"				// ClearFrontSelection - ClearSelection's door; IsLanding - IsLanding's
 #include "KFCResultHistory.h"		// QueryReadsAsTier, RenameLiveFromQuery - the lists' names are this half's
 #include "KFCTableTab.h"			// IsCurrent - TableTabConditions' answer, kept from the Table face's calls
+#include "KFCRubyTab.h"				// IsCurrent - RubyTabConditions' answer, kept from the Ruby face's calls
 #include "KFCQRTab.h"				// IsCurrent - IsQRCodeTabCurrent's answer, kept from the QR Code face's calls
 #include "KFCDiag.h"				// KFC_DIAG_FAULT - test builds only (bg-first-view)
 #ifdef KFC_DIAG
@@ -588,6 +589,11 @@ public:
 	virtual bool TableTabConditions(KFCTableConditions& outConditions)
 	{
 		return KFCTableTab::IsCurrent(outConditions);
+	}
+
+	virtual bool RubyTabConditions(KFCRubyConditions& outConditions)
+	{
+		return KFCRubyTab::IsCurrent(outConditions);
 	}
 };
 

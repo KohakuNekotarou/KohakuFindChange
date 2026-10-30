@@ -11,7 +11,7 @@
 //  standing on the table's own character (ITableTextContainer's anchor): going to it, its page and flags, following an
 //  edit, Copy and Clear from Results are every text row's. What it draws for that character is its size and its style
 //  (Hit::runChain - "3x4 TS1 +"). Its Replace gives its table the style the tab's Change side names, or clears its overrides
-//  (KFCReplaceEngine's table rows - the facade's ApplyTableStyle, ClearLocalOverrides). Read only here, and no setting of
+//  (KFCReplaceEngine's WriteOwnTabRows - the facade's ApplyTableStyle, ClearLocalOverrides). Read only here, and no setting of
 //  Find/Change's is read or touched. The main thread only.
 //
 //========================================================================================

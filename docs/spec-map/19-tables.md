@@ -1,6 +1,6 @@
 # 19. 表スタイルで表を探す（検索と置換の「Table」タブ）
 
-> コード地図での位置: `model/KFCTableSearch.*`（タブが今のタブか・歩く・行の字・書く）・`model/KFCReplaceEngine.cpp` の `ReplaceTableRows`（行の Replace）・`ui/KFCTableTab.*`（タブの面）。
+> コード地図での位置: `model/KFCTableSearch.*`（タブが今のタブか・歩く・行の字・書く）・`model/KFCReplaceEngine.cpp` の `WriteOwnTabRows`＋`TableWrite`（行の Replace）・`ui/KFCTableTab.*`（タブの面）。
 > 設計書 `docs/superpowers/specs/2026-10-31-kfc-table-tab-design.md`（T1〜T13）。各項目の末尾の（T<番号>）は設計書の決定。回帰の表＝`work/kbs-regress/tb-cases.tsv`。裁定＝`work/sdd/2026-10-31-kfc-table-tab/progress.md`。
 > 訂正の書き方は [00-index.md](00-index.md)。
 
@@ -64,7 +64,7 @@
 
 ## 5. 効かない操作
 
-- **TBL-40** 灰色＝Narrow Down（全部）・Search Text in These Objects・行の Special Operations・Restore from Copy・物語の行の Search This Story Again。扉も断る（`RefuseTableRow`）。動く＝Copy・Clear・Search This Document Again・Search These Results Again（**その一覧の探した条件で**＝面が変わっていても同じ）。段から戻すと同じ行。（T11）回帰 `tb-menus`・`tb-search-again`・`tb-doc-again`・`tb-tier-back`
+- **TBL-40** 灰色＝Narrow Down（全部）・Search Text in These Objects・行の Special Operations・Restore from Copy・物語の行の Search This Story Again。扉も断る（`RefuseOwnTabRow`）。動く＝Copy・Clear・Search This Document Again・Search These Results Again（**その一覧の探した条件で**＝面が変わっていても同じ）。段から戻すと同じ行。（T11）回帰 `tb-menus`・`tb-search-again`・`tb-doc-again`・`tb-tier-back`
   - 訂正:
 
 - **TBL-41** Change All in Book はこのタブで灰色（扉も断る）。（T12）回帰 `tb-changeall-refused`
