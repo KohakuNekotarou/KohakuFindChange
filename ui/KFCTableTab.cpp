@@ -305,7 +305,9 @@ public:
 		gShown = false;
 		KFC_DIAG_LOG("TBLTAB hidden");
 		StopHearingWorkspace();
-		IActiveContext* const context = GetExecutionContextSession()->GetActiveContext();
+		// (The dialog can go with the application: no session, no context - nothing is attached to a context that has gone.)
+		ISession* const session = GetExecutionContextSession();
+		IActiveContext* const context = (session != nil) ? session->GetActiveContext() : nil;
 		InterfacePtr<ISubject> contextSubject(context, UseDefaultIID());
 		if (contextSubject != nil && contextSubject->IsAttached(ISubject::kRegularAttachment, this, IID_IACTIVECONTEXT, IID_IOBSERVER))
 			contextSubject->DetachObserver(ISubject::kRegularAttachment, this, IID_IACTIVECONTEXT, IID_IOBSERVER);
