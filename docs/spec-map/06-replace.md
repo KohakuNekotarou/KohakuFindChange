@@ -267,7 +267,7 @@
   まとめて選んだ行の1つなら選んだ行すべて・文書をまたいでも1つの取り消しの段（Edit メニューの名前 `Clear Overrides`＝UNDO-02）。書いた行は頭に `Cleared`（物の行の Clear Object Style Overrides と同じ語）・目玉が付く（ROW-45）。文字は変わらないので Replace は灰色にならず、ほかの行も動かない。置換済みの行も消せる（Restore from Copy は写しの書式＝上書きごとに戻す）。後で Replace／Restore from Copy をかけると語はその書き込みの語に替わる。
   **灰色**＝押せる行が1つも無いとき（SET-11）。1行ずつの扉＝物の行・アウトライン済み・文字の無い一致（GREP の `^`・`$`）・ロック・文書が無い／開けない・ストーリーが追えない形で変わった・一致の文字が検索の後で書き換わった（置換済みの行は書いた文字と比べる）。**あふれた文字は消せる**（組版が要らない）。
   文＝`Cleared overrides on ID:262 #3.`／`Cleared overrides on 1 of 2 matches: ID:262 #1. Left as they were: 1 had no overrides.`／1行の断り `Clear Overrides: <理由>`（例 `Clear Overrides: the match has no overrides to clear - left as it is.`）。
-  回帰＝`nor-cases.tsv` の `overrides-clear-*`（★本体と双子で並べる＝`overrides-clear-twin`＝双子の段落に DOM の `clearOverrides(OverrideType.ALL)` を当てて、属性を1つずつ比べる・`overrides-clear-twin-mixed`＝本物の上書き〈倍率〉と、上書きでないもの〈条件・ルビ・文字スタイル〉が同じ一致に付いた形）。（作り＝`model/KFCTextOverrides.cpp`・`KFCReplaceEngine::ClearOverridesHits`。）
+  回帰＝`nor-cases.tsv` の `overrides-clear-*`（★本体と双子で並べる＝`overrides-clear-twin`＝双子の段落に DOM の `clearOverrides(OverrideType.ALL)` を当てて、属性を1つずつ比べる・`overrides-clear-twin-mixed`＝本物の上書き〈倍率〉と、上書きでないもの〈条件・ルビ・文字スタイル〉が同じ一致に付いた形・`overrides-clear-in-cell`＝表のセルの一致〈段落の範囲はセルの終わりまで・隣のセルは触らない〉・`overrides-clear-para-neighbour`）。脚注の中の一致は試験していない（セルと同じ読み方＝段落の範囲はそのスレッドの中）。（作り＝`model/KFCTextOverrides.cpp`・`KFCReplaceEngine::ClearOverridesHits`。）
   - 訂正:
 
 ---
