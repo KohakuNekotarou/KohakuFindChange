@@ -2648,6 +2648,25 @@ void ReadStoryVersions(const UIDRef& docRef, const std::vector<KFCResultModel::H
 	}
 }
 
+}	// anonymous namespace
+
+void KFCSearchEngine::BuildListedHits(const UIDRef& docRef, const std::vector<ListedPlace>& places,
+	std::vector<KFCResultModel::Hit>& outHits, std::map<UID, uint32>& outVersions)
+{
+	// What each document's frames and stories answer (WalkCache), once for the document's rows.
+	WalkCache cache;
+	IDataBase* const db = docRef.GetDataBase();
+	outHits.reserve(outHits.size() + places.size());
+	for (size_t p = 0; p < places.size(); ++p)
+	{
+		KFCResultModel::Hit& hit = outHits.emplace_back();
+		BuildHit(docRef, UIDRef(db, places[p].story), places[p].start, places[p].end, kHitEverything, cache, hit);
+	}
+	ReadStoryVersions(docRef, outHits, outVersions);
+}
+
+namespace
+{
 // WHAT A WALK THAT DID NOT END CLEANLY OWES THE SUMMARY, named for what was walked - the search's walks (CollectTargets:
 // the Book Scope OFF walks' and a book's chapters') and Search Text in These Objects' (CollectObjectTexts), into the tally's
 // lists (KFCSearchEngine.h). One that broke off keeps its hits: they are real and are filed like any other, and what the
@@ -4771,6 +4790,9 @@ namespace
 // THE DOOR BOTH SEARCHES AGAIN ASK: has the query changed since the search? Asked, not refused
 // (QueryUnchangedSinceSearch - StaleRowPlaces' note): nothing is cleared, and the tab the walk then runs in is stated.
 // false = changed, and the sentence said.
+// What a search again says of a query run's list (SearchStoryAgain, SearchDocumentAgain, SearchListOnceMore).
+const char* const kRunListHasNoSearch = "this list records a query run - no search made it.";
+
 bool QueryUnchangedForAgain(PMString& outStatus)
 {
 	if (KFCReplaceEngine::QueryUnchangedSinceSearch())
@@ -5181,6 +5203,13 @@ bool KFCSearchEngine::SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMStrin
 	// handed back runs the message loop, and what that dispatches must not start inside it (KFCRunGuard.h).
 	const SearchingFlagGuard searchingGuard;
 	outStatus.Append("Search This Story Again: ");
+	// A QUERY RUN'S LIST HAS NO SEARCH TO SEARCH AGAIN (the run list spec's R12 - the menu greys it; this stays for a caller that never
+	// opened the menu).
+	if (KFCResultModel::ListIsRunList())
+	{
+		outStatus.Append(kRunListHasNoSearch);
+		return false;
+	}
 	const UID story = KFCResultModel::GetGroupStory(chapterIdx, groupIdx);
 	if (story == kInvalidUID)
 	{
@@ -5341,6 +5370,13 @@ bool KFCSearchEngine::SearchDocumentAgain(int32 chapterIdx, PMString& outStatus)
 	// the chapter the search handed back, before the walk, runs the message loop too (KFCRunGuard.h).
 	const SearchingFlagGuard searchingGuard;
 	outStatus.Append("Search This Document Again: ");
+	// A QUERY RUN'S LIST HAS NO SEARCH TO SEARCH AGAIN (the run list spec's R12 - the menu greys it; this stays for a caller that never
+	// opened the menu).
+	if (KFCResultModel::ListIsRunList())
+	{
+		outStatus.Append(kRunListHasNoSearch);
+		return false;
+	}
 	UIDRef docRef;
 	IDFile file;
 	PMString name;
@@ -5565,6 +5601,14 @@ bool SearchListOnceMore(const KFCNarrowStep* step, PMString& outStatus)
 	}
 	PMString lead((step != nil) ? "Narrow Down: " : "Search These Results Again: ");
 	lead.SetTranslatable(kFalse);
+	// A QUERY RUN'S LIST HAS NO SEARCH TO SEARCH AGAIN (the run list spec's R12 - the menu greys it; this stays for a caller that never
+	// opened the menu).
+	if (KFCResultModel::ListIsRunList())
+	{
+		outStatus.Append(lead);
+		outStatus.Append(kRunListHasNoSearch);
+		return false;
+	}
 	// A NARROW DOWN'S CONDITION: one this build knows; one only a text row can meet, refused over a list of object rows
 	// (the menu greys it - this stays for a caller that never opened the menu, as Find's refusals do - the narrow-down
 	// spec's N8).

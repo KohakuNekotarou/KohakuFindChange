@@ -90,6 +90,8 @@ public:
 	}
 	virtual bool IsFromAllDocuments() { return KFCResultModel::IsFromAllDocuments(); }
 	virtual bool ListIsQRCodes() { return KFCResultModel::ListIsQRCodes(); }
+	virtual bool ListIsRunList() { return KFCResultModel::ListIsRunList(); }
+	virtual void GetRunNames(PMString& out) { out = KFCResultModel::RunNames(); }
 };
 
 CREATE_PMINTERFACE(KFCResultsSession, kKFCResultsImpl)

@@ -440,6 +440,24 @@ bool KFCResultModel::ListIsQRCodes()
 	return gHeader.searchMode == static_cast<int32>(kKFCQRCodeSearchMode);
 }
 
+bool KFCResultModel::ListIsRunList()
+{
+	return gHeader.searchMode == static_cast<int32>(kKFCRunListSearchMode);
+}
+
+void KFCResultModel::SetRunNames(const PMString& names)
+{
+	gHeader.runNames = names;
+	gHeader.runNames.SetTranslatable(kFalse);
+}
+
+PMString KFCResultModel::RunNames()
+{
+	PMString names(gHeader.runNames);
+	names.SetTranslatable(kFalse);
+	return names;
+}
+
 void KFCResultModel::CloseChapter(int32 chapterIdx, const IDFile* closedFile)
 {
 	Chapter* c = ChapterAt(chapterIdx);
@@ -786,6 +804,8 @@ bool KFCResultModel::GetHitRow(int32 chapterIdx, int32 hitIdx, RowDisplay& out)
 	out.kept = h.kept;
 	out.special = h.special;
 	out.outlinedText = h.outlinedText;
+	out.runChain = h.runChain;
+	out.runNames = h.runNames;
 	return true;
 }
 

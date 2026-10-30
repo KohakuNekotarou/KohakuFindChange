@@ -92,6 +92,9 @@ namespace KFCQueryCopier
 	    nothing of Find/Change's is read, and nothing is stated back (Apply) or compared (Matches). Valid: the list keeps a
 	    query of its own, so its searches again go through (SearchListOnceMore's door). */
 	void CaptureQRCodes(KFCQueryCopy& out);
+	/** A QUERY RUN'S LIST'S (KFCRunList): the mode alone, kKFCRunListSearchMode, for the same reasons - it has no query of its
+	    own to state or compare, and a tier without a copy could not be switched back to. */
+	void CaptureRunList(KFCQueryCopy& out);
 
 	/** State `copy` back into Find/Change: the tab, then every field that differs from what the dialog holds now, with the
 	    dialog's own commands (KFCFindChangeCmds; the formats with kClearFindFormatCmdBoss / kClearChangeFormatCmdBoss and

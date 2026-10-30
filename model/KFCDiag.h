@@ -54,6 +54,9 @@
 //                (the same note: what opening the story rows one at a time costs). Throwaway documents only.
 //    changeall-cancel  KFCChangeAll::Run takes Cancel as pressed after its first chapter - every chapter must come
 //                back as it was (case all-cancel-book, ca-cases.tsv). Throwaway documents only.
+//    run-list-cap  the file holds "<n>": the list a query run leaves holds n rows (KFCRunList - case rl-cap, rl-cases.tsv).
+//    run-list-mismatch  KFCRunList takes the find of the run's first document as having selected one more than its Change All
+//                wrote - that document is left out of the list and said (case rl-mismatch).
 //    no-window   KFCBookScope::ShowChapterWindow answers that the window could not be opened - a written chapter stays
 //                held and windowless; Change All in Book and the query run must say "left open with no window"
 //                (work\kbs-regress\xq-cases.tsv). Throwaway documents only.

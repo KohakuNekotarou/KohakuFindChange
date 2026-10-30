@@ -104,6 +104,8 @@ namespace
 		virtual bool IsHitItemGone(int32, int32) { return false; }
 		virtual bool IsFromAllDocuments() { return false; }
 		virtual bool ListIsQRCodes() { return false; }
+		virtual bool ListIsRunList() { return false; }
+		virtual void GetRunNames(PMString& out) { out.Clear(); }
 	};
 
 	class KFCRunsStandInImpl : public IKFCRuns

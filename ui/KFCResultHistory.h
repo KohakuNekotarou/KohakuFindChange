@@ -76,6 +76,10 @@ namespace KFCResultHistory
 	    rows are only gone to). */
 	bool TierHoldsQRCodes(int32 tier);
 
+	/** Is tier `tier` a query run's list (-1 = the live list, asked of the model; a grey one as its copy noted it)? Its heading's
+	    Narrow Down and Search These Results Again are grey over it: no search made it (the run list spec's R12). */
+	bool TierHoldsRunList(int32 tier);
+
 	/** A tier's name - the query Find/Change holds now, in the author's words (F and C rather than Find and Change):
 	    "[<tab>] F:"<find>" C:"<change>"", each side as the Application Bar's field would show it
 	    (KFCFindChangeQueryWords / KFCFindChangeChangeWords) and cut at 200 characters; "[<tab>]" alone for a tab with

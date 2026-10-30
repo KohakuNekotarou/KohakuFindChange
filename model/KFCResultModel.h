@@ -198,6 +198,9 @@ namespace KFCResultModel
 								// named after - stands on no page (Narrow Down's On Pasteboard; told by the class of the frame's
 								// owner page, never by its "PB" spelling). An object row says so in onPasteboard.
 		PMString	outlinedText;	// a text row written as outlines (RowDisplay::outlinedText): the characters it outlined
+		PMString	runChain;	// a row of a query run's list (KFCRunList - RowDisplay::runChain): what its place has been, in the
+								// row's words, cut for the row
+		PMString	runNames;	// ...and the queries that wrote it, in the run's order (RowDisplay::runNames)
 		UID			matchFrame;	// a TEXT row's match's own frame (the parcel's - IParcelList::GetParcelFrameUID), kInvalidUID when
 								// it has none placed: what Frames of These Matches climbs to the frame the person selects
 		UID			pageUID;	// the page the row names (a text row's frame's - the "+" frame's for an overset match -, an object
@@ -422,6 +425,14 @@ namespace KFCResultModel
 	/** Is the list a QR CODE LIST - KFC's QR Code tab's (KFCQRSearch: its search mode kKFCQRCodeSearchMode)? Its rows are only
 	    gone to (QR-18): nothing is replaced, outlined or changed from it, and it is not narrowed. */
 	bool ListIsQRCodes();
+	/** Is the list A QUERY RUN'S (KFCRunList: its search mode kKFCRunListSearchMode)? Its rows are what the run wrote: gone to,
+	    copied and taken off the list - nothing is written from them and it has no query to search again with (the run list spec's
+	    R12). */
+	bool ListIsRunList();
+	/** Its queries that wrote what it lists ("a, b", in the run's order): a tier's heading names the list by them ("[Run/Document]
+	    a, b"). Kept with the list, so an Undo and a Redo of the run bring it with it - empty for any other list. */
+	void SetRunNames(const PMString& names);
+	PMString RunNames();
 	/** Is the list a FRAMES OF THESE MATCHES list - object rows found by a text search, not by the Object tab's (its
 	    Replace writes with the Object tab's Change Object Format alone - KFCObjectReplace, the narrow-down
 	    spec's N6)? */
@@ -1097,6 +1108,7 @@ namespace KFCResultModel
 		bool			hasRun;			// NoteRun
 		bool			changeAllWrote;	// NoteChangeAllWrote
 		std::shared_ptr<const KFCQueryCopy>	query;	// SetQueryCopy - the search's query, copied (null = not a search's list)
+		PMString		runNames;		// SetRunNames - a query run's list's queries
 		ListHeader() : fromBook(false), fromAllDocuments(false), searchScope(kScopeDocument), searchMode(-1), hasRun(false),
 			changeAllWrote(false) {}
 	};

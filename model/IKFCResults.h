@@ -135,6 +135,11 @@ public:
 	    only gone to (QR-18 - the heading's menu greys Narrow Down and Search Text in These Objects by it, kept per
 	    tier), and a row gone is a QR code no longer there. */
 	virtual bool ListIsQRCodes() = 0;
+	/** = KFCResultModel::ListIsRunList (appended - the run list) - the live list is a query run's: nothing is written from its rows
+	    and it has no search to search again (the heading's menu and the story and document rows' grey by it, kept per tier). */
+	virtual bool ListIsRunList() = 0;
+	/** = KFCResultModel::RunNames (appended) - a query run's list's queries, as its tier's heading names them. */
+	virtual void GetRunNames(PMString& out) = 0;
 };
 
 #endif // __IKFCResults_h__

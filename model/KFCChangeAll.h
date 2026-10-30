@@ -19,12 +19,16 @@
 #ifndef __KFCChangeAll_h__
 #define __KFCChangeAll_h__
 
+#include "InterfacePtr.h"
 #include "PMString.h"
 #include "UIDRef.h"
 #include "WalkerScopeOptions.h"
 #include "KFCBookScope.h"		// ChapterDoc - a run's documents (LeaveRunDocuments, PutRunDocumentsBack)
 
 #include <vector>
+
+class ITextWalker;			// InitWalk
+class ITextWalkerScope;
 
 namespace KFCChangeAll
 {
@@ -51,6 +55,14 @@ namespace KFCChangeAll
 	    (IFindChangeCmdData::GetReplacementCount; 0 when it says nothing). False = the walk could not start or the
 	    command failed - answered kFailure, or left the error state raised; the error state is left clear. */
 	bool WriteDocument(const UIDRef& docRef, int32 selectionScope, const WalkerScopeOptions& scopeOptions, int32& outCount);
+
+	/** THE WALK WRITEDOCUMENT TAKES, READY TO GO - the session's shared walker initialised on that scope, with the find/change
+	    client and the session's options. Asked by WriteDocument and by what has to walk the same matches before it writes them
+	    (KFCRunList - the query run's list): one place answers what a document's write covers. outNothingToWalk: the scope
+	    holds nothing to walk (KFCSearchEngine::ScopeHasNothingToWalk). False = the walk could not be set up; nothing was
+	    started. The caller stops the walker (KFCSearchEngine::WalkerStops). */
+	bool InitWalk(const UIDRef& docRef, int32 selectionScope, const WalkerScopeOptions& scopeOptions,
+		InterfacePtr<ITextWalker>& outWalker, InterfacePtr<ITextWalkerScope>& outScope, bool& outNothingToWalk);
 
 	/** WHAT EACH DOCUMENT OF A RUN IS LEFT AS once the run's step is kept - the one rule for Change All in Book and the query
 	    run (KFCQuerySequence). targets = the run's documents, opened (a closed chapter windowless and held) before its step;

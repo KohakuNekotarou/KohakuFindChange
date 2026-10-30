@@ -124,14 +124,10 @@ const char* KFCChangeAll::CommandName()
 	return "Change All in Book (No List)";
 }
 
-bool KFCChangeAll::WriteDocument(const UIDRef& docRef, int32 selectionScope, const WalkerScopeOptions& scopeOptions,
-	int32& outCount)
+bool KFCChangeAll::InitWalk(const UIDRef& docRef, int32 selectionScope, const WalkerScopeOptions& scopeOptions,
+	InterfacePtr<ITextWalker>& outWalker, InterfacePtr<ITextWalkerScope>& outScope, bool& outNothingToWalk)
 {
-	outCount = 0;
-	// Nothing processed over an error already standing (KFCReplaceEngine's RunWalkerCmd says why): a failure - the caller's
-	// step goes back by it.
-	if (ErrorUtils::PMGetGlobalErrorCode() != kSuccess)
-		return false;
+	outNothingToWalk = false;
 	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
 	InterfacePtr<IK2ServiceRegistry> registry(GetExecutionContextSession(), UseDefaultIID());
 	InterfacePtr<IK2ServiceProvider> provider(registry != nil
@@ -148,13 +144,32 @@ bool KFCChangeAll::WriteDocument(const UIDRef& docRef, int32 selectionScope, con
 	if (walker->IsWalking())
 		walker->Halt();
 	walker->Initialize(client, scope, opts, nil);
+	outNothingToWalk = KFCSearchEngine::ScopeHasNothingToWalk(scope);
+	outWalker.reset(walker.forget());
+	outScope.reset(scope.forget());
+	return true;
+}
+
+bool KFCChangeAll::WriteDocument(const UIDRef& docRef, int32 selectionScope, const WalkerScopeOptions& scopeOptions,
+	int32& outCount)
+{
+	outCount = 0;
+	// Nothing processed over an error already standing (KFCReplaceEngine's RunWalkerCmd says why): a failure - the caller's
+	// step goes back by it.
+	if (ErrorUtils::PMGetGlobalErrorCode() != kSuccess)
+		return false;
+	InterfacePtr<ITextWalker> walker;
+	InterfacePtr<ITextWalkerScope> scope;
+	bool nothingToWalk = false;
+	if (!InitWalk(docRef, selectionScope, scopeOptions, walker, scope, nothingToWalk))
+		return false;
 	const KFCSearchEngine::WalkerStops stops(walker);		// halted on every way out (KFCSearchEngine.h)
 	// NOTHING TO WALK IS NOTHING TO CHANGE (KFCSearchEngine::ScopeHasNothingToWalk - a document with no text frame, or
 	// with master-page text only and Include Master Pages off): the command would answer kFailure, read below as a
 	// failed Change All, and the caller would take its whole step back - a book stopped at its chapter of pictures,
 	// while InDesign's own Change All goes past it (measured - cases xq-notext-doc, xq-masteronly-doc,
 	// ca-book-notext-chapters). Done, with nothing changed.
-	if (KFCSearchEngine::ScopeHasNothingToWalk(scope))
+	if (nothingToWalk)
 	{
 		KFC_DIAG_LOG("CHANGEALL doc=%p scope=%d nothing to walk - nothing to change", (void*)docRef.GetDataBase(), (int)selectionScope);
 		return true;

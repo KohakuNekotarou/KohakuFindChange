@@ -150,6 +150,19 @@ namespace KFCSearchEngine
 		std::map<UID, uint32>* storyVersions = nil, std::map<UID, KFCResultModel::SearchedRange>* searchedRanges = nil,
 		UID searchedStory = kInvalidUID, const std::vector<UID>* searchedObjects = nil);
 
+	/** A QUERY RUN'S LIST'S ROWS OF ONE DOCUMENT (KFCRunList): for each place what a search's row holds - its story and range, its
+	    line and hash, its page and flags, its story's first words - as the search builds it (BuildHit, kHitEverything); the
+	    stories' versions as they stand. Composes the text a row stands in, as a search does. The caller says the rest, and
+	    files them (FileChapter). */
+	struct ListedPlace
+	{
+		UID			story;
+		TextIndex	start;
+		TextIndex	end;
+	};
+	void BuildListedHits(const UIDRef& docRef, const std::vector<ListedPlace>& places, std::vector<KFCResultModel::Hit>& outHits,
+		std::map<UID, uint32>& outVersions);
+
 	/** THE SCOPE DOORS SEARCHBOOK HAS ALWAYS ASKED, IN ONE PLACE (so the query run asks the same):
 	    Book Scope with a Search: other than Document, a Search: this panel cannot follow, no target book, an
 	    empty one, no active document. false = refused, outRefusal holds SearchBook's own sentence. Touches nothing.

@@ -194,7 +194,7 @@ namespace KFCRunListChain
 		for (size_t s = 0; s < place.steps.size(); ++s)
 		{
 			if (s > 0)
-				out += U" → ";
+				out += U" \u2192 ";
 			out += StepWords(place, s);
 		}
 		return out;

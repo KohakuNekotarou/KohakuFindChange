@@ -276,6 +276,13 @@ void KFCQueryCopier::CaptureQRCodes(KFCQueryCopy& out)
 	out.valid = true;
 }
 
+void KFCQueryCopier::CaptureRunList(KFCQueryCopy& out)
+{
+	out = KFCQueryCopy();
+	out.mode = static_cast<int32>(kKFCRunListSearchMode);
+	out.valid = true;
+}
+
 bool KFCQueryCopier::Apply(const KFCQueryCopy& copy, PMString& outWhat)
 {
 	outWhat.Clear();
@@ -283,8 +290,8 @@ bool KFCQueryCopier::Apply(const KFCQueryCopy& copy, PMString& outWhat)
 	if (!copy.valid)
 		return Failed(outWhat, "there is no query to put back");
 	// A QR CODE LIST'S COPY STATES NOTHING: InDesign has no such mode to state (KFCModelTypes.h - never handed to a command),
-	// and no setting of Find/Change's steers its walk (KFCQRSearch).
-	if (copy.mode == kKFCQRCodeSearchMode)
+	// and no setting of Find/Change's steers its walk (KFCQRSearch). Nor a query run's list's: it has no query (KFCRunList).
+	if (copy.mode == kKFCQRCodeSearchMode || copy.mode == kKFCRunListSearchMode)
 		return true;
 	using namespace KFCFindChangeCmds;
 	const int32 mode = copy.mode;
@@ -415,8 +422,8 @@ bool KFCQueryCopier::Matches(const KFCQueryCopy& copy, PMString& outWhat)
 	outWhat.SetTranslatable(kFalse);
 	if (!copy.valid)
 		return Failed(outWhat, "there is no query to compare");
-	if (copy.mode == kKFCQRCodeSearchMode)
-		return true;		// a QR code list's copy: no field of Find/Change's is its (Apply's note)
+	if (copy.mode == kKFCQRCodeSearchMode || copy.mode == kKFCRunListSearchMode)
+		return true;		// a QR code list's copy, a query run's list's: no field of Find/Change's is its (Apply's note)
 	KFCQueryCopy now;
 	Capture(now);
 	const char* const differs = FirstDifference(copy, now);

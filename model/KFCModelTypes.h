@@ -83,6 +83,11 @@ namespace KFCResultModel
 									// docs/superpowers/specs/2026-10-18-kfc-text-outlines-design.md X6): the characters
 									// it outlined, drawn where the match stands; matchText holds what the row reads
 									// now (the inline's mark, not shown), which the doors compare. Empty on other rows.
+		PMString		runChain;	// A ROW OF A QUERY RUN'S LIST (Hit::runChain -
+									// docs/superpowers/specs/2026-10-30-kfc-run-result-list-design.md R6): what its place has
+									// been, drawn where the match stands ("cat -> dog -> kog"); matchText holds what the
+									// row reads now, which the doors compare. Empty on other rows.
+		PMString		runNames;	// ...and the queries that wrote it, drawn after the line ("  (a, b)").
 
 		RowDisplay() : replaced(false), outlined(false), kept(false), special(0) {}
 	};
@@ -198,6 +203,11 @@ struct KFCOversetLoc
     kFindSearchModeCmdBoss or to a saved query - InDesign has no such mode, and showing the tab changes none of its own
     (measured in KT - GetSearchMode stays the tab shown before it). */
 enum { kKFCQRCodeSearchMode = 100 };
+
+/** A QUERY RUN'S LIST'S "SEARCH MODE" (docs/superpowers/specs/2026-10-30-kfc-run-result-list-design.md - KFCRunList): what the
+    header of the list a saved query run leaves holds (KFCResultModel::ListIsRunList). No tab is on it, no search made it and
+    it has no query to search or write with: KFC'S ALONE, as kKFCQRCodeSearchMode is - never handed to InDesign. */
+enum { kKFCRunListSearchMode = 101 };
 
 /** WHAT KEEPS A QR CODE FIND NEXT FOUND FROM BEING SELECTED (IKFCRuns::QRCodeNext's outReach - KFCQRSearch::Next; the UI half's
     landing says it on the tab's line - KFCJump::LandOnQRCode): its row's own words (KFCObjectSearch::ReadItemPlace), as bits. */

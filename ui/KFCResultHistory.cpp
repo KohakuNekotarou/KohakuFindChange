@@ -78,8 +78,10 @@ namespace
 		bool					holdsQRCodes;	// ...QR codes (IKFCResults::ListIsQRCodes when it was kept) - its heading's
 												// Narrow Down and Search Text in These Objects grey (TierHoldsQRCodes -
 												// QR-18)
+		bool					holdsRunList;	// ...a query run's list (IKFCResults::ListIsRunList when it was kept) - its heading's
+												// Narrow Down and Search These Results Again grey (TierHoldsRunList)
 
-		KeptTier() : set(0), open(false), holdsObjects(false), holdsQRCodes(false) {}
+		KeptTier() : set(0), open(false), holdsObjects(false), holdsQRCodes(false), holdsRunList(false) {}
 	};
 
 	/** THE LIVE TIER'S NAME and the list it names: the model's result set it was given to (0 = none - the model counts its
@@ -126,7 +128,9 @@ namespace
 	// Is the list the model holds now the one a search that keeps made?
 	bool LiveIsStacked()
 	{
-		return gLive.stacked && gLive.set != 0 && gLive.set == KFCResults()->GetResultSetId();
+		// A QUERY RUN'S LIST IS A TIER BY ITSELF, ITS NAME THE LIST'S OWN (LiveTierLabel - the run list spec's R7): gLive goes on naming the
+		// list the run replaced, whose name its Ctrl+Z needs (DropStackIfRemade).
+		return KFCResults()->ListIsRunList() || (gLive.stacked && gLive.set != 0 && gLive.set == KFCResults()->GetResultSetId());
 	}
 
 	// The rows under `row` of kept tier `tier` (-1 = the tier's own row); nil when either is not there.
@@ -206,7 +210,8 @@ namespace
 		if (!KFCResultTree::GetRowLook(KFCResultNodeID::CreateLiveTier(), head))
 			return false;
 		out.set = KFCResults()->GetResultSetId();
-		out.name = LiveIsStacked() ? gLive.label : PMString();
+		// (A query run's list has no search's name: nothing to read a query against - QueryReadsAsTier.)
+		out.name = (LiveIsStacked() && !KFCResults()->ListIsRunList()) ? gLive.label : PMString();
 		out.name.SetTranslatable(kFalse);
 		out.label = head.label;
 		out.head = KFCResultHistory::LiveTierLabel();	// the name GetRowLook wrote it with, before the counts
@@ -218,6 +223,7 @@ namespace
 			? (treeMgr->IsNodeExpanded(KFCResultNodeID::CreateLiveTier()) != kFalse) : true;
 		out.holdsObjects = KFCResults()->ListHoldsObjects();
 		out.holdsQRCodes = KFCResults()->ListIsQRCodes();
+		out.holdsRunList = KFCResults()->ListIsRunList();
 		CopyRows(treeMgr, KFCResultNodeID::CreateLiveTier(), -1, out);
 		return true;
 	}
@@ -547,6 +553,13 @@ bool KFCResultHistory::TierHoldsQRCodes(int32 tier)
 	return tier < static_cast<int32>(gKept.size()) && gKept[static_cast<size_t>(tier)].holdsQRCodes;
 }
 
+bool KFCResultHistory::TierHoldsRunList(int32 tier)
+{
+	if (tier < 0)
+		return KFCResults()->ListIsRunList();
+	return tier < static_cast<int32>(gKept.size()) && gKept[static_cast<size_t>(tier)].holdsRunList;
+}
+
 namespace
 {
 	// One side of a tier's name: the words, cut at kLabelWordsMax where a character may be cut (KFCSafeCut).
@@ -720,7 +733,17 @@ PMString KFCResultHistory::LiveTierLabel()
 {
 	PMString label("Results");
 	label.SetTranslatable(kFalse);
-	if (gLive.set != 0 && gLive.set == KFCResults()->GetResultSetId() && !gLive.label.IsEmpty())
+	if (KFCResults()->ListIsRunList())
+	{
+		// A QUERY RUN'S LIST: "[Run/Document] a, b" - its queries that wrote what it lists (the run list spec's R7), kept with it.
+		PMString names;
+		KFCResults()->GetRunNames(names);
+		PMString run("[Run] ");
+		run.SetTranslatable(kFalse);
+		run.Append(names);
+		label = WithScope(run, KFCResults()->GetSearchScope());
+	}
+	else if (gLive.set != 0 && gLive.set == KFCResults()->GetResultSetId() && !gLive.label.IsEmpty())
 		label = WithScope(gLive.label, KFCResults()->GetSearchScope());	// "[Text/Story] ..." - the list's own Search:
 	// A NARROWED LIST'S CONDITIONS, after the name - drawn for Search:'s reason (the narrow-down spec's N4: "[Text/Book]
 	// F:"cat" C:"dog" / In Tables / Pages 1-5").

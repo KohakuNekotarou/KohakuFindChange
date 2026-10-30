@@ -1153,8 +1153,9 @@ QueryCompared CompareQueryWithSearch()
 {
 	// ----- (0) A QR CODE LIST (KFCQRSearch) has no query to change: it lists every QR code, and no setting of Find/Change
 	// steers its walk - so nothing is asked of Find/Change and nothing is stated. Its searches again list its QR codes again
-	// whatever tab the dialog is on, and its rows are never replaced (CanReplaceHit).
-	if (KFCResultModel::ListIsQRCodes())
+	// whatever tab the dialog is on, and its rows are never replaced (CanReplaceHit). A query run's list has none either: no
+	// search made it, and its rows are not written again (RefuseRunListRow).
+	if (KFCResultModel::ListIsQRCodes() || KFCResultModel::ListIsRunList())
 		return kQueryUnchanged;
 
 	// ----- (1) the TAB the results were searched with -----
@@ -1293,13 +1294,26 @@ bool KFCReplaceEngine::QueryUnchangedSinceSearch()
 // KFC's own (the no-track spec's F1).
 // ======================================================================================================
 
+// A QUERY RUN'S LIST'S ROWS ARE NOT WRITTEN AGAIN (the run list spec's R12): they record what the run wrote - each a place of a chain
+// of queries, with no copy and no query of its own to write with. The menu greys what it offers (KFCActionComponent); these
+// doors are for a press that never went through it - Return on a row, a shortcut. True = refused, what is said in outStatus.
+static bool RefuseRunListRow(const char* what, PMString& outStatus)
+{
+	if (!KFCResultModel::ListIsRunList())
+		return false;
+	outStatus = what;
+	outStatus.Append(": this list records a query run - its rows are not written again.");
+	outStatus.SetTranslatable(kFalse);
+	return true;
+}
+
 bool KFCReplaceEngine::CanReplaceHit(int32 chapterIdx, int32 hitIdx)
 {
 	// Nothing greys it (WhyGreyed - the one place the reasons are asked: the menu's grey state and the rows a Replace of
 	// rows selected together leaves are the same question).
 	// A QR CODE LIST'S ROWS ARE NEVER REPLACED (QR-18 - the author: "no replace"): greyed whatever the row says
-	// - the doors that turn a press away name it (ReplaceHit, ReplaceHits, KFCObjectReplace).
-	if (KFCResultModel::ListIsQRCodes())
+	// - the doors that turn a press away name it (ReplaceHit, ReplaceHits, KFCObjectReplace). Nor a query run's (RefuseRunListRow).
+	if (KFCResultModel::ListIsQRCodes() || KFCResultModel::ListIsRunList())
 		return false;
 	return WhyGreyed(chapterIdx, hitIdx) == kGreyedNot;
 }
@@ -2189,6 +2203,8 @@ bool KFCReplaceEngine::ReplaceHit(int32 chapterIdx, int32 hitIdx, PMString& outS
 		outStatus.SetTranslatable(kFalse);
 		return false;
 	}
+	if (RefuseRunListRow("Replace", outStatus))
+		return false;
 	if (!CanReplaceHit(chapterIdx, hitIdx))
 	{
 		outStatus = "Replace: this row cannot be replaced (already replaced, locked, or not a match of Find/Change).";
@@ -2223,6 +2239,8 @@ bool KFCReplaceEngine::ReplaceHits(const KFCRowsByChapter& rowsByChapter, PMStri
 		outStatus.SetTranslatable(kFalse);
 		return false;
 	}
+	if (RefuseRunListRow("Replace", outStatus))
+		return false;
 	// OBJECT ROWS: InDesign's object replace, row by row (KFCObjectReplace::ReplaceRows - it asks each row).
 	if (KFCResultModel::GetHitItem(firstChapter, firstHit) != kInvalidUID)
 		return KFCObjectReplace::ReplaceRows(rowsByChapter, outStatus);
@@ -2893,6 +2911,8 @@ bool KFCReplaceEngine::RestoreHits(const KFCRowsByChapter& rowsByChapter, PMStri
 	KFC_DIAG_WRITTEN_DOCS_CHECK("restore-rows");	// (test builds: after DocsAfterWrite, below - KFCDiagWrittenDocs.h)
 	outStatus.Clear();
 	outStatus.SetTranslatable(kFalse);
+	if (RefuseRunListRow("Restore from Copy", outStatus))
+		return false;
 	if (KFCRunGuard::IsAnyRunning())
 	{
 		outStatus.Append(KFCRunGuard::BusyMessage());
@@ -3356,6 +3376,8 @@ bool OutlineInChapter(OutlineChapter& chapter, int32 (&counts)[kOutlineRefusalCo
 
 bool KFCReplaceEngine::CanOutlineHit(int32 chapterIdx, int32 hitIdx)
 {
+	if (KFCResultModel::ListIsRunList())
+		return false;		// (RefuseRunListRow's note)
 	return OutlineRowRefusal(chapterIdx, hitIdx) == kOutlineOk;
 }
 
@@ -3364,6 +3386,8 @@ bool KFCReplaceEngine::OutlineHits(const KFCRowsByChapter& rowsByChapter, PMStri
 	KFC_DIAG_WRITTEN_DOCS_CHECK("outline-text-rows");	// (test builds: after DocsAfterWrite, below - KFCDiagWrittenDocs.h)
 	outStatus.Clear();
 	outStatus.SetTranslatable(kFalse);
+	if (RefuseRunListRow("Create Outlines", outStatus))
+		return false;
 	if (KFCRunGuard::IsAnyRunning())
 	{
 		outStatus.Append(KFCRunGuard::BusyMessage());
@@ -3734,6 +3758,8 @@ bool ClearInChapter(ClearChapter& chapter, int32 (&counts)[kClearRefusalCount])
 
 bool KFCReplaceEngine::CanClearOverridesHit(int32 chapterIdx, int32 hitIdx)
 {
+	if (KFCResultModel::ListIsRunList())
+		return false;		// (RefuseRunListRow's note)
 	return ClearRowRefusal(chapterIdx, hitIdx) == kClearOk;
 }
 
@@ -3742,6 +3768,8 @@ bool KFCReplaceEngine::ClearOverridesHits(const KFCRowsByChapter& rowsByChapter,
 	KFC_DIAG_WRITTEN_DOCS_CHECK("clear-overrides-rows");	// (test builds: after DocsAfterWrite, below - KFCDiagWrittenDocs.h)
 	outStatus.Clear();
 	outStatus.SetTranslatable(kFalse);
+	if (RefuseRunListRow("Clear Overrides", outStatus))
+		return false;
 	if (KFCRunGuard::IsAnyRunning())
 	{
 		outStatus.Append(KFCRunGuard::BusyMessage());

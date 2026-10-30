@@ -40,6 +40,7 @@
 #include "KFCProgressBar.h"		// the run's one bar - the UI half's, asked for through IKFCUIServices
 #include "KFCResultModel.h"
 #include "KFCRunGuard.h"
+#include "KFCRunList.h"			// the list the run leaves - what each query's Change All wrote, placed
 #include "KFCSavedQueries.h"	// LoadIntoFindChange - each query in turn; Describe - a file's name as the dialog shows it
 #include "KFCSearchEngine.h"
 #include "KFCUndoFollow.h"
@@ -265,6 +266,13 @@ int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 	}
 	recorder.ReadStories(targets);
 
+	// THE LIST THE RUN LEAVES (docs/superpowers/specs/2026-10-30-kfc-run-result-list-design.md): what each query's Change All writes,
+	// placed as it goes.
+	std::vector<PMString> queryNames;
+	for (size_t q = 0; q < queries.size(); ++q)
+		queryNames.push_back(queries[q].name);
+	KFCRunList::Recorder runList(queryNames, targets);
+
 	// ===== ONE SEQUENCE AROUND EVERY QUERY (one Ctrl+Z - the query-sequence spec's D5).
 	std::vector<int32> perQuery(queries.size(), -1);
 	std::vector<PMString> skipped[kSkipReasons];		// the queries skipped, by their reason (kSkipWords)
@@ -424,6 +432,8 @@ int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 				// docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md): no rows collected, no
 				// limit - over writeScope (asked once, above the loops).
 				int32 count = 0, partial = 0;
+				if (!objectQuery)
+					runList.RecordBefore(d, static_cast<int32>(q), writeScope, scopeOptions);		// (just before: the same text, the same walk)
 				const bool wrote = objectQuery
 					? KFCObjectReplace::ReplaceAllInDoc(targets[d].docRef, count, partial)
 					: KFCChangeAll::WriteDocument(targets[d].docRef, writeScope, scopeOptions, count);
@@ -436,6 +446,10 @@ int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 					why.Append(query.name);
 					break;
 				}
+				if (objectQuery)
+					runList.NoteObjectQuery();
+				else
+					runList.RecordAfter(d, static_cast<int32>(q), count);
 				perQuery[q] += count;
 				replaced += count;
 				if (count > 0)
@@ -523,12 +537,22 @@ int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 	std::vector<PMString> unclosed;
 	KFCChangeAll::LeaveRunDocuments(targets, wasModified, wroteTo, unclosed);
 
-	// ===== NO LIST (F7 - the no-track spec's section 5: the panel is left EMPTY). No header either: a book's row would
-	// read "(0)" over a run that wrote hundreds. NoteRun keeps the panel's icon on "a command ran".
+	// ===== THE LIST IT LEAVES (the run list spec's section 6): a new list of what it wrote, made here - past the write, with the
+	// chapters written given their windows - and kept with the run's Undo step (recorder.Keep: its Redo puts this list back). Making
+	// rows writes nothing, as a search's do. With no row, the panel is left EMPTY as it always was (no header either: a book's row
+	// would read "(0)"). NoteRun keeps the panel's icon on "a command ran".
 	KFCResultModel::Clear();
 	KFCSearchEngine::ForgetSearchedFindFormat();
 	KFCResultModel::NoteRun();
 	KFCResultModel::NoteChangeAllWrote(replaced > 0);		// the panel's pencil cat (KFCPanelIcon): each query is a Change All
+	const KFCResultModel::SearchScopeKind listScope = scope.fromBook ? KFCResultModel::kScopeBook
+		: scope.allDocuments ? KFCResultModel::kScopeAllDocuments
+		: (writeScope == static_cast<int32>(IWalkerScopeFactoryUtils::kStoryScope)) ? KFCResultModel::kScopeStory
+		: (writeScope == static_cast<int32>(IWalkerScopeFactoryUtils::kToEndOfStoryScope)) ? KFCResultModel::kScopeToEndOfStory
+		: (writeScope == static_cast<int32>(IWalkerScopeFactoryUtils::kSelectionScope)) ? KFCResultModel::kScopeSelection
+		: KFCResultModel::kScopeDocument;
+	PMString listWords;
+	(void)runList.FileList(scope.fromBook, scope.allDocuments, listScope, bookName, listWords);
 	recorder.Keep();
 
 	// ===== THE MESSAGE (the no-track spec's section 5).
@@ -549,6 +573,7 @@ int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 		outSummary.AppendNumber(selection.total);
 	}
 	outSummary.Append(".");		// one undo step; nothing said of Ctrl+Z (the no-track spec's F20)
+	outSummary.Append(listWords);
 	for (int32 r = 0; r < kSkipReasons; ++r)
 		AppendSkipped(outSummary, kSkipWords[r], skipped[r]);
 	KFCBookScope::AppendUnopenableNote(outSummary, unopenable);

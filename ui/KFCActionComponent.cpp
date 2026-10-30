@@ -1079,8 +1079,9 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 				// A story row's menu: Search This Story Again over a story row (a run standing greys everything, above).
 				// What the engine refuses (a changed query, a search over part of a story) it says on the status line
 				// rather than greying the item, so the user learns why (KFCSearchEngine::SearchStoryAgain).
+				// (Grey over a query run's list: no search made it - the run list spec's R12.)
 				int32 chapter = -1, group = -1;
-				const bool enable = RightClickedStory(widget, chapter, group);
+				const bool enable = RightClickedStory(widget, chapter, group) && !KFCResults()->ListIsRunList();
 				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 				break;
 			}
@@ -1096,7 +1097,7 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 				const KFCResultModel::SearchScopeKind scope = KFCResults()->GetSearchScope();
 				const bool overPart = (scope == KFCResultModel::kScopeStory || scope == KFCResultModel::kScopeToEndOfStory
 					|| scope == KFCResultModel::kScopeSelection || scope == KFCResultModel::kScopeInObjects);
-				const bool enable = !overPart && RightClickedDocument(widget, chapter);
+				const bool enable = !overPart && !KFCResults()->ListIsRunList() && RightClickedDocument(widget, chapter);
 				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 				break;
 			}
@@ -1122,8 +1123,9 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 			{
 				// A tier's own row's menu: Search These Results Again over a tier's row - its refusals (a part of a document, a
 				// document or book not open, a list no search made) said on the status line, as Search This Document Again's.
+				// (Grey over a query run's list: no search made it - the run list spec's R12.)
 				int32 tier = -1;
-				const bool enable = RightClickedTier(widget, tier);
+				const bool enable = RightClickedTier(widget, tier) && !KFCResultHistory::TierHoldsRunList(tier);
 				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 				break;
 			}
@@ -1228,11 +1230,13 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 				const int32 narrow = NarrowKindOf(action);
 				if (narrow != kKFCNarrowNone)
 				{
-					// (Every condition grey over a tier of QR codes - it lists every QR code, not narrowed: QR-18.)
+					// (Every condition grey over a tier of QR codes - it lists every QR code, not narrowed: QR-18 - and over a query
+					// run's list: no search made it, the run list spec's R12.)
 					int32 tier = -1;
 					PMString layer;
 					const bool enable = RightClickedTier(widget, tier)
 						&& !KFCResultHistory::TierHoldsQRCodes(tier)
+						&& !KFCResultHistory::TierHoldsRunList(tier)
 						&& !(NarrowIsTextOnly(narrow) && KFCResultHistory::TierHoldsObjects(tier))
 						&& (narrow != kKFCNarrowOnLayer || ActiveLayerName(ac, layer));
 					listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);

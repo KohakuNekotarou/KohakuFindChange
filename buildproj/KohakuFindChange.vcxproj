@@ -240,6 +240,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCRowFocus.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCTierStore.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCQuerySequence.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCRunList.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCChangeAll.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCSavedQueries.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCStartupShutdown.cpp"/>
@@ -295,6 +296,9 @@
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCRowFocus.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCTierStore.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCQuerySequence.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCRunListChain.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCRunListAlign.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCRunList.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCChangeAll.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCSavedQueries.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCUndoFollow.h"/>

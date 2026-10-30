@@ -522,7 +522,19 @@ bool KFCResultTree::GetRowLook(const NodeID& node, RowLook& out)
 		// place, so the row still says what it was.
 		if (row.outlined && !row.outlinedText.IsEmpty())
 			out.match = row.outlinedText;
+		// A ROW OF A QUERY RUN'S LIST (docs/superpowers/specs/2026-10-30-kfc-run-result-list-design.md R6): what its place has been is
+		// drawn where the match stands, the queries that wrote it after the line. Drawn, not kept in the row's own texts - those
+		// are what the doors compare with the document.
+		if (!row.runChain.IsEmpty())
+			out.match = row.runChain;
 		out.post = row.postText;
+		if (!row.runNames.IsEmpty())
+		{
+			out.post.Append("  (");
+			out.post.Append(row.runNames);
+			out.post.Append(")");
+			out.post.SetTranslatable(kFalse);
+		}
 		out.kept = row.kept;
 		return true;
 	}

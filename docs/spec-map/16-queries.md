@@ -163,14 +163,14 @@
 
 - **QRY-20** Run は右の並びの順に、各クエリを**本体の Change All**（一覧なし・上限なし）で、範囲の各文書に書く（10-06 の設計 F7）。
   範囲は QRY-17 の行のとおり。ブックなら章を先に全部開いて抱え、書いた章には窓を付け、書かなかった章は閉じて返す（第3章と同じ）。
-  終わってもパネルに一覧は出さない。
+  終わるとパネルに**書いた場所の一覧**が新しい段で出る（QRY-31〜・2026-10-31 から。それまでは一覧を出さなかった）。
   - 訂正:
 
-- **QRY-21** ★実行全体で **Ctrl+Z 1回**（取り消しの段は1つ）。終わると「検索と置換」の設定を空にする（同梱スクリプト FindChangeByList.jsx と同じ考え方）。
+- **QRY-21** ★実行全体で **Ctrl+Z 1回**（取り消しの段は1つ）。Ctrl+Z で Run の前の一覧に戻り、やり直しで Run の一覧（QRY-31）に戻る。終わると「検索と置換」の設定を空にする（同梱スクリプト FindChangeByList.jsx と同じ考え方）。
   - 訂正:
 
 - **QRY-22** 結果はパネルのメッセージ欄に ――
-  `Ran <N> queries: <合計> replaced (1: <数>, 2: <数>, 3: -).`（`-`＝飛ばしたクエリ・1本なら `query:`）。
+  `Ran <N> queries: <合計> replaced (1: <数>, 2: <数>, 3: -). Listed <R> place(s).`（`-`＝飛ばしたクエリ・1本なら `query:`・後ろの文＝QRY-31〜QRY-37）。
   選んだ文書のときは `… replaced (…) in <S> selected document(s) of <T>.`。
   飛ばしたクエリは ` Skipped <n> queries: nothing to find (<名前>, …).`
   （Color のクエリと、検索する文字も形式も無いクエリ＝Object のクエリなら Find Object Format が空のもの）。
@@ -225,6 +225,33 @@
   ★2026-10-14 夜の作者の決定（チャットの設計に「はい」）＝**選ばれた行が位置**：検索が通ったら、また読めない・探すものが無いで飛ばしたら、**選択を1つ下へ**（最後の行ではそのまま）。ファイルが無い・検索が断られたときは動かさない。**同じクエリを続けて Find しない**＝最後の Find のクエリ（ファイルで比べる）と、そのとき出来た一覧がまだパネルの今の一覧なら、検索せずに `Find <n> of <N>: <kind>  <name> was searched just now - its results are on the panel. Pick another query of the run order.`（灰色にはしない）。ほかの検索・Run・Clear Results・段の切り替えの後なら同じクエリでも検索する（ただし Run を Ctrl+Z してその一覧が今の一覧に戻れば、また断る＝ROW-41・2026-10-22 作者の決定 W12-a）。`Find: all <N> queries of the run order have been searched ...` の文と「1本目へ戻る」決まりは外した。段の見出しの頭の番号は選んだ行の番号。✅ 2026-10-14 夜に実機（1行目→2→3→3で止まる→断る→1行目を選び直して検索）。
   **Run が通ると段は消える**（ROW-41）。今の一覧の名前は控えられ、Run を Ctrl+Z して一覧が戻ると名前も戻る（ROW-41・2026-10-22 作者の決定 W12-a）。
   ★Find で積んだ段も、灰色になった後で中の行をクリックすれば**その段に切り替えられる**（ROW-42・2026-10-14 夕）＝条件は段ができた時に KFC がメモリの中に写したもので戻す＝**元のクエリのファイルは読み直さない**（後でファイルを直しても消しても、段の条件は変わらない）。戻した後の見出しの検算では、段の見出しの先頭の `<n>  ` を除いて比べる。Find の位置（次に検索する1本）は切り替えでは変わらない。
+  - 訂正:
+
+- **QRY-31** ★**Run が書いた場所の一覧**（2026-10-30 作者「クエリの連続でAllで置換したときに結果の一覧をだすのを」・見せ方は 10-29 夜の作者の決定 D1〜D4）＝走り終わると、**書いた場所ごとに1行**の新しい段がパネルに出る。行の一致の部分に、その場所が何から何になったかを矢印でつなぐ（`猫 → 犬 → Dog`）。行の末尾に書いたクエリの名前（`  (a, b)`）。頭に `Changed`・目玉が付く。
+  - 訂正:
+
+- **QRY-32** ★**段の見出し**＝`[Run/<範囲>] <名前>, <名前>  (N/N)`（範囲＝Document・Book・All Documents・Story・To End of Story・Selection／名前＝行に名前の出るクエリ＝Run の順）。**1行も無ければ今までどおり**パネルは空で、段も見出しも出ない。
+  - 訂正:
+
+- **QRY-33** ★**連鎖の決まり（作者の決定）**＝後のクエリの一致が前の置換と元の字にまたがったら、**1行にまとめ、影響した範囲の元の字から並べる**（`猫犬 → 犬犬 → Dog`）／空に置換＝`(deleted)` で、行は消えた場所を指す（`cat → (deleted)`）／後のクエリで元の字に戻っても**行に残す**（`猫 → 犬 → 猫`）／何も無かった所に書いた（`^` など幅の無い一致）＝`(empty)` から始まる（`(empty) → #`）／書式だけのクエリは字が同じまま並ぶ（`cat → cat`）。連鎖の字は行のために切る（合わせて約50字・切った所に `…`）。
+  - 訂正:
+
+- **QRY-34** ★**場所の求め方（推測しない）**＝本体の Change All は「何件」しか返さないので、各クエリ・各文書の Change All の**直前に**同じ範囲・同じ設定で KFC の検索を歩いて一致を控え、**書いた後の本文に、一致の外の変わらない字を当てて**新しい場所を求める。`犬犬→猫猫` のように Change To が1つの長さ（`$` が無い）なら、隣り合う一致も別の行。長さのばらつく GREP（`$0` など）で境が字から決まらないときは、**隣り合う一致を1行にまとめる**（`ab` → `[ab → aaxbbx]`）。
+  - 訂正:
+
+- **QRY-35** ★**入れない文書**＝文書ごと・クエリごとに、検索の件数と Change All の件数が違う・変わらない字が当たらない・走り終わりの本文が場所と合わない文書は、**その文書の行を1つも出さず**メッセージ欄で名前と理由を言う（`The list leaves out <文書> - <クエリ> replaced <a> where a find selected <b>.`／`The list leaves out <文書> - the replaced text of <クエリ> could not be placed.`／`The list leaves out <文書> - its text moved under the run's writes.`）。**誤った場所を指す行は、行が無いより悪い**。書き込みそのものは今までどおり（一覧のために Run が止まることは無い）。
+  - 訂正:
+
+- **QRY-36** ★**数の上限**＝行は **1000** まで。越えた分は書いて数えて言う（`The list shows the first 1000 of 1234 places.`）。連鎖の追いかけは全部の場所で行う（上限は見せる行だけ）。場所の物語が Run の途中で消えた（アンカーごと消えたインラインの枠の中など）行は作らず数えて言う（`<n> place(s) whose story is gone are not listed.`）。
+  - 訂正:
+
+- **QRY-37** **Object のクエリは一覧に入れない**＝今どおり書いて件数に入る。文に ` Object queries are not listed.`。
+  - 訂正:
+
+- **QRY-38** ★**Run の行でできること**＝着地（クリック・矢印・Next／Previous Result）・Copy Rows・Clear from Results・段の Copy These Results／Clear These Results・目玉。**書く操作は灰色**＝Replace・Restore from Copy（写しが無い）・Special Operations（Clear Overrides・Create Outlines）。Return など、メニューを通らない道も断る（`Replace: this list records a query run - its rows are not written again.`）。**探し直しも灰色**＝段の Narrow Down・Search These Results Again、物語の行の Search This Story Again、文書の行の Search This Document Again（探し直す検索が無い＝`... this list records a query run - no search made it.`）。
+  - 訂正:
+
+- **QRY-39** **次の検索は Run の一覧を段として残す**（検索の段と同じ）＝灰色の段から切り替えられ、切り替えても「検索と置換」の設定は変えない（Run の一覧にクエリは無い）。Change All in Book (No List) は一覧を作らない（名前のとおり・F18）。⚠**Run の一覧がある間は Change All in Book は断る**（検索の一覧と同じ＝`Change All: the panel holds a list - choose Clear Results first.`）。
   - 訂正:
 
 ---
