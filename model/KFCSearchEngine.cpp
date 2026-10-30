@@ -3622,7 +3622,7 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	{
 		KFCRubyConditions asking;
 		(void)KFCRubySearch::IsTabCurrent(&asking);
-		if (asking.withoutRuby && asking.base.IsEmpty())
+		if (asking.kind == kKFCRubyFindWithout && asking.base.IsEmpty())
 		{
 			outSummary.Append("Text Without Ruby looks for a text: type it in Base Text on the Ruby tab in Edit > Find/Change.");
 			return 0;
@@ -3859,7 +3859,7 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	{
 		if (againCopy != nil && again != nil && !again->freshQuery)
 		{
-			rubyAsked.withoutRuby = againCopy->rubyWithout;
+			rubyAsked.kind = againCopy->rubyKind;
 			rubyAsked.base = againCopy->rubyBase;
 			rubyAsked.reading = againCopy->rubyReading;
 		}
@@ -3874,7 +3874,7 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 		else if (tableTab)
 			KFCQueryCopier::CaptureTables(copy, tableFindStyle, tableOverridesOnly);
 		else if (rubyTab)
-			KFCQueryCopier::CaptureRuby(copy, rubyAsked.withoutRuby, rubyAsked.base, rubyAsked.reading);
+			KFCQueryCopier::CaptureRuby(copy, rubyAsked.kind, rubyAsked.base, rubyAsked.reading);
 		else
 			KFCQueryCopier::Capture(copy);
 		if (copy.valid)
@@ -5518,7 +5518,7 @@ bool KFCSearchEngine::SearchDocumentAgain(int32 chapterIdx, PMString& outStatus)
 			KFCRubyConditions listAsked;
 			if (asked != nil)
 			{
-				listAsked.withoutRuby = asked->rubyWithout;
+				listAsked.kind = asked->rubyKind;
 				listAsked.base = asked->rubyBase;
 				listAsked.reading = asked->rubyReading;
 			}

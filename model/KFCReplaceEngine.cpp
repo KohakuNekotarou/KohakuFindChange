@@ -72,6 +72,7 @@
 #include "KFCCopyStore.h"		// the copies a row's Replace takes and its Restore from Copy puts back
 #include "KFCTableSearch.h"		// a table row's Replace - the Table tab's Change side
 #include "KFCRubySearch.h"		// a ruby row's Replace - the Ruby tab's
+#include "KFCQueryCopy.h"		// rubyKind - a list of ruby marks
 #include "ITableModel.h"
 #include "KFCTextOverrides.h"	// ClearOverrides - a text row's Special Operations > Clear Overrides
 #ifdef KFC_DIAG
@@ -4091,6 +4092,10 @@ public:
 	virtual OwnTabRefusal RowDoor(const UIDRef& storyRef, OwnTabRow& row) = 0;
 	/** Inside the step: writes the row, outWords what it draws after it (empty: its own text). */
 	virtual ErrorCode WriteRow(const UIDRef& storyRef, const OwnTabRow& row, PMString& outWords) = 0;
+	/** Inside the step: writes a document's rows - each by WriteRow, marked. A way whose write moves text writes them its own way (MarksWrite). False = InDesign would not write a row. */
+	virtual bool WriteChapter(OwnTabChapter& chapter);
+	/** What is said when it would not (a way that knows why says so). */
+	virtual const char* WontWriteWords() const { return "Replace: InDesign would not write a row - nothing was changed."; }
 	/** The special operation that marks a written row (its word - SpecialRowWord). */
 	virtual int32 RowMark() const = 0;
 	virtual const char* StepKey() const = 0;
@@ -4184,27 +4189,127 @@ private:
 };
 
 // THE ROWS OF ONE DOCUMENT, inside the write's step. Each row's words read again after its command. False = InDesign would not write a row: the caller takes the step back.
-bool WriteRowsInChapter(OwnTabWrite& how, OwnTabChapter& chapter)
+bool OwnTabWrite::WriteChapter(OwnTabChapter& chapter)
 {
 	IDataBase* const db = chapter.docRef.GetDataBase();
 	if (db == nil)
 		return false;
-	how.EnterDocument(db);
+	EnterDocument(db);
 	for (size_t k = 0; k < chapter.rows.size(); ++k)
 	{
 		OwnTabRow& row = chapter.rows[k];
 		const UIDRef storyRef(db, row.story);
 		PMString words;
 		words.SetTranslatable(kFalse);
-		if (how.WriteRow(storyRef, row, words) != kSuccess)
+		if (WriteRow(storyRef, row, words) != kSuccess)
 			return false;
-		KFC_DIAG_LOG("OWNTABWRITE %s chapter=%d row=%d story=%u at=%d", how.StepName(), chapter.chapterIdx, row.hit, row.story.Get(), (int)row.start);
+		KFC_DIAG_LOG("OWNTABWRITE %s chapter=%d row=%d story=%u at=%d", StepName(), chapter.chapterIdx, row.hit, row.story.Get(), (int)row.start);
 		row.done = true;
 		++chapter.written;
-		KFCResultModel::MarkHitOwnChange(chapter.chapterIdx, row.hit, how.RowMark(), words);
+		KFCResultModel::MarkHitOwnChange(chapter.chapterIdx, row.hit, RowMark(), words);
 	}
 	return true;
 }
+
+// THE RUBY TAB'S MARKS (the spec's R12): the reading in the mark itself, whatever the Change side says; the marks taken out of the text, so the document's other rows are carried and read
+// back (OutlineInChapter's way) - a written row stands on its base then, and reads as a row with ruby does.
+class MarksWrite : public OwnTabWrite
+{
+public:
+	MarksWrite() : fStillThere(false) {}
+	virtual const char* NothingToChange() const { return nil; }
+	virtual void EnterDocument(IDataBase* /*db*/) {}
+	virtual OwnTabRefusal RowDoor(const UIDRef& storyRef, OwnTabRow& row)
+	{
+		int32 baseOffset = 0, baseLength = 0;
+		WideString reading;
+		return KFCRubySearch::ReadMark(storyRef, row.start, row.end, baseOffset, baseLength, reading) ? kOwnTabOk : kOwnTabAsAsked;
+	}
+	virtual ErrorCode WriteRow(const UIDRef& /*storyRef*/, const OwnTabRow& /*row*/, PMString& /*outWords*/) { return kFailure; }	// (WriteChapter's own)
+	virtual bool WriteChapter(OwnTabChapter& chapter)
+	{
+		IDataBase* const db = chapter.docRef.GetDataBase();
+		const int32 chapterIdx = chapter.chapterIdx;
+		const int32 hitCount = KFCResultModel::GetHitCount(chapterIdx);
+		if (db == nil || hitCount <= 0)
+			return false;
+		std::vector<RowNow> rowNow(static_cast<size_t>(hitCount));
+		std::map<int32, size_t> writing;		// hit -> its place in chapter.rows
+		for (size_t k = 0; k < chapter.rows.size(); ++k)
+			writing[chapter.rows[k].hit] = k;
+		std::vector<int32> keptRows;			// every other row that stands - read back at the end
+		for (int32 i = 0; i < hitCount; ++i)
+		{
+			const std::map<int32, size_t>::const_iterator r = writing.find(i);
+			if (r != writing.end())
+			{
+				const OwnTabRow& row = chapter.rows[r->second];
+				SetRowAt(db, rowNow[static_cast<size_t>(i)], row.story, row.start, row.end);	// the doors have just read it there
+				continue;
+			}
+			KeepRowIfItStands(chapterIdx, i, db, rowNow, keptRows);
+		}
+		// IN TEXT ORDER (their story, then where they start now).
+		std::vector<std::pair<std::pair<UID, TextIndex>, size_t> > order;
+		for (size_t k = 0; k < chapter.rows.size(); ++k)
+		{
+			TextIndex now = kInvalidTextIndex;
+			if (RowStartNow(db, rowNow[static_cast<size_t>(chapter.rows[k].hit)], now))
+				order.push_back(std::make_pair(std::make_pair(chapter.rows[k].story, now), k));
+		}
+		std::sort(order.begin(), order.end());
+		std::vector<int32> baseLengths(chapter.rows.size(), 0);
+		for (size_t o = 0; o < order.size(); ++o)
+		{
+			OwnTabRow& row = chapter.rows[order[o].second];
+			TextIndex at = kInvalidTextIndex;
+			if (!RowStartNow(db, rowNow[static_cast<size_t>(row.hit)], at))
+				continue;
+			const RowThread thread = rowNow[static_cast<size_t>(row.hit)].thread;
+			const TextIndex offset = rowNow[static_cast<size_t>(row.hit)].offset;
+			const int32 length = rowNow[static_cast<size_t>(row.hit)].length;
+			int32 baseLength = 0;
+			if (KFCRubySearch::WriteMark(UIDRef(db, row.story), at, length, baseLength, fStillThere) != kSuccess)
+				return false;
+			CarryRowsPast(rowNow, thread, offset, offset + length, baseLength);
+			SetRowAt(db, rowNow[static_cast<size_t>(row.hit)], row.story, at, at + baseLength);
+			KFC_DIAG_LOG("OWNTABWRITE mark chapter=%d row=%d story=%u at=%d length=%d base=%d", chapterIdx, row.hit, row.story.Get(), (int)at, (int)length, (int)baseLength);
+			row.done = true;
+			++chapter.written;
+		}
+		// EVERY ROW WHERE ITS TEXT STANDS NOW (a Replace's read-back): the rows carried, the rows left, and the written ones - on their base now.
+		ReadBackRows(chapterIdx, db, rowNow, keptRows);
+		for (size_t k = 0; k < chapter.rows.size(); ++k)
+		{
+			const OwnTabRow& row = chapter.rows[k];
+			const RowNow& place = rowNow[static_cast<size_t>(row.hit)];
+			TextIndex s = kInvalidTextIndex;
+			if (!RowStartNow(db, place, s))
+				continue;
+			const UIDRef storyRef(db, row.story);
+			KFCResultModel::SetHitRange(chapterIdx, row.hit, row.story, s, s + place.length);
+			KFCSearchEngine::RereadRowText(chapterIdx, row.hit, storyRef, s, s + place.length);
+			if (row.done)
+				KFCResultModel::MarkHitOwnChange(chapterIdx, row.hit, RowMark(),
+					KFCRubySearch::RowWords(storyRef, s, s + place.length, KFCRubySearch::ReadingOn(storyRef, s, s + place.length)));
+		}
+		for (std::set<UID>::const_iterator st = chapter.stories.begin(); st != chapter.stories.end(); ++st)
+			KFCSearchEngine::RereadStoryLead(chapterIdx, UIDRef(db, *st));
+		return true;
+	}
+	virtual const char* WontWriteWords() const
+	{
+		return fStillThere ? "Replace: the marks stay in the text under Track Changes - turn it off for this story to take them out. Nothing was changed."
+			: "Replace: InDesign would not write a row - nothing was changed.";
+	}
+	virtual int32 RowMark() const { return kKFCSpecialRubyChange; }
+	virtual const char* StepKey() const { return kKFCRubyChangeStepKey; }
+	virtual const char* StepName() const { return "Change Ruby"; }
+	virtual const char* Verb() const { return "Changed ruby on"; }
+	virtual const char* Noun() const { return "rows"; }
+private:
+	bool	fStillThere;
+};
 
 bool WriteOwnTabRows(OwnTabWrite& how, const KFCRowsByChapter& rowsByChapter, PMString& outStatus)
 {
@@ -4350,7 +4455,7 @@ bool WriteOwnTabRows(OwnTabWrite& how, const KFCRowsByChapter& rowsByChapter, PM
 		}
 		for (size_t c = 0; c < chapters.size() && !failed; ++c)
 		{
-			if (!WriteRowsInChapter(how, chapters[c]))
+			if (!how.WriteChapter(chapters[c]))
 				failed = true;
 			writtenRows += chapters[c].written;
 		}
@@ -4373,7 +4478,7 @@ bool WriteOwnTabRows(OwnTabWrite& how, const KFCRowsByChapter& rowsByChapter, PM
 		for (size_t c = 0; c < chapters.size(); ++c)
 			for (std::set<UID>::const_iterator s = chapters[c].stories.begin(); s != chapters[c].stories.end(); ++s)
 				KFCRowFoci::ReanchorStory(chapters[c].chapterIdx, *s);
-		outStatus.Append(failed ? "Replace: InDesign would not write a row - nothing was changed." : "Replace: no row was written.");
+		outStatus.Append(failed ? how.WontWriteWords() : "Replace: no row was written.");
 		return false;
 	}
 	for (size_t c = 0; c < chapters.size(); ++c)
@@ -4399,6 +4504,12 @@ static bool ReplaceOwnTabRows(const KFCRowsByChapter& rowsByChapter, PMString& o
 {
 	if (KFCResultModel::ListIsRuby())
 	{
+		const std::shared_ptr<const KFCQueryCopy> asked(KFCResultModel::GetQueryCopy());
+		if (asked != nil && asked->rubyKind == kKFCRubyFindMarks)
+		{
+			MarksWrite marks;
+			return WriteOwnTabRows(marks, rowsByChapter, outStatus);
+		}
 		RubyWrite ruby;
 		return WriteOwnTabRows(ruby, rowsByChapter, outStatus);
 	}

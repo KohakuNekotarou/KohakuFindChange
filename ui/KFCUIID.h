@@ -784,6 +784,7 @@ DECLARE_PMID(kWidgetIDSpace, kKFCRubyTabRemoveWidgetID, kKFCUIPrefix + 75)
 #define kKFCRubyTabFindKey				kKFCStringPrefix "kKFCRubyTabFindKey"
 #define kKFCRubyTabWithKey				kKFCStringPrefix "kKFCRubyTabWithKey"
 #define kKFCRubyTabWithoutKey			kKFCStringPrefix "kKFCRubyTabWithoutKey"
+#define kKFCRubyTabMarksKey				kKFCStringPrefix "kKFCRubyTabMarksKey"
 #define kKFCRubyTabBaseKey				kKFCStringPrefix "kKFCRubyTabBaseKey"
 #define kKFCRubyTabReadingKey			kKFCStringPrefix "kKFCRubyTabReadingKey"
 #define kKFCRubyTabChangeKey			kKFCStringPrefix "kKFCRubyTabChangeKey"

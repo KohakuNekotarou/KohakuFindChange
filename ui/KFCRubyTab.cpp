@@ -46,8 +46,7 @@ bool gAskedSet = false;
 // The drop-downs' entries, in the face's order (KFCUI.fr).
 const int32 kAllDocumentsEntry = 0;
 const int32 kDocumentEntry = 1;
-const int32 kWithRubyEntry = 0;
-const int32 kWithoutRubyEntry = 1;
+// (Find:'s entries are KFCModelTypes.h's kKFCRubyFind* - the same order.)
 
 KFCRubyConditions& Asked()
 {
@@ -87,12 +86,19 @@ void SetField(IPanelControlData* panel, const WidgetID& widget, const PMString& 
 		field->SetString(words, kTrue, kFalse);
 }
 
-// Ruby: means nothing to Text Without Ruby: grey there.
+// Ruby: means nothing to Text Without Ruby, nor the Change side to ruby from marks - the reading is in the mark: grey there.
 void ShowKind(IPanelControlData* panel)
 {
 	IControlView* const reading = (panel != nil) ? panel->FindWidget(kKFCRubyTabReadingWidgetID) : nil;
 	if (reading != nil)
-		reading->Enable(Asked().withoutRuby ? kFalse : kTrue);
+		reading->Enable(Asked().kind == kKFCRubyFindWithout ? kFalse : kTrue);
+	const bool changes = (Asked().kind != kKFCRubyFindMarks);
+	IControlView* const change = (panel != nil) ? panel->FindWidget(kKFCRubyTabChangeWidgetID) : nil;
+	if (change != nil)
+		change->Enable(changes ? kTrue : kFalse);
+	IControlView* const remove = (panel != nil) ? panel->FindWidget(kKFCRubyTabRemoveWidgetID) : nil;
+	if (remove != nil)
+		remove->Enable(changes ? kTrue : kFalse);
 }
 
 // THE FACE WRITTEN FROM WHAT IS KEPT. Its own widgets only - nothing is walked. Not heard (notifyOfChange kFalse).
@@ -104,7 +110,7 @@ void FillFace(IPMUnknown* face)
 		scope->Select((Asked().scope == IWalkerScopeFactoryUtils::kAllDocumentScope) ? kAllDocumentsEntry : kDocumentEntry, kTrue, kFalse);
 	InterfacePtr<IDropDownListController> kind(QueryList(face, kKFCRubyTabKindWidgetID));
 	if (kind != nil)
-		kind->Select(Asked().withoutRuby ? kWithoutRubyEntry : kWithRubyEntry, kTrue, kFalse);
+		kind->Select(Asked().kind, kTrue, kFalse);
 	SetField(panel, kKFCRubyTabBaseWidgetID, Asked().base);
 	SetField(panel, kKFCRubyTabReadingWidgetID, Asked().reading);
 	SetField(panel, kKFCRubyTabChangeWidgetID, Asked().changeTo);
@@ -260,11 +266,11 @@ public:
 		{
 			InterfacePtr<IDropDownListController> list(view, UseDefaultIID());
 			const int32 entry = (list != nil) ? list->GetSelected() : -1;
-			if (entry == kWithRubyEntry || entry == kWithoutRubyEntry)
-				Asked().withoutRuby = (entry == kWithoutRubyEntry);
+			if (entry >= kKFCRubyFindWith && entry <= kKFCRubyFindMarks)
+				Asked().kind = entry;
 			InterfacePtr<IPanelControlData> panel(this, UseDefaultIID());
 			ShowKind(panel);
-			KFC_DIAG_LOG("RUBYTAB without=%d", Asked().withoutRuby ? 1 : 0);
+			KFC_DIAG_LOG("RUBYTAB kind=%d", static_cast<int>(Asked().kind));
 		}
 		else if (widget == kKFCRubyTabBaseWidgetID)
 		{

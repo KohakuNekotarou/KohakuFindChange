@@ -52,5 +52,16 @@
 - **RUBY-40** 灰色と扉は Table タブの TBL-40 と同じ。動く＝Copy・Clear・Search This Document Again・Search These Results Again（その一覧の探した条件で）。段から戻すと同じ行。Change All in Book は灰色。（R9・R10）回帰 `rb-menus`・`rb-search-again`・`rb-doc-again`・`rb-tier-back`・`rb-changeall-refused`
   - 訂正:
 
-- **RUBY-41** 作っていないもの＝原稿の印（`｜漢字《かんじ》`）から付けて印を消す形・読みの GREP・ルビの見た目の検索と置換。（R11）
+- **RUBY-41** 作っていないもの＝読みの GREP・ルビの見た目の検索と置換・青空文庫以外の印の書き方（`漢字（かんじ）` など）。（R11）
+  - 訂正:
+
+## 6. 原稿の印からルビ（Ruby Marks in Text）
+
+- **RUBY-50** ★`Find:` の3つ目。青空文庫の書き方＝`｜漢字《かんじ》`（バーは全角・半角）、バーが無ければ《の直前の漢字（々〆〇ヶを含む）。読みが空・行をまたぐ・親文字が無いものは印でない。Base Text・Ruby で絞れる。行は印の範囲（字はふつうの行のまま）。段の名前＝`[Ruby/Document] F:"[Ruby Marks]"`。（R12）回帰 `rb-marks-list`・`rb-marks-not`・`rb-marks-base`・`rb-marks-reading`・`rb-marks-face`
+  - 訂正:
+
+- **RUBY-51** ★Replace＝読みを親文字に付け（グループルビ）、印を文字から消す。Change 側は見ない（欄は灰色）。文字が動くので同じ文書の他の行を運ぶ（`MarksWrite::WriteChapter`＝`OutlineInChapter` の型）。書いた行は親文字に立ち、`Changed`＋`親文字《読み》`。もう一度は「既にそのとおり」。全部で Ctrl+Z 1回＝文字も行も戻る。（R12）回帰 `rb-marks-replace-one`・`rb-marks-replace-all`・`rb-marks-undo`・`rb-marks-again`・`rb-marks-cell`・`rb-marks-book`
+  - 訂正:
+
+- **RUBY-52** ★Track Changes が入っている物語は断る（消した字が物語に残るので、段ごと戻して文で言う）。実測＝自分の変更履歴の挿入を消すのは記録に残らず本当に消える（その場合は書ける）。回帰 `rb-marks-track`
   - 訂正:

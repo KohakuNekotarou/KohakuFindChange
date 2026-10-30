@@ -80,7 +80,7 @@ struct KFCQueryCopy
 	PMString	tableFindStyle;
 	bool		tableOverridesOnly;
 	// A RUBY LIST'S (CaptureRuby): the same.
-	bool		rubyWithout;
+	int32		rubyKind;				// kKFCRubyFindWith ... (KFCModelTypes.h)
 	PMString	rubyBase;
 	PMString	rubyReading;
 
@@ -105,7 +105,7 @@ namespace KFCQueryCopier
 	/** A TABLE LIST'S (KFCTableSearch): the mode, kKFCTableSearchMode, and its find side - nothing of Find/Change's, nothing stated back. */
 	void CaptureTables(KFCQueryCopy& out, const PMString& findStyle, bool overridesOnly);
 	/** A RUBY LIST'S (KFCRubySearch): the mode, kKFCRubySearchMode, and its find side - the same. */
-	void CaptureRuby(KFCQueryCopy& out, bool withoutRuby, const PMString& base, const PMString& reading);
+	void CaptureRuby(KFCQueryCopy& out, int32 kind, const PMString& base, const PMString& reading);
 
 	/** State `copy` back into Find/Change: the tab, then every field that differs from what the dialog holds now, with the
 	    dialog's own commands (KFCFindChangeCmds; the formats with kClearFindFormatCmdBoss / kClearChangeFormatCmdBoss and

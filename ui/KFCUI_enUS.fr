@@ -190,6 +190,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCRubyTabFindKey,				"Find:",
                 kKFCRubyTabWithKey,				"Text With Ruby",
                 kKFCRubyTabWithoutKey,			"Text Without Ruby",
+                kKFCRubyTabMarksKey,			"Ruby Marks in Text",
                 kKFCRubyTabBaseKey,				"Base Text:",
                 kKFCRubyTabReadingKey,			"Ruby:",
                 kKFCRubyTabChangeKey,			"Change Ruby To:",

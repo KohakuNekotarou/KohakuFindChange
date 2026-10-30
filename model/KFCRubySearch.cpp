@@ -115,6 +115,117 @@ bool Holds(const WideString& words, const PMString& part)
 	return part.IsEmpty() || Plain(words).IndexOfString(part) >= 0;
 }
 
+// ----- THE MARKS OF A MANUSCRIPT (the spec's R12). U+FF5C or U+007C the bar, U+300A and U+300B the reading's marks, as Aozora Bunko writes ruby.
+const char32_t kMarkOpen = 0x300A;
+const char32_t kMarkClose = 0x300B;
+
+bool IsBar(char32_t c)
+{
+	return c == 0xFF5C || c == 0x007C;
+}
+
+// What Aozora Bunko's rule takes for a base with no bar: the kanji just before the reading.
+bool IsKanji(char32_t c)
+{
+	return (c >= 0x3400 && c <= 0x9FFF) || (c >= 0xF900 && c <= 0xFAFF) || (c >= 0x20000 && c <= 0x2FFFF)
+		|| c == 0x3005 || c == 0x3006 || c == 0x3007 || c == 0x30F6;
+}
+
+// No mark runs over these: a paragraph's end, a table's or an anchor's character, anything of InDesign's in the text.
+bool StopsMark(char32_t c)
+{
+	return c < 0x20 || c == 0xFEFF || (c >= 0xE000 && c <= 0xF8FF);
+}
+
+struct MarkPlace
+{
+	size_t	first;		// the bar, or the base when there is none
+	size_t	baseStart;
+	size_t	open;		// the opening mark; the base ends here
+	size_t	close;		// the closing mark
+};
+
+// THE MARK WHOSE READING OPENS AT `open`, if it is one: a reading of something, closed before the line ends, after a base - the text from a bar since the last mark (the bar's reach, in
+// Aozora Bunko's rule), or else the kanji just before it.
+bool MarkAtOpen(const std::u32string& text, size_t open, MarkPlace& out)
+{
+	size_t close = open + 1;
+	while (close < text.size() && text[close] != kMarkClose && text[close] != kMarkOpen && !StopsMark(text[close]))
+		++close;
+	if (close >= text.size() || text[close] != kMarkClose || close == open + 1)
+		return false;
+	size_t back = open;
+	while (back > 0 && !IsBar(text[back - 1]) && text[back - 1] != kMarkClose && text[back - 1] != kMarkOpen && !StopsMark(text[back - 1]))
+		--back;
+	if (back > 0 && IsBar(text[back - 1]))
+	{
+		if (back == open)
+			return false;		// a bar and no base
+		out.first = back - 1;
+		out.baseStart = back;
+	}
+	else
+	{
+		size_t kanji = open;
+		while (kanji > 0 && IsKanji(text[kanji - 1]))
+			--kanji;
+		if (kanji == open)
+			return false;		// not the base of anything
+		out.first = kanji;
+		out.baseStart = kanji;
+	}
+	out.open = open;
+	out.close = close;
+	return true;
+}
+
+std::u32string U32Of(const PMString& words)
+{
+	std::u32string out;
+	const WideString wide(words);
+	for (WideString::const_iterator c = wide.begin(); c != wide.end(); ++c)
+		out.push_back(static_cast<char32_t>(static_cast<uint32>(*c)));
+	return out;
+}
+
+WideString WideOf(const std::u32string& words)
+{
+	WideString out;
+	for (size_t c = 0; c < words.size(); ++c)
+		out.Append(UTF32TextChar(static_cast<uint32>(words[c])));
+	return out;
+}
+
+// THE MARKS OF ONE STORY, by the conditions.
+void WalkMarks(const UIDRef& storyRef, ITextModel* model, const KFCRubyConditions& asked, size_t limit,
+	std::vector<KFCSearchEngine::ListedPlace>& ioPlaces, bool& outCapped)
+{
+	const std::u32string text(U32Of(KFCSearchEngine::ReadText(storyRef, 0, model->TotalLength())));
+	if (static_cast<int32>(text.size()) != model->TotalLength())
+		return;		// (a reading of another length has not told each position's character)
+	const std::u32string wantedBase(U32Of(asked.base)), wantedReading(U32Of(asked.reading));
+	for (size_t open = text.find(kMarkOpen); open != std::u32string::npos; open = text.find(kMarkOpen, open + 1))
+	{
+		MarkPlace mark;
+		if (!MarkAtOpen(text, open, mark) || StandsInSetAsideText(model, static_cast<TextIndex>(open)))
+			continue;
+		const std::u32string base(text, mark.baseStart, mark.open - mark.baseStart);
+		const std::u32string reading(text, mark.open + 1, mark.close - mark.open - 1);
+		if (base.find(wantedBase) == std::u32string::npos || reading.find(wantedReading) == std::u32string::npos)
+			continue;
+		if (ioPlaces.size() >= limit)
+		{
+			outCapped = true;
+			return;
+		}
+		KFCSearchEngine::ListedPlace place;
+		place.story = storyRef.GetUID();
+		place.start = static_cast<TextIndex>(mark.first);
+		place.end = static_cast<TextIndex>(mark.close + 1);
+		ioPlaces.push_back(place);
+	}
+}
+
 // THE RUNS OF ONE STORY WITH RUBY, by the conditions.
 void WalkWithRuby(const UIDRef& storyRef, ITextModel* model, const KFCRubyConditions& asked, size_t limit,
 	std::vector<KFCSearchEngine::ListedPlace>& ioPlaces, bool& outCapped)
@@ -217,14 +328,16 @@ bool WalkDoc(const UIDRef& docRef, const KFCRubyConditions& asked, size_t limit,
 		InterfacePtr<ITextModel> model(storyRef, UseDefaultIID());
 		if (model == nil)
 			continue;
-		if (asked.withoutRuby)
+		if (asked.kind == kKFCRubyFindWithout)
 			WalkWithoutRuby(storyRef, model, asked, limit, places, outCapped);
+		else if (asked.kind == kKFCRubyFindMarks)
+			WalkMarks(storyRef, model, asked, limit, places, outCapped);
 		else
 			WalkWithRuby(storyRef, model, asked, limit, places, outCapped);
 	}
 	KFCSearchEngine::BuildListedHits(docRef, places, outHits, outVersions);
 	// What the rows with ruby draw there; a row without any draws its text.
-	for (size_t h = 0; !asked.withoutRuby && h < outHits.size() && h < places.size(); ++h)
+	for (size_t h = 0; asked.kind == kKFCRubyFindWith && h < outHits.size() && h < places.size(); ++h)
 	{
 		const UIDRef storyRef(db, places[h].story);
 		outHits[h].runChain = KFCRubySearch::RowWords(storyRef, places[h].start, places[h].end, KFCRubySearch::ReadingOn(storyRef, places[h].start, places[h].end));
@@ -273,7 +386,9 @@ bool KFCRubySearch::IsTabCurrent(KFCRubyConditions* outConditions)
 			if (eq != std::string::npos)
 				value.SetUTF8String(line.substr(eq + 1));
 			if (line == "kind=without")
-				conditions.withoutRuby = true;
+				conditions.kind = kKFCRubyFindWithout;
+			else if (line == "kind=marks")
+				conditions.kind = kKFCRubyFindMarks;
 			else if (line.compare(0, 5, "base=") == 0)
 				conditions.base = value;
 			else if (line.compare(0, 5, "ruby=") == 0)
@@ -455,6 +570,58 @@ ErrorCode KFCRubySearch::Apply(const UIDRef& story, TextIndex start, TextIndex e
 	}
 	InterfacePtr<ICommand> apply(cmds->ApplyCmd(RangeData(start, end), attrs, kCharAttrStrandBoss));
 	return (apply != nil) ? CmdUtils::ProcessCommand(apply) : kFailure;
+}
+
+bool KFCRubySearch::ReadMark(const UIDRef& story, TextIndex start, TextIndex end, int32& outBaseOffset, int32& outBaseLength, WideString& outReading)
+{
+	outBaseOffset = 0;
+	outBaseLength = 0;
+	outReading.clear();
+	if (end <= start)
+		return false;
+	const std::u32string text(U32Of(KFCSearchEngine::ReadText(story, start, end - start)));
+	const size_t open = text.rfind(kMarkOpen);
+	MarkPlace mark;
+	if (open == std::u32string::npos || !MarkAtOpen(text, open, mark) || mark.first != 0 || mark.close + 1 != text.size())
+		return false;
+	outBaseOffset = static_cast<int32>(mark.baseStart);
+	outBaseLength = static_cast<int32>(mark.open - mark.baseStart);
+	outReading = WideOf(std::u32string(text, mark.open + 1, mark.close - mark.open - 1));
+	return true;
+}
+
+ErrorCode KFCRubySearch::WriteMark(const UIDRef& story, TextIndex at, int32 length, int32& outBaseLength, bool& outStillThere)
+{
+	outBaseLength = 0;
+	outStillThere = false;
+	InterfacePtr<ITextModel> model(story, UseDefaultIID());
+	InterfacePtr<ITextModelCmds> cmds(story, UseDefaultIID());
+	int32 baseOffset = 0, baseLength = 0;
+	WideString reading;
+	if (model == nil || cmds == nil || !ReadMark(story, at, at + length, baseOffset, baseLength, reading))
+		return kFailure;
+	// THE READING AND ITS MARKS FIRST, THEN THE BAR: the later text first, so the earlier place stands.
+	const TextIndex open = at + baseOffset + baseLength;
+	const int32 readingLength = at + length - open;
+	const int32 before = model->TotalLength();
+	InterfacePtr<ICommand> outReadingCmd(cmds->DeleteCmd(open, readingLength));
+	if (outReadingCmd == nil || CmdUtils::ProcessCommand(outReadingCmd) != kSuccess)
+		return kFailure;
+	if (model->TotalLength() != before - readingLength)
+	{
+		outStillThere = true;		// Track Changes keeps deleted text in the story
+		return kFailure;
+	}
+	if (baseOffset > 0)
+	{
+		InterfacePtr<ICommand> outBarCmd(cmds->DeleteCmd(at, baseOffset));
+		if (outBarCmd == nil || CmdUtils::ProcessCommand(outBarCmd) != kSuccess)
+			return kFailure;
+	}
+	const ErrorCode applied = Apply(story, at, at + baseLength, reading);
+	if (applied == kSuccess)
+		outBaseLength = baseLength;
+	return applied;
 }
 
 ErrorCode KFCRubySearch::Remove(const UIDRef& story, TextIndex start, TextIndex end)

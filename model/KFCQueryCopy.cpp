@@ -36,7 +36,7 @@ KFCQueryCopy::KFCQueryCopy()
 	  replaceGlyph(kInvalidGlyphID), objectType(0), findParaStyle(kInvalidUID), findCharStyle(kInvalidUID),
 	  changeParaStyle(kInvalidUID), changeCharStyle(kInvalidUID), objectFindStyle(kInvalidUID),
 	  objectChangeStyle(kInvalidUID), attrDB(nil), changeConditionsMode(0), useFindROS(kFalse), useReplaceROS(kFalse),
-	  valid(false), tableOverridesOnly(false), rubyWithout(false)
+	  valid(false), tableOverridesOnly(false), rubyKind(0)
 {
 }
 
@@ -286,11 +286,11 @@ void KFCQueryCopier::CaptureTables(KFCQueryCopy& out, const PMString& findStyle,
 	out.valid = true;
 }
 
-void KFCQueryCopier::CaptureRuby(KFCQueryCopy& out, bool withoutRuby, const PMString& base, const PMString& reading)
+void KFCQueryCopier::CaptureRuby(KFCQueryCopy& out, int32 kind, const PMString& base, const PMString& reading)
 {
 	out = KFCQueryCopy();
 	out.mode = static_cast<int32>(kKFCRubySearchMode);
-	out.rubyWithout = withoutRuby;
+	out.rubyKind = kind;
 	out.rubyBase = base;
 	out.rubyBase.SetTranslatable(kFalse);
 	out.rubyReading = reading;

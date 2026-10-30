@@ -3981,6 +3981,7 @@ resource KFCRubyTabPanelWidget (kKFCRubyTabRsrcID + index_enUS)
 					{{
 						kKFCRubyTabWithKey,
 						kKFCRubyTabWithoutKey,
+						kKFCRubyTabMarksKey,
 					}}
 					kEVENoSpaceAfter,
 				),

@@ -224,17 +224,20 @@ enum { kKFCTableSearchMode = 102 };
 /** THE RUBY TAB'S "SEARCH MODE" (docs/superpowers/specs/2026-10-31-kfc-ruby-tab-design.md): the Table tab's for its own tab (KFCRubySearch::IsTabCurrent). KFC'S ALONE. */
 enum { kKFCRubySearchMode = 103 };
 
+/** The Ruby tab's Find: - its entries' order (KFCUI.fr). Marks = ruby written out in the text as a manuscript writes it, a base and its reading in marks (KFCRubySearch.h). */
+enum { kKFCRubyFindWith = 0, kKFCRubyFindWithout = 1, kKFCRubyFindMarks = 2 };
+
 /** WHAT THE RUBY TAB ASKS (the face's - KFCRubyTab, read by IKFCUIServices::RubyTabConditions; a ruby list keeps its find side in its query copy). */
 struct KFCRubyConditions
 {
-	bool		withoutRuby;	// Find: Text Without Ruby - the occurrences of base with none on them; else the text with ruby
+	int32		kind;			// Find: - kKFCRubyFindWith, kKFCRubyFindWithout (the occurrences of base with none on them), kKFCRubyFindMarks
 	PMString	base;			// its base contains this; empty = any (Text Without Ruby: what it looks for - refused empty)
-	PMString	reading;		// its reading contains this; empty = any (Text With Ruby alone)
+	PMString	reading;		// its reading contains this; empty = any (not Text Without Ruby)
 	PMString	changeTo;		// the reading a row's Replace gives it; empty = none given
 	bool		removeRuby;		// ...or its Replace takes the ruby off - over changeTo
 	int32		scope;			// its Search: - IWalkerScopeFactoryUtils::kDocumentScope (at launch) or kAllDocumentScope
 
-	KFCRubyConditions() : withoutRuby(false), removeRuby(false), scope(0) {}
+	KFCRubyConditions() : kind(kKFCRubyFindWith), removeRuby(false), scope(0) {}
 };
 
 /** A style path with one character swapped for another - KFCStylePathWords' way, and the test build's fault switch's the other way. */

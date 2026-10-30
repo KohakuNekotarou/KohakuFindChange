@@ -663,13 +663,13 @@ namespace
 			KFCRubyConditions asked;
 			(void)KFCRuns()->RubyConditions(asked);
 			label.Append(" F:\"");
-			if (asked.withoutRuby)
+			if (asked.kind == kKFCRubyFindWithout)
 			{
 				label.Append(asked.base);
 				label.Append(" (no ruby)");
 			}
 			else if (asked.base.IsEmpty() && asked.reading.IsEmpty())
-				label.Append("[Any Ruby]");
+				label.Append((asked.kind == kKFCRubyFindMarks) ? "[Ruby Marks]" : "[Any Ruby]");
 			else
 			{
 				label.Append(asked.base);
