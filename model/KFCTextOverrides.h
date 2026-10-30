@@ -32,8 +32,8 @@ namespace KFCTextOverrides
 
 	/** THE OVERRIDES CLEAR OVERRIDES TAKES OFF [start, end): the character-level ones on the range, and the paragraph-level
 	    ones of the paragraphs it stands in [outParaStart, outParaStart + outParaLength) - each list the attributes' names
-	    (ITextModelCmds::ClearOverridesCmd reads no value), ruby's thirty left out (not overrides to InDesign - the header's
-	    note). false = nothing could be read. */
+	    (ITextModelCmds::ClearOverridesCmd reads no value), ruby's thirty and the conditions left out (not overrides to
+	    InDesign - the note at the head; the DOM's clearOverrides leaves them too). false = nothing could be read. */
 	bool CollectOverrides(ITextModel* model, TextIndex start, TextIndex end, boost::shared_ptr<AttributeBossList>& outChar,
 		boost::shared_ptr<AttributeBossList>& outPara, TextIndex& outParaStart, int32& outParaLength);
 

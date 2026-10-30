@@ -14,6 +14,7 @@
 #include "IAttrReport.h"
 #include "IAttributeStrand.h"		// GetLocalOverrides - a run's own attributes, character or paragraph level
 #include "ICommand.h"
+#include "IComposeScanner.h"		// FindSurroundingParagraph - the paragraphs a match stands in
 #include "ITextAttrUtils.h"			// GetTotalAttributesAtIndex - InDesign's own "is the style overridden here"
 #include "ITextModel.h"
 #include "ITextModelCmds.h"			// ClearOverridesCmd - the attributes named taken off, one command a strand
@@ -21,6 +22,7 @@
 // General includes:
 #include "CJKID.h"					// ruby's thirty attributes
 #include "CmdUtils.h"
+#include "ConditionalTextID.h"		// kConditionalTextAttributeBoss - the conditions applied to text
 #include "CreateObject.h"			// ::CreateObject2 - an attribute boss to name a class in a list
 #include "TextID.h"					// kCharAttrStrandBoss, kParaAttrStrandBoss
 #include "UIDRef.h"
@@ -55,16 +57,24 @@ const ClassID kRubyAttrs[] =
 	kTARubyAutoTCYAutoScaleBoss
 };
 
-bool IsRuby(ClassID attr)
+// IS IT AN ATTRIBUTE INDESIGN DOES NOT COUNT AS AN OVERRIDE - ruby's thirty, and the conditions applied to the text: kept on
+// the text "as a style override" (IConditionalTextFacade.h - kConditionalTextAttributeBoss), but the DOM's styleOverridden
+// reads false for a word whose only one is a condition (B0), and the DOM's clearOverrides(ALL) leaves the condition on a word
+// whose 80% it takes off (measured 10-30, case overrides-clear-twin-mixed: KFC's Clear Overrides had taken the condition
+// along). Clear Overrides leaves both where InDesign's own leaves them.
+bool IsNoOverride(ClassID attr)
 {
+	if (attr == kConditionalTextAttributeBoss)
+		return true;
 	for (size_t i = 0; i < sizeof(kRubyAttrs) / sizeof(kRubyAttrs[0]); ++i)
 		if (kRubyAttrs[i] == attr)
 			return true;
 	return false;
 }
 
-// THE NAMES OF `own`'S ATTRIBUTES, ruby's left out, added to `into` once each. A new boss of each class names it - the
-// list's values are never read (ITextModelCmds.h: "attributes to clear"; KIDMCPRuby.cpp builds its list the same way).
+// THE NAMES OF `own`'S ATTRIBUTES, ruby's and the conditions left out (IsNoOverride), added to `into` once each. A new boss
+// of each class names it - the list's values are never read (ITextModelCmds.h: "attributes to clear"; KIDMCPRuby.cpp
+// builds its list the same way).
 // false = an attribute's boss could not be made (the list would then clear less than it says).
 bool AddNames(const AttributeBossList* own, AttributeBossList& into)
 {
@@ -73,7 +83,7 @@ bool AddNames(const AttributeBossList* own, AttributeBossList& into)
 	for (int32 n = 0; n < own->CountBosses(); ++n)
 	{
 		const ClassID attr = own->GetClassN(n);
-		if (IsRuby(attr) || into.ContainsAttribute(attr))
+		if (IsNoOverride(attr) || into.ContainsAttribute(attr))
 			continue;
 		InterfacePtr<IAttrReport> name(::CreateObject2<IAttrReport>(attr));
 		if (name == nil)
@@ -150,22 +160,29 @@ bool KFCTextOverrides::CollectOverrides(ITextModel* model, TextIndex start, Text
 			return false;
 		at += (count > 0) ? count : 1;		// (one character on at least - a run of no length is not asked again)
 	}
-	// The paragraph level: every paragraph the range stands in, from its first one's start to its last one's return.
-	TextIndex first = kInvalidTextIndex, past = start;
-	for (TextIndex at = start; at < end; )
+	// The paragraph level: the paragraphs the range stands in, from the first one's start to the last one's return - read by
+	// IComposeScanner::FindSurroundingParagraph (the story's end counted: KFCReplaceEngine's ParagraphOf reading), NOT by the
+	// strand's runs: the paragraph attribute strand keeps neighbouring paragraphs of the same attributes as ONE run (measured
+	// 10-30 - one paragraph's match read a run over eight paragraphs), and a run's range took a neighbour's override along
+	// (case overrides-clear-para-neighbour: the next paragraph's centring went with the match's).
+	InterfacePtr<IComposeScanner> scanner(model, UseDefaultIID());
+	if (scanner == nil)
+		return false;
+	int32 firstLength = 0, lastLength = 0;
+	const TextIndex first = scanner->FindSurroundingParagraph(start, &firstLength, kFalse);
+	const TextIndex last = scanner->FindSurroundingParagraph(end - 1, &lastLength, kFalse);
+	if (first < 0 || last < first || firstLength <= 0 || lastLength <= 0)
+		return false;
+	outParaStart = first;
+	outParaLength = (last + lastLength) - first;
+	for (TextIndex at = first; at < outParaStart + outParaLength; )
 	{
 		int32 count = 0;
-		TextIndex runBegin = at;
-		const DataWrapper<AttributeBossList> own = paras->GetLocalOverrides(at, &count, &runBegin);
+		const DataWrapper<AttributeBossList> own = paras->GetLocalOverrides(at, &count);
 		if (!AddNames(own.get(), *outPara))
 			return false;
-		if (first == kInvalidTextIndex)
-			first = runBegin;
 		at += (count > 0) ? count : 1;		// (one character on at least, as above)
-		past = at;
 	}
-	outParaStart = (first == kInvalidTextIndex) ? start : first;
-	outParaLength = past - outParaStart;
 	KFC_DIAG_LOG("OVERRIDES own at=%d..%d char=[%s] para=[%s] paras=%d..%d", static_cast<int>(start), static_cast<int>(end),
 		DiagClasses(*outChar).c_str(), DiagClasses(*outPara).c_str(), static_cast<int>(outParaStart),
 		static_cast<int>(outParaStart + outParaLength));

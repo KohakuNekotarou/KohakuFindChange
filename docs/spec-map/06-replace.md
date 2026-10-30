@@ -263,11 +263,11 @@
   - 訂正:
 
 - **REP-40** ★**文字の行の Special Operations ▸ Clear Overrides**（ヒットの行の右クリック・abc 順で Create Outlines の上・2026-10-30＝設計書 `docs/superpowers/specs/2026-10-30-kfc-next-overrides-restore-design.md` B2〜B7＝作者「設計は貴方のお勧めで」の私の判断）――
-  **本体の段落スタイルパネルの「オーバーライドを消去」を、その一致を選んで押したのと同じ**＝一致の文字の文字の上書きと、一致がかかる段落の段落の上書きを消す（段落の上書きは段落まるごとに効く＝本体と同じ・同じ段落のほかの行にも効く）。書く口＝公式の `ITextModelCmds::ClearOverridesCmd`（消す属性の名前を `IAttributeStrand::GetLocalOverrides` で集める）。**ルビは消さない**（本体はルビを上書きと数えない＝ROW-46 の B0）。**本体が上書きなしと言う一致は書かずに数える**（`had no overrides`）。
+  **本体の段落スタイルパネルの「オーバーライドを消去」を、その一致を選んで押したのと同じ**＝一致の文字の文字の上書きと、一致がかかる段落の段落の上書きを消す（段落の上書きは段落まるごとに効く＝本体と同じ・同じ段落のほかの行にも効く・**一致の無い隣の段落は、同じ上書きを持っていても触らない**＝本体と同じ・2026-10-30 のブランチの見直しで直した＝段落の属性の帯は同じ属性の段落が続くと1つの run にまとめるので、run の範囲で消すと隣まで消えていた・回帰 `overrides-clear-para-neighbour`）。書く口＝公式の `ITextModelCmds::ClearOverridesCmd`（消す属性の名前を `IAttributeStrand::GetLocalOverrides` で集める）。**ルビと条件は消さない**（本体はどちらも上書きと数えない＝ROW-46 の B0・DOM の `clearOverrides()` も残す＝条件は文字に「スタイルの上書き」として載っているので、倍率などと一緒に消えていた＝2026-10-30 のブランチの見直しで直した・回帰 `overrides-clear-twin-mixed`）。**本体が上書きなしと言う一致は書かずに数える**（`had no overrides`）。
   まとめて選んだ行の1つなら選んだ行すべて・文書をまたいでも1つの取り消しの段（Edit メニューの名前 `Clear Overrides`＝UNDO-02）。書いた行は頭に `Cleared`（物の行の Clear Object Style Overrides と同じ語）・目玉が付く（ROW-45）。文字は変わらないので Replace は灰色にならず、ほかの行も動かない。置換済みの行も消せる（Restore from Copy は写しの書式＝上書きごとに戻す）。後で Replace／Restore from Copy をかけると語はその書き込みの語に替わる。
   **灰色**＝押せる行が1つも無いとき（SET-11）。1行ずつの扉＝物の行・アウトライン済み・文字の無い一致（GREP の `^`・`$`）・ロック・文書が無い／開けない・ストーリーが追えない形で変わった・一致の文字が検索の後で書き換わった（置換済みの行は書いた文字と比べる）。**あふれた文字は消せる**（組版が要らない）。
   文＝`Cleared overrides on ID:262 #3.`／`Cleared overrides on 1 of 2 matches: ID:262 #1. Left as they were: 1 had no overrides.`／1行の断り `Clear Overrides: <理由>`（例 `Clear Overrides: the match has no overrides to clear - left as it is.`）。
-  回帰＝`nor-cases.tsv` の `overrides-clear-*`（★本体と双子で並べる＝`overrides-clear-twin`＝双子の段落に DOM の `clearOverrides(OverrideType.ALL)` を当てて、属性を1つずつ比べる）。（作り＝`model/KFCTextOverrides.cpp`・`KFCReplaceEngine::ClearOverridesHits`。）
+  回帰＝`nor-cases.tsv` の `overrides-clear-*`（★本体と双子で並べる＝`overrides-clear-twin`＝双子の段落に DOM の `clearOverrides(OverrideType.ALL)` を当てて、属性を1つずつ比べる・`overrides-clear-twin-mixed`＝本物の上書き〈倍率〉と、上書きでないもの〈条件・ルビ・文字スタイル〉が同じ一致に付いた形）。（作り＝`model/KFCTextOverrides.cpp`・`KFCReplaceEngine::ClearOverridesHits`。）
   - 訂正:
 
 ---
