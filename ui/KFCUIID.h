@@ -112,10 +112,11 @@ DECLARE_PMID(kClassIDSpace, kKFCAlertAnswerBoss, kKFCUIPrefix + 31)
 // The value dialogs - Move..., Scale..., Rotate..., Shear... and Narrow Down's Pages... (KFCSpecialDialogs.cpp): one
 // boss for the five, each its own view. + 32: the next after the highest spent.
 DECLARE_PMID(kClassIDSpace, kKFCValueDialogBoss, kKFCUIPrefix + 32)
-// The QR Code tab's face in InDesign's Find/Change dialog (KFCQRTab.cpp - docs/superpowers/specs/2026-10-27-kfc-qr-code-search-design.md).
-DECLARE_PMID(kClassIDSpace, kKFCQRTabPanelBoss, kKFCUIPrefix + 33)
-DECLARE_PMID(kClassIDSpace, kKFCTableTabPanelBoss, kKFCUIPrefix + 34)
-DECLARE_PMID(kClassIDSpace, kKFCRubyTabPanelBoss, kKFCUIPrefix + 35)
+// The Kohaku tab's face in InDesign's Find/Change dialog (KFCKohakuTab.cpp - docs/superpowers/specs/2026-10-27-kfc-qr-code-search-design.md).
+DECLARE_PMID(kClassIDSpace, kKFCKohakuTabPanelBoss, kKFCUIPrefix + 33)
+// The Kohaku+ tab's queries in Find/Change's own Query menu: the watch on the command processor, and the filter on Save Query's press (KFCKohakuQueryMenu).
+DECLARE_PMID(kClassIDSpace, kKFCKohakuQueryWatchBoss, kKFCUIPrefix + 34)
+DECLARE_PMID(kClassIDSpace, kKFCKohakuSaveFilterBoss, kKFCUIPrefix + 35)
 
 
 // InterfaceIDs:
@@ -237,16 +238,12 @@ DECLARE_PMID(kImplementationIDSpace, kKFCQueryScopeObserverImpl, kKFCUIPrefix + 
 // The value dialogs' controller and observer (KFCSpecialDialogs.cpp). + 59 and + 60: the next after the highest spent.
 DECLARE_PMID(kImplementationIDSpace, kKFCValueDialogControllerImpl, kKFCUIPrefix + 59)
 DECLARE_PMID(kImplementationIDSpace, kKFCValueDialogObserverImpl, kKFCUIPrefix + 60)
-// The QR Code tab's face (KFCQRTab.cpp): what describes it, what hears its widgets, what the dialog's protocol calls.
-DECLARE_PMID(kImplementationIDSpace, kKFCQRTabPanelCreatorImpl, kKFCUIPrefix + 61)
-DECLARE_PMID(kImplementationIDSpace, kKFCQRTabObserverImpl, kKFCUIPrefix + 62)
-DECLARE_PMID(kImplementationIDSpace, kKFCQRTabControllerImpl, kKFCUIPrefix + 63)
-DECLARE_PMID(kImplementationIDSpace, kKFCTableTabPanelCreatorImpl, kKFCUIPrefix + 64)
-DECLARE_PMID(kImplementationIDSpace, kKFCTableTabObserverImpl, kKFCUIPrefix + 65)
-DECLARE_PMID(kImplementationIDSpace, kKFCTableTabControllerImpl, kKFCUIPrefix + 66)
-DECLARE_PMID(kImplementationIDSpace, kKFCRubyTabPanelCreatorImpl, kKFCUIPrefix + 67)
-DECLARE_PMID(kImplementationIDSpace, kKFCRubyTabObserverImpl, kKFCUIPrefix + 68)
-DECLARE_PMID(kImplementationIDSpace, kKFCRubyTabControllerImpl, kKFCUIPrefix + 69)
+// The Kohaku tab's face (KFCKohakuTab.cpp): what describes it, what hears its widgets, what the dialog's protocol calls.
+DECLARE_PMID(kImplementationIDSpace, kKFCKohakuTabPanelCreatorImpl, kKFCUIPrefix + 61)
+DECLARE_PMID(kImplementationIDSpace, kKFCKohakuTabObserverImpl, kKFCUIPrefix + 62)
+DECLARE_PMID(kImplementationIDSpace, kKFCKohakuTabControllerImpl, kKFCUIPrefix + 63)
+DECLARE_PMID(kImplementationIDSpace, kKFCKohakuQueryWatchImpl, kKFCUIPrefix + 64)
+DECLARE_PMID(kImplementationIDSpace, kKFCKohakuSaveFilterEHImpl, kKFCUIPrefix + 65)
 
 
 // ActionIDs:
@@ -452,8 +449,7 @@ DECLARE_PMID(kActionIDSpace, kKFCShearActionID, kKFCUIPrefix + 90)
 DECLARE_PMID(kActionIDSpace, kKFCClearFromResultsActionID, kKFCUIPrefix + 93)
 //DECLARE_PMID(kActionIDSpace, kKFCClearRowsSepActionID, kKFCUIPrefix + 94)
 // NARROW DOWN (docs/superpowers/specs/2026-10-18-kfc-narrow-down-design.md N1, N2): a tier heading's submenu, its
-// items + 95 ... + 102 - + 98 and + 101, its two rules, retired with the row menus' other rules (above): never reuse.
-DECLARE_PMID(kActionIDSpace, kKFCNarrowInTablesActionID, kKFCUIPrefix + 95)
+// items + 95 ... + 102 - + 98 and + 101, its two rules, retired with the row menus' other rules (above), and + 95, In Tables (10-31 - Search Text in These Tables, + 112, in its place): never reuse.
 DECLARE_PMID(kActionIDSpace, kKFCNarrowInFootnotesActionID, kKFCUIPrefix + 96)
 DECLARE_PMID(kActionIDSpace, kKFCNarrowInEndnotesActionID, kKFCUIPrefix + 97)
 //DECLARE_PMID(kActionIDSpace, kKFCNarrowSep1ActionID, kKFCUIPrefix + 98)
@@ -485,6 +481,8 @@ DECLARE_PMID(kActionIDSpace, kKFCNarrowWithOverridesActionID, kKFCUIPrefix + 110
 // SPECIAL OPERATIONS > CLEAR OVERRIDES (the spec's B2): a TEXT row's - the overrides of its match taken off, as the paragraph
 // styles panel's Clear Overrides takes them off a selection (KFCReplaceEngine::ClearOverridesHits). + 111.
 DECLARE_PMID(kActionIDSpace, kKFCClearTextOverridesActionID, kKFCUIPrefix + 111)
+// A tier's heading's Search Text in These Tables (the author, 10-31: list the tables, then search the text in them - KFCResultHistory::SearchTextInObjects). + 112.
+DECLARE_PMID(kActionIDSpace, kKFCSearchTextInTablesActionID, kKFCUIPrefix + 112)
 
 
 // WidgetIDs:
@@ -572,26 +570,34 @@ DECLARE_PMID(kWidgetIDSpace, kKFCValueAxisVerticalWidgetID, kKFCUIPrefix + 54)
 DECLARE_PMID(kWidgetIDSpace, kKFCValuePagesWidgetID, kKFCUIPrefix + 55)
 DECLARE_PMID(kWidgetIDSpace, kKFCValuePositionLabelWidgetID, kKFCUIPrefix + 56)
 DECLARE_PMID(kWidgetIDSpace, kKFCValueAxisLabelWidgetID, kKFCUIPrefix + 57)
-// The QR Code tab's face (KFCQRTab.cpp): the face itself (the switcher names it), its Search:, its Find Next and its two
+// The Kohaku tab's face (KFCKohakuTab.cpp): the face itself (the switcher names it), its Search:, its Find Next and its two
 // lines - what Find Next found, and why it could not select it (each a line of its own: a long content cuts only its own).
-DECLARE_PMID(kWidgetIDSpace, kKFCQRTabPanelWidgetID, kKFCUIPrefix + 58)
-DECLARE_PMID(kWidgetIDSpace, kKFCQRTabScopeWidgetID, kKFCUIPrefix + 59)
+DECLARE_PMID(kWidgetIDSpace, kKFCKohakuTabPanelWidgetID, kKFCUIPrefix + 58)
+DECLARE_PMID(kWidgetIDSpace, kKFCKohakuTabScopeWidgetID, kKFCUIPrefix + 59)
 DECLARE_PMID(kWidgetIDSpace, kKFCQRTabFindNextWidgetID, kKFCUIPrefix + 60)
 DECLARE_PMID(kWidgetIDSpace, kKFCQRTabStatusWidgetID, kKFCUIPrefix + 61)
 DECLARE_PMID(kWidgetIDSpace, kKFCQRTabNoteWidgetID, kKFCUIPrefix + 62)
-DECLARE_PMID(kWidgetIDSpace, kKFCTableTabPanelWidgetID, kKFCUIPrefix + 63)
-DECLARE_PMID(kWidgetIDSpace, kKFCTableTabScopeWidgetID, kKFCUIPrefix + 64)
+DECLARE_PMID(kWidgetIDSpace, kKFCKohakuTabKindWidgetID, kKFCUIPrefix + 63)
+DECLARE_PMID(kWidgetIDSpace, kKFCKohakuQRSectionWidgetID, kKFCUIPrefix + 64)
 DECLARE_PMID(kWidgetIDSpace, kKFCTableTabFindStyleWidgetID, kKFCUIPrefix + 65)
 DECLARE_PMID(kWidgetIDSpace, kKFCTableTabOverridesOnlyWidgetID, kKFCUIPrefix + 66)
 DECLARE_PMID(kWidgetIDSpace, kKFCTableTabChangeStyleWidgetID, kKFCUIPrefix + 67)
 DECLARE_PMID(kWidgetIDSpace, kKFCTableTabClearOverridesWidgetID, kKFCUIPrefix + 68)
-DECLARE_PMID(kWidgetIDSpace, kKFCRubyTabPanelWidgetID, kKFCUIPrefix + 69)
-DECLARE_PMID(kWidgetIDSpace, kKFCRubyTabScopeWidgetID, kKFCUIPrefix + 70)
+DECLARE_PMID(kWidgetIDSpace, kKFCKohakuTableSectionWidgetID, kKFCUIPrefix + 69)
+DECLARE_PMID(kWidgetIDSpace, kKFCKohakuRubySectionWidgetID, kKFCUIPrefix + 70)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyTabKindWidgetID, kKFCUIPrefix + 71)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyTabBaseWidgetID, kKFCUIPrefix + 72)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyTabReadingWidgetID, kKFCUIPrefix + 73)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyTabChangeWidgetID, kKFCUIPrefix + 74)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyTabRemoveWidgetID, kKFCUIPrefix + 75)
+DECLARE_PMID(kWidgetIDSpace, kKFCKohakuKentenSectionWidgetID, kKFCUIPrefix + 76)
+DECLARE_PMID(kWidgetIDSpace, kKFCKentenTabKindWidgetID, kKFCUIPrefix + 77)
+DECLARE_PMID(kWidgetIDSpace, kKFCKentenTabBaseWidgetID, kKFCUIPrefix + 78)
+DECLARE_PMID(kWidgetIDSpace, kKFCKentenTabMarkWidgetID, kKFCUIPrefix + 79)
+DECLARE_PMID(kWidgetIDSpace, kKFCKentenTabChangeWidgetID, kKFCUIPrefix + 80)
+DECLARE_PMID(kWidgetIDSpace, kKFCKentenTabRemoveWidgetID, kKFCUIPrefix + 81)
+// Save Query's name (the value dialog's view for it)
+DECLARE_PMID(kWidgetIDSpace, kKFCValueQueryNameWidgetID, kKFCUIPrefix + 82)
 
 
 // "About Plug-ins" sub-menu:
@@ -641,6 +647,7 @@ DECLARE_PMID(kWidgetIDSpace, kKFCRubyTabRemoveWidgetID, kKFCUIPrefix + 75)
 #define kKFCSearchTierAgainMenuKey	kKFCStringPrefix "kKFCSearchTierAgainMenuKey"
 // ...and its Search Text in These Objects (measured against every other key - key_collisions.py: none reads alike).
 #define kKFCSearchTextInObjectsMenuKey	kKFCStringPrefix "kKFCSearchTextInObjectsMenuKey"
+#define kKFCSearchTextInTablesMenuKey	kKFCStringPrefix "kKFCSearchTextInTablesMenuKey"
 // ...and an object row's Create Outlines (measured against every other key - key_collisions.py: none reads alike).
 #define kKFCCreateOutlinesMenuKey	kKFCStringPrefix "kKFCCreateOutlinesMenuKey"
 // ...and a text row's Restore from Copy (measured against every other key - key_collisions.py).
@@ -651,7 +658,6 @@ DECLARE_PMID(kWidgetIDSpace, kKFCRubyTabRemoveWidgetID, kKFCUIPrefix + 75)
 // ...and a tier heading's Narrow Down - the submenu's name and its items (measured against every other key -
 // key_collisions.py: none reads alike).
 #define kKFCNarrowDownSubmenuKey		kKFCStringPrefix "kKFCNarrowDownSubmenuKey"
-#define kKFCNarrowInTablesMenuKey		kKFCStringPrefix "kKFCNarrowInTablesMenuKey"
 #define kKFCNarrowInFootnotesMenuKey	kKFCStringPrefix "kKFCNarrowInFootnotesMenuKey"
 #define kKFCNarrowInEndnotesMenuKey		kKFCStringPrefix "kKFCNarrowInEndnotesMenuKey"
 #define kKFCNarrowPagesMenuKey			kKFCStringPrefix "kKFCNarrowPagesMenuKey"
@@ -763,15 +769,27 @@ DECLARE_PMID(kWidgetIDSpace, kKFCRubyTabRemoveWidgetID, kKFCUIPrefix + 75)
 #define kKFCValueCancelKey				kKFCStringPrefix "kKFCValueCancelKey"
 #define kKFCValueNotZeroKey				kKFCStringPrefix "kKFCValueNotZeroKey"
 #define kKFCValueNoPagesKey				kKFCStringPrefix "kKFCValueNoPagesKey"
+#define kKFCQueryNameDialogKey			kKFCStringPrefix "kKFCQueryNameDialogKey"
+#define kKFCQueryNameFieldKey			kKFCStringPrefix "kKFCQueryNameFieldKey"
+#define kKFCQueryNameBlankKey			kKFCStringPrefix "kKFCQueryNameBlankKey"
+#define kKFCQueryNameCharsKey			kKFCStringPrefix "kKFCQueryNameCharsKey"
+#define kKFCQueryNameTooLongKey			kKFCStringPrefix "kKFCQueryNameTooLongKey"
+#define kKFCQueryReplaceAskKey			kKFCStringPrefix "kKFCQueryReplaceAskKey"
 // "Find/Change Selected Documents (Book)" - the toggle under Book Scope.
 #define kKFCSelectedDocumentsMenuKey	kKFCStringPrefix "kKFCSelectedDocumentsMenuKey"
-// The QR Code tab's face in Find/Change (KFCQRTab.cpp): its tab's label, its Search: and its two entries, its button.
-#define kKFCQRTabTitleKey				kKFCStringPrefix "kKFCQRTabTitleKey"
-#define kKFCQRTabSearchKey				kKFCStringPrefix "kKFCQRTabSearchKey"
-#define kKFCQRTabAllDocumentsKey		kKFCStringPrefix "kKFCQRTabAllDocumentsKey"
-#define kKFCQRTabDocumentKey			kKFCStringPrefix "kKFCQRTabDocumentKey"
+// The Kohaku tab's face in Find/Change (KFCKohakuTab.cpp): its tab's label, its Find: and its entries, its Search: and its entries, its parts' words.
+#define kKFCKohakuTabTitleKey			kKFCStringPrefix "kKFCKohakuTabTitleKey"
+#define kKFCKohakuFindLabelKey			kKFCStringPrefix "kKFCKohakuFindLabelKey"
+#define kKFCKohakuTabQRCodeKey			kKFCStringPrefix "kKFCKohakuTabQRCodeKey"
+#define kKFCKohakuTabTableKey			kKFCStringPrefix "kKFCKohakuTabTableKey"
+#define kKFCKohakuTabRubyKey			kKFCStringPrefix "kKFCKohakuTabRubyKey"
+#define kKFCKohakuTabSearchKey			kKFCStringPrefix "kKFCKohakuTabSearchKey"
+#define kKFCKohakuTabAllDocumentsKey	kKFCStringPrefix "kKFCKohakuTabAllDocumentsKey"
+#define kKFCKohakuDocumentKey		kKFCStringPrefix "kKFCKohakuDocumentKey"
+#define kKFCKohakuStoryEntryKey			kKFCStringPrefix "kKFCKohakuStoryEntryKey"
+#define kKFCKohakuTabToEndKey			kKFCStringPrefix "kKFCKohakuTabToEndKey"
+#define kKFCKohakuSelectionKey		kKFCStringPrefix "kKFCKohakuSelectionKey"
 #define kKFCQRTabFindNextKey			kKFCStringPrefix "kKFCQRTabFindNextKey"
-#define kKFCTableTabTitleKey			kKFCStringPrefix "kKFCTableTabTitleKey"
 #define kKFCTableTabFindStyleKey		kKFCStringPrefix "kKFCTableTabFindStyleKey"
 #define kKFCTableTabAnyStyleKey			kKFCStringPrefix "kKFCTableTabAnyStyleKey"
 #define kKFCTableTabOverridesOnlyKey	kKFCStringPrefix "kKFCTableTabOverridesOnlyKey"
@@ -780,8 +798,7 @@ DECLARE_PMID(kWidgetIDSpace, kKFCRubyTabRemoveWidgetID, kKFCUIPrefix + 75)
 #define kKFCTableTabClearOverridesKey	kKFCStringPrefix "kKFCTableTabClearOverridesKey"
 #define kKFCTableTabGuideFindKey		kKFCStringPrefix "kKFCTableTabGuideFindKey"
 #define kKFCTableTabGuideReplaceKey		kKFCStringPrefix "kKFCTableTabGuideReplaceKey"
-#define kKFCRubyTabTitleKey				kKFCStringPrefix "kKFCRubyTabTitleKey"
-#define kKFCRubyTabFindKey				kKFCStringPrefix "kKFCRubyTabFindKey"
+#define kKFCRubyTabLookForKey			kKFCStringPrefix "kKFCRubyTabLookForKey"
 #define kKFCRubyTabWithKey				kKFCStringPrefix "kKFCRubyTabWithKey"
 #define kKFCRubyTabWithoutKey			kKFCStringPrefix "kKFCRubyTabWithoutKey"
 #define kKFCRubyTabMarksKey				kKFCStringPrefix "kKFCRubyTabMarksKey"
@@ -790,6 +807,25 @@ DECLARE_PMID(kWidgetIDSpace, kKFCRubyTabRemoveWidgetID, kKFCUIPrefix + 75)
 #define kKFCRubyTabChangeKey			kKFCStringPrefix "kKFCRubyTabChangeKey"
 #define kKFCRubyTabTakeOffKey			kKFCStringPrefix "kKFCRubyTabTakeOffKey"
 #define kKFCRubyTabGuideFindKey			kKFCStringPrefix "kKFCRubyTabGuideFindKey"
+#define kKFCKohakuTabKentenKey			kKFCStringPrefix "kKFCKohakuTabKentenKey"
+#define kKFCKentenTabWithKey			kKFCStringPrefix "kKFCKentenTabWithKey"
+#define kKFCKentenTabWithoutKey			kKFCStringPrefix "kKFCKentenTabWithoutKey"
+#define kKFCKentenTabMarkKey			kKFCStringPrefix "kKFCKentenTabMarkKey"
+#define kKFCKentenTabAnyMarkKey			kKFCStringPrefix "kKFCKentenTabAnyMarkKey"
+#define kKFCKentenTabChangeKey			kKFCStringPrefix "kKFCKentenTabChangeKey"
+#define kKFCKentenTabRemoveWordKey		kKFCStringPrefix "kKFCKentenTabRemoveWordKey"
+#define kKFCKentenTabGuideFindKey		kKFCStringPrefix "kKFCKentenTabGuideFindKey"
+#define kKFCKentenSesameKey				kKFCStringPrefix "kKFCKentenSesameKey"
+#define kKFCKentenWhiteSesameKey		kKFCStringPrefix "kKFCKentenWhiteSesameKey"
+#define kKFCKentenFisheyeKey			kKFCStringPrefix "kKFCKentenFisheyeKey"
+#define kKFCKentenBlackCircleKey		kKFCStringPrefix "kKFCKentenBlackCircleKey"
+#define kKFCKentenSmallBlackKey			kKFCStringPrefix "kKFCKentenSmallBlackKey"
+#define kKFCKentenBullseyeKey			kKFCStringPrefix "kKFCKentenBullseyeKey"
+#define kKFCKentenTriBlackKey		kKFCStringPrefix "kKFCKentenTriBlackKey"
+#define kKFCKentenTriOpenKey		kKFCStringPrefix "kKFCKentenTriOpenKey"
+#define kKFCKentenWhiteCircleKey		kKFCStringPrefix "kKFCKentenWhiteCircleKey"
+#define kKFCKentenSmallWhiteKey			kKFCStringPrefix "kKFCKentenSmallWhiteKey"
+#define kKFCKentenCustomKey				kKFCStringPrefix "kKFCKentenCustomKey"
 
 // Other StringKeys:
 #define kKFCAboutBoxStringKey	kKFCStringPrefix "kKFCAboutBoxStringKey"
@@ -930,6 +966,7 @@ DECLARE_PMID(kWidgetIDSpace, kKFCRubyTabRemoveWidgetID, kKFCUIPrefix + 75)
 // (6.0 was Replace's place in the abc order until 2.1.1.)
 #define kKFCRestoreOriginalMenuItemPosition		7.0		// Restore from Copy
 #define kKFCSearchTextInObjectsMenuItemPosition	7.5		// Search Text in These Objects
+#define kKFCSearchTextInTablesMenuItemPosition	7.6		// Search Text in These Tables
 #define kKFCSearchTierAgainMenuItemPosition		8.0		// Search These Results Again
 #define kKFCSearchDocumentAgainMenuItemPosition	9.0		// Search This Document Again
 #define kKFCSearchStoryAgainMenuItemPosition	10.0	// Search This Story Again
@@ -942,7 +979,6 @@ DECLARE_PMID(kWidgetIDSpace, kKFCRubyTabRemoveWidgetID, kKFCUIPrefix + 75)
 #define kKFCNarrowFramesMenuItemPosition		1.0		// Frames of These Matches
 #define kKFCNarrowInEndnotesMenuItemPosition	2.0		// In Endnotes
 #define kKFCNarrowInFootnotesMenuItemPosition	3.0		// In Footnotes
-#define kKFCNarrowInTablesMenuItemPosition		4.0		// In Tables
 #define kKFCNarrowOnLayerMenuItemPosition		5.0		// On Active Layer
 #define kKFCNarrowOnPasteboardMenuItemPosition	6.0		// On Pasteboard
 #define kKFCNarrowPagesMenuItemPosition			7.0		// Pages...
@@ -1002,15 +1038,12 @@ DECLARE_PMID(kWidgetIDSpace, kKFCRubyTabRemoveWidgetID, kKFCUIPrefix + 75)
 #define kKFCRotateDialogRsrcID				(kSDKDefDialogResourceID + 14)
 #define kKFCShearDialogRsrcID				(kSDKDefDialogResourceID + 16)
 #define kKFCPagesDialogRsrcID				(kSDKDefDialogResourceID + 18)
-// The QR Code tab's face (KFCQRTab.cpp): its view (a LocaleIndex here, its body at + index_enUS - clear of the result rows'
+#define kKFCQueryNameDialogRsrcID			(kSDKDefDialogResourceID + 20)
+// The Kohaku tab's face (KFCKohakuTab.cpp): its view (a LocaleIndex here, its body at + index_enUS - clear of the result rows'
 // and the query row's, + 20 to + 23), and its offer to Find/Change (IDList / IDListPair - the id
 // IPanelCreator::GetPanelRsrcID hands back).
-#define kKFCQRTabRsrcID						(kSDKDefPanelResourceID + 30)
-#define kKFCQRTabIDListRsrcID				(kSDKDefPanelResourceID + 32)
-#define kKFCTableTabRsrcID					(kSDKDefPanelResourceID + 33)
-#define kKFCTableTabIDListRsrcID			(kSDKDefPanelResourceID + 35)
-#define kKFCRubyTabRsrcID					(kSDKDefPanelResourceID + 36)
-#define kKFCRubyTabIDListRsrcID				(kSDKDefPanelResourceID + 38)
+#define kKFCKohakuTabRsrcID					(kSDKDefPanelResourceID + 30)
+#define kKFCKohakuTabIDListRsrcID			(kSDKDefPanelResourceID + 32)
 #define kKFCValueFieldWidth					84
 // One row of the query dialog's lists: KCM's book comparison dialog's row height (kKCMBookRowHeight), the one other
 // list the Kohaku plug-ins draw in a dialog's font. Read by the row resource, the lists' scroll increments

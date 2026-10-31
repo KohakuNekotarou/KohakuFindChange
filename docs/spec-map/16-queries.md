@@ -256,6 +256,17 @@
 
 ---
 
+## 9. Kohaku+ タブのクエリ（2026-10-31）
+
+- **QRY-90** 左の一覧に Kohaku+ タブのクエリも並ぶ（種類 `QR Code`・`Table`・`Ruby`・`Kenten`・本体の種類の後）。Ruby・Kenten は日本語の InDesign だけ（タブと同じ）。回帰 `kq-qd-left`
+  - 訂正:
+
+- **QRY-91** Find＝タブに条件を入れて（`Runs on:` の範囲で）一覧を作る。ダブルクリック＝本体の欄で選ぶのと同じ（タブが開き、欄がその名前を言う）。回帰 `kq-qd-find`・`kq-qd-dbl`
+  - 訂正:
+
+- **QRY-92** Run＝一覧を作らずに Change 側を書く（Remove も）。全部を Ctrl+Z 1回で戻す一本の中。Change 側が無いクエリ（QR Code を含む）は飛ばして言う（`nothing to change to`）。範囲が物語・選択範囲なら、その中だけ。一覧には載せない（`Kohaku+ queries are not listed.`）。回帰 `kq-qd-run`・`kq-qd-run-remove`・`kq-qd-run-qr`
+  - 訂正:
+
 ## ⬜ この章で未確認
 
 この章を書くにあたって**確かめていない**もの。「書いていない＝そういう決まりが無い」ではない。

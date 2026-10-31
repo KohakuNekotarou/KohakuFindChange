@@ -313,19 +313,24 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 	// item there - HasFindQueryNow; this door is for a caller that never went through the menu.)
 	if (KFCSearchEngine::CurrentSearchMode() == kKFCQRCodeSearchMode)
 	{
-		outSummary.Append("Change All: the Find/Change dialog is on the QR Code tab. This panel lists QR codes there - nothing"
+		outSummary.Append("Change All: the Find/Change dialog is on QR Code on the Kohaku+ tab. This panel lists QR codes there - nothing"
 			" to change.");
 		return 0;
 	}
 	// THE TABLE TAB (KFCTableSearch - the table tab spec's T12): its rows are written one list at a time, with the list up.
 	if (KFCSearchEngine::CurrentSearchMode() == kKFCTableSearchMode)
 	{
-		outSummary.Append("Change All: the Find/Change dialog is on the Table tab. List the tables and Replace their rows.");
+		outSummary.Append("Change All: the Find/Change dialog is on Table on the Kohaku+ tab. List the tables and Replace their rows.");
+		return 0;
+	}
+	if (KFCSearchEngine::CurrentSearchMode() == kKFCKentenSearchMode)	// (the Kenten kind's the same)
+	{
+		outSummary.Append("Change All: the Find/Change dialog is on Kenten on the Kohaku+ tab. List the text and Replace its rows.");
 		return 0;
 	}
 	if (KFCSearchEngine::CurrentSearchMode() == kKFCRubySearchMode)		// (the Ruby tab's the same - its spec's R10)
 	{
-		outSummary.Append("Change All: the Find/Change dialog is on the Ruby tab. List the ruby and Replace its rows.");
+		outSummary.Append("Change All: the Find/Change dialog is on Ruby on the Kohaku+ tab. List the ruby and Replace its rows.");
 		return 0;
 	}
 	// THE OBJECT TAB (the object search spec's O13): InDesign's object Change All over each chapter. Refused with

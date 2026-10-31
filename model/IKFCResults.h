@@ -111,7 +111,7 @@ public:
 	virtual uint32 GetResultSetId() = 0;
 	/** = KFCResultModel::SetHitKept (appended) - the row eye's click: a row's eye on or off. false = no such row. */
 	virtual bool SetHitKept(int32 chapterIdx, int32 hitIdx, bool kept) = 0;
-	/** = KFCResultModel::NarrowWords (appended) - a narrowed list's conditions in words ("In Tables / Pages 1-5"; empty for
+	/** = KFCResultModel::NarrowWords (appended) - a narrowed list's conditions in words ("In Footnotes / Pages 1-5"; empty for
 	    any other list): a tier's heading names them after its name. */
 	virtual void GetNarrowWords(PMString& out) = 0;
 	/** = KFCResultModel::ListHoldsObjects (appended) - the list's rows are object rows (an Object tab search's, a
@@ -143,6 +143,8 @@ public:
 	/** = KFCResultModel::ListHasOwnChangeTab (appended - the Table and Ruby tabs) - the live list is one of a tab of KFC's with a Change side: its rows are written by that side
 	    alone, and it is not narrowed (the heading's menu and the rows' grey by it, kept per tier). */
 	virtual bool ListHasOwnChangeTab() = 0;
+	/** = KFCResultModel::ListIsTables (appended - Search Text in These Tables) - the live list is a Table kind's (the heading's Search Text in These Tables, grey over any other, kept per tier). */
+	virtual bool ListIsTables() = 0;
 };
 
 #endif // __IKFCResults_h__

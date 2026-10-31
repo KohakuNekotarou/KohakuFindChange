@@ -15,7 +15,7 @@
 //      only, the field's text put into that tab first when it differs (KFCSearchEngine::SetQuery). On the
 //      other tabs Return is still stopped but nothing is searched; the status line says so while the panel
 //      is up (the author's call at the first live check - not the dialog's query searched there).
-//    . On KFC's own QR Code tab (KFCQRTab - QR-22) the field shows nothing, and Return - an empty field's
+//    . On KFC's own QR Code tab (KFCKohakuTab - QR-22) the field shows nothing, and Return - an empty field's
 //      too - lists the QR codes; what was typed is not used and nothing is put into Find/Change.
 //  (The triangle does not choose the tab - a design tried and dropped.)
 //  OFF by default; OFF = the field is not touched at all.
@@ -82,7 +82,7 @@ bool	KFCFindChangeQueryWords(PMString& outWords);
 bool	KFCFindChangeChangeWords(PMString& outWords);
 
 // THE FIELD WRITTEN AGAIN FROM THE TAB FIND/CHANGE IS ON, NOW - for a change of tab that sends no notification of
-// Find/Change's settings: KFC's QR Code face shown (KFCQRTab, whose field shows nothing - QR-22). Nothing while
+// Find/Change's settings: KFC's QR Code face shown (KFCKohakuTab, whose field shows nothing - QR-22). Nothing while
 // the link is off.
 void	KFCMirrorAppBarFieldNow();
 

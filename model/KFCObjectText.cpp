@@ -17,7 +17,10 @@
 #include "IHierarchy.h"
 #include "IMainItemTOPData.h"		// the text on an item's path
 #include "IMultiColumnTextFrame.h"
+#include "ITableModel.h"			// Search Text in These Tables' items
+#include "ITableTextContainer.h"	// a table's character in its story
 #include "ITextModel.h"
+#include "ITextStoryThread.h"		// GetDictUID - the table a cell's thread is of
 #include "ITextUtils.h"			// CollectOwnedItems - the frames anchored in a frame's text
 
 // General includes:
@@ -26,7 +29,7 @@
 #include "TextID.h"				// kInlineBoss - an inline or anchored frame's anchor
 #include "Utils.h"
 
-#include <algorithm>				// std::sort - the stretches put in story order
+#include <algorithm>				// std::sort - the stretches put in story order; std::find - is it listed
 
 // Project includes:
 #include "KFCObjectText.h"
@@ -134,6 +137,40 @@ bool ItemText(IDataBase* db, UID item, KFCObjectText::Ranges& out, int32 depth)
 	}
 	return taken;
 }
+
+// A TABLE'S TEXT (Search Text in These Tables): the stretch of its character - the walk's scope takes the cells in, as it does a table in a selection (collectStoryRanges - KFCSearchEngine's QueryPartScope).
+bool TableText(ITableModel* table, KFCObjectText::Ranges& out)
+{
+	InterfacePtr<ITableTextContainer> text(table, UseDefaultIID());
+	InterfacePtr<ITextModel> model((text != nil) ? text->QueryTextModel() : nil);
+	if (model == nil)
+		return false;
+	const TextIndex anchor = text->GetAnchorTextIndex();
+	out.stretches.push_back(KFCObjectText::Stretch{ ::GetUID(model), anchor, anchor + text->GetAnchorSpan(), false });
+	return true;
+}
+
+// DOES THIS TABLE STAND IN A CELL OF A TABLE OF THE LIST - its character in the cell's thread, or in a table that does? The walk over the outer table's cells walks its cells too: a stretch of its own would find its text twice (measured - tb-text-nested).
+bool StandsInListedTable(IDataBase* db, ITableModel* table, const std::vector<UID>& items)
+{
+	UID at = ::GetUID(table);
+	for (int32 depth = 0; depth < 16; ++depth)
+	{
+		InterfacePtr<ITableTextContainer> text(db, at, UseDefaultIID());
+		InterfacePtr<ITextModel> model((text != nil) ? text->QueryTextModel() : nil);
+		InterfacePtr<ITextStoryThread> thread((model != nil) ? model->QueryStoryThread(text->GetAnchorTextIndex(), nil, nil) : nil);
+		if (thread == nil)
+			return false;
+		const UID outer = thread->GetDictUID();
+		InterfacePtr<ITableModel> outerTable(db, outer, UseDefaultIID());
+		if (outerTable == nil)
+			return false;		// (the story's own text: no table round it)
+		if (std::find(items.begin(), items.end(), outer) != items.end())
+			return true;
+		at = outer;
+	}
+	return false;
+}
 }	// anonymous namespace
 
 void KFCObjectText::Collect(IDataBase* db, const std::vector<UID>& items, Ranges& out)
@@ -144,6 +181,18 @@ void KFCObjectText::Collect(IDataBase* db, const std::vector<UID>& items, Ranges
 	for (size_t i = 0; i < items.size(); ++i)
 	{
 		const UID item = items[i];
+		if (item != kInvalidUID && db->IsValidUID(item))
+		{
+			InterfacePtr<ITableModel> table(db, item, UseDefaultIID());
+			if (table != nil)
+			{
+				out.tables = true;
+				++out.objects;
+				if (!StandsInListedTable(db, table, items) && !TableText(table, out))
+					++out.noText;
+				continue;
+			}
+		}
 		if (!KFCPageItemFacts::ItemIsThere(db, item))
 		{
 			++out.gone;
@@ -176,6 +225,8 @@ void KFCObjectText::Collect(IDataBase* db, const std::vector<UID>& items, Ranges
 
 bool KFCObjectText::Keeps(const Ranges& r, IDataBase* db, const KFCResultModel::Hit& hit)
 {
+	if (r.tables)
+		return true;		// (no frame was asked for: the table's cells, wherever they are drawn)
 	// NO FRAME = overset text (FrameUIDForPosition's kInvalidUID) - not Hit::isOverset, which a match whose frame sits on no
 	// page carries too.
 	if (hit.matchFrame == kInvalidUID)

@@ -1,6 +1,6 @@
-# 19. 表スタイルで表を探す（検索と置換の「Table」タブ）
+# 19. 表スタイルで表を探す（Kohaku+ タブの Find: Table）
 
-> コード地図での位置: `model/KFCTableSearch.*`（タブが今のタブか・歩く・行の字・書く）・`model/KFCReplaceEngine.cpp` の `WriteOwnTabRows`＋`TableWrite`（行の Replace）・`ui/KFCTableTab.*`（タブの面）。
+> コード地図での位置: `model/KFCTableSearch.*`（タブが今のタブか・歩く・行の字・書く）・`model/KFCReplaceEngine.cpp` の `WriteOwnTabRows`＋`TableWrite`（行の Replace）・`ui/KFCKohakuTab.*`（タブの面）。
 > 設計書 `docs/superpowers/specs/2026-10-31-kfc-table-tab-design.md`（T1〜T13）。各項目の末尾の（T<番号>）は設計書の決定。回帰の表＝`work/kbs-regress/tb-cases.tsv`。裁定＝`work/sdd/2026-10-31-kfc-table-tab/progress.md`。
 > 訂正の書き方は [00-index.md](00-index.md)。
 
@@ -8,10 +8,10 @@
 
 ## 1. タブと面
 
-- **TBL-01** ★本体の「検索と置換」のタブの行に、KFC の **「Table」タブ**が出る（QR Code タブの隣・並びは本体が決める＝今は `文字種変換, Table, QR Code`）。そのタブが今のタブのとき、KFC の Find in … は範囲の中の**表**を一覧にする。閉じる時にそのタブなら、閉じている間も同じ（次に開くとそのタブで開く）。（T1）回帰 `tb-face-shown`・`tb-face-find`・`tb-face-closed`・`tb-face-done`
+- **TBL-01** ★本体の「検索と置換」の **Kohaku+ タブ**（21 章）の Find: を **Table** にしているとき、KFC の Find in … は範囲の中の表を一覧にする。閉じる時にそうなら閉じている間も同じ。（T1・K1）回帰 `tb-face-shown`・`tb-face-find`・`tb-face-closed`・`tb-face-done`・`tb-face-switch-back`
   - 訂正:
 
-- **TBL-02** 面の中身＝**Search:**（All Documents／Document）・**Find Table Style:**（`[Any Table Style]`＋前面の文書の表スタイル）・**With Overrides Only**・**Change to Table Style:**（`[Leave As It Is]`＋前面の文書の表スタイル）・**Clear Overrides**・案内の2行。「完了」は本体の枠のもの。値は KFC が覚える（InDesign を起動している間だけ・起動直後は Document・Any・切・Leave As It Is・切）。（T2）回帰 `tb-face-pick`・`tb-face-overrides`・`tb-face-change`・`tb-face-clear`・`tb-face-scope`
+- **TBL-02** 部品＝**Find Table Style:**（`[Any Table Style]`＋前面の文書の表スタイル）・**With Overrides Only**・**Change to Table Style:**（`[Leave As It Is]`＋前面の文書の表スタイル）・**Clear Overrides**・案内の2行。語の下に一覧（KOHAKU-20）。**Search:** は 5つ（KOHAKU-10）。値は KFC が覚える（起動している間だけ）。（T2・K5）回帰 `tb-face-pick`・`tb-face-overrides`・`tb-face-change`・`tb-face-clear`・`tb-face-scope`・`tb-part-face`
   - 訂正:
 
 - **TBL-03** 一覧は**前面の文書に付いていく**（面を見せている間に前面の文書が変わる・表スタイルが増える・消える）。前面の文書に無い表スタイルを選んだままなら、一覧の末尾に残す（探すのは名前で全部の文書）。グループの中の表スタイルは `グループ:名前`（本体の区切りは U+E00B＝`KFCStylePathWords`）。（T2・T3）回帰 `tb-face-follows`・`tb-face-new-style`・`tb-face-asked-kept`・`tb-grouped`・`tb-grouped-any`
@@ -20,7 +20,7 @@
 - **TBL-04** 面に Find Next は**無い**（設計の T13 を実装で取りやめた＝パネルの Find と Next Result で足りる・文字の範囲への着地は行のクリックの内部）。作者が欲しければ足す。
   - 訂正:
 
-- **TBL-05** タブが8枚になったので、日本語版の窓の幅（532）では帯の両端が約10px 切れる（テキスト・QR Code。押せる）。窓の幅は変えていない（`work/sdd/2026-10-31-kfc-table-tab/progress.md`）。
+- **TBL-05** ~~タブが8枚で帯の両端が切れる~~ ⇒ 10-31 に Kohaku+ の1枚へまとめて解消（KOHAKU-01）。
   - 訂正:
 
 ## 2. 探す
@@ -68,4 +68,12 @@
   - 訂正:
 
 - **TBL-41** Change All in Book はこのタブで灰色（扉も断る）。（T12）回帰 `tb-changeall-refused`
+  - 訂正:
+
+## 6. 表の中の文字を探す
+
+- **TBL-50** ★Table の一覧の見出しの右クリック **Search Text in These Tables**＝一覧の表（Clear で外した行の表を除く）のセルの文字を、本体の検索と置換のタブ（Text／GREP／Glyph／Transliterate）の条件で探し、新しい段に出す（`[Text/Tables] F:"…"`）。元の表の一覧は段として残る。Table の一覧以外では灰色。Find/Change が Kohaku+ タブのままなら断る（`Find/Change is on the Kohaku+ tab - …`）。（K10）回帰 `tb-text`・`tb-text-grey`・`tb-text-on-kohaku`・`tb-text-none`・`tb-text-cleared`
+  - 訂正:
+
+- **TBL-51** 新しい段の行はふつうの文字の行＝Replace・Search These Results Again・Search This Story Again が効く（同じ表を、今の中身で）。Search This Document Again は灰色。表の中の表は一度だけ数える。消えた表は数えて言う。ブックの閉じた章は開いて歩いて閉じる。（K10）回帰 `tb-text-replace`・`tb-text-again`・`tb-text-story-again`・`tb-text-doc-grey`・`tb-text-nested`・`tb-text-nested-inner`・`tb-text-gone`・`tb-text-book`
   - 訂正:

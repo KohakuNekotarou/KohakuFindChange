@@ -36,7 +36,7 @@ KFCQueryCopy::KFCQueryCopy()
 	  replaceGlyph(kInvalidGlyphID), objectType(0), findParaStyle(kInvalidUID), findCharStyle(kInvalidUID),
 	  changeParaStyle(kInvalidUID), changeCharStyle(kInvalidUID), objectFindStyle(kInvalidUID),
 	  objectChangeStyle(kInvalidUID), attrDB(nil), changeConditionsMode(0), useFindROS(kFalse), useReplaceROS(kFalse),
-	  valid(false), tableOverridesOnly(false), rubyKind(0)
+	  valid(false), tableOverridesOnly(false), rubyKind(0), kentenKind(0), kentenMark(0)
 {
 }
 
@@ -286,6 +286,17 @@ void KFCQueryCopier::CaptureTables(KFCQueryCopy& out, const PMString& findStyle,
 	out.valid = true;
 }
 
+void KFCQueryCopier::CaptureKenten(KFCQueryCopy& out, int32 kind, const PMString& base, int32 mark)
+{
+	out = KFCQueryCopy();
+	out.mode = static_cast<int32>(kKFCKentenSearchMode);
+	out.kentenKind = kind;
+	out.kentenBase = base;
+	out.kentenBase.SetTranslatable(kFalse);
+	out.kentenMark = mark;
+	out.valid = true;
+}
+
 void KFCQueryCopier::CaptureRuby(KFCQueryCopy& out, int32 kind, const PMString& base, const PMString& reading)
 {
 	out = KFCQueryCopy();
@@ -313,8 +324,8 @@ bool KFCQueryCopier::Apply(const KFCQueryCopy& copy, PMString& outWhat)
 		return Failed(outWhat, "there is no query to put back");
 	// A QR CODE LIST'S COPY STATES NOTHING: InDesign has no such mode to state (KFCModelTypes.h - never handed to a command),
 	// and no setting of Find/Change's steers its walk (KFCQRSearch). Nor a query run's list's: it has no query (KFCRunList). Nor a
-	// table list's: what it asks is the Table tab's (KFCTableSearch). Nor a ruby list's.
-	if (copy.mode == kKFCQRCodeSearchMode || copy.mode == kKFCRunListSearchMode || copy.mode == kKFCTableSearchMode || copy.mode == kKFCRubySearchMode)
+	// table list's: what it asks is the Table tab's (KFCTableSearch). Nor a ruby or kenten list's.
+	if (copy.mode == kKFCQRCodeSearchMode || copy.mode == kKFCRunListSearchMode || copy.mode == kKFCTableSearchMode || copy.mode == kKFCRubySearchMode || copy.mode == kKFCKentenSearchMode)
 		return true;
 	using namespace KFCFindChangeCmds;
 	const int32 mode = copy.mode;
@@ -445,8 +456,8 @@ bool KFCQueryCopier::Matches(const KFCQueryCopy& copy, PMString& outWhat)
 	outWhat.SetTranslatable(kFalse);
 	if (!copy.valid)
 		return Failed(outWhat, "there is no query to compare");
-	if (copy.mode == kKFCQRCodeSearchMode || copy.mode == kKFCRunListSearchMode || copy.mode == kKFCTableSearchMode || copy.mode == kKFCRubySearchMode)
-		return true;		// a QR code list's copy, a query run's list's, a table or ruby list's: no field of Find/Change's is its (Apply's note)
+	if (copy.mode == kKFCQRCodeSearchMode || copy.mode == kKFCRunListSearchMode || copy.mode == kKFCTableSearchMode || copy.mode == kKFCRubySearchMode || copy.mode == kKFCKentenSearchMode)
+		return true;		// a QR code list's copy, a query run's list's, a table, ruby or kenten list's: no field of Find/Change's is its (Apply's note)
 	KFCQueryCopy now;
 	Capture(now);
 	const char* const differs = FirstDifference(copy, now);

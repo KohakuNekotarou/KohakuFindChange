@@ -72,6 +72,8 @@
 #include "KFCCopyStore.h"		// the copies a row's Replace takes and its Restore from Copy puts back
 #include "KFCTableSearch.h"		// a table row's Replace - the Table tab's Change side
 #include "KFCRubySearch.h"		// a ruby row's Replace - the Ruby tab's
+#include "KFCKentenSearch.h"	// a kenten row's Replace - the Kenten kind's
+#include "IKentenStyle.h"		// Kenten_None - Remove Kenten
 #include "KFCQueryCopy.h"		// rubyKind - a list of ruby marks
 #include "ITableModel.h"
 #include "KFCTextOverrides.h"	// ClearOverrides - a text row's Special Operations > Clear Overrides
@@ -4112,7 +4114,7 @@ public:
 	virtual const char* NothingToChange() const
 	{
 		return (fAsked.changeStyle.IsEmpty() && !fAsked.clearOverrides)
-			? "Replace: nothing to change on the Table tab - choose Change to Table Style or Clear Overrides in Edit > Find/Change." : nil;
+			? "Replace: nothing to change on the Kohaku+ tab - choose Change to Table Style or Clear Overrides in Edit > Find/Change." : nil;
 	}
 	virtual void EnterDocument(IDataBase* db)
 	{
@@ -4160,7 +4162,7 @@ public:
 	virtual const char* NothingToChange() const
 	{
 		return (fAsked.changeTo.IsEmpty() && !fAsked.removeRuby)
-			? "Replace: nothing to change on the Ruby tab - type Change Ruby To or choose Remove Ruby in Edit > Find/Change." : nil;
+			? "Replace: nothing to change on the Kohaku+ tab - type Change Ruby To or choose Remove Ruby in Edit > Find/Change." : nil;
 	}
 	virtual void EnterDocument(IDataBase* /*db*/) {}
 	virtual OwnTabRefusal RowDoor(const UIDRef& storyRef, OwnTabRow& row)
@@ -4186,6 +4188,38 @@ public:
 	virtual const char* Noun() const { return "rows"; }
 private:
 	KFCRubyConditions	fAsked;
+};
+
+// THE KENTEN KIND'S: the kind of mark on a row's text, the look of the marks left as it stands - or, Remove Kenten, the marks taken off whole (KFCKentenSearch::Remove).
+class KentenWrite : public OwnTabWrite
+{
+public:
+	KentenWrite() { (void)KFCKentenSearch::IsTabCurrent(&fAsked); }
+	virtual const char* NothingToChange() const
+	{
+		return (fAsked.changeTo == 0 && !fAsked.removeKenten)
+			? "Replace: nothing to change on the Kohaku+ tab - choose Change Kenten To or Remove Kenten in Edit > Find/Change." : nil;
+	}
+	virtual void EnterDocument(IDataBase* /*db*/) {}
+	virtual OwnTabRefusal RowDoor(const UIDRef& storyRef, OwnTabRow& row)
+	{
+		return (KFCKentenSearch::MarkOn(storyRef, row.start, row.end) == Wanted()) ? kOwnTabAsAsked : kOwnTabOk;
+	}
+	virtual ErrorCode WriteRow(const UIDRef& storyRef, const OwnTabRow& row, PMString& outWords)
+	{
+		const ErrorCode wrote = fAsked.removeKenten ? KFCKentenSearch::Remove(storyRef, row.start, row.end) : KFCKentenSearch::Write(storyRef, row.start, row.end, Wanted());
+		if (wrote == kSuccess)
+			outWords = KFCKentenSearch::RowWords(storyRef, row.start, row.end, Wanted());
+		return wrote;
+	}
+	virtual int32 RowMark() const { return kKFCSpecialKentenChange; }
+	virtual const char* StepKey() const { return kKFCKentenChangeStepKey; }
+	virtual const char* StepName() const { return "Change Kenten"; }
+	virtual const char* Verb() const { return "Changed kenten on"; }
+	virtual const char* Noun() const { return "rows"; }
+private:
+	int32 Wanted() const { return fAsked.removeKenten ? static_cast<int32>(IKentenStyle::Kenten_None) : fAsked.changeTo; }
+	KFCKentenConditions	fAsked;
 };
 
 // THE ROWS OF ONE DOCUMENT, inside the write's step. Each row's words read again after its command. False = InDesign would not write a row: the caller takes the step back.
@@ -4502,6 +4536,11 @@ bool WriteOwnTabRows(OwnTabWrite& how, const KFCRowsByChapter& rowsByChapter, PM
 
 static bool ReplaceOwnTabRows(const KFCRowsByChapter& rowsByChapter, PMString& outStatus)
 {
+	if (KFCResultModel::ListIsKenten())
+	{
+		KentenWrite kenten;
+		return WriteOwnTabRows(kenten, rowsByChapter, outStatus);
+	}
 	if (KFCResultModel::ListIsRuby())
 	{
 		const std::shared_ptr<const KFCQueryCopy> asked(KFCResultModel::GetQueryCopy());

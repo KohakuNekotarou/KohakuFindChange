@@ -107,6 +107,7 @@ namespace
 		virtual bool ListIsRunList() { return false; }
 		virtual void GetRunNames(PMString& out) { out.Clear(); }
 		virtual bool ListHasOwnChangeTab() { return false; }
+		virtual bool ListIsTables() { return false; }
 	};
 
 	class KFCRunsStandInImpl : public IKFCRuns
@@ -181,6 +182,10 @@ namespace
 		virtual bool CanClearOverridesHit(int32, int32) { return false; }
 		virtual bool TableConditions(KFCTableConditions& outConditions) { outConditions = KFCTableConditions(); return false; }
 		virtual bool RubyConditions(KFCRubyConditions& outConditions) { outConditions = KFCRubyConditions(); return false; }
+		virtual bool KentenConditions(KFCKentenConditions& outConditions) { outConditions = KFCKentenConditions(); return false; }
+		virtual bool ReadKohakuQuery(const IDFile&, KFCKohakuQueryData& out) { out = KFCKohakuQueryData(); return false; }
+		virtual void KohakuQueryText(const KFCKohakuQueryData&, PMString& outText) { outText.Clear(); }
+		virtual bool KohakuQueryFile(int32, const PMString&, IDFile&) { return false; }
 	};
 
 	class KFCChaptersStandInImpl : public IKFCChapters

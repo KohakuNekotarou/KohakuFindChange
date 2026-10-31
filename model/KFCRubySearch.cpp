@@ -197,7 +197,7 @@ WideString WideOf(const std::u32string& words)
 }
 
 // THE MARKS OF ONE STORY, by the conditions.
-void WalkMarks(const UIDRef& storyRef, ITextModel* model, const KFCRubyConditions& asked, size_t limit,
+void WalkMarks(const UIDRef& storyRef, ITextModel* model, const KFCRubyConditions& asked, const std::vector<KFCSearchEngine::ListedPlace>* part, size_t limit,
 	std::vector<KFCSearchEngine::ListedPlace>& ioPlaces, bool& outCapped)
 {
 	const std::u32string text(U32Of(KFCSearchEngine::ReadText(storyRef, 0, model->TotalLength())));
@@ -213,6 +213,8 @@ void WalkMarks(const UIDRef& storyRef, ITextModel* model, const KFCRubyCondition
 		const std::u32string reading(text, mark.open + 1, mark.close - mark.open - 1);
 		if (base.find(wantedBase) == std::u32string::npos || reading.find(wantedReading) == std::u32string::npos)
 			continue;
+		if (part != nil && !KFCSearchEngine::StretchesHold(*part, storyRef.GetUID(), static_cast<TextIndex>(mark.first), static_cast<TextIndex>(mark.close + 1)))
+			continue;
 		if (ioPlaces.size() >= limit)
 		{
 			outCapped = true;
@@ -226,8 +228,8 @@ void WalkMarks(const UIDRef& storyRef, ITextModel* model, const KFCRubyCondition
 	}
 }
 
-// THE RUNS OF ONE STORY WITH RUBY, by the conditions.
-void WalkWithRuby(const UIDRef& storyRef, ITextModel* model, const KFCRubyConditions& asked, size_t limit,
+// THE RUNS OF ONE STORY WITH RUBY, by the conditions - a run the searched part touches is a run of it: the reading is over the whole.
+void WalkWithRuby(const UIDRef& storyRef, ITextModel* model, const KFCRubyConditions& asked, const std::vector<KFCSearchEngine::ListedPlace>* part, size_t limit,
 	std::vector<KFCSearchEngine::ListedPlace>& ioPlaces, bool& outCapped)
 {
 	InterfacePtr<IRubyAttrStrand> strand(static_cast<IRubyAttrStrand*>(model->QueryStrand(kRubyAttrStrandBoss, IRubyAttrStrand::kDefaultIID)));
@@ -244,7 +246,7 @@ void WalkWithRuby(const UIDRef& storyRef, ITextModel* model, const KFCRubyCondit
 		if (len <= 0)
 			break;
 		const TextIndex runEnd = at + len;
-		if (on != kFalse)
+		if (on != kFalse && (part == nil || KFCSearchEngine::StretchesTouch(*part, storyRef.GetUID(), at, runEnd)))
 		{
 			const WideString reading(ReadingOfRun(scanner, at, runEnd));
 			if (!reading.empty() && !StandsInSetAsideText(model, at) && Holds(reading, asked.reading))
@@ -270,7 +272,7 @@ void WalkWithRuby(const UIDRef& storyRef, ITextModel* model, const KFCRubyCondit
 }
 
 // THE OCCURRENCES OF THE BASE TEXT IN ONE STORY WITH NO RUBY ON THEM.
-void WalkWithoutRuby(const UIDRef& storyRef, ITextModel* model, const KFCRubyConditions& asked, size_t limit,
+void WalkWithoutRuby(const UIDRef& storyRef, ITextModel* model, const KFCRubyConditions& asked, const std::vector<KFCSearchEngine::ListedPlace>* part, size_t limit,
 	std::vector<KFCSearchEngine::ListedPlace>& ioPlaces, bool& outCapped)
 {
 	const std::u32string text([&] {
@@ -294,6 +296,8 @@ void WalkWithoutRuby(const UIDRef& storyRef, ITextModel* model, const KFCRubyCon
 		const TextIndex end = start + static_cast<int32>(wanted.size());
 		if (StandsInSetAsideText(model, start))
 			continue;
+		if (part != nil && !KFCSearchEngine::StretchesHold(*part, storyRef.GetUID(), start, end))
+			continue;
 		if (strand != nil && scanner != nil && RubyAnywhereIn(strand, scanner, start, end))
 			continue;
 		if (ioPlaces.size() >= limit)
@@ -309,8 +313,8 @@ void WalkWithoutRuby(const UIDRef& storyRef, ITextModel* model, const KFCRubyCon
 	}
 }
 
-// ONE DOCUMENT'S ROWS. False = no story list to walk.
-bool WalkDoc(const UIDRef& docRef, const KFCRubyConditions& asked, size_t limit, std::vector<KFCResultModel::Hit>& outHits,
+// ONE DOCUMENT'S ROWS - of its searched part alone, given one. False = no story list to walk.
+bool WalkDoc(const UIDRef& docRef, const KFCRubyConditions& asked, const std::vector<KFCSearchEngine::ListedPlace>* part, size_t limit, std::vector<KFCResultModel::Hit>& outHits,
 	std::map<UID, uint32>& outVersions, bool& outCapped)
 {
 	outCapped = false;
@@ -326,14 +330,14 @@ bool WalkDoc(const UIDRef& docRef, const KFCRubyConditions& asked, size_t limit,
 	{
 		const UIDRef storyRef(stories->GetNthTextModelUID(s));
 		InterfacePtr<ITextModel> model(storyRef, UseDefaultIID());
-		if (model == nil)
+		if (model == nil || (part != nil && !KFCSearchEngine::StretchesTouch(*part, storyRef.GetUID(), 0, kMaxInt32)))
 			continue;
 		if (asked.kind == kKFCRubyFindWithout)
-			WalkWithoutRuby(storyRef, model, asked, limit, places, outCapped);
+			WalkWithoutRuby(storyRef, model, asked, part, limit, places, outCapped);
 		else if (asked.kind == kKFCRubyFindMarks)
-			WalkMarks(storyRef, model, asked, limit, places, outCapped);
+			WalkMarks(storyRef, model, asked, part, limit, places, outCapped);
 		else
-			WalkWithRuby(storyRef, model, asked, limit, places, outCapped);
+			WalkWithRuby(storyRef, model, asked, part, limit, places, outCapped);
 	}
 	KFCSearchEngine::BuildListedHits(docRef, places, outHits, outVersions);
 	// What the rows with ruby draw there; a row without any draws its text.
@@ -399,6 +403,12 @@ bool KFCRubySearch::IsTabCurrent(KFCRubyConditions* outConditions)
 				conditions.removeRuby = true;
 			else if (line == "scope=all")
 				conditions.scope = IWalkerScopeFactoryUtils::kAllDocumentScope;
+			else if (line == "scope=story")
+				conditions.scope = IWalkerScopeFactoryUtils::kStoryScope;
+			else if (line == "scope=toend")
+				conditions.scope = IWalkerScopeFactoryUtils::kToEndOfStoryScope;
+			else if (line == "scope=selection")
+				conditions.scope = IWalkerScopeFactoryUtils::kSelectionScope;
 		}
 	}
 #endif
@@ -415,7 +425,8 @@ bool KFCRubySearch::IsTabCurrent(KFCRubyConditions* outConditions)
 }
 
 void KFCRubySearch::CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBook,
-	std::vector<KFCBookScope::SkippedChapter>& unopenable, KFCSearchEngine::CollectTally& out, int32 reserved, const KFCRubyConditions& asked)
+	std::vector<KFCBookScope::SkippedChapter>& unopenable, KFCSearchEngine::CollectTally& out, int32 reserved, const KFCRubyConditions& asked,
+	const std::vector<KFCSearchEngine::ListedPlace>* part)
 {
 	out = KFCSearchEngine::CollectTally();
 	PMString title(fromBook ? "Searching book..." : "Searching...");
@@ -446,7 +457,7 @@ void KFCRubySearch::CollectTargets(std::vector<KFCBookScope::ChapterDoc>& target
 		std::vector<KFCResultModel::Hit> hits;
 		std::map<UID, uint32> versions;
 		bool capped = false;
-		const bool walked = WalkDoc(docRef, asked, limit - static_cast<size_t>(out.total), hits, versions, capped);
+		const bool walked = WalkDoc(docRef, asked, part, limit - static_cast<size_t>(out.total), hits, versions, capped);
 		// A book's chapter goes back now, closed on the spot (one chapter of ours at a time - the other walks' rule).
 		if (fromBook && !KFCBookScope::HandBackHeldDocNow(docRef))
 			out.unclosed.push_back(targets[i].shortName);
@@ -482,10 +493,53 @@ bool KFCRubySearch::WalkOneDocument(const UIDRef& docRef, const PMString& name, 
 	bar.DisableChildProgressBars(kTrue);
 	KFCSetCountedTask(bar, "Document", 0, 1, name);
 	bar.SetPosition(0);
-	const bool walked = WalkDoc(docRef, asked, limit, outHits, outVersions, outCapped);
+	const bool walked = WalkDoc(docRef, asked, nil, limit, outHits, outVersions, outCapped);
 	outCancelled = walked && bar.WasCancelled(kFalse);
 	bar.SetPosition(kRubyDocSpan);
 	return walked && !outCancelled;
+}
+
+bool KFCRubySearch::WriteDocument(const UIDRef& docRef, const KFCRubyConditions& asked, const std::vector<KFCSearchEngine::ListedPlace>* part, int32& outCount)
+{
+	outCount = 0;
+	std::vector<KFCResultModel::Hit> hits;
+	std::map<UID, uint32> versions;
+	bool capped = false;
+	if (!WalkDoc(docRef, asked, part, static_cast<size_t>(kMaxInt32), hits, versions, capped))
+		return false;
+	IDataBase* const db = docRef.GetDataBase();
+	const WideString wanted(asked.removeRuby ? PMString() : asked.changeTo);
+	// FROM THE LAST TO THE FIRST: a mark's write takes characters out, and the places before it stand (each story's places are in its order).
+	for (size_t h = hits.size(); h > 0; --h)
+	{
+		const KFCResultModel::Hit& hit = hits[h - 1];
+		if (hit.isLocked)
+			continue;
+		const UIDRef story(db, hit.storyUID);
+		if (asked.kind == kKFCRubyFindMarks)
+		{
+			int32 baseLength = 0;
+			bool stillThere = false;
+			if (WriteMark(story, hit.textStart, hit.textEnd - hit.textStart, baseLength, stillThere) != kSuccess)
+				return false;
+		}
+		else if (asked.removeRuby)
+		{
+			if (ReadingOn(story, hit.textStart, hit.textEnd).empty())
+				continue;
+			if (Remove(story, hit.textStart, hit.textEnd) != kSuccess)
+				return false;
+		}
+		else
+		{
+			if (ReadingOn(story, hit.textStart, hit.textEnd) == wanted)
+				continue;
+			if (Apply(story, hit.textStart, hit.textEnd, wanted) != kSuccess)
+				return false;
+		}
+		++outCount;
+	}
+	return true;
 }
 
 WideString KFCRubySearch::ReadingOn(const UIDRef& story, TextIndex start, TextIndex end)

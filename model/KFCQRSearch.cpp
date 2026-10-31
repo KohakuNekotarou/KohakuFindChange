@@ -106,7 +106,7 @@ bool KFCQRSearch::IsTabCurrent(int32* outScope)
 			scope = IWalkerScopeFactoryUtils::kAllDocumentScope;
 	}
 #endif
-	// THE TAB ITSELF IS THE UI HALF'S (the design's D1 - KFCQRTab in the UI half keeps it from the face's own calls): asked
+	// THE TAB ITSELF IS THE UI HALF'S (the design's D1 - KFCKohakuTab in the UI half keeps it from the face's own calls): asked
 	// every time. No UI half - InDesign Server, a background thread's session, another build's half - is no QR Code tab.
 	if (!answered)
 	{

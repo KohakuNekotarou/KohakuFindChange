@@ -41,6 +41,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCClearOverridesStepKey,		"Clear Overrides",
                 kKFCTableStyleStepKey,			"Apply Table Style",
                 kKFCRubyChangeStepKey,			"Change Ruby",
+                kKFCKentenChangeStepKey,		"Change Kenten",
                 // An object row's other Special Operations (KFCObjectSpecial) - InDesign's own English command names.
                 kKFCFillFramePropStepKey,			"Fill Frame Proportionally",
                 kKFCFitContentPropStepKey,			"Fit Content Proportionally",

@@ -65,6 +65,9 @@ namespace KFCResultHistory
 	    heading draws "Objects" in the scope's place, WithScope). The list drawn again, the status line set. True = a new list. */
 	bool SearchTextInObjects(PMString& outSummary);
 
+	/** Is tier `tier` a Table kind's list (-1 = the live list; a grey one as its copy noted it)? Its heading's Search Text in These Tables is grey over any other. */
+	bool TierHoldsTables(int32 tier);
+
 	/** Are tier `tier`'s rows object rows - an Object tab search's, a QR Code tab search's, a Frames of These Matches
 	    list's (-1 = the live list, asked of the model; a grey one as its copy noted it)? The heading's Narrow Down
 	    greys a text-only condition by it, and its Search Text in These Objects is grey over text rows (and over
@@ -134,7 +137,7 @@ namespace KFCResultHistory
 	/** The live tier's name as its row draws it: the label of the search that made the list the model holds, with the
 	    Search: it was searched with after the tab ("[Text/Story] F:..." - the author: "easy to read"; drawn, not kept
 	    in the name, which QueryReadsAsTier reads the query against), or "Results" for a list KFC did not name (the
-	    one a query run leaves, say) - and a narrowed list's conditions after it, drawn so too ("... / In Tables"). */
+	    one a query run leaves, say) - and a narrowed list's conditions after it, drawn so too ("... / In Footnotes"). */
 	PMString LiveTierLabel();
 
 	/** WHERE THE LIVE TIER STANDS AMONG THE TIERS (v2 R4 - the tiers stay in search order, the live one in its place: the

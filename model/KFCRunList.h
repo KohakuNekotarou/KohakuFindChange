@@ -49,6 +49,9 @@ namespace KFCRunList
 		/** An Object query ran: written and counted, not listed (R11) - said. */
 		void NoteObjectQuery();
 
+		/** A query of the Kohaku+ tab ran: the same (it writes tables and marks, not a text's Change All's places) - said. */
+		void NoteKohakuQuery();
+
 		/** The run stands, its documents left as they are left (LeaveRunDocuments): each place read against the text as it
 		    stands, a row made of it and filed into the model - which the caller has just cleared - under a header naming the
 		    list a query run's (kKFCRunListSearchMode, RunNames), up to the rows a list holds (R9). Returns the rows filed;
@@ -85,6 +88,7 @@ namespace KFCRunList
 		std::vector<Doc>							fDocs;
 		std::vector<size_t>							fDocOfTarget;
 		bool										fObjectQuery;
+		bool										fKohakuQuery;
 
 		Recorder(const Recorder&);
 		Recorder& operator=(const Recorder&);

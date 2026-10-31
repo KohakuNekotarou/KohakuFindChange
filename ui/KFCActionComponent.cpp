@@ -300,7 +300,6 @@ const struct NarrowAction
 	int32	kind;
 } kNarrowActions[] =
 {
-	{ kKFCNarrowInTablesActionID, kKFCNarrowInTables },
 	{ kKFCNarrowInFootnotesActionID, kKFCNarrowInFootnotes },
 	{ kKFCNarrowInEndnotesActionID, kKFCNarrowInEndnotes },
 	{ kKFCNarrowPagesActionID, kKFCNarrowPages },
@@ -321,12 +320,12 @@ int32 NarrowKindOf(const ActionID& action)
 	return kKFCNarrowNone;
 }
 
-// Is it a condition only a text row can meet (In Tables, In Footnotes, In Endnotes, Frames of These Matches, With
+// Is it a condition only a text row can meet (In Footnotes, In Endnotes, Frames of These Matches, With
 // Overrides - the narrow-down spec's N2: greyed over a tier of object rows, kept on the menu)? (The model's own question is
 // KFCNarrow::IsTextOnly - the UI half does not link the model's code.)
 bool NarrowIsTextOnly(int32 kind)
 {
-	return kind == kKFCNarrowInTables || kind == kKFCNarrowInFootnotes || kind == kKFCNarrowInEndnotes
+	return kind == kKFCNarrowInFootnotes || kind == kKFCNarrowInEndnotes
 		|| kind == kKFCNarrowFrames || kind == kKFCNarrowWithOverrides;
 }
 
@@ -721,6 +720,7 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 		}
 
 		case kKFCSearchTextInObjectsActionID:
+		case kKFCSearchTextInTablesActionID:		// (the same over a tier of the Table kind: the model asks what the list is)
 		{
 			// A tier's own row's right-click menu (docs/superpowers/specs/2026-10-21-kfc-text-in-object-results-design.md T2): the
 			// text inside that tier's objects, into a new tier - a grey tier switched to first, as Narrow Down switches (a refusal
@@ -1096,7 +1096,7 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 				int32 chapter = -1;
 				const KFCResultModel::SearchScopeKind scope = KFCResults()->GetSearchScope();
 				const bool overPart = (scope == KFCResultModel::kScopeStory || scope == KFCResultModel::kScopeToEndOfStory
-					|| scope == KFCResultModel::kScopeSelection || scope == KFCResultModel::kScopeInObjects);
+					|| scope == KFCResultModel::kScopeSelection || scope == KFCResultModel::kScopeInObjects || scope == KFCResultModel::kScopeInTables);
 				const bool enable = !overPart && !KFCResults()->ListIsRunList() && RightClickedDocument(widget, chapter);
 				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 				break;
@@ -1140,6 +1140,14 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 				int32 tier = -1;
 				const bool enable = RightClickedTier(widget, tier) && KFCResultHistory::TierHoldsObjects(tier)
 					&& !KFCResultHistory::TierHoldsQRCodes(tier);
+				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
+				break;
+			}
+			case kKFCSearchTextInTablesActionID:
+			{
+				// ...and over a tier of the Table kind alone (TierHoldsTables): its other refusals said when pressed, as the objects' are.
+				int32 tier = -1;
+				const bool enable = RightClickedTier(widget, tier) && KFCResultHistory::TierHoldsTables(tier);
 				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 				break;
 			}

@@ -36,6 +36,9 @@
 #include "ISubject.h"				// the observer's Update hears one
 #include "ITextDataValidation.h"	// IsEntryLegal / GetErrorString - a field's own range check, and its words
 #include "ITriStateControlData.h"	// the chain, the axis buttons
+#include "FileUtils.h"				// a query's file - is the name taken
+#include "KFCModelAccess.h"			// KFCRuns() - a query's file is the model's
+#include "StringUtils.h"			// ReplaceStringParameters - the name in what is asked
 #include "widgetid.h"				// IID_ITEXTCONTROLDATA / IID_ITRISTATECONTROLDATA and their messages
 
 // General includes:
@@ -74,10 +77,11 @@ int32 gPagesLength = 0;
 
 // THE QUESTION BEING ASKED - which dialog stands (modal: one at a time), so the one controller and the one observer
 // know which fields they fill, follow and read.
-enum Asking { kAskingNone = 0, kAskingMove, kAskingScale, kAskingRotate, kAskingShear, kAskingPages };
+enum Asking { kAskingNone = 0, kAskingMove, kAskingScale, kAskingRotate, kAskingShear, kAskingPages, kAskingQueryName };
 Asking gAsking = kAskingNone;
 bool gAnswered = false;				// OK pressed, and what it answered kept (ApplyDialogFields)
-PMString* gPagesAnswer = nil;		// AskPageRange's answer while its dialog stands - the range, whatever its length
+PMString* gPagesAnswer = nil;		// AskPageRange's answer while its dialog stands - the range, whatever its length - and AskQueryName's
+int32 gQueryMode = 0;				// the kind of the query whose name is asked
 // MOVE: which pair was typed last - Distance and Angle (true) or Horizontal and Vertical. Followed on every change of
 // a field's text (kEditBoxKeyStrokeMessage comes for a text put in without a key too - measured with KIDMCP's
 // WM_SETTEXT, as a paste would put it - and Enter commits the field before OK reads it), so the pair typed is the
@@ -101,8 +105,42 @@ RsrcID ViewOf(Asking asking)
 		case kAskingScale:	return kKFCScaleDialogRsrcID;
 		case kAskingRotate:	return kKFCRotateDialogRsrcID;
 		case kAskingShear:	return kKFCShearDialogRsrcID;
+		case kAskingQueryName:	return kKFCQueryNameDialogRsrcID;
 		default:			return kKFCPagesDialogRsrcID;
 	}
+}
+
+// THE NAME OFFERED: "Query <n>", the first of them the kind has no query of.
+PMString NextQueryName(int32 mode)
+{
+	for (int32 n = 1; ; ++n)
+	{
+		PMString name("Query ");
+		name.SetTranslatable(kFalse);
+		name.AppendNumber(n);
+		IDFile file;
+		if (n >= 10000 || !KFCRuns()->KohakuQueryFile(mode, name, file) || FileUtils::DoesFileExist(file) == kFalse)
+			return name;
+	}
+}
+
+// A QUERY'S NAME AS INDESIGN'S OWN DIALOG HOLDS IT (read from its panel plug-in - docs/ai-notes/kfc-native-query-menu-2026-10-31.md): not all blank, none of the characters a file's name cannot have, and short enough to be a file - with
+// "<Kind> - " in front and ".xml" behind, at the 255 a name of a file can be. The key of what is wrong, or nil.
+const char* WrongWithQueryName(const PMString& name)
+{
+	const WideString wide(name);
+	bool something = false;
+	for (WideString::const_iterator c = wide.begin(); c != wide.end(); ++c)
+	{
+		const uint32 v = static_cast<uint32>(*c);
+		if (v == '"' || v == '*' || v == '/' || v == ':' || v == '<' || v == '>' || v == '?' || v == '\\' || v == '|')
+			return kKFCQueryNameCharsKey;
+		if (v != 0x20 && v != 0x2003 && v != 0x3000)
+			something = true;
+	}
+	if (!something)
+		return kKFCQueryNameBlankKey;
+	return (name.CharCount() > 230) ? kKFCQueryNameTooLongKey : nil;
 }
 
 // A value next to nothing written as nothing: the arithmetic below leaves a trace (the cosine of 90 degrees) that a
@@ -220,6 +258,10 @@ protected:
 				SelectDialogWidget(kKFCValuePagesWidgetID);
 				break;
 			}
+			case kAskingQueryName:
+				SetTextControlData(kKFCValueQueryNameWidgetID, NextQueryName(gQueryMode), nil, kTrue, kFalse);
+				SelectDialogWidget(kKFCValueQueryNameWidgetID);
+				break;
 			default:
 				break;
 		}
@@ -285,6 +327,27 @@ protected:
 				return kKFCValuePagesWidgetID;
 			}
 		}
+		if (gAsking == kAskingQueryName)
+		{
+			PMString name(GetTextControlData(kKFCValueQueryNameWidgetID));
+			name.StripWhiteSpace(PMString::kLeadingAndTrailingWhiteSpace);
+			name.SetTranslatable(kFalse);
+			const char* const wrong = WrongWithQueryName(name);
+			if (wrong != nil)
+			{
+				CAlert::WarningAlert(PMString(wrong));
+				return kKFCValueQueryNameWidgetID;
+			}
+			// THE KIND HAS A QUERY OF THAT NAME: asked, as InDesign's own dialog asks; No stands the dialog again.
+			IDFile file;
+			if (KFCRuns()->KohakuQueryFile(gQueryMode, name, file) && FileUtils::DoesFileExist(file) != kFalse)
+			{
+				PMString ask(kKFCQueryReplaceAskKey, PMString::kTranslateDuringCall);
+				StringUtils::ReplaceStringParameters(&ask, name);
+				if (CAlert::ModalAlert(ask, PMString(kYesString, PMString::kTranslateDuringCall), PMString(kNoString, PMString::kTranslateDuringCall), kNullString, 2, CAlert::eWarningIcon) != 1)
+					return kKFCValueQueryNameWidgetID;
+			}
+		}
 		return kNoInvalidWidgets;
 	}
 
@@ -317,6 +380,15 @@ protected:
 				gShearVertical = (GetTriStateControlData(kKFCValueAxisVerticalWidgetID)
 					== ITriStateControlData::kSelected);
 				break;
+			case kAskingQueryName:
+			{
+				PMString name(GetTextControlData(kKFCValueQueryNameWidgetID));
+				name.StripWhiteSpace(PMString::kLeadingAndTrailingWhiteSpace);
+				name.SetTranslatable(kFalse);
+				if (gPagesAnswer != nil)
+					*gPagesAnswer = name;
+				break;
+			}
 			case kAskingPages:
 			{
 				PMString pages(GetTextControlData(kKFCValuePagesWidgetID));
@@ -547,6 +619,25 @@ bool KFCSpecialDialogs::AskPageRange(PMString& io, PMString& outWhy)
 	io = answer;
 	io.SetTranslatable(kFalse);
 	return !io.IsEmpty();
+}
+
+bool KFCSpecialDialogs::AskQueryName(int32 mode, PMString& outName, PMString& outWhy)
+{
+	outWhy.Clear();
+	outWhy.SetTranslatable(kFalse);
+	gQueryMode = mode;
+	PMString answer;
+	const AskResult asked = Ask(kAskingQueryName, &answer);
+	if (asked == kNotShown)
+	{
+		outWhy.Append("Save Query: the dialog could not be shown - nothing was saved.");
+		return false;
+	}
+	if (asked == kCancelled)
+		return false;		// Cancel: nothing saved, nothing said
+	outName = answer;
+	outName.SetTranslatable(kFalse);
+	return !outName.IsEmpty();
 }
 
 bool KFCSpecialDialogs::AskTransformValues(int32 op, KFCSpecialParams& io, PMString& outWhy)

@@ -35,6 +35,7 @@
 // Project includes:
 #include "KFCSavedQueries.h"
 #include "KFCDiag.h"			// KFC_DIAG_LOG - what the query reader answered, test builds only
+#include "KFCKohakuQuery.h"		// the Kohaku+ tab's queries: their files
 
 namespace
 {
@@ -55,8 +56,14 @@ namespace
 		{ "Glyph",			IFindChangeOptions::kGlyphSearch },
 		{ "Object",			IFindChangeOptions::kObjectSearch },
 		{ "Transliterate",	IFindChangeOptions::kTransliterateSearch },
+		// THE KOHAKU+ TAB'S (KFCKohakuQuery.h): no folder of their own - KFC makes none - so they come after the kinds that have one.
+		{ "QR Code",		kKFCQRCodeSearchMode },
+		{ "Table",			kKFCTableSearchMode },
+		{ "Ruby",			kKFCRubySearchMode },
+		{ "Kenten",			kKFCKentenSearchMode },
 	};
 	const int32 kKindCount = static_cast<int32>(sizeof(kKinds) / sizeof(kKinds[0]));
+	const int32 kFolderKinds = 5;	// the first five: the kinds with a folder
 
 	const char* const kQueriesFolder = "Find-Change Queries";
 
@@ -64,7 +71,7 @@ namespace
 	    Windows folder names. */
 	int32 KindIndexOfFolder(const PMString& folderName)
 	{
-		for (int32 i = 0; i < kKindCount; ++i)
+		for (int32 i = 0; i < kFolderKinds; ++i)
 			if (folderName.IsEqual(PMString(kKinds[i].folder), kFalse))
 				return i;
 		return kKindCount;
@@ -120,6 +127,21 @@ namespace
 		}
 	}
 
+	/** THE KOHAKU+ TAB'S QUERIES, of the files in the queries' folder itself: Ruby and Kenten in a Japanese InDesign alone, as the tab offers them (KFCKohakuTab.cpp's JapaneseKinds, and its test switch). */
+	void CollectKohakuQueries(std::vector<KFCSavedQuery>& out)
+	{
+		IDFile folder;
+		if (!KFCKohakuQuery::FolderOf(folder))
+			return;
+		std::vector<KFCSavedQuery> found;
+		CollectFolder(folder, found);
+		const bool japanese = !KFC_DIAG_FAULT("not-japanese") && LocaleSetting::GetLocale().GetUserInterfaceId() == k_jaJP;
+		for (size_t k = 0; k < found.size(); ++k)
+			if (found[k].mode == kKFCQRCodeSearchMode || found[k].mode == kKFCTableSearchMode
+				|| (japanese && (found[k].mode == kKFCRubySearchMode || found[k].mode == kKFCKentenSearchMode)))
+				out.push_back(found[k]);
+	}
+
 	/** The dialog's order: kind, then name ignoring case. Stable-sorted, so the user's - collected first - stay before
 	    InDesign's of the same name. */
 	bool ListedBefore(const KFCSavedQuery& a, const KFCSavedQuery& b)
@@ -146,7 +168,7 @@ void KFCSavedQueries::List(std::vector<KFCSavedQuery>& out)
 	IDFile presetsRoot;
 	const bool havePresetsRoot = GetPresetsRoot(presetsRoot);
 
-	for (int32 k = 0; k < kKindCount; ++k)
+	for (int32 k = 0; k < kFolderKinds; ++k)
 	{
 		const PMString kindFolder(kKinds[k].folder);
 		if (haveUserRoot)
@@ -163,6 +185,7 @@ void KFCSavedQueries::List(std::vector<KFCSavedQuery>& out)
 			CollectFolder(folder, out);
 		}
 	}
+	CollectKohakuQueries(out);
 	std::stable_sort(out.begin(), out.end(), ListedBefore);
 }
 
@@ -174,6 +197,18 @@ void KFCSavedQueries::Describe(const IDFile& file, KFCSavedQuery& out)
 	out.name.SetTranslatable(kFalse);
 	out.exists = FileUtils::DoesFileExist(file) != kFalse;
 	out.bundled = IsUnderPresets(file);
+
+	// THE KOHAKU+ TAB'S: its kind in the file; its name the file's, its kind's head off (the menu of InDesign's shows the head - that menu has only the name to say it with).
+	KFCKohakuQueryData own;
+	if (KFCKohakuQuery::IsInItsFolder(file) && KFCKohakuQuery::Read(file, own))
+	{
+		out.mode = own.mode;
+		const PMString head(KFCKohakuQuery::EntryName(own.mode, PMString()));
+		if (out.name.CharCount() > head.CharCount() && out.name.IsEqual(head, kFalse, kTrue /*the head's length only*/))
+			out.name.Remove(0, head.CharCount());
+		out.name.SetTranslatable(kFalse);
+		return;
+	}
 
 	// The kind is the folder's name: the parent for the user's (Find-Change Queries\<kind>\x.xml), the grandparent for
 	// InDesign's (...\<kind>\<language>\x.xml). Asked by name, so a path that names no kind's folder - a run order copied

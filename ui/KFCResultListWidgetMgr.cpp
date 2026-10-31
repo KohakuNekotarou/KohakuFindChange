@@ -1364,6 +1364,7 @@ const char* KFCResultTree::SpecialRowWord(int32 op)
 		case kKFCSpecialClearTextOverrides:		return "Cleared";	// a text row's Clear Overrides - the same word
 		case kKFCSpecialTableStyle:				return "Styled";	// a table row's Replace (the table tab spec's T9)
 		case kKFCSpecialRubyChange:				return "Changed";	// a ruby row's Replace (the ruby tab spec's R8)
+		case kKFCSpecialKentenChange:			return "Changed";	// a kenten row's Replace
 		case kKFCSpecialDelete:					return "Deleted";
 		default:								return "";
 	}

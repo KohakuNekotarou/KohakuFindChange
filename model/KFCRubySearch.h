@@ -33,13 +33,14 @@
 namespace KFCRubySearch
 {
 	/** IS THE RUBY TAB FIND/CHANGE'S TAB NOW, and what it asks (outConditions, when given - the tab's as it stands, whichever tab is shown: a row's Replace reads its
-	    Change side). Asked of the UI half (IKFCUIServices::RubyTabConditions - ui/KFCRubyTab.h); no UI half = not the Ruby tab. A TEST BUILD asks its fault switch
-	    ruby-tab first: on = the Ruby tab, its file's lines kind=without, base=, ruby=, change=, remove=1, scope=all the conditions. */
+	    Change side). Asked of the UI half (IKFCUIServices::RubyTabConditions - ui/KFCKohakuTab.h); no UI half = not the Ruby tab. A TEST BUILD asks its fault switch
+	    ruby-tab first: on = the Ruby tab, its file's lines kind=without, base=, ruby=, change=, remove=1, scope=all|story|toend|selection the conditions. */
 	bool IsTabCurrent(KFCRubyConditions* outConditions = nil);
 
-	/** THE TAB'S WALK OVER A RUN'S TARGETS (KFCTableSearch::CollectTargets' shape). */
+	/** THE TAB'S WALK OVER A RUN'S TARGETS (KFCTableSearch::CollectTargets' shape). part (KFCSearchEngine::PartStretches): a run with ruby its stretches touch - the reading is over the whole of it; an
+	    occurrence or a mark they hold whole, as a text search finds none a selection cuts. nil = the whole of each target. */
 	void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBook, std::vector<KFCBookScope::SkippedChapter>& unopenable,
-		KFCSearchEngine::CollectTally& out, int32 reserved, const KFCRubyConditions& asked);
+		KFCSearchEngine::CollectTally& out, int32 reserved, const KFCRubyConditions& asked, const std::vector<KFCSearchEngine::ListedPlace>* part = nil);
 
 	/** One document's rows again (Search This Document Again). False = cancelled or nothing to walk with. */
 	bool WalkOneDocument(const UIDRef& docRef, const PMString& name, size_t limit, const KFCRubyConditions& asked,
@@ -62,8 +63,12 @@ namespace KFCRubySearch
 	    outBaseLength = what is left at `at`. kFailure with outStillThere: a deletion left the text where it was - Track Changes on in the story, which keeps deleted text. */
 	ErrorCode WriteMark(const UIDRef& story, TextIndex at, int32 length, int32& outBaseLength, bool& outStillThere);
 
+	/** A QUERY RUN'S WRITE OF ONE DOCUMENT (KFCKohakuQuery::WriteDocument): what the conditions list, given their Change side (ruby from marks: its mark's), with no rows. outCount = the places written. False = InDesign would
+	    not write one - Track Changes keeps the marks a run would take out (WriteMark). */
+	bool WriteDocument(const UIDRef& docRef, const KFCRubyConditions& asked, const std::vector<KFCSearchEngine::ListedPlace>* part, int32& outCount);
+
 	/** Takes the ruby off [start, end) inside the caller's step: every ruby attribute's override removed - the official snippet only turns the flag off, which leaves the
-	    reading behind (KIDMCPRuby.cpp's ClearRubyOn, the same thirty). kSuccess = done. */
+	    reading behind (KIDMCPRuby.cpp's ClearRubyOn, the same thirty). A style cannot give text a ruby - it has no flag and no reading (measured, 10-31), unlike a kenten's kind - so nothing is left to turn off; a style's look stays. kSuccess = done. */
 	ErrorCode Remove(const UIDRef& story, TextIndex start, TextIndex end);
 }
 

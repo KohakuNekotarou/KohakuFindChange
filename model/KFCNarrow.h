@@ -31,7 +31,7 @@
 
 namespace KFCNarrow
 {
-	/** WHERE A MATCH'S TEXT STANDS (In Tables / In Footnotes / In Endnotes): read off the story thread holding `at` -
+	/** WHERE A MATCH'S TEXT STANDS (In Footnotes / In Endnotes): read off the story thread holding `at` -
 	    the owner of its thread dictionary (ITextStoryThread::GetDictUID: a table's cells are threads of
 	    kTableModelBoss, a footnote's text one of kFootnoteReferenceBoss - the iid-boss dictionary's owners of
 	    IID_ITEXTSTORYTHREADDICT) - and whether the story is an endnote's (Facade::IEndnoteFacade::IsEndnoteStory - a
@@ -105,9 +105,9 @@ namespace KFCNarrow
 		mutable std::vector<PMString>					fNoLayerDocs;	// the documents with no layer of the name (LayerOf)
 	};
 
-	/** Is this a condition only a text row can meet (In Tables / In Footnotes / In Endnotes / Frames of These Matches)? */
+	/** Is this a condition only a text row can meet (In Footnotes / In Endnotes / Frames of These Matches)? */
 	bool IsTextOnly(int32 kind);
-	/** A step's words, as the menu names it ("In Tables") - the status line's refusals. */
+	/** A step's words, as the menu names it ("In Footnotes") - the status line's refusals. */
 	PMString StepWords(const KFCNarrowStep& step);
 }
 

@@ -190,8 +190,7 @@ namespace KFCResultModel
 								// and no count counts it. The list's alone (the document is not touched): an Undo's copy of the
 								// row does not bring it back (ApplyRowStep keeps it), and a search again drops it for good.
 		// WHERE THE MATCH'S TEXT STANDS (Narrow Down - docs/superpowers/specs/2026-10-18-kfc-narrow-down-design.md N5), read
-		// as the search builds a text row (KFCSearchEngine's BuildHit): in a table cell, in a footnote, in an endnote's story.
-		bool		inTable;
+		// as the search builds a text row (KFCSearchEngine's BuildHit): in a footnote, in an endnote's story.
 		bool		inFootnote;
 		bool		inEndnote;
 		bool		frameOnPasteboard;	// a TEXT row's frame - the match's, or for an overset match the "+" frame its page is
@@ -264,16 +263,17 @@ namespace KFCResultModel
 		// chapter is bound again (RebindChapterDoc), asked by every door that takes the row's item (RowItemIsThere,
 		// IsHitItemGone).
 		bool		itemGone;
+		UID			tableUID;	// A TABLE KIND'S ROW: its table (KFCTableSearch - Search Text in These Tables searches the text in it); kInvalidUID for any other row
 
 		Hit() : pageIndex(-1), isOverset(false), isLocked(false), isHidden(false), onHiddenSpread(false),
 				fontGroup(-1), fontGroupPos(-1), storyUID(kInvalidUID),
 				textStart(kInvalidTextIndex), textEnd(kInvalidTextIndex), matchHash(0),
-				replaced(false), outlined(false), special(0), kept(false), cleared(false), inTable(false),
+				replaced(false), outlined(false), special(0), kept(false), cleared(false),
 				inFootnote(false), inEndnote(false), frameOnPasteboard(false), matchFrame(kInvalidUID), pageUID(kInvalidUID),
 				frameLayer(kInvalidUID), outcome(kOutcomeNone),
 				pageOrdinal(0), storyOrdinal(-1),
 				itemUID(kInvalidUID), onPasteboard(false), isMaster(false), isGrouped(false), isInline(false),
-				isAnchored(false), itemPrint(0), itemPrintLength(0), itemGone(false) {}
+				isAnchored(false), itemPrint(0), itemPrintLength(0), itemGone(false), tableUID(kInvalidUID) {}
 	};
 
 	/** One STORY of a chapter's hits - one story row in the tree. The struct keeps the name it had when
@@ -415,7 +415,7 @@ namespace KFCResultModel
 	    them; recorded beside SetSearchScope, after the commit point. Empty for every list no Narrow Down made. */
 	void SetNarrowSteps(const std::vector<KFCNarrowStep>& steps);
 	std::vector<KFCNarrowStep> GetNarrowSteps();
-	/** The steps in words, as a tier's heading draws them after its name and the status line names them: "In Tables /
+	/** The steps in words, as a tier's heading draws them after its name and the status line names them: "In Footnotes /
 	    Pages 1-5" - empty for none. */
 	PMString NarrowWords();
 	/** ARE THE LIST'S ROWS OBJECT ROWS - an Object tab search's, a QR Code tab search's (ListIsQRCodes), or a
@@ -438,6 +438,8 @@ namespace KFCResultModel
 	bool ListIsTables();
 	/** Is the list A RUBY LIST - KFC's Ruby tab's (KFCRubySearch: its search mode kKFCRubySearchMode)? Text rows on each ruby's run. */
 	bool ListIsRuby();
+	/** Is the list A KENTEN LIST - the Kenten kind's (KFCKentenSearch: its search mode kKFCKentenSearchMode)? Text rows on each stretch of marks. */
+	bool ListIsKenten();
 	/** IS THE LIST ONE OF A TAB OF KFC'S THAT HAS A CHANGE SIDE - Table, Ruby? Its rows are text rows standing for something no text row's other write means anything to: a
 	    Replace is that tab's (KFCReplaceEngine's WriteOwnTabRows), and the list is not narrowed. */
 	bool ListHasOwnChangeTab();
@@ -721,6 +723,9 @@ namespace KFCResultModel
 
 	/** A row's place among its story's rows as the search found them (Hit::storyOrdinal); -1 = no such row. */
 	int32 GetHitStoryOrdinal(int32 chapterIdx, int32 hitIdx);
+
+	/** The table a Table kind's row stands for (Hit::tableUID); kInvalidUID for any other row or an index out of range. */
+	UID GetHitTable(int32 chapterIdx, int32 hitIdx);
 
 	/** The page item an OBJECT row stands for (Hit::itemUID); kInvalidUID for a text row or an index out of range. */
 	UID GetHitItem(int32 chapterIdx, int32 hitIdx);

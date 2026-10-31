@@ -195,7 +195,7 @@ PMString ChainWords(const Place& place)
 }	// anonymous namespace
 
 KFCRunList::Recorder::Recorder(const std::vector<PMString>& queryNames, const std::vector<KFCBookScope::ChapterDoc>& targets)
-	: fNames(queryNames), fTargets(targets), fObjectQuery(false)
+	: fNames(queryNames), fTargets(targets), fObjectQuery(false), fKohakuQuery(false)
 {
 	fDocOfTarget.reserve(targets.size());
 	for (size_t t = 0; t < targets.size(); ++t)
@@ -341,6 +341,11 @@ void KFCRunList::Recorder::RecordAfter(size_t target, int32 query, int32 count)
 		story.before.clear();
 		story.before.shrink_to_fit();
 	}
+}
+
+void KFCRunList::Recorder::NoteKohakuQuery()
+{
+	fKohakuQuery = true;
 }
 
 void KFCRunList::Recorder::NoteObjectQuery()
@@ -521,6 +526,8 @@ int32 KFCRunList::Recorder::FileList(bool fromBook, bool allDocuments, KFCResult
 			outWords.Append(fDocs[d].why);
 	if (fObjectQuery)
 		outWords.Append(" Object queries are not listed.");
+	if (fKohakuQuery)
+		outWords.Append(" Kohaku+ queries are not listed.");
 	return listed;
 }
 

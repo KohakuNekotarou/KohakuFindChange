@@ -32,7 +32,7 @@ namespace KFCQRSearch
 {
 	/** IS THE QR CODE TAB FIND/CHANGE'S TAB NOW (the design's D1), and the tab's Search: in outScope (when given) -
 	    IWalkerScopeFactoryUtils::kDocumentScope or kAllDocumentScope. Asked of the UI half, which keeps it from the face's
-	    own calls (IKFCUIServices::IsQRCodeTabCurrent - ui/KFCQRTab.h); no UI half = not the QR Code tab. A TEST BUILD asks
+	    own calls (IKFCUIServices::IsQRCodeTabCurrent - ui/KFCKohakuTab.h); no UI half = not the QR Code tab. A TEST BUILD asks
 	    its fault switch qr-tab first (the model's cases, which need no dialog): on = the QR Code tab, its file's first line
 	    "all" = All Documents, anything else Document. false = not the QR Code tab. */
 	bool IsTabCurrent(int32* outScope = nil);
@@ -61,7 +61,7 @@ namespace KFCQRSearch
 	    What the QR code holds is not compared - a row keeps the text it was found with (Q15). */
 	bool RowHoldsQRCode(int32 chapterIdx, int32 hitIdx);
 
-	/** FIND NEXT ON THE QR CODE TAB (the design's Q10 / D5 - the tab's button, ui/KFCQRTab): the QR code after `last` -
+	/** FIND NEXT ON THE QR CODE TAB (the design's Q10 / D5 - the tab's button, ui/KFCKohakuTab): the QR code after `last` -
 	    the one Find Next found before; an invalid UIDRef, or one of a document not in the range now or no longer holding it =
 	    from the start - in the list's own order: the tab's Search: (the active document, or every open one in the order
 	    All Documents lists them - KFCBookScope::ListOpenDocuments), each document's QR codes in page order

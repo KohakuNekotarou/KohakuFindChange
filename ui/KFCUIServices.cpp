@@ -56,9 +56,7 @@
 #include "KFCBookPanelLookup.h"
 #include "KFCJump.h"				// ClearFrontSelection - ClearSelection's door; IsLanding - IsLanding's
 #include "KFCResultHistory.h"		// QueryReadsAsTier, RenameLiveFromQuery - the lists' names are this half's
-#include "KFCTableTab.h"			// IsCurrent - TableTabConditions' answer, kept from the Table face's calls
-#include "KFCRubyTab.h"				// IsCurrent - RubyTabConditions' answer, kept from the Ruby face's calls
-#include "KFCQRTab.h"				// IsCurrent - IsQRCodeTabCurrent's answer, kept from the QR Code face's calls
+#include "KFCKohakuTab.h"			// IsQRCodeTabCurrent's, TableTabConditions' and RubyTabConditions' answers, kept from the face's calls
 #include "KFCDiag.h"				// KFC_DIAG_FAULT - test builds only (bg-first-view)
 #ifdef KFC_DIAG
 #include "ILayoutViewUtils.h"		// GetAllLayoutViews - bg-first-view's old way, a test build's only
@@ -583,17 +581,22 @@ public:
 
 	virtual bool IsQRCodeTabCurrent(int32& outScope)
 	{
-		return KFCQRTab::IsCurrent(outScope);
+		return KFCKohakuTab::IsQRCodeCurrent(outScope);
 	}
 
 	virtual bool TableTabConditions(KFCTableConditions& outConditions)
 	{
-		return KFCTableTab::IsCurrent(outConditions);
+		return KFCKohakuTab::IsTableCurrent(outConditions);
 	}
 
 	virtual bool RubyTabConditions(KFCRubyConditions& outConditions)
 	{
-		return KFCRubyTab::IsCurrent(outConditions);
+		return KFCKohakuTab::IsRubyCurrent(outConditions);
+	}
+
+	virtual bool KentenTabConditions(KFCKentenConditions& outConditions)
+	{
+		return KFCKohakuTab::IsKentenCurrent(outConditions);
 	}
 };
 

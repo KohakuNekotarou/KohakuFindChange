@@ -55,9 +55,8 @@
 #include "KFCQueryList.h"
 #include "KFCQueryOrder.h"
 #include "KFCQueryOrderFile.h"		// KFCChooseOrderFileToSave / ToLoad - Save Order... / Load Order...'s file
-#include "KFCTableTab.h"			// YieldToSavedQuery - the Table tab steps aside the same
-#include "KFCRubyTab.h"				// ...and the Ruby tab
-#include "KFCQRTab.h"				// YieldToSavedQuery - a loaded query states its own tab over the QR Code tab
+#include "KFCKohakuQueryMenu.h"		// ShowQuery - a query of the Kohaku+ tab double-clicked
+#include "KFCKohakuTab.h"			// YieldToSavedQuery - a loaded query states its own tab over the Kohaku tab; StateQuery - a query of its own
 #include "KFCResultHistory.h"		// Find - a query searched as a new tier; the same query twice in a row; a Run's drop
 #include "KFCResultTree.h"			// Rebuild / ShowStatus - the panel, told of a run as Find tells it
 #include "KFCUIID.h"
@@ -283,22 +282,37 @@ namespace
 			SayOnBoth(panel, say);
 			return;
 		}
-		if (!KFCRuns()->LoadSavedQuery(query.file))
+		// A QUERY OF THE KOHAKU+ TAB (KFCKohakuQuery.h): stated on the tab, for this Find (over Search: as the dialog's Runs on: says it); what the tab is is its own again after it.
+		const bool ownQuery = KFCIsKohakuQueryMode(query.mode);
+		KFCKohakuQueryData own;
+		struct EndStated
+		{
+			bool stated;
+			EndStated() : stated(false) {}
+			~EndStated() { if (stated) KFCKohakuTab::EndStatedFind(); }
+		} endStated;
+		if (ownQuery ? !KFCRuns()->ReadKohakuQuery(query.file, own) : !KFCRuns()->LoadSavedQuery(query.file))
 		{
 			PickNextOrderRow(panel, next);
 			say.Append(" skipped: the file could not be read.");
 			SayOnBoth(panel, say);
 			return;
 		}
+		if (ownQuery)
+		{
+			int32 nativeMode = -1, nativeScope = -1;
+			KFCRuns()->FindChangeTabAndScope(nativeMode, nativeScope);
+			KFCKohakuTab::StateQuery(own, true, nativeScope);
+			endStated.stated = true;
+		}
 		// THE QUERY STATES ITS OWN TAB: KFC's QR Code tab, if it is Find/Change's, steps aside until the person shows it again
-		// (KFCQRTab) - the grey state below and the Find search what the query says.
-		KFCQRTab::YieldToSavedQuery();
-		KFCTableTab::YieldToSavedQuery();
-		KFCRubyTab::YieldToSavedQuery();
+		// (KFCKohakuTab) - the grey state below and the Find search what the query says.
+		else
+			KFCKohakuTab::YieldToSavedQuery();
 		// NOTHING TO FIND: a tab this panel does not search (Colour), or - but on the Object tab, whose search lists every
 		// frame of its type with no format set - nothing set to find (the query run's own question - KFCQuerySequence).
 		const int32 mode = KFCRuns()->CurrentSearchMode();
-		if (!KFCRuns()->CanSearchTab(mode) || (mode != IFindChangeOptions::kObjectSearch && !KFCRuns()->HasFindQueryNow()))
+		if (!ownQuery && (!KFCRuns()->CanSearchTab(mode) || (mode != IFindChangeOptions::kObjectSearch && !KFCRuns()->HasFindQueryNow())))
 		{
 			PickNextOrderRow(panel, next);
 			say.Append(" skipped: nothing to find.");
@@ -860,6 +874,23 @@ void KFCQueryDialogShowInFindChange(int32 savedIndex)
 	// loaded with the dialog last on Text - the GREP strings in, the Text tab shown). Loaded into the dialog once it
 	// stands, the query takes its own tab, as a query picked in the dialog's own Query menu does.
 	(void)KFCShowFindChangeDialog();
+	// A QUERY OF THE KOHAKU+ TAB: stated on the tab, the tab shown, and InDesign's menu says it.
+	if (KFCIsKohakuQueryMode(query.mode))
+	{
+		KFCKohakuQueryData own;
+		if (!KFCRuns()->ReadKohakuQuery(query.file, own))
+		{
+			say.Append(query.name);
+			say.Append(" could not be loaded into Find/Change.");
+			ShowDialogMessage(gOpenPanel, say);
+			return;
+		}
+		KFCKohakuQueryMenu::ShowQuery(own, query.file);
+		say.Append("Loaded into Find/Change: ");
+		say.Append(KFCQueryOrder::SavedRowText(savedIndex));
+		ShowDialogMessage(gOpenPanel, say);
+		return;
+	}
 	if (!KFCRuns()->LoadSavedQuery(query.file))
 	{
 		say.Append(query.name);

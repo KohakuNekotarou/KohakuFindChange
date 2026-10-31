@@ -45,6 +45,10 @@ namespace KFCSpecialDialogs
 	    io: the range on OK, its leading and trailing spaces taken off. false = Cancel (outWhy empty), or the dialog
 	    could not be shown (outWhy says so). The model reads the range in each document (KFCNarrow::ReadPageRange). */
 	bool AskPageRange(PMString& io, PMString& outWhy);
+
+	/** SAVE QUERY ON THE KOHAKU+ TAB (KFCKohakuQueryMenu): a query's name asked, in a dialog of the same make - offered the next free "Query <n>" of the kind, held to the rules of InDesign's own dialog for it (nothing blank, none of
+	    the characters a file's name cannot have), and asked Replace? when the kind has a query of that name. outName on OK. false = Cancel (outWhy empty), or the dialog could not be shown (outWhy says so). */
+	bool AskQueryName(int32 mode, PMString& outName, PMString& outWhy);
 }
 
 #endif // __KFCSpecialDialogs_h__

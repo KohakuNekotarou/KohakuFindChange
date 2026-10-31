@@ -395,7 +395,6 @@ PMString KFCResultModel::NarrowWords()
 			words.Append(" / ");
 		switch (step.kind)
 		{
-			case kKFCNarrowInTables:		words.Append("In Tables"); break;
 			case kKFCNarrowInFootnotes:		words.Append("In Footnotes"); break;
 			case kKFCNarrowInEndnotes:		words.Append("In Endnotes"); break;
 			case kKFCNarrowPages:			words.Append("Pages "); words.Append(step.pages); break;
@@ -450,6 +449,11 @@ bool KFCResultModel::ListIsTables()
 	return gHeader.searchMode == static_cast<int32>(kKFCTableSearchMode);
 }
 
+bool KFCResultModel::ListIsKenten()
+{
+	return gHeader.searchMode == static_cast<int32>(kKFCKentenSearchMode);
+}
+
 bool KFCResultModel::ListIsRuby()
 {
 	return gHeader.searchMode == static_cast<int32>(kKFCRubySearchMode);
@@ -457,7 +461,7 @@ bool KFCResultModel::ListIsRuby()
 
 bool KFCResultModel::ListHasOwnChangeTab()
 {
-	return ListIsTables() || ListIsRuby();
+	return ListIsTables() || ListIsRuby() || ListIsKenten();
 }
 
 void KFCResultModel::SetRunNames(const PMString& names)
@@ -1866,6 +1870,12 @@ void KFCResultModel::GetListCounts(const ModelSnapshot& list, int32& outReplaced
 		outHits += ShownRows(list.chapters[c].hits);
 		outReplaced += ReplacedRows(list.chapters[c].hits);
 	}
+}
+
+UID KFCResultModel::GetHitTable(int32 chapterIdx, int32 hitIdx)
+{
+	const Hit* h = HitAt(chapterIdx, hitIdx);
+	return (h != nil) ? h->tableUID : kInvalidUID;
 }
 
 UID KFCResultModel::GetHitItem(int32 chapterIdx, int32 hitIdx)

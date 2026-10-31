@@ -59,7 +59,8 @@ namespace KFCResultModel
 		kScopeStory,
 		kScopeToEndOfStory,
 		kScopeSelection,
-		kScopeInObjects		// Search Text in These Objects: the text of a tier's objects (Chapter::searchedObjects)
+		kScopeInObjects,	// Search Text in These Objects: the text of a tier's objects (Chapter::searchedObjects)
+		kScopeInTables		// Search Text in These Tables: the text of a tier's tables (Chapter::searchedObjects holds their UIDs)
 	};
 
 	/** THE MOST TIERS KEPT (the author's call - 50 being too many searches to keep): past it the oldest goes. One
@@ -102,8 +103,8 @@ namespace KFCResultModel
 enum KFCNarrowKind
 {
 	kKFCNarrowNone = 0,
-	kKFCNarrowInTables = 1,		// the match's text in a table cell
-	kKFCNarrowInFootnotes,		// ...in a footnote
+	// (1 was In Tables: gone with the Table kind's Search Text in These Tables - the author, 10-31 - and not used again.)
+	kKFCNarrowInFootnotes = 2,	// the match's text in a footnote
 	kKFCNarrowInEndnotes,		// ...in an endnote (its own story)
 	kKFCNarrowPages,			// the row's page in a range of pages (`pages` - the print dialog's way of writing one)
 	kKFCNarrowOnPasteboard,		// the item, or the match's frame, out on the pasteboard
@@ -177,6 +178,8 @@ enum KFCSpecialOp
 	kKFCSpecialTableStyle,
 	// A ruby row's Replace (the Ruby tab - its spec's R8): the same - the row reads "Changed", and can be written again.
 	kKFCSpecialRubyChange,
+	// A kenten row's Replace (the Kenten kind - KFCKentenSearch): the same.
+	kKFCSpecialKentenChange,
 	kKFCSpecialOpCount
 };
 
@@ -227,7 +230,7 @@ enum { kKFCRubySearchMode = 103 };
 /** The Ruby tab's Find: - its entries' order (KFCUI.fr). Marks = ruby written out in the text as a manuscript writes it, a base and its reading in marks (KFCRubySearch.h). */
 enum { kKFCRubyFindWith = 0, kKFCRubyFindWithout = 1, kKFCRubyFindMarks = 2 };
 
-/** WHAT THE RUBY TAB ASKS (the face's - KFCRubyTab, read by IKFCUIServices::RubyTabConditions; a ruby list keeps its find side in its query copy). */
+/** WHAT THE RUBY TAB ASKS (the face's - KFCKohakuTab, read by IKFCUIServices::RubyTabConditions; a ruby list keeps its find side in its query copy). */
 struct KFCRubyConditions
 {
 	int32		kind;			// Find: - kKFCRubyFindWith, kKFCRubyFindWithout (the occurrences of base with none on them), kKFCRubyFindMarks
@@ -235,10 +238,49 @@ struct KFCRubyConditions
 	PMString	reading;		// its reading contains this; empty = any (not Text Without Ruby)
 	PMString	changeTo;		// the reading a row's Replace gives it; empty = none given
 	bool		removeRuby;		// ...or its Replace takes the ruby off - over changeTo
-	int32		scope;			// its Search: - IWalkerScopeFactoryUtils::kDocumentScope (at launch) or kAllDocumentScope
+	int32		scope;			// its Search: - IWalkerScopeFactoryUtils::kDocumentScope (at launch), kAllDocumentScope, or over part of the front document kStoryScope, kToEndOfStoryScope, kSelectionScope
 
 	KFCRubyConditions() : kind(kKFCRubyFindWith), removeRuby(false), scope(0) {}
 };
+
+/** THE KENTEN KIND'S "SEARCH MODE" (the author, 10-31 - KFCKentenSearch.h): the Ruby kind's for its own (KFCKentenSearch::IsTabCurrent). KFC'S ALONE. */
+enum { kKFCKentenSearchMode = 104 };
+
+/** The Kenten part's Look For: - its entries' order (KFCUI.fr). */
+enum { kKFCKentenFindWith = 0, kKFCKentenFindWithout = 1 };
+
+/** WHAT THE KENTEN KIND ASKS (the face's - KFCKohakuTab, read by IKFCUIServices::KentenTabConditions; a kenten list keeps its find side in its query copy). */
+struct KFCKentenConditions
+{
+	int32		kind;			// Look For: - kKFCKentenFindWith, kKFCKentenFindWithout (the occurrences of base with none on them)
+	PMString	base;			// its text contains this; empty = any (Text Without Kenten: what it looks for - refused empty)
+	int32		mark;			// Kenten: - 0 = any, or an IKentenStyle::KentenKind (not Text Without Kenten)
+	int32		changeTo;		// Change Kenten To: - the IKentenStyle::KentenKind a row's Replace gives it; 0 = none given
+	bool		removeKenten;	// ...or its Replace takes the marks off - over changeTo
+	int32		scope;			// its Search: - as KFCRubyConditions::scope
+
+	KFCKentenConditions() : kind(kKFCKentenFindWith), mark(0), changeTo(0), removeKenten(false), scope(0) {}
+};
+
+/** A KIND OF KENTEN AS THE PAGE'S OWN MARKS READ (IKentenStyle::KentenKind's numbers: U+FE45 the sesame dot and the rest) - what a kenten row and a kenten list's name draw. Custom, a glyph of the person's
+    which they do not read: an asterisk. */
+inline UTF32TextChar KFCKentenMarkCharacter(int32 mark)
+{
+	switch (mark)
+	{
+		case 1:		return UTF32TextChar(0xFE45);		// Kenten_BlackSesameDot
+		case 2:		return UTF32TextChar(0xFE46);		// Kenten_WhiteSesameDot
+		case 3:		return UTF32TextChar(0x25C9);		// Kenten_Fisheye
+		case 4:		return UTF32TextChar(0x25CF);		// Kenten_BlackCircle
+		case 5:		return UTF32TextChar(0x2022);		// Kenten_SmallBlackCircle
+		case 6:		return UTF32TextChar(0x25CE);		// Kenten_Bullseye
+		case 7:		return UTF32TextChar(0x25B2);		// Kenten_BlackTriangle
+		case 8:		return UTF32TextChar(0x25B3);		// Kenten_WhiteTriangle
+		case 9:		return UTF32TextChar(0x25CB);		// Kenten_WhiteCircle
+		case 10:	return UTF32TextChar(0x25E6);		// Kenten_SmallWhiteCircle
+		default:	return UTF32TextChar(0x2731);		// Kenten_Custom
+	}
+}
 
 /** A style path with one character swapped for another - KFCStylePathWords' way, and the test build's fault switch's the other way. */
 inline PMString KFCStylePathSwapped(const PMString& path, textchar from, textchar to)
@@ -262,7 +304,7 @@ inline PMString KFCStylePathWords(const PMString& path)
 	return KFCStylePathSwapped(path, kTextChar_StyleGroupPathSeparator, kTextChar_Colon);
 }
 
-/** WHAT THE TABLE TAB ASKS (the face's - KFCTableTab, read by IKFCUIServices::TableTabConditions; a table list keeps its find side
+/** WHAT THE TABLE TAB ASKS (the face's - KFCKohakuTab, read by IKFCUIServices::TableTabConditions; a table list keeps its find side
     in its query copy, so its searches again ask what its search asked). A table style is named by its full path, untranslated
     (GetFullPath(kFalse) - its group's separator in it; KFCStylePathWords reads it out): its UID means nothing in a book's other chapter. */
 struct KFCTableConditions
@@ -271,9 +313,26 @@ struct KFCTableConditions
 	bool		overridesOnly;	// only tables with overrides of their own
 	PMString	changeStyle;	// the style a row's Replace gives its table; empty = it keeps its own
 	bool		clearOverrides;	// ...and its Replace clears its table's overrides
-	int32		scope;			// its Search: - IWalkerScopeFactoryUtils::kDocumentScope (at launch) or kAllDocumentScope
+	int32		scope;			// its Search: - IWalkerScopeFactoryUtils::kDocumentScope (at launch), kAllDocumentScope, or over part of the front document kStoryScope, kToEndOfStoryScope, kSelectionScope
 
 	KFCTableConditions() : overridesOnly(false), clearOverrides(false), scope(0) {}
+};
+
+/** IS THIS MODE ONE A SAVED QUERY OF THE KOHAKU+ TAB IS OF (KFCKohakuQuery.h)? */
+inline bool KFCIsKohakuQueryMode(int32 mode)
+{
+	return mode == kKFCQRCodeSearchMode || mode == kKFCTableSearchMode || mode == kKFCRubySearchMode || mode == kKFCKentenSearchMode;
+}
+
+/** WHAT A SAVED QUERY OF THE KOHAKU+ TAB HOLDS: its kind (kKFCTableSearchMode ...) and what that kind asks. A query's scope is no part of it: it runs on what Search: says when it runs. */
+struct KFCKohakuQueryData
+{
+	int32				mode;
+	KFCTableConditions	table;
+	KFCRubyConditions	ruby;
+	KFCKentenConditions	kenten;
+
+	KFCKohakuQueryData() : mode(-1) {}
 };
 
 /** WHAT KEEPS A QR CODE FIND NEXT FOUND FROM BEING SELECTED (IKFCRuns::QRCodeNext's outReach - KFCQRSearch::Next; the UI half's

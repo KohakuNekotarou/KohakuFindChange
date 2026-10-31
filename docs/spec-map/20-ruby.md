@@ -1,6 +1,6 @@
-# 20. ルビで探す・ルビを付ける（検索と置換の「Ruby」タブ）
+# 20. ルビで探す・ルビを付ける（Kohaku+ タブの Find: Ruby）
 
-> コード地図での位置: `model/KFCRubySearch.*`（タブが今のタブか・歩く・行の字・読みの読み書き）・`model/KFCReplaceEngine.cpp` の `WriteOwnTabRows`（行の Replace＝Table タブと共通）・`ui/KFCRubyTab.*`（タブの面）。
+> コード地図での位置: `model/KFCRubySearch.*`（タブが今のタブか・歩く・行の字・読みの読み書き）・`model/KFCReplaceEngine.cpp` の `WriteOwnTabRows`（行の Replace＝Table タブと共通）・`ui/KFCKohakuTab.*`（タブの面）。
 > 設計書 `docs/superpowers/specs/2026-10-31-kfc-ruby-tab-design.md`（R1〜R11）。各項目の末尾の（R<番号>）は設計書の決定。回帰の表＝`work/kbs-regress/rb-cases.tsv`。
 > 訂正の書き方は [00-index.md](00-index.md)。
 
@@ -8,10 +8,10 @@
 
 ## 1. タブと面
 
-- **RUBY-01** ★本体の「検索と置換」のタブの行に、KFC の **「Ruby」タブ**が出る。そのタブが今のタブのとき、KFC の Find in … はルビの一覧を作る。閉じる時にそのタブなら閉じている間も同じ。（R1）回帰 `rb-face-shown`・`rb-face-find`・`rb-face-closed`・`rb-face-done`・`rb-face-switch-back`
+- **RUBY-01** ★本体の「検索と置換」の **Kohaku+ タブ**（21 章）の Find: を **Ruby** にしているとき（日本語で起動しているときだけ出る＝KOHAKU-03）、KFC の Find in … はルビの一覧を作る。閉じる時にそうなら閉じている間も同じ。（R1・K1）回帰 `rb-face-shown`・`rb-face-find`・`rb-face-closed`・`rb-face-done`・`rb-face-switch-back`
   - 訂正:
 
-- **RUBY-02** 面の中身＝**Search:**・**Find:**（Text With Ruby／Text Without Ruby）・**Base Text:**・**Ruby:**（Without のとき灰色）・**Change Ruby To:**・**Remove Ruby**・案内の2行。文字欄は1打鍵ごとに控える。値は KFC が覚える（起動している間だけ）。（R2）回帰 `rb-face-base`・`rb-face-reading`・`rb-face-kind`・`rb-face-change`・`rb-face-remove`・`rb-face-scope`
+- **RUBY-02** 部品＝**Look For:**（Text With Ruby／Text Without Ruby／Ruby Marks in Text）・**Base Text:**・**Ruby:**（Without のとき灰色）・**Change Ruby To:**・**Remove Ruby**・案内の2行。**Search:** は 5つ（KOHAKU-10）。文字欄は1打鍵ごとに控える。値は KFC が覚える（起動している間だけ）。（R2・K5）回帰 `rb-face-base`・`rb-face-reading`・`rb-face-kind`・`rb-face-change`・`rb-face-remove`・`rb-face-scope`・`rb-part-face`
   - 訂正:
 
 ## 2. 探す
@@ -38,7 +38,7 @@
 
 ## 4. Replace
 
-- **RUBY-30** ★行の右クリックの Replace と Return＝**その時の面の Change 側**。Change Ruby To＝読みを付ける（`kTARubyAttrBoss`・`kTARubyStringBoss` だけ＝ルビの見た目は触らない。新しく付ける複数文字はグループルビ）。Remove Ruby＝ルビの属性を全部外す（30 個・Change Ruby To より優先）。物語に strand が無ければ先に作る。（R7）回帰 `rb-change-one`・`rb-change-all`・`rb-without-apply`・`rb-no-strand`・`rb-remove`・`rb-remove-wins`・`rb-return`・`rb-cell-change`・`rb-book-replace`
+- **RUBY-30** ★行の右クリックの Replace と Return＝**その時の面の Change 側**。Change Ruby To＝読みを付ける（`kTARubyAttrBoss`・`kTARubyStringBoss` だけ＝ルビの見た目は触らない。新しく付ける複数文字はグループルビ）。Remove Ruby＝ルビの属性を全部外す（30 個・KIDMCP の `ClearRubyOn` と同じ一覧と同じ `ClearOverridesCmd`・Change Ruby To より優先）。スタイルはルビそのもの（フラグ・読み）を持てない（DOM に無い＝10-31 実測）＝スタイルの見た目は残す。回帰 `rb-remove-all`・`rb-style`・`rb-remove-keeps-style-look`・`rb-undo-remove-all`。物語に strand が無ければ先に作る。（R7）回帰 `rb-change-one`・`rb-change-all`・`rb-without-apply`・`rb-no-strand`・`rb-remove`・`rb-remove-wins`・`rb-return`・`rb-cell-change`・`rb-book-replace`
   - 訂正:
 
 - **RUBY-31** 断り＝Change 側に何も無い／既にそのとおり（数える＝書かない）。ロックされた行は灰色。（R7）回帰 `rb-nothing`・`rb-same`・`rb-locked`

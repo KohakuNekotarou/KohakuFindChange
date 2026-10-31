@@ -7,7 +7,8 @@
 //  SEARCH TEXT IN THESE OBJECTS - THE TEXT (docs/superpowers/specs/2026-10-21-kfc-text-in-object-results-design.md T3):
 //  the text a tier of object rows holds, made into the stretches its walk takes (KFCSearchEngine's CollectObjectTexts) -
 //  each found frame's own part of its story, and the overset after a story's last frame - with the frames those
-//  stretches were taken from, which every row the walk builds is checked against (Keeps).
+//  stretches were taken from, which every row the walk builds is checked against (Keeps). SEARCH TEXT IN THESE TABLES takes the same road: a table's UID among the items, its character the stretch - the
+//  walk's scope takes its cells in, as it does a table in a selection.
 //
 //========================================================================================
 
@@ -45,6 +46,7 @@ namespace KFCObjectText
 		int32					objects = 0;	// the objects still in the document, text or not
 		int32					noText = 0;		// ...of which none gave a stretch (a rectangle, an image's frame, an empty frame)
 		int32					gone = 0;		// the objects no longer in the document (deleted since the object search)
+		bool					tables = false;	// the items were tables: every row of the walk is in one (Keeps asks no frame)
 	};
 
 	/** The text of `items` - page items of one document - as stretches to walk. A text frame: its own text, the official

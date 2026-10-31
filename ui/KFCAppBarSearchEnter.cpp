@@ -392,10 +392,10 @@ static bool MirrorFindChangeIntoField()
 {
 	if (sShutdown || !sAppBarSearchEnter)
 		return false;
-	// THE QR CODE TAB (KFCQRTab - QR-22): the field shows nothing - the tab has no query in words, and a Return
+	// THE QR CODE TAB (KFCKohakuTab - QR-22): the field shows nothing - the tab has no query in words, and a Return
 	// there lists the QR codes whatever is typed (RunPendingSearch).
 	const int32 ownTab = KFCRuns()->CurrentSearchMode();		// (the Table and Ruby tabs' the same: no query in words)
-	const bool qrTab = (ownTab == kKFCQRCodeSearchMode || ownTab == kKFCTableSearchMode || ownTab == kKFCRubySearchMode);
+	const bool qrTab = (ownTab == kKFCQRCodeSearchMode || ownTab == kKFCTableSearchMode || ownTab == kKFCRubySearchMode || ownTab == kKFCKentenSearchMode);
 	PMString query;
 	if (!qrTab && !KFCFindChangeQueryWords(query))
 		return false;	// Object, Colour: not this panel's
@@ -458,7 +458,7 @@ static uint32 RunPendingSearch(void* /*refPtr*/)
 	// there), so an empty field searches too, and nothing is put into Find/Change. (Asked after the shutdown test: the
 	// model is not asked anything once the session is going.)
 	const int32 ownTab = KFCRuns()->CurrentSearchMode();		// (the Table and Ruby tabs' the same: its Return lists what they find)
-	const bool qrTab = (ownTab == kKFCQRCodeSearchMode || ownTab == kKFCTableSearchMode || ownTab == kKFCRubySearchMode);
+	const bool qrTab = (ownTab == kKFCQRCodeSearchMode || ownTab == kKFCTableSearchMode || ownTab == kKFCRubySearchMode || ownTab == kKFCKentenSearchMode);
 	if (text.empty() && !qrTab)
 		return IIdleTask::kEndOfTime;
 

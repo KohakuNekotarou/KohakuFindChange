@@ -67,9 +67,27 @@ bool StandsInSetAsideText(ITextModel* model, TextIndex at)
 	return kind == kHiddenTextBoss || kind == kDeletedTextBoss || kind == kNoteDataBoss;
 }
 
+// IN THE SEARCHED PART (Search: Story, To End of Story, Selection): its character in a stretch - the table in the text - or a stretch in one of its cells: a text cursor or a selection inside it, the
+// table it stands in (each cell a story thread whose dictionary is the table).
+bool TableInPart(const std::vector<KFCSearchEngine::ListedPlace>& part, const UIDRef& storyRef, ITextModel* model, ITableModel* table, TextIndex anchor)
+{
+	if (KFCSearchEngine::StretchesTouch(part, storyRef.GetUID(), anchor, anchor + 1))
+		return true;
+	const UID tableUID = ::GetUID(table);
+	for (size_t p = 0; p < part.size(); ++p)
+	{
+		if (part[p].story != storyRef.GetUID())
+			continue;
+		InterfacePtr<ITextStoryThread> thread(model->QueryStoryThread(part[p].start, nil, nil));
+		if (thread != nil && thread->GetDictUID() == tableUID)
+			return true;
+	}
+	return false;
+}
+
 // The tables of one story, by the conditions, into places and what their rows draw.
-void WalkStory(const UIDRef& storyRef, const PMString& findStyle, bool overridesOnly, size_t limit,
-	std::vector<KFCSearchEngine::ListedPlace>& ioPlaces, std::vector<PMString>& ioWords, bool& outCapped)
+void WalkStory(const UIDRef& storyRef, const PMString& findStyle, bool overridesOnly, const std::vector<KFCSearchEngine::ListedPlace>* part, size_t limit,
+	std::vector<KFCSearchEngine::ListedPlace>& ioPlaces, std::vector<PMString>& ioWords, std::vector<UID>& ioTables, bool& outCapped)
 {
 	InterfacePtr<ITableModelList> tables(storyRef, UseDefaultIID());
 	InterfacePtr<ITextModel> model(storyRef, UseDefaultIID());
@@ -83,6 +101,8 @@ void WalkStory(const UIDRef& storyRef, const PMString& findStyle, bool overrides
 		InterfacePtr<ITableModel> table(tables->QueryNthModel(t));
 		InterfacePtr<ITableTextContainer> text(table, UseDefaultIID());
 		if (table == nil || text == nil || StandsInSetAsideText(model, text->GetAnchorTextIndex()))
+			continue;
+		if (part != nil && !TableInPart(*part, storyRef, model, table, text->GetAnchorTextIndex()))
 			continue;
 		const UIDRef tableRef(::GetUIDRef(table));
 		UID style = kInvalidUID;
@@ -103,11 +123,12 @@ void WalkStory(const UIDRef& storyRef, const PMString& findStyle, bool overrides
 		place.end = place.start + text->GetAnchorSpan();
 		ioPlaces.push_back(place);
 		ioWords.push_back(KFCTableSearch::TableWords(table));
+		ioTables.push_back(tableRef.GetUID());
 	}
 }
 
-// ONE DOCUMENT'S TABLES AS ROWS. False = no story list to walk.
-bool WalkDoc(const UIDRef& docRef, const PMString& findStyle, bool overridesOnly, size_t limit, std::vector<KFCResultModel::Hit>& outHits,
+// ONE DOCUMENT'S TABLES AS ROWS - of its searched part alone, given one. False = no story list to walk.
+bool WalkDoc(const UIDRef& docRef, const PMString& findStyle, bool overridesOnly, const std::vector<KFCSearchEngine::ListedPlace>* part, size_t limit, std::vector<KFCResultModel::Hit>& outHits,
 	std::map<UID, uint32>& outVersions, bool& outCapped)
 {
 	outCapped = false;
@@ -119,14 +140,17 @@ bool WalkDoc(const UIDRef& docRef, const PMString& findStyle, bool overridesOnly
 	IDataBase::SaveRestoreModifiedState dirtyGuard(db);
 	std::vector<KFCSearchEngine::ListedPlace> places;
 	std::vector<PMString> words;
+	std::vector<UID> tables;
 	const int32 count = stories->GetAllTextModelCount();
 	for (int32 s = 0; s < count && !outCapped; ++s)
-		WalkStory(stories->GetNthTextModelUID(s), findStyle, overridesOnly, limit, places, words, outCapped);
+		if (part == nil || KFCSearchEngine::StretchesTouch(*part, stories->GetNthTextModelUID(s).GetUID(), 0, kMaxInt32))
+			WalkStory(stories->GetNthTextModelUID(s), findStyle, overridesOnly, part, limit, places, words, tables, outCapped);
 	KFCSearchEngine::BuildListedHits(docRef, places, outHits, outVersions);
 	for (size_t h = 0; h < outHits.size(); ++h)
 	{
 		outHits[h].runChain = words[h];
 		outHits[h].runChain.SetTranslatable(kFalse);
+		outHits[h].tableUID = tables[h];
 	}
 	return true;
 }
@@ -165,6 +189,12 @@ bool KFCTableSearch::IsTabCurrent(KFCTableConditions* outConditions)
 				conditions.clearOverrides = true;
 			else if (line == "scope=all")
 				conditions.scope = IWalkerScopeFactoryUtils::kAllDocumentScope;
+			else if (line == "scope=story")
+				conditions.scope = IWalkerScopeFactoryUtils::kStoryScope;
+			else if (line == "scope=toend")
+				conditions.scope = IWalkerScopeFactoryUtils::kToEndOfStoryScope;
+			else if (line == "scope=selection")
+				conditions.scope = IWalkerScopeFactoryUtils::kSelectionScope;
 		}
 	}
 #endif
@@ -182,7 +212,7 @@ bool KFCTableSearch::IsTabCurrent(KFCTableConditions* outConditions)
 
 void KFCTableSearch::CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBook,
 	std::vector<KFCBookScope::SkippedChapter>& unopenable, KFCSearchEngine::CollectTally& out, int32 reserved, const PMString& findStyle,
-	bool overridesOnly)
+	bool overridesOnly, const std::vector<KFCSearchEngine::ListedPlace>* part)
 {
 	out = KFCSearchEngine::CollectTally();
 	PMString title(fromBook ? "Searching book..." : "Searching...");
@@ -218,7 +248,7 @@ void KFCTableSearch::CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targe
 		std::vector<KFCResultModel::Hit> hits;
 		std::map<UID, uint32> versions;
 		bool capped = false;
-		const bool walked = WalkDoc(docRef, findStyle, overridesOnly, limit - static_cast<size_t>(out.total), hits, versions, capped);
+		const bool walked = WalkDoc(docRef, findStyle, overridesOnly, part, limit - static_cast<size_t>(out.total), hits, versions, capped);
 		// A book's chapter goes back now, closed on the spot (one chapter of ours at a time - the other walks' rule).
 		if (fromBook && !KFCBookScope::HandBackHeldDocNow(docRef))
 			out.unclosed.push_back(targets[i].shortName);
@@ -254,10 +284,36 @@ bool KFCTableSearch::WalkOneDocument(const UIDRef& docRef, const PMString& name,
 	bar.DisableChildProgressBars(kTrue);
 	KFCSetCountedTask(bar, "Document", 0, 1, name);
 	bar.SetPosition(0);
-	const bool walked = WalkDoc(docRef, findStyle, overridesOnly, limit, outHits, outVersions, outCapped);
+	const bool walked = WalkDoc(docRef, findStyle, overridesOnly, nil, limit, outHits, outVersions, outCapped);
 	outCancelled = walked && bar.WasCancelled(kFalse);
 	bar.SetPosition(kTableDocSpan);
 	return walked && !outCancelled;
+}
+
+bool KFCTableSearch::WriteDocument(const UIDRef& docRef, const KFCTableConditions& asked, const std::vector<KFCSearchEngine::ListedPlace>* part, int32& outCount)
+{
+	outCount = 0;
+	std::vector<KFCResultModel::Hit> hits;
+	std::map<UID, uint32> versions;
+	bool capped = false;
+	if (!WalkDoc(docRef, asked.findStyle, asked.overridesOnly, part, static_cast<size_t>(kMaxInt32), hits, versions, capped))
+		return false;
+	IDataBase* const db = docRef.GetDataBase();
+	const UID style = asked.changeStyle.IsEmpty() ? kInvalidUID : StyleNamed(db, asked.changeStyle);
+	if (!asked.changeStyle.IsEmpty() && style == kInvalidUID)
+		return true;		// this document has no style of that name: nothing of it to write (a row's Replace says so; a run writes on)
+	for (size_t h = 0; h < hits.size(); ++h)
+	{
+		if (hits[h].isLocked)
+			continue;
+		InterfacePtr<ITableModel> table(QueryTableAt(UIDRef(db, hits[h].storyUID), hits[h].textStart));
+		if (table == nil || !WouldChange(table, style, asked.clearOverrides))
+			continue;
+		if (Write(table, style, asked.clearOverrides) != kSuccess)
+			return false;
+		++outCount;
+	}
+	return true;
 }
 
 ITableModel* KFCTableSearch::QueryTableAt(const UIDRef& story, TextIndex at)

@@ -86,7 +86,7 @@ DECLARE_PMID(kInterfaceIDSpace, IID_IKFCUIBOUNDARY, kKFCPrefix + 14)
 // its layout - or only what one of its fields means (KFCSpecialParams::y became Shear's axis as well: the layout the
 // same, but a half that did not read it would shear the other way); kKFCVersion is in the stamp too, so two releases
 // never pass for one. What each revision changed is this file's history (git log -p -- model/KFCBoundaryID.h).
-#define kKFCBoundaryRevision	"30"
+#define kKFCBoundaryRevision	"33"
 #define kKFCBoundaryStamp		kKFCVersion "/" kKFCBoundaryRevision
 
 #endif // __KFCBoundaryID_h__

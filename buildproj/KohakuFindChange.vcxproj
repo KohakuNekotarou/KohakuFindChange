@@ -263,6 +263,8 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCQRSearch.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCTableSearch.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCRubySearch.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCKentenSearch.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCKohakuQuery.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCNarrow.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCObjectText.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCObjectReplace.cpp"/>
@@ -312,6 +314,8 @@
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCQRSearch.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCTableSearch.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCRubySearch.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCKentenSearch.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCKohakuQuery.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCNarrow.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCObjectText.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCObjectReplace.h"/>

@@ -42,6 +42,7 @@
 #include "KFCRunGuard.h"
 #include "KFCRunList.h"			// the list the run leaves - what each query's Change All wrote, placed
 #include "KFCSavedQueries.h"	// LoadIntoFindChange - each query in turn; Describe - a file's name as the dialog shows it
+#include "KFCKohakuQuery.h"		// a query of the Kohaku+ tab: read and written with no rows
 #include "KFCSearchEngine.h"
 #include "KFCUndoFollow.h"
 
@@ -338,11 +339,27 @@ int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 				why.Append(query.name);
 				break;
 			}
-			const bool loaded = KFCSavedQueries::LoadIntoFindChange(query.file);
+			// A QUERY OF THE KOHAKU+ TAB (KFCKohakuQuery.h): no field of Find/Change's holds it, and its write is KFC's own - read here, written below where a text query's Change All is. One with nothing on its
+			// Change side (a QR code's list has none) is skipped, as an Object query with none is.
+			KFCSavedQuery described;
+			KFCSavedQueries::Describe(query.file, described);
+			const bool ownQuery = KFCIsKohakuQueryMode(described.mode);
+			KFCKohakuQueryData own;
+			if (ownQuery && !KFCKohakuQuery::Read(query.file, own))
+			{
+				skip(kSkipUnread);
+				continue;
+			}
+			if (ownQuery && !KFCKohakuQuery::HasChangeSide(own))
+			{
+				skip(kSkipNoChangeTo);
+				continue;
+			}
+			const bool loaded = ownQuery || KFCSavedQueries::LoadIntoFindChange(query.file);
 			// The tab the query turned Find/Change to: InDesign's own mode - not the QR Code tab the dialog may be showing
 			// (it changes no mode of InDesign's - KFCSearchEngine::FindChangeMode).
 			const int32 mode = KFCSearchEngine::FindChangeMode();
-			if (!loaded || !KFCSearchEngine::CanSearchTab(mode) || !KFCSearchEngine::HasFindQueryForMode(mode))
+			if (!ownQuery && (!loaded || !KFCSearchEngine::CanSearchTab(mode) || !KFCSearchEngine::HasFindQueryForMode(mode)))
 			{
 				skip(loaded ? kSkipNothingToFind : kSkipUnread);
 				continue;
@@ -351,7 +368,7 @@ int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 			// the object walker has no story, and a text Selection names no page item - so on a run over part of the
 			// front document it is skipped and said; and one with nothing to change to is skipped as Change All in Book
 			// refuses it.
-			const bool objectQuery = (mode == IFindChangeOptions::kObjectSearch);
+			const bool objectQuery = !ownQuery && (mode == IFindChangeOptions::kObjectSearch);
 			if (objectQuery && !wholeDocuments)
 			{
 				skip(kSkipPartOfDocument);
@@ -365,7 +382,7 @@ int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 			// The tab and the change side are stated for a text query only: an Object query's write is the service's own
 			// object replace, which no text walker mode steers (CommitSearchMode turns that tab away by design - as in
 			// KFCSearchEngine::SearchBook and Change All in Book).
-			if (!objectQuery && !KFCSearchEngine::CommitSearchMode())
+			if (!objectQuery && !ownQuery && !KFCSearchEngine::CommitSearchMode())
 			{
 				failed = true;
 				why = "the Find/Change tab could not be set for ";
@@ -375,7 +392,7 @@ int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 			perQuery[q] = 0;
 			// THE CHANGE SIDE, STATED HERE - inside the run's sequence (the query run's one exception to CommitReplaceSide's
 			// rule): a Ctrl+Z of the run takes the whole of it back, the stated side included.
-			if (!objectQuery && !KFCSearchEngine::CommitReplaceSide())
+			if (!objectQuery && !ownQuery && !KFCSearchEngine::CommitReplaceSide())
 			{
 				failed = true;
 				why = "the Change To in Find/Change could not be stated for ";
@@ -386,6 +403,20 @@ int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 			// just loaded set them, so they are read now - read once for the run, every query would walk with the first's.
 			WalkerScopeOptions scopeOptions;
 			KFCSearchEngine::GetKFCWalkerScopeOptions(scopeOptions);
+			// ...A QUERY OF THE KOHAKU+ TAB OVER PART OF THE FRONT DOCUMENT: what InDesign's own scope holds (KFCSearchEngine::PartStretches - forward, as a search's: To End of Story, backwards, is the text before the caret).
+			std::vector<KFCSearchEngine::ListedPlace> ownPart;
+			const bool ownOverPart = ownQuery && !wholeDocuments;
+			if (ownOverPart)
+			{
+				KFCForwardSearchScope forward(true);
+				if (!KFCSearchEngine::PartStretches(writeScope, targets[0].docRef.GetDataBase(), ownPart))
+				{
+					failed = true;
+					why = "what Search: holds in the selection could not be read for ";
+					why.Append(query.name);
+					break;
+				}
+			}
 			// ONE DOCUMENT AT A TIME - every one already open and held: nothing is opened or closed between the writes.
 			for (size_t d = 0; d < targets.size() && !cancelled && !failed; ++d)
 			{
@@ -432,9 +463,11 @@ int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 				// docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md): no rows collected, no
 				// limit - over writeScope (asked once, above the loops).
 				int32 count = 0, partial = 0;
-				if (!objectQuery)
+				if (!objectQuery && !ownQuery)
 					runList.RecordBefore(d, static_cast<int32>(q), writeScope, scopeOptions);		// (just before: the same text, the same walk)
-				const bool wrote = objectQuery
+				const bool wrote = ownQuery
+					? KFCKohakuQuery::WriteDocument(targets[d].docRef, own, ownOverPart ? &ownPart : nil, count)
+					: objectQuery
 					? KFCObjectReplace::ReplaceAllInDoc(targets[d].docRef, count, partial)
 					: KFCChangeAll::WriteDocument(targets[d].docRef, writeScope, scopeOptions, count);
 				if (objectQuery)
@@ -442,12 +475,14 @@ int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 				if (!wrote)
 				{
 					failed = true;
-					why = "InDesign's Change All failed for ";
+					why = ownQuery ? "InDesign would not write " : "InDesign's Change All failed for ";
 					why.Append(query.name);
 					break;
 				}
 				if (objectQuery)
 					runList.NoteObjectQuery();
+				else if (ownQuery)
+					runList.NoteKohakuQuery();
 				else
 					runList.RecordAfter(d, static_cast<int32>(q), count);
 				perQuery[q] += count;

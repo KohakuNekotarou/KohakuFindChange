@@ -41,6 +41,8 @@
 #include "KFCSearchEngine.h"
 #include "KFCTableSearch.h"			// IsTabCurrent - the Table tab, and what it asks
 #include "KFCRubySearch.h"			// IsTabCurrent - the Ruby tab, and what it asks
+#include "KFCKentenSearch.h"		// ...and the Kenten kind
+#include "KFCKohakuQuery.h"			// a saved query of the Kohaku+ tab
 #include "KFCTierStore.h"
 
 class KFCResultsSession : public CPMUnknown<IKFCResults>
@@ -95,6 +97,7 @@ public:
 	virtual bool ListIsRunList() { return KFCResultModel::ListIsRunList(); }
 	virtual void GetRunNames(PMString& out) { out = KFCResultModel::RunNames(); }
 	virtual bool ListHasOwnChangeTab() { return KFCResultModel::ListHasOwnChangeTab(); }
+	virtual bool ListIsTables() { return KFCResultModel::ListIsTables(); }
 };
 
 CREATE_PMINTERFACE(KFCResultsSession, kKFCResultsImpl)
@@ -187,6 +190,15 @@ public:
 	virtual bool CanClearOverridesHit(int32 chapterIdx, int32 hitIdx) { return KFCReplaceEngine::CanClearOverridesHit(chapterIdx, hitIdx); }
 	virtual bool TableConditions(KFCTableConditions& outConditions) { return KFCTableSearch::IsTabCurrent(&outConditions); }
 	virtual bool RubyConditions(KFCRubyConditions& outConditions) { return KFCRubySearch::IsTabCurrent(&outConditions); }
+	virtual bool KentenConditions(KFCKentenConditions& outConditions) { return KFCKentenSearch::IsTabCurrent(&outConditions); }
+	virtual bool ReadKohakuQuery(const IDFile& file, KFCKohakuQueryData& out) { return KFCKohakuQuery::Read(file, out); }
+	virtual void KohakuQueryText(const KFCKohakuQueryData& query, PMString& outText)
+	{
+		outText.Clear();
+		outText.SetUTF8String(KFCKohakuQuery::FileText(query));
+		outText.SetTranslatable(kFalse);
+	}
+	virtual bool KohakuQueryFile(int32 mode, const PMString& name, IDFile& out) { return KFCKohakuQuery::FileOf(mode, name, out); }
 };
 
 CREATE_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)

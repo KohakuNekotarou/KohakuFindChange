@@ -163,12 +163,24 @@ namespace KFCSearchEngine
 	void BuildListedHits(const UIDRef& docRef, const std::vector<ListedPlace>& places, std::vector<KFCResultModel::Hit>& outHits,
 		std::map<UID, uint32>& outVersions);
 
+	/** WHAT A SEARCH: OVER PART OF THE FRONT DOCUMENT HOLDS, FOR A WALK THAT READS A STORY'S OWN LISTS, NOT THE TEXT WALKER'S (the Table and Ruby kinds' - KFCTableSearch, KFCRubySearch; the author: "a
+	    table stands in a story - Search: as the Text tab has it"): Story, To End of Story or Selection as InDesign's own scope holds it, the selection deciding (QueryWalkerScope_UsingSelections, as the
+	    text walk asks it) - Story's its story whole, the other two's their stretches, in its walker's order, the cells of the tables in them among them. Nothing left out: these kinds have no Include
+	    switches (WalkerScopeOptions' default). Only what stands in db. Empty = nothing to walk. false = not read: no scope, or more stretches than it counts. */
+	bool PartStretches(int32 selectionScope, IDataBase* db, std::vector<ListedPlace>& outStretches);
+
+	/** Does one of the stretches touch [start, end) of the story? (A ruby run a selection cuts; a table's character.) */
+	bool StretchesTouch(const std::vector<ListedPlace>& stretches, UID story, TextIndex start, TextIndex end);
+
+	/** Does one of them hold the whole of [start, end)? (A text's occurrence, as a text search finds none a selection cuts.) */
+	bool StretchesHold(const std::vector<ListedPlace>& stretches, UID story, TextIndex start, TextIndex end);
+
 	/** THE SCOPE DOORS SEARCHBOOK HAS ALWAYS ASKED, IN ONE PLACE (so the query run asks the same):
 	    Book Scope with a Search: other than Document, a Search: this panel cannot follow, no target book, an
 	    empty one, no active document. false = refused, outRefusal holds SearchBook's own sentence. Touches nothing.
 	    forQueries = a saved query run's scope (the query dialog's Run, and its Runs on: line): Search: as InDesign's own tab
 	    holds it (FindChangeScope) - never the QR Code tab's, which lists QR codes and runs no query. A saved query states its
-	    own tab: the dialog's Find steps the QR Code tab aside before it searches (KFCQRTab::YieldToSavedQuery). */
+	    own tab: the dialog's Find steps the QR Code tab aside before it searches (KFCKohakuTab::YieldToSavedQuery). */
 	bool ResolveRunScope(RunScope& out, PMString& outRefusal, bool forQueries = false);
 
 	/** THE RUN'S TARGET DOORS - ResolveRunScope's last three, and the Object tab's
@@ -665,7 +677,7 @@ namespace KFCSearchEngine
 	    objects - Chapter::searchedObjects): the list of objects parked as a tier first, as Find parks it. Refused, nothing
 	    changed (outStatus, after "Search Text in These Objects: "): a run standing, a list of text rows, Find/Change on the
 	    Object or Color tab or with nothing to find, no object left, its document or book not open. True = a new list (no match
-	    too); false = refused or cancelled. */
+	    too); false = refused or cancelled. SEARCH TEXT IN THESE TABLES IS THIS TOO, over a Table kind's list: the text in its rows' tables, into a new list of the scope kScopeInTables. */
 	bool SearchTextInObjects(PMString& outStatus);
 
 	/** A story's VERSION: ITextModel::GetChangeCount - the counter InDesign moves for every change to the

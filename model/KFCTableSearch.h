@@ -36,14 +36,15 @@ namespace KFCTableSearch
 {
 	/** IS THE TABLE TAB FIND/CHANGE'S TAB NOW, and what it asks (outConditions, when given - the tab's as it stands, whichever tab is
 	    shown: a row's Replace reads its Change side). Asked of the UI half, which keeps it from the face's own calls
-	    (IKFCUIServices::TableTabConditions - ui/KFCTableTab.h); no UI half = not the Table tab. A TEST BUILD asks its fault switch
-	    table-tab first: on = the Table tab, its file's lines find=, overrides=1, change=, clear=1, scope=all the conditions. */
+	    (IKFCUIServices::TableTabConditions - ui/KFCKohakuTab.h); no UI half = not the Table tab. A TEST BUILD asks its fault switch
+	    table-tab first: on = the Table tab, its file's lines find=, overrides=1, change=, clear=1, scope=all|story|toend|selection the conditions. */
 	bool IsTabCurrent(KFCTableConditions* outConditions = nil);
 
 	/** THE TAB'S WALK OVER A RUN'S TARGETS (the QR Code tab's shape - KFCQRSearch::CollectTargets): each target's tables that meet the
-	    conditions, filed a chapter each (KFCSearchEngine::FileChapter); a book's chapter opened and handed straight back. */
+	    conditions, filed a chapter each (KFCSearchEngine::FileChapter); a book's chapter opened and handed straight back. part (Search: Story, To End of Story, Selection - KFCSearchEngine::PartStretches):
+	    the tables whose character stands in its stretches, or that a stretch stands in - a text cursor or a selection in a cell; nil = the whole of each target. */
 	void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBook, std::vector<KFCBookScope::SkippedChapter>& unopenable,
-		KFCSearchEngine::CollectTally& out, int32 reserved, const PMString& findStyle, bool overridesOnly);
+		KFCSearchEngine::CollectTally& out, int32 reserved, const PMString& findStyle, bool overridesOnly, const std::vector<KFCSearchEngine::ListedPlace>* part = nil);
 
 	/** One document's tables again (Search This Document Again). False = cancelled or nothing to walk with. */
 	bool WalkOneDocument(const UIDRef& docRef, const PMString& name, size_t limit, const PMString& findStyle, bool overridesOnly,
@@ -51,6 +52,9 @@ namespace KFCTableSearch
 
 	/** THE TABLE WHOSE CHARACTER STANDS AT `at` of the story (AddRef'd), or nil. */
 	ITableModel* QueryTableAt(const UIDRef& story, TextIndex at);
+
+	/** A QUERY RUN'S WRITE OF ONE DOCUMENT (KFCKohakuQuery::WriteDocument): the tables the conditions list, given their Change side, with no rows. outCount = the tables written. False = InDesign would not write one. */
+	bool WriteDocument(const UIDRef& docRef, const KFCTableConditions& asked, const std::vector<KFCSearchEngine::ListedPlace>* part, int32& outCount);
 
 	/** What a row draws for a table: "<rows>x<columns> <style>", " +" for overrides of its own. */
 	PMString TableWords(ITableModel* table);

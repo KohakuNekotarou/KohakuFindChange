@@ -98,15 +98,10 @@ REGISTER_PMINTERFACE(KFCAlertAnswerService, kKFCAlertAnswerServiceImpl)
 // (KFCSpecialDialogs.cpp).
 REGISTER_PMINTERFACE(KFCValueDialogController, kKFCValueDialogControllerImpl)
 REGISTER_PMINTERFACE(KFCValueDialogObserver, kKFCValueDialogObserverImpl)
-// The QR Code tab's face in InDesign's Find/Change dialog: its creator, its observer and its controller (KFCQRTab.cpp).
-REGISTER_PMINTERFACE(KFCQRTabPanelCreator, kKFCQRTabPanelCreatorImpl)
-REGISTER_PMINTERFACE(KFCQRTabObserver, kKFCQRTabObserverImpl)
-REGISTER_PMINTERFACE(KFCQRTabController, kKFCQRTabControllerImpl)
-// The Table tab's face in the same dialog (KFCTableTab.cpp).
-REGISTER_PMINTERFACE(KFCTableTabPanelCreator, kKFCTableTabPanelCreatorImpl)
-REGISTER_PMINTERFACE(KFCTableTabObserver, kKFCTableTabObserverImpl)
-REGISTER_PMINTERFACE(KFCTableTabController, kKFCTableTabControllerImpl)
-// The Ruby tab's face in the same dialog (KFCRubyTab.cpp).
-REGISTER_PMINTERFACE(KFCRubyTabPanelCreator, kKFCRubyTabPanelCreatorImpl)
-REGISTER_PMINTERFACE(KFCRubyTabObserver, kKFCRubyTabObserverImpl)
-REGISTER_PMINTERFACE(KFCRubyTabController, kKFCRubyTabControllerImpl)
+// The Kohaku tab's face in InDesign's Find/Change dialog: its creator, its observer and its controller (KFCKohakuTab.cpp).
+REGISTER_PMINTERFACE(KFCKohakuTabPanelCreator, kKFCKohakuTabPanelCreatorImpl)
+REGISTER_PMINTERFACE(KFCKohakuTabObserver, kKFCKohakuTabObserverImpl)
+REGISTER_PMINTERFACE(KFCKohakuTabController, kKFCKohakuTabControllerImpl)
+// The Kohaku+ tab's queries in Find/Change's own Query menu.
+REGISTER_PMINTERFACE(KFCKohakuQueryWatch, kKFCKohakuQueryWatchImpl)
+REGISTER_PMINTERFACE(KFCKohakuSaveFilterEH, kKFCKohakuSaveFilterEHImpl)

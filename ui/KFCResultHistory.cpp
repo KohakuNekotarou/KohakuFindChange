@@ -80,6 +80,7 @@ namespace
 												// QR-18)
 		bool					holdsOwnChangeTab;	// ...a list of a tab of KFC's with a Change side (IKFCResults::ListHasOwnChangeTab when it was kept) - its
 												// heading's Narrow Down greys (TierHoldsOwnChangeTab)
+		bool					holdsTables;	// ...a Table kind's list (IKFCResults::ListIsTables when it was kept) - its heading's Search Text in These Tables (TierHoldsTables)
 		bool					holdsRunList;	// ...a query run's list (IKFCResults::ListIsRunList when it was kept) - its heading's
 												// Narrow Down and Search These Results Again grey (TierHoldsRunList)
 
@@ -226,6 +227,7 @@ namespace
 		out.holdsObjects = KFCResults()->ListHoldsObjects();
 		out.holdsQRCodes = KFCResults()->ListIsQRCodes();
 		out.holdsOwnChangeTab = KFCResults()->ListHasOwnChangeTab();
+		out.holdsTables = KFCResults()->ListIsTables();
 		out.holdsRunList = KFCResults()->ListIsRunList();
 		CopyRows(treeMgr, KFCResultNodeID::CreateLiveTier(), -1, out);
 		return true;
@@ -556,6 +558,13 @@ bool KFCResultHistory::TierHoldsQRCodes(int32 tier)
 	return tier < static_cast<int32>(gKept.size()) && gKept[static_cast<size_t>(tier)].holdsQRCodes;
 }
 
+bool KFCResultHistory::TierHoldsTables(int32 tier)
+{
+	if (tier < 0)
+		return KFCResults()->ListIsTables();
+	return tier < static_cast<int32>(gKept.size()) && gKept[static_cast<size_t>(tier)].holdsTables;
+}
+
 bool KFCResultHistory::TierHoldsOwnChangeTab(int32 tier)
 {
 	if (tier < 0)
@@ -618,6 +627,7 @@ namespace
 			case KFCResultModel::kScopeToEndOfStory:	words = "To End of Story"; break;
 			case KFCResultModel::kScopeSelection:		words = "Selection"; break;
 			case KFCResultModel::kScopeInObjects:		words = "Objects"; break;		// Search Text in These Objects
+			case KFCResultModel::kScopeInTables:		words = "Tables"; break;		// Search Text in These Tables
 			default:									break;
 		}
 		const CharCounter open = out.IndexOfWChar(UTF32TextChar('['), 0);
@@ -645,7 +655,7 @@ namespace
 		// are another tab's, the one InDesign's mode still is.
 		if (mode == kKFCQRCodeSearchMode)
 			return label;
-		// THE TABLE TAB'S WORDS ARE ITS OWN FACE'S (KFCTableTab): F:"TS1", with a + for With Overrides Only - as its rows mark an override.
+		// THE TABLE TAB'S WORDS ARE ITS OWN FACE'S (KFCKohakuTab): F:"TS1", with a + for With Overrides Only - as its rows mark an override.
 		if (mode == kKFCTableSearchMode)
 		{
 			KFCTableConditions asked;
@@ -654,6 +664,32 @@ namespace
 			label.Append(asked.findStyle.IsEmpty() ? PMString("[Any Table Style]") : KFCStylePathWords(asked.findStyle));
 			if (asked.overridesOnly)
 				label.Append(" +");
+			label.Append("\"");
+			return label;
+		}
+		// THE KENTEN KIND'S THE SAME: F:"base<mark>" as its rows draw it; F:"base" (no kenten) for Text Without Kenten; [Any Kenten] with nothing asked.
+		if (mode == kKFCKentenSearchMode)
+		{
+			KFCKentenConditions asked;
+			(void)KFCRuns()->KentenConditions(asked);
+			label.Append(" F:\"");
+			if (asked.kind == kKFCKentenFindWithout)
+			{
+				label.Append(asked.base);
+				label.Append(" (no kenten)");
+			}
+			else if (asked.base.IsEmpty() && asked.mark == 0)
+				label.Append("[Any Kenten]");
+			else
+			{
+				label.Append(asked.base);
+				if (asked.mark != 0)
+				{
+					label.AppendW(UTF32TextChar(0x300A));
+					label.AppendW(KFCKentenMarkCharacter(asked.mark));
+					label.AppendW(UTF32TextChar(0x300B));
+				}
+			}
 			label.Append("\"");
 			return label;
 		}
@@ -791,7 +827,7 @@ PMString KFCResultHistory::LiveTierLabel()
 	else if (gLive.set != 0 && gLive.set == KFCResults()->GetResultSetId() && !gLive.label.IsEmpty())
 		label = WithScope(gLive.label, KFCResults()->GetSearchScope());	// "[Text/Story] ..." - the list's own Search:
 	// A NARROWED LIST'S CONDITIONS, after the name - drawn for Search:'s reason (the narrow-down spec's N4: "[Text/Book]
-	// F:"cat" C:"dog" / In Tables / Pages 1-5").
+	// F:"cat" C:"dog" / In Footnotes / Pages 1-5").
 	PMString narrow;
 	KFCResults()->GetNarrowWords(narrow);
 	if (!narrow.IsEmpty())

@@ -85,7 +85,7 @@ namespace KFCJump
 	    clearing, for the object search's "nothing was selected" given back (IKFCUIServices::ClearSelection). */
 	void ClearFrontSelection();
 
-	/** THE QR CODE TAB'S FIND NEXT LANDS (KFCQRTab - QR-19): a QR code's frame no list holds, landed on as an
+	/** THE QR CODE TAB'S FIND NEXT LANDS (KFCKohakuTab - QR-19): a QR code's frame no list holds, landed on as an
 	    object row's click lands (JumpToObject - the spec map's OBJ-09): its document in front, the view on it, the frame
 	    selected. `reach` = what keeps it from being selected (kKFCQRReach* bits, KFCModelTypes.h - IKFCRuns::QRCodeNext):
 	    locked or hidden = shown, not selected; in overset text = the view on its "+"; on a hidden spread = nothing moves.
