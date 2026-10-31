@@ -11,7 +11,7 @@
 - **KOHAKU-01** ★本体の「検索と置換」のタブの行に、KFC のタブは **`Kohaku+` の1枚**（本体の6枚と合わせて7枚＝日本語版の窓の幅で切れない）。（K1）回帰 `kh-one-tab`
   - 訂正:
 
-- **KOHAKU-02** ★面の上に **Find:**（QR Code／Table／Ruby／Kenten）と **Search:**。その下に選んだ種類の部品だけが出る。`Find Next` は QR Code のときだけ右上。（K2）回帰 `kh-part-shown`
+- **KOHAKU-02** ★面の上に **Find:**（QR Code／Table／Ruby／Kenten）と **Search:**。その下に選んだ種類の部品だけが出る。`Find Next` は QR Code のときだけ右上（窓を別の種類で開いてから QR Code にしても押せる）。（K2）回帰 `kh-part-shown`・`kh-findnext-after-another-kind`
   - 訂正:
 
 - **KOHAKU-03** ★**Ruby と Kenten は日本語で起動しているときだけ** Find: に出る（他の言語では QR Code・Table の2つ）。（K11）回帰 `kh-japanese`・`kh-not-japanese`・`kh-not-japanese-on-ruby`

@@ -229,10 +229,10 @@ bool OnSaveQuery(IEvent* e)
 	IControlView* const button = KFCQueryFindChangeWidget(kFCQuerySaveButtonWidgetID);
 	if (dialog == nullptr || button == nil || !button->IsVisible() || !button->IsEnabled())
 		return false;
-	const SysPoint global = ::ToSys(PMPoint(e->GlobalWhere()));
+	// (Windows' question in Windows' own point - KFCPanelAlpha's; the button's box, below, in InDesign's.)
 	POINT at;
-	at.x = SysPointH(global);
-	at.y = SysPointV(global);
+	if (!::GetCursorPos(&at))
+		return false;
 	HWND const under = ::WindowFromPoint(at);
 	if (under == nullptr || ::GetAncestor(under, GA_ROOT) != dialog)
 		return false;

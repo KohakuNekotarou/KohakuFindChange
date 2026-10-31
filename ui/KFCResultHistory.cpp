@@ -84,7 +84,7 @@ namespace
 		bool					holdsRunList;	// ...a query run's list (IKFCResults::ListIsRunList when it was kept) - its heading's
 												// Narrow Down and Search These Results Again grey (TierHoldsRunList)
 
-		KeptTier() : set(0), open(false), holdsObjects(false), holdsQRCodes(false), holdsOwnChangeTab(false), holdsRunList(false) {}
+		KeptTier() : set(0), open(false), holdsObjects(false), holdsQRCodes(false), holdsOwnChangeTab(false), holdsTables(false), holdsRunList(false) {}
 	};
 
 	/** THE LIVE TIER'S NAME and the list it names: the model's result set it was given to (0 = none - the model counts its

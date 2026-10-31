@@ -3774,8 +3774,8 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 						),
 					}
 				),
-				// the buttons' column: Find Next, as the faces' Find Next (116 x 26, top right). THE STRUT UNDER IT: EVE sizes a column from what is shown when the dialog is laid out, so a dialog opened on another kind had
-				// it 0 x 0 - and Find Next, shown later, stood outside it and took no click (measured).
+				// the buttons' column: Find Next, as the faces' Find Next (116 x 26, top right). THE STRUT UNDER IT holds the column's size: once, in a long session, the column stood 0 x 0 with Find Next outside it, visible,
+				// enabled and taking no click (2026-10-31). What brought it on is not known - the flows tried do not - so this guards, it does not cure.
 				EVEGenericPanelWidget
 				(
 					kInvalidWidgetID, kPMRsrcID_None,

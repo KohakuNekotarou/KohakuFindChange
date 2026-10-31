@@ -11,6 +11,7 @@
 #include "VCPlugInHeaders.h"
 
 // Interface includes:
+#include "IKentenStyle.h"		// the kinds - the Kenten lists' last entries
 #include "IPMStream.h"
 
 // General includes:
@@ -199,6 +200,15 @@ bool KFCKohakuQuery::Read(const IDFile& file, KFCKohakuQueryData& out)
 			out.kenten.removeKenten = (number != 0);
 		at = close + 1;
 	}
+	// A FILE IS WHAT ANYONE MADE OF IT, AND THE FACE SELECTS BY THESE: a number its list has no entry for reads as the list's first (the lists - KFCUI.fr: Kenten: is Any and every kind, Change Kenten To: has no Custom).
+	if (out.ruby.kind < kKFCRubyFindWith || out.ruby.kind > kKFCRubyFindMarks)
+		out.ruby.kind = kKFCRubyFindWith;
+	if (out.kenten.kind < kKFCKentenFindWith || out.kenten.kind > kKFCKentenFindWithout)
+		out.kenten.kind = kKFCKentenFindWith;
+	if (out.kenten.mark < 0 || out.kenten.mark > IKentenStyle::Kenten_Custom)
+		out.kenten.mark = 0;
+	if (out.kenten.changeTo < 0 || out.kenten.changeTo >= IKentenStyle::Kenten_Custom)
+		out.kenten.changeTo = 0;
 	return KFCIsKohakuQueryMode(out.mode);
 }
 

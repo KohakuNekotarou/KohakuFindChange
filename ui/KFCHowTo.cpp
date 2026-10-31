@@ -78,7 +78,7 @@ const wchar_t* const kHowToEN =
 	L"[Finding and setting ruby (Find: Ruby - a Japanese InDesign)]\n"
 	L"- Find in ... lists the text with ruby (Base Text and Ruby: what its text and its reading contain), or, with Text Without Ruby, each occurrence of Base Text that has none.\n"
 	L"- Replace on a row gives it the tab's Change Ruby To, or takes its ruby off with Remove Ruby, as they stand then. One Ctrl+Z takes back the rows replaced together.\n"
-	L"- Ruby Marks in Text lists ruby a manuscript wrote out, as \u30FB\uFF5C\u6F22\u5B57\u300A\u304B\u3093\u3058\u300B or \u6F22\u5B57\u300A\u304B\u3093\u3058\u300B (with no bar, the kanji just before it). Replace on its row puts the reading on the base and takes the marks out.\n"
+	L"- Ruby Marks in Text lists ruby a manuscript wrote out, as \uFF5C\u6F22\u5B57\u300A\u304B\u3093\u3058\u300B or \u6F22\u5B57\u300A\u304B\u3093\u3058\u300B (with no bar, the kanji just before it). Replace on its row puts the reading on the base and takes the marks out.\n"
 	L"\n"
 	L"[Finding and setting kenten (Find: Kenten - a Japanese InDesign)]\n"
 	L"- Find in ... lists the text with emphasis marks (Base Text: what its text contains; Kenten: the kind), or, with Text Without Kenten, each occurrence of Base Text that has none.\n"

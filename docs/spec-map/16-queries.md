@@ -267,6 +267,9 @@
 - **QRY-92** Run＝一覧を作らずに Change 側を書く（Remove も）。全部を Ctrl+Z 1回で戻す一本の中。Change 側が無いクエリ（QR Code を含む）は飛ばして言う（`nothing to change to`）。範囲が物語・選択範囲なら、その中だけ。一覧には載せない（`Kohaku+ queries are not listed.`）。回帰 `kq-qd-run`・`kq-qd-run-remove`・`kq-qd-run-qr`
   - 訂正:
 
+- **QRY-93** ファイルの数字がタブの一覧に無い値（手で直したファイルなど）は、その一覧の先頭として読む。回帰 `kq-bad-values`
+  - 訂正:
+
 ## ⬜ この章で未確認
 
 この章を書くにあたって**確かめていない**もの。「書いていない＝そういう決まりが無い」ではない。
