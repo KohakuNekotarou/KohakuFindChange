@@ -86,8 +86,8 @@ namespace KFCResultHistory
 	/** Does the tier (-1 = the live list) hold a list of a tab of KFC's with a Change side (IKFCResults::ListHasOwnChangeTab when it was kept)? Its heading's Narrow Down greys. */
 	bool TierHoldsOwnChangeTab(int32 tier);
 
-	/** A tier's name - the query Find/Change holds now, in the author's words (F and C rather than Find and Change):
-	    "[<tab>] F:"<find>" C:"<change>"", each side as the Application Bar's field would show it
+	/** A tier's name - the query Find/Change holds now, in the author's words (Find and Change - 11-01; they were F and C):
+	    "[<tab>] Find:"<find>" Change:"<change>"", each side as the Application Bar's field would show it
 	    (KFCFindChangeQueryWords / KFCFindChangeChangeWords) and cut at 200 characters; "[<tab>]" alone for a tab with
 	    nothing to say in words (Object) and for KFC's QR Code tab, which has no query ("[QR Code]"). The panel's Find
 	    names its tier by it; the query dialog's Find puts the query's place in the run order in front. */
@@ -135,7 +135,7 @@ namespace KFCResultHistory
 	int32 KeptTierCount();
 
 	/** The live tier's name as its row draws it: the label of the search that made the list the model holds, with the
-	    Search: it was searched with after the tab ("[Text/Story] F:..." - the author: "easy to read"; drawn, not kept
+	    Search: it was searched with after the tab ("[Text/Story] Find:..." - the author: "easy to read"; drawn, not kept
 	    in the name, which QueryReadsAsTier reads the query against), or "Results" for a list KFC did not name (the
 	    one a query run leaves, say) - and a narrowed list's conditions after it, drawn so too ("... / In Footnotes"). */
 	PMString LiveTierLabel();

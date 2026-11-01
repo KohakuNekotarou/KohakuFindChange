@@ -721,7 +721,7 @@ namespace
 		PMString findWords, changeWords;
 		if (KFCFindChangeQueryWords(findWords))
 		{
-			// Find and Change (the author, 11-01, to try how it reads: it was F and C, the row having the panel's width to fill).
+			// Find and Change (the author, 11-01: tried and kept. It was F and C, the row having the panel's width to fill).
 			label.Append(" Find:\"");
 			AppendQueryWords(label, findWords);
 			label.Append("\"");
@@ -827,7 +827,7 @@ PMString KFCResultHistory::LiveTierLabel()
 	else if (gLive.set != 0 && gLive.set == KFCResults()->GetResultSetId() && !gLive.label.IsEmpty())
 		label = WithScope(gLive.label, KFCResults()->GetSearchScope());	// "[Text/Story] ..." - the list's own Search:
 	// A NARROWED LIST'S CONDITIONS, after the name - drawn for Search:'s reason (the narrow-down spec's N4: "[Text/Book]
-	// F:"cat" C:"dog" / In Footnotes / Pages 1-5").
+	// Find:"cat" Change:"dog" / In Footnotes / Pages 1-5").
 	PMString narrow;
 	KFCResults()->GetNarrowWords(narrow);
 	if (!narrow.IsEmpty())

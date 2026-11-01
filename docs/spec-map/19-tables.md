@@ -37,7 +37,7 @@
 - **TBL-13** 上限＝行 1000（物の一覧と同じ）。超えたら `Stopped at the 1000 limit.`。（T7）回帰 `tb-cap`
   - 訂正:
 
-- **TBL-14** Book Scope で Search: が All Documents なら本体のタブと同じ文で断る（FIND-13 の形）。段の名前＝`[Table/Document] F:"TS1"`（With Overrides Only は ` +`・無条件は `[Any Table Style]`）。保存したクエリにはならない。クエリのダイアログの Find・Run は自分のタブを言う（タブは譲る＝Search: も本体のタブのもの）。回帰 `tb-yield-open`・`tb-yield-closed`・`tb-query-run-scope`・`tb-text-replace-name`
+- **TBL-14** Book Scope で Search: が All Documents なら本体のタブと同じ文で断る（FIND-13 の形）。段の名前＝`[Table/Document] Find:"TS1"`（With Overrides Only は ` +`・無条件は `[Any Table Style]`）。保存したクエリにはならない。クエリのダイアログの Find・Run は自分のタブを言う（タブは譲る＝Search: も本体のタブのもの）。回帰 `tb-yield-open`・`tb-yield-closed`・`tb-query-run-scope`・`tb-text-replace-name`
   - 訂正:
 
 - **TBL-15** アプリケーションバーの欄は空になり、Return で一覧を作る（QR-22 と同じ）。回帰 `tb-appbar-enter`
@@ -72,7 +72,7 @@
 
 ## 6. 表の中の文字を探す
 
-- **TBL-50** ★Table の一覧の見出しの右クリック **Search Text in These Tables**＝一覧の表（Clear で外した行の表を除く）のセルの文字を、本体の検索と置換のタブ（Text／GREP／Glyph／Transliterate）の条件で探し、新しい段に出す（`[Text/Tables] F:"…"`）。元の表の一覧は段として残る。Table の一覧以外では灰色。Find/Change が Kohaku+ タブのままなら断る（`Find/Change is on the Kohaku+ tab - …`）。（K10）回帰 `tb-text`・`tb-text-grey`・`tb-text-on-kohaku`・`tb-text-none`・`tb-text-cleared`
+- **TBL-50** ★Table の一覧の見出しの右クリック **Search Text in These Tables**＝一覧の表（Clear で外した行の表を除く）のセルの文字を、本体の検索と置換のタブ（Text／GREP／Glyph／Transliterate）の条件で探し、新しい段に出す（`[Text/Tables] Find:"…"`）。元の表の一覧は段として残る。Table の一覧以外では灰色。Find/Change が Kohaku+ タブのままなら断る（`Find/Change is on the Kohaku+ tab - …`）。（K10）回帰 `tb-text`・`tb-text-grey`・`tb-text-on-kohaku`・`tb-text-none`・`tb-text-cleared`
   - 訂正:
 
 - **TBL-51** 新しい段の行はふつうの文字の行＝Replace・Search These Results Again・Search This Story Again が効く（同じ表を、今の中身で）。Search This Document Again は灰色。表の中の表は一度だけ数える。消えた表は数えて言う。ブックの閉じた章は開いて歩いて閉じる。（K10）回帰 `tb-text-replace`・`tb-text-again`・`tb-text-story-again`・`tb-text-doc-grey`・`tb-text-nested`・`tb-text-nested-inner`・`tb-text-gone`・`tb-text-book`

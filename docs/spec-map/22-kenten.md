@@ -22,7 +22,7 @@
 - **KENTEN-12** 隠した条件の中は出さない。本文・セル・マスターの全部の物語。上限 1000。回帰 `kt-hidden`・`kt-cell`
   - 訂正:
 
-- **KENTEN-13** 段の名前＝`[Kenten/Document] F:"[Any Kenten]"`。保存したクエリの Find はタブを譲る。回帰 `kt-yield-closed`
+- **KENTEN-13** 段の名前＝`[Kenten/Document] Find:"[Any Kenten]"`。保存したクエリの Find はタブを譲る。回帰 `kt-yield-closed`
   - 訂正:
 
 ## 3. 行
