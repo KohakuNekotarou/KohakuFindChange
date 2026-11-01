@@ -464,6 +464,11 @@ bool KFCResultModel::ListHasOwnChangeTab()
 	return ListIsTables() || ListIsRuby() || ListIsKenten();
 }
 
+bool KFCResultModel::ListDrawsTwoLines()
+{
+	return ListIsRuby() || ListIsKenten();
+}
+
 void KFCResultModel::SetRunNames(const PMString& names)
 {
 	gHeader.runNames = names;
@@ -825,6 +830,7 @@ bool KFCResultModel::GetHitRow(int32 chapterIdx, int32 hitIdx, RowDisplay& out)
 	out.outlinedText = h.outlinedText;
 	out.runChain = h.runChain;
 	out.runNames = h.runNames;
+	out.upper = h.upper;
 	return true;
 }
 
@@ -1329,7 +1335,7 @@ void KFCResultModel::MarkHitSpecial(int32 chapterIdx, int32 hitIdx, int32 op)
 	h.outcome = kOutcomeNone;	// the write has just found its text there
 }
 
-void KFCResultModel::MarkHitOwnChange(int32 chapterIdx, int32 hitIdx, int32 op, const PMString& words)
+void KFCResultModel::MarkHitOwnChange(int32 chapterIdx, int32 hitIdx, int32 op, const PMString& words, const KFCRowUpper& upper)
 {
 	Hit* hp = HitAt(chapterIdx, hitIdx);
 	if (hp == nil)
@@ -1337,6 +1343,7 @@ void KFCResultModel::MarkHitOwnChange(int32 chapterIdx, int32 hitIdx, int32 op, 
 	MarkHitSpecial(chapterIdx, hitIdx, op);		// (its backup taken there - before this change too)
 	hp->runChain = words;
 	hp->runChain.SetTranslatable(kFalse);
+	hp->upper = upper;
 }
 
 void KFCResultModel::MarkHitOutlined(int32 chapterIdx, int32 hitIdx, UID storyUID, TextIndex start, TextIndex end,

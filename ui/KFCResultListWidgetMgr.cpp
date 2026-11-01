@@ -199,6 +199,17 @@ namespace
 			return true;
 		return nodeID->IsKeptRow() && KFCResultHistory::IsKeptHit(nodeID->GetTier(), nodeID->GetKeptRow());
 	}
+
+	// A ROW DRAWN ON TWO LINES (the author, 11-01 - "as KCM's"): a hit row of a ruby or kenten list, or a kept tier's copy of one. THE ONE QUESTION: the row's resource, its widget type and
+	// its height are all this answer - a height the tree asks for that the widget does not have cuts the row off (KCMStoryTreeWidgetMgr's shape).
+	bool DrawsTall(const KFCResultNodeID* nodeID)
+	{
+		if (nodeID == nil)
+			return false;
+		if (nodeID->IsHitRow())
+			return KFCResults()->ListDrawsTwoLines();
+		return nodeID->IsKeptRow() && KFCResultHistory::IsKeptTall(nodeID->GetTier(), nodeID->GetKeptRow());
+	}
 }
 
 /** Builds and fills the result tree's row widgets (chapter rows and hit rows). */
@@ -214,7 +225,7 @@ public:
 		TreeNodePtr<KFCResultNodeID> nodeID(node);
 		RsrcID rsrcID = kKFCResultChapterNodeWidgetRsrcID;
 		if (DrawsAsHit(nodeID))
-			rsrcID = kKFCResultHitNodeWidgetRsrcID;
+			rsrcID = DrawsTall(nodeID) ? kKFCResultTallHitNodeWidgetRsrcID : kKFCResultHitNodeWidgetRsrcID;
 
 		// Built the way the layer panel builds its rows (LayerPanelTreeViewWidgetMgr.cpp:403-416), in
 		// three steps rather than one CreateObject, so that the ORDER is spelled out:
@@ -250,17 +261,18 @@ public:
 	{
 		TreeNodePtr<KFCResultNodeID> nodeID(node);
 		if (DrawsAsHit(nodeID))
-			return kKFCResultHitNodeWidgetID;
+			return DrawsTall(nodeID) ? kKFCResultTallHitNodeWidgetID : kKFCResultHitNodeWidgetID;
 		return kKFCResultChapterNodeWidgetID;
 	}
 
 	// The tree asks how big a row is rather than measuring one, so answer both questions the way
 	// the built-in panels do (LayerPanelTreeViewWidgetMgr / LinksUIPanelTreeViewWidgetMgr each
-	// implement both). Every row here is one fixed height, and every row is as wide as the tree -
+	// implement both). A row is one fixed height but a ruby or kenten list's hit row, twice that (DrawsTall), and every row is as wide as the tree -
 	// this list has no horizontal scroll bar and no columns to add up.
-	virtual PMReal GetNodeWidgetHeight(const NodeID& /*node*/) const
+	virtual PMReal GetNodeWidgetHeight(const NodeID& node) const
 	{
-		return kRowHeight;
+		TreeNodePtr<KFCResultNodeID> nodeID(node);
+		return (DrawsAsHit(nodeID) && DrawsTall(nodeID)) ? PMReal(kKFCResultTallRowHeight) : kRowHeight;
 	}
 
 	virtual PMReal GetNodeWidgetWidth(const NodeID& /*node*/) const
@@ -450,7 +462,10 @@ private:
 		// defaults to kTrue), and a recycled row would keep the picture of the row it used to be.
 		InterfacePtr<IKFCRowData> data(cell, UseDefaultIID());
 		if (data != nil)
+		{
 			data->SetSegments(look.locator, look.flag, look.pre, look.match, look.post);
+			data->SetTwoLines(look.twoLines, look.drawMatch, look.upper);
+		}
 		// Disabled for a kept row, enabled for every other - set on every apply, as the label's is (LayOutBranchRow).
 		if (kept)
 			cell->Disable();
@@ -536,6 +551,14 @@ bool KFCResultTree::GetRowLook(const NodeID& node, RowLook& out)
 			out.post.SetTranslatable(kFalse);
 		}
 		out.kept = row.kept;
+		// A RUBY OR KENTEN LIST'S ROW (the author, 11-01): on two lines - the text alone on the lower, what stands over it on the upper. out.match stays base<<reading>>: the label and Copy read it.
+		out.twoLines = KFCResults()->ListDrawsTwoLines();
+		if (out.twoLines)
+		{
+			out.drawMatch = row.matchText;
+			out.drawMatch.SetTranslatable(kFalse);
+			out.upper = row.upper;
+		}
 		return true;
 	}
 	if (nodeID->IsBookRow())
@@ -658,11 +681,13 @@ void KFCResultTree::Rebuild()
 	// ChangeRoot(kTrue) says every row widget has the same height, which they do - both row
 	// resources are kKFCResultRowHeight tall and GetNodeWidgetHeight answers that for every node.
 	// (The number itself is not spelled out here, for the reason kRowHeight gives at the top.)
+	// BUT WHILE A RUBY OR KENTEN LIST IS ON THE TREE, LIVE OR KEPT: its hit rows are twice that (DrawsTall) - kFalse, or the tree reckons every row's place from one height (KCM's trees).
+	const bool16 rowsOneHeight = (KFCResults()->ListDrawsTwoLines() || KFCResultHistory::AnyKeptTall()) ? kFalse : kTrue;
 	treeMgr->ClearTree(kTrue);
 #ifdef KFC_DIAG
 	if (expandMode != 2)
 #endif
-		treeMgr->ChangeRoot(kTrue);
+		treeMgr->ChangeRoot(rowsOneHeight);
 
 	// A BOOK's chapters come up CLOSED. A book-wide search can fill the panel with the first
 	// chapter's hits, which buries the fact that other chapters matched at all; closed chapters show
@@ -728,7 +753,7 @@ void KFCResultTree::Rebuild()
 
 #ifdef KFC_DIAG
 	if (expandMode == 2)
-		treeMgr->ChangeRoot(kTrue);		// the rows were opened above, before the tree was connected again
+		treeMgr->ChangeRoot(rowsOneHeight);		// the rows were opened above, before the tree was connected again
 	{
 		double tTree = 0;
 		KFC_SPENT(tTree, cTree);

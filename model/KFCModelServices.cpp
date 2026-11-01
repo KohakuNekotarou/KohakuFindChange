@@ -98,6 +98,7 @@ public:
 	virtual void GetRunNames(PMString& out) { out = KFCResultModel::RunNames(); }
 	virtual bool ListHasOwnChangeTab() { return KFCResultModel::ListHasOwnChangeTab(); }
 	virtual bool ListIsTables() { return KFCResultModel::ListIsTables(); }
+	virtual bool ListDrawsTwoLines() { return KFCResultModel::ListDrawsTwoLines(); }
 };
 
 CREATE_PMINTERFACE(KFCResultsSession, kKFCResultsImpl)
@@ -199,6 +200,10 @@ public:
 		outText.SetTranslatable(kFalse);
 	}
 	virtual bool KohakuQueryFile(int32 mode, const PMString& name, IDFile& out) { return KFCKohakuQuery::FileOf(mode, name, out); }
+	// (Not under the list's query: the Table part's buttons are the dialog's, as the QR Code part's Find Next.)
+	virtual bool TableNext(const KFCTableLook& look, KFCTableFound& out) { return KFCTableSearch::Next(look, out); }
+	virtual bool TableChangeFound(const KFCTableFound& found, PMString& outWords) { return KFCTableSearch::ChangeFound(found, outWords); }
+	virtual bool TableChangeAll(const KFCTableLook& look, int32& outChanged, int32& outMatched, PMString& outWords) { return KFCTableSearch::ChangeAll(look, outChanged, outMatched, outWords); }
 };
 
 CREATE_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)

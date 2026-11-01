@@ -28,6 +28,28 @@
 
 #include <vector>
 
+/** ONE READING OVER PART OF A TWO-LINE ROW'S MATCH (KFCRowUpper): by characters from the match's start. */
+struct KFCRowUpperRun
+{
+	int32		offset;
+	int32		length;
+	PMString	reading;
+
+	KFCRowUpperRun() : offset(0), length(0) {}
+};
+
+/** WHAT STANDS ABOVE THE MATCH OF A RUBY OR KENTEN ROW (the author, 11-01: on two lines, as KCM's rows; drawn by the UI half's KFCColorTextView). The readings, or a kind of mark over every
+    character, or a bar - what its row's Replace took off, KCM's way - or nothing (a row that never had any). Hit::runChain goes on holding the row's words ("base<reading>"), for a reader of the
+    widgets and Copy. */
+struct KFCRowUpper
+{
+	std::vector<KFCRowUpperRun>	runs;
+	int32						mark;	// an IKentenStyle::KentenKind over the whole match; 0 = none
+	bool						gone;	// its Replace took the ruby or the marks off: a bar
+
+	KFCRowUpper() : mark(0), gone(false) {}
+};
+
 namespace KFCResultModel
 {
 	/** What became of a hit when a replace ran over it. Only ever set on rows the replace actually
@@ -91,6 +113,7 @@ namespace KFCResultModel
 									// been, drawn where the match stands ("cat -> dog -> kog"); matchText holds what the
 									// row reads now, which the doors compare. Empty on other rows.
 		PMString		runNames;	// ...and the queries that wrote it, drawn after the line ("  (a, b)").
+		KFCRowUpper		upper;		// A RUBY OR KENTEN ROW'S UPPER LINE (Hit::upper). Empty on other rows.
 
 		RowDisplay() : replaced(false), outlined(false), kept(false), special(0) {}
 	};
@@ -230,17 +253,25 @@ enum { kKFCRubySearchMode = 103 };
 /** The Ruby tab's Find: - its entries' order (KFCUI.fr). Marks = ruby written out in the text as a manuscript writes it, a base and its reading in marks (KFCRubySearch.h). */
 enum { kKFCRubyFindWith = 0, kKFCRubyFindWithout = 1, kKFCRubyFindMarks = 2 };
 
+/** ONE COLUMN OF THE RUBY PART'S BOXES, THE COLUMNS JOINED TO IT WITH IT (the author, 11-01: Find's Ruby: and Base Text: are boxes, and Change Ruby To's follow them): the base text - the joined boxes' together - the Change side's reading over it (KFCRubyChangePlan::Piece, in
+    PMStrings), and what Find's Ruby: box over it holds. A search reads KFCRubyConditions' base and reading, all the boxes' words run together; findReading is here to bring the boxes back as they stood. */
+struct KFCRubyChangePiece
+{
+	PMString	base;
+	PMString	reading;
+	PMString	findReading;
+};
+
 /** WHAT THE RUBY TAB ASKS (the face's - KFCKohakuTab, read by IKFCUIServices::RubyTabConditions; a ruby list keeps its find side in its query copy). */
 struct KFCRubyConditions
 {
 	int32		kind;			// Find: - kKFCRubyFindWith, kKFCRubyFindWithout (the occurrences of base with none on them), kKFCRubyFindMarks
 	PMString	base;			// its base contains this; empty = any (Text Without Ruby: what it looks for - refused empty)
 	PMString	reading;		// its reading contains this; empty = any (not Text Without Ruby)
-	PMString	changeTo;		// the reading a row's Replace gives it; empty = none given
-	bool		removeRuby;		// ...or its Replace takes the ruby off - over changeTo
+	std::vector<KFCRubyChangePiece>	change;	// what a row's Replace gives it: the boxes in order. No box reading anything = its Replace takes the ruby off (the author, 11-01)
 	int32		scope;			// its Search: - IWalkerScopeFactoryUtils::kDocumentScope (at launch), kAllDocumentScope, or over part of the front document kStoryScope, kToEndOfStoryScope, kSelectionScope
 
-	KFCRubyConditions() : kind(kKFCRubyFindWith), removeRuby(false), scope(0) {}
+	KFCRubyConditions() : kind(kKFCRubyFindWith), scope(0) {}
 };
 
 /** THE KENTEN KIND'S "SEARCH MODE" (the author, 10-31 - KFCKentenSearch.h): the Ruby kind's for its own (KFCKentenSearch::IsTabCurrent). KFC'S ALONE. */
@@ -343,6 +374,34 @@ enum
 	kKFCQRReachHidden		= 2,	// hidden (Object > Hide, or a hidden layer) - shown, not selected
 	kKFCQRReachHiddenSpread	= 4,	// on a hidden spread - nothing moves
 	kKFCQRReachOverset		= 8		// in overset text - the view on its "+", not selected
+};
+
+/** WHERE THE TABLE PART'S BUTTONS GO ON FROM (IKFCRuns::TableNext, TableChangeAll - KFCTableSearch; docs/superpowers/specs/2026-11-01-kfc-kohaku-trial-fixes-design.md F3, F4). The face reads the selection, the model walks. */
+struct KFCTableLook
+{
+	UIDRef		lastDoc;	// the table Find Next found last: its document (gNull = none) - compared, never followed
+	UIDRef		lastStory;
+	TextIndex	lastAt;
+	bool		onLast;		// the selection is as that landing left it: on past that table, over the range read then. False = it has moved: the range read again, on from the selection
+	UIDRef		selStory;	// the text selection now, a caret too (gNull = none)
+	TextIndex	selEnd;
+
+	KFCTableLook() : lastAt(kInvalidTextIndex), onLast(false), selEnd(kInvalidTextIndex) {}
+};
+
+/** WHAT THE TABLE PART'S FIND NEXT FOUND (IKFCRuns::TableNext): where it stands and what keeps it from being selected (kKFCQRReach* bits), the face's first line, and - a Search: the selection does not offer, searched as Document - the sentence that says so. */
+struct KFCTableFound
+{
+	UIDRef		doc;		// gNull = nothing found
+	UIDRef		story;
+	TextIndex	at;			// its character: [at, end)
+	TextIndex	end;
+	UID			table;
+	int32		reach;
+	PMString	words;
+	PMString	note;
+
+	KFCTableFound() : at(kInvalidTextIndex), end(kInvalidTextIndex), table(kInvalidUID), reach(0) {}
 };
 
 /** What the UI half's alert handler does with an alert raised inside a walk of ours (IKFCRuns::AnswerAlert - the

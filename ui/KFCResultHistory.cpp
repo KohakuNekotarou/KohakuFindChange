@@ -655,24 +655,24 @@ namespace
 		// are another tab's, the one InDesign's mode still is.
 		if (mode == kKFCQRCodeSearchMode)
 			return label;
-		// THE TABLE TAB'S WORDS ARE ITS OWN FACE'S (KFCKohakuTab): F:"TS1", with a + for With Overrides Only - as its rows mark an override.
+		// THE TABLE TAB'S WORDS ARE ITS OWN FACE'S (KFCKohakuTab): Find:"TS1", with a + for With Overrides Only - as its rows mark an override.
 		if (mode == kKFCTableSearchMode)
 		{
 			KFCTableConditions asked;
 			(void)KFCRuns()->TableConditions(asked);
-			label.Append(" F:\"");
+			label.Append(" Find:\"");
 			label.Append(asked.findStyle.IsEmpty() ? PMString("[Any Table Style]") : KFCStylePathWords(asked.findStyle));
 			if (asked.overridesOnly)
 				label.Append(" +");
 			label.Append("\"");
 			return label;
 		}
-		// THE KENTEN KIND'S THE SAME: F:"base<mark>" as its rows draw it; F:"base" (no kenten) for Text Without Kenten; [Any Kenten] with nothing asked.
+		// THE KENTEN KIND'S THE SAME: Find:"base<mark>" as its rows draw it; Find:"base" (no kenten) for Text Without Kenten; [Any Kenten] with nothing asked.
 		if (mode == kKFCKentenSearchMode)
 		{
 			KFCKentenConditions asked;
 			(void)KFCRuns()->KentenConditions(asked);
-			label.Append(" F:\"");
+			label.Append(" Find:\"");
 			if (asked.kind == kKFCKentenFindWithout)
 			{
 				label.Append(asked.base);
@@ -693,12 +693,12 @@ namespace
 			label.Append("\"");
 			return label;
 		}
-		// THE RUBY TAB'S THE SAME: F:"base<reading>" as its rows draw it; F:"base" (no ruby) for Text Without Ruby; [Any Ruby] with nothing asked.
+		// THE RUBY TAB'S THE SAME: Find:"base<reading>" as its rows draw it; Find:"base" (no ruby) for Text Without Ruby; [Any Ruby] with nothing asked.
 		if (mode == kKFCRubySearchMode)
 		{
 			KFCRubyConditions asked;
 			(void)KFCRuns()->RubyConditions(asked);
-			label.Append(" F:\"");
+			label.Append(" Find:\"");
 			if (asked.kind == kKFCRubyFindWithout)
 			{
 				label.Append(asked.base);
@@ -721,12 +721,12 @@ namespace
 		PMString findWords, changeWords;
 		if (KFCFindChangeQueryWords(findWords))
 		{
-			// F and C, not Find and Change (the author's call): the row has the panel's width to fill.
-			label.Append(" F:\"");
+			// Find and Change (the author, 11-01, to try how it reads: it was F and C, the row having the panel's width to fill).
+			label.Append(" Find:\"");
 			AppendQueryWords(label, findWords);
 			label.Append("\"");
 			(void)KFCFindChangeChangeWords(changeWords);		// the same tab, so it answers as the find side did
-			label.Append(" C:\"");
+			label.Append(" Change:\"");
 			AppendQueryWords(label, changeWords);
 			label.Append("\"");
 		}
@@ -899,6 +899,21 @@ bool KFCResultHistory::IsKeptHit(int32 tier, int32 row)
 {
 	const KeptRow* kept = RowOf(tier, row);
 	return kept != nil && kept->look.hit;
+}
+
+bool KFCResultHistory::IsKeptTall(int32 tier, int32 row)
+{
+	const KeptRow* kept = RowOf(tier, row);
+	return kept != nil && kept->look.hit && kept->look.twoLines;
+}
+
+bool KFCResultHistory::AnyKeptTall()
+{
+	for (size_t t = 0; t < gKept.size(); ++t)
+		for (size_t r = 0; r < gKept[t].rows.size(); ++r)
+			if (gKept[t].rows[r].look.hit && gKept[t].rows[r].look.twoLines)
+				return true;
+	return false;
 }
 
 void KFCResultHistory::NoteOpenTiers(ITreeViewMgr* treeMgr)

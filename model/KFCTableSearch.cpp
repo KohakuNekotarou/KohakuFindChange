@@ -39,6 +39,7 @@
 #include "IKFCUIServices.h"			// the tab itself is the UI half's
 #include "KFCDiag.h"
 #include "KFCProgressBar.h"			// KFCSetCountedTask too - the bar's line
+#include "KFCReplaceEngine.h"		// WriteFaceTables - the part's Change and Change All
 
 namespace
 {
@@ -153,6 +154,135 @@ bool WalkDoc(const UIDRef& docRef, const PMString& findStyle, bool overridesOnly
 		outHits[h].tableUID = tables[h];
 	}
 	return true;
+}
+
+// THE RANGE THE PART'S BUTTONS GO OVER (KFCTableSearch.h - Next): read when the selection has moved or Search: changed, kept while the selection is as the last landing left it. db is compared, never followed.
+struct ButtonRange
+{
+	int32									scope;		// the Search: it was read for; -1 = not read
+	const IDataBase*						db;			// the front document it was read in
+	bool									fellBack;	// a Search: the selection did not offer: over the document, and said
+	std::vector<KFCSearchEngine::ListedPlace>	part;
+
+	ButtonRange() : scope(-1), db(nil), fellBack(false) {}
+};
+ButtonRange gButtonRange;
+
+bool ScopeIsPartOfDocument(int32 scope)
+{
+	return scope == IWalkerScopeFactoryUtils::kStoryScope || scope == IWalkerScopeFactoryUtils::kToEndOfStoryScope || scope == IWalkerScopeFactoryUtils::kSelectionScope;
+}
+
+// The Text tab's sentence for a Search: the selection does not offer (KFCSearchEngine::ResolveRunScope's words).
+void AppendFellBack(PMString& io, int32 scope)
+{
+	io.Append("Search: is ");
+	io.Append(scope == IWalkerScopeFactoryUtils::kStoryScope ? "Story" : scope == IWalkerScopeFactoryUtils::kToEndOfStoryScope ? "To End of Story" : "Selection");
+	io.Append(scope == IWalkerScopeFactoryUtils::kSelectionScope ? ", but no text is selected"
+		: scope == IWalkerScopeFactoryUtils::kToEndOfStoryScope ? ", but there is no text cursor"
+		: ", but no text or text frame is selected");
+	io.Append(" - the whole document was searched, as Edit > Find/Change does.");
+}
+
+struct ButtonRow
+{
+	size_t					doc;
+	KFCResultModel::Hit		hit;
+};
+
+// EVERY TABLE OF THE BUTTONS' RANGE IN THE LIST'S ORDER (KFCQRSearch::Next's walk): document by document, each in page order. False = it did not look: outRefusal says why.
+bool WalkButtonRange(const KFCTableLook& look, const KFCTableConditions& asked, std::vector<KFCBookScope::ChapterDoc>& outDocs, std::vector<ButtonRow>& outRows, PMString& outRefusal)
+{
+	if (asked.scope == IWalkerScopeFactoryUtils::kAllDocumentScope)
+		KFCBookScope::ListOpenDocuments(outDocs);
+	else
+	{
+		IDocument* const doc = KFCBookScope::ActiveDocument();		// non-owning
+		if (doc != nil)
+			outDocs.push_back(KFCBookScope::DocAsChapter(doc));
+	}
+	if (outDocs.empty())
+	{
+		outRefusal.Append("No document is open.");
+		return false;
+	}
+	IDataBase* const front = outDocs[0].docRef.GetDataBase();
+	if (!look.onLast || gButtonRange.scope != asked.scope || (ScopeIsPartOfDocument(asked.scope) && gButtonRange.db != front))
+	{
+		gButtonRange = ButtonRange();
+		gButtonRange.db = front;
+		if (ScopeIsPartOfDocument(asked.scope))
+		{
+			if (KFCSearchEngine::SearchScopeForSelection(asked.scope) != asked.scope)
+				gButtonRange.fellBack = true;
+			else if (!KFCSearchEngine::PartStretches(asked.scope, front, gButtonRange.part))
+			{
+				outRefusal.Append("What Search: holds in the selection could not be read - nothing was searched.");
+				return false;
+			}
+		}
+		gButtonRange.scope = asked.scope;
+	}
+	const std::vector<KFCSearchEngine::ListedPlace>* const part = (ScopeIsPartOfDocument(asked.scope) && !gButtonRange.fellBack) ? &gButtonRange.part : nil;
+	for (size_t d = 0; d < outDocs.size(); ++d)
+	{
+		std::vector<KFCResultModel::Hit> hits;
+		std::map<UID, uint32> versions;
+		bool capped = false;
+		if (!WalkDoc(outDocs[d].docRef, asked.findStyle, asked.overridesOnly, part, static_cast<size_t>(KFCResultModel::kKFCCollectObjectLimit), hits, versions, capped))
+			continue;
+		KFCResultModel::OrderHitsByPage(hits);
+		for (size_t h = 0; h < hits.size(); ++h)
+		{
+			ButtonRow one;
+			one.doc = d;
+			one.hit = hits[h];
+			outRows.push_back(one);
+		}
+	}
+	return true;
+}
+
+// The row after the table found last - the first when that one is not among them.
+size_t RowAfterLast(const KFCTableLook& look, const std::vector<KFCBookScope::ChapterDoc>& docs, const std::vector<ButtonRow>& rows)
+{
+	if (look.lastDoc == UIDRef::gNull)
+		return 0;
+	for (size_t k = 0; k < rows.size(); ++k)
+		if (docs[rows[k].doc].docRef == look.lastDoc && rows[k].hit.storyUID == look.lastStory.GetUID() && rows[k].hit.textStart == look.lastAt)
+			return (k + 1) % rows.size();
+	return 0;
+}
+
+// A selection's place among a story's tables: its end - in a table's cell (each cell a story thread whose dictionary is the table, read after the body's text), just past that table's character.
+TextIndex SelectionPlace(const UIDRef& story, TextIndex selEnd)
+{
+	InterfacePtr<ITextModel> model(story, UseDefaultIID());
+	if (model == nil || selEnd <= 0)
+		return selEnd;
+	InterfacePtr<ITextStoryThread> thread(model->QueryStoryThread(selEnd - 1, nil, nil));
+	InterfacePtr<ITableTextContainer> inTable(story.GetDataBase(), (thread != nil) ? thread->GetDictUID() : kInvalidUID, UseDefaultIID());
+	return (inTable != nil) ? inTable->GetAnchorTextIndex() + 1 : selEnd;
+}
+
+// FIND NEXT'S ROW (KFCTableSearch.h).
+size_t PickNextRow(const KFCTableLook& look, const std::vector<KFCBookScope::ChapterDoc>& docs, const std::vector<ButtonRow>& rows)
+{
+	if (look.onLast || look.selStory == UIDRef::gNull)
+		return RowAfterLast(look, docs, rows);
+	const TextIndex place = SelectionPlace(look.selStory, look.selEnd);
+	bool inStory = false;
+	size_t lastOfStory = 0;
+	for (size_t k = 0; k < rows.size(); ++k)
+	{
+		if (docs[rows[k].doc].docRef.GetDataBase() != look.selStory.GetDataBase() || rows[k].hit.storyUID != look.selStory.GetUID())
+			continue;
+		if (rows[k].hit.textStart >= place)
+			return k;
+		inStory = true;
+		lastOfStory = k;
+	}
+	return inStory ? (lastOfStory + 1) % rows.size() : RowAfterLast(look, docs, rows);
 }
 }	// anonymous namespace
 
@@ -313,6 +443,195 @@ bool KFCTableSearch::WriteDocument(const UIDRef& docRef, const KFCTableCondition
 			return false;
 		++outCount;
 	}
+	return true;
+}
+
+bool KFCTableSearch::Next(const KFCTableLook& look, KFCTableFound& out)
+{
+	out = KFCTableFound();
+	out.words.SetTranslatable(kFalse);
+	out.note.SetTranslatable(kFalse);
+	KFCTableConditions asked;
+	(void)IsTabCurrent(&asked);
+	std::vector<KFCBookScope::ChapterDoc> docs;
+	std::vector<ButtonRow> rows;
+	if (!WalkButtonRange(look, asked, docs, rows, out.words) || rows.empty())
+		return false;
+	const ButtonRow& one = rows[PickNextRow(look, docs, rows)];
+	const UIDRef docRef(docs[one.doc].docRef);
+	out.doc = docRef;
+	out.story = UIDRef(docRef.GetDataBase(), one.hit.storyUID);
+	out.at = one.hit.textStart;
+	out.end = one.hit.textEnd;
+	out.table = one.hit.tableUID;
+	if (one.hit.isLocked)
+		out.reach |= kKFCQRReachLocked;
+	if (one.hit.isHidden)
+		out.reach |= kKFCQRReachHidden;
+	if (one.hit.onHiddenSpread)
+		out.reach |= kKFCQRReachHiddenSpread;
+	if (one.hit.isOverset)
+		out.reach |= kKFCQRReachOverset;
+	// THE LINE: what its row draws, then where it stands, and its document over All Documents (KFCQRSearch::Next's).
+	out.words.Append(one.hit.runChain);
+	if (one.hit.isOverset)
+		out.words.Append(" - overset text");
+	else if (one.hit.frameOnPasteboard)
+		out.words.Append(" - pasteboard");
+	else
+	{
+		out.words.Append(" - page ");
+		out.words.Append(one.hit.pageString);
+	}
+	if (asked.scope == IWalkerScopeFactoryUtils::kAllDocumentScope)
+	{
+		out.words.Append(" - ");
+		out.words.Append(docs[one.doc].shortName);
+	}
+	if (gButtonRange.fellBack)
+		AppendFellBack(out.note, asked.scope);
+	KFC_DIAG_LOG("TBLBTN next story=%d at=%d reach=%d rows=%d words=%s", static_cast<int>(out.story.GetUID().Get()), static_cast<int>(out.at), static_cast<int>(out.reach),
+		static_cast<int>(rows.size()), out.words.GetUTF8String().c_str());
+	return true;
+}
+
+bool KFCTableSearch::ChangeFound(const KFCTableFound& found, PMString& outWords)
+{
+	outWords.Clear();
+	outWords.SetTranslatable(kFalse);
+	KFCTableConditions asked;
+	(void)IsTabCurrent(&asked);
+	// THE DOORS - nothing written yet. The document first: everything after it follows its database.
+	if (asked.changeStyle.IsEmpty() && !asked.clearOverrides)
+	{
+		outWords.Append("Nothing to change - choose Change to Table Style or Clear Overrides.");
+		return false;
+	}
+	if (found.doc == UIDRef::gNull || !KFCBookScope::IsDocStillOpen(found.doc))
+	{
+		outWords.Append("That table's document has been closed - press Find Next.");
+		return false;
+	}
+	InterfacePtr<ITableModel> table(QueryTableAt(found.story, found.at));
+	if (table == nil || ::GetUID(table) != found.table)
+	{
+		outWords.Append("That table is no longer there - press Find Next.");
+		return false;
+	}
+	if (!KFCSearchEngine::IsFrameEditable(found.story, KFCSearchEngine::EditableFrameForMatch(found.story, found.at)))
+	{
+		outWords.Append("That table is locked - not changed.");
+		return false;
+	}
+	const UID style = asked.changeStyle.IsEmpty() ? kInvalidUID : StyleNamed(found.doc.GetDataBase(), asked.changeStyle);
+	if (!asked.changeStyle.IsEmpty() && style == kInvalidUID)
+	{
+		outWords.Append("This document has no table style of that name - not changed.");
+		return false;
+	}
+	if (!WouldChange(table, style, asked.clearOverrides))
+	{
+		outWords.Append("That table already reads as the Change side asks.");
+		return false;
+	}
+	KFCReplaceEngine::FaceTable one;
+	one.doc = found.doc;
+	one.story = found.story.GetUID();
+	one.table = found.table;
+	one.style = style;
+	if (!KFCReplaceEngine::WriteFaceTables(std::vector<KFCReplaceEngine::FaceTable>(1, one), asked.clearOverrides, outWords))
+		return false;
+	outWords.Append("Changed: ");
+	outWords.Append(TableWords(table));
+	KFC_DIAG_LOG("TBLBTN change wrote words=%s", outWords.GetUTF8String().c_str());
+	return true;
+}
+
+bool KFCTableSearch::ChangeAll(const KFCTableLook& look, int32& outChanged, int32& outMatched, PMString& outWords)
+{
+	outChanged = 0;
+	outMatched = 0;
+	outWords.Clear();
+	outWords.SetTranslatable(kFalse);
+	KFCTableConditions asked;
+	(void)IsTabCurrent(&asked);
+	if (asked.changeStyle.IsEmpty() && !asked.clearOverrides)
+	{
+		outWords.Append("Nothing to change - choose Change to Table Style or Clear Overrides.");
+		return false;
+	}
+	std::vector<KFCBookScope::ChapterDoc> docs;
+	std::vector<ButtonRow> rows;
+	if (!WalkButtonRange(look, asked, docs, rows, outWords))
+		return false;
+	outMatched = static_cast<int32>(rows.size());
+	std::vector<KFCReplaceEngine::FaceTable> targets;
+	int32 locked = 0, noStyle = 0, asAsked = 0;
+	std::map<size_t, UID> styleOfDoc;
+	for (size_t k = 0; k < rows.size(); ++k)
+	{
+		const KFCResultModel::Hit& hit = rows[k].hit;
+		const UIDRef docRef(docs[rows[k].doc].docRef);
+		if (hit.isLocked)
+		{
+			++locked;
+			continue;
+		}
+		if (styleOfDoc.count(rows[k].doc) == 0)
+			styleOfDoc[rows[k].doc] = asked.changeStyle.IsEmpty() ? kInvalidUID : StyleNamed(docRef.GetDataBase(), asked.changeStyle);
+		const UID style = styleOfDoc[rows[k].doc];
+		if (!asked.changeStyle.IsEmpty() && style == kInvalidUID)
+		{
+			++noStyle;
+			continue;
+		}
+		InterfacePtr<ITableModel> table(docRef.GetDataBase(), hit.tableUID, UseDefaultIID());
+		if (table == nil || !WouldChange(table, style, asked.clearOverrides))
+		{
+			++asAsked;
+			continue;
+		}
+		KFCReplaceEngine::FaceTable one;
+		one.doc = docRef;
+		one.story = hit.storyUID;
+		one.table = hit.tableUID;
+		one.style = style;
+		targets.push_back(one);
+	}
+	if (!targets.empty() && !KFCReplaceEngine::WriteFaceTables(targets, asked.clearOverrides, outWords))
+		return false;
+	outChanged = static_cast<int32>(targets.size());
+	outWords.AppendNumber(outChanged);
+	outWords.Append(" of ");
+	outWords.AppendNumber(outMatched);
+	outWords.Append(" table(s) changed.");
+	if (locked + noStyle + asAsked > 0)
+	{
+		outWords.Append(" Left as they were:");
+		const char* sep = " ";
+		if (locked > 0)
+		{
+			outWords.Append(sep);
+			outWords.AppendNumber(locked);
+			outWords.Append(" locked");
+			sep = ", ";
+		}
+		if (noStyle > 0)
+		{
+			outWords.Append(sep);
+			outWords.AppendNumber(noStyle);
+			outWords.Append(" no such table style");
+			sep = ", ";
+		}
+		if (asAsked > 0)
+		{
+			outWords.Append(sep);
+			outWords.AppendNumber(asAsked);
+			outWords.Append(" already as asked");
+		}
+		outWords.Append(".");
+	}
+	KFC_DIAG_LOG("TBLBTN changeall changed=%d matched=%d words=%s", static_cast<int>(outChanged), static_cast<int>(outMatched), outWords.GetUTF8String().c_str());
 	return true;
 }
 

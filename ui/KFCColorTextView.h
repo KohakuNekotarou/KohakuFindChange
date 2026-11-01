@@ -17,6 +17,7 @@
 
 #include "IPMUnknown.h"
 #include "PMString.h"
+#include "KFCModelTypes.h"	// KFCRowUpper - what stands above a two-line row's match
 #include "KFCUIID.h"
 
 /** The parts a hit row's colour cell paints: the page LOCATOR ("P1(2)", drawn at the full theme
@@ -42,6 +43,13 @@ public:
 	/** Read this row's parts back (for the cell's Draw). */
 	virtual void GetSegments(PMString& outLocator, PMString& outFlag, PMString& outPre,
 		PMString& outMatch, PMString& outPost) const = 0;
+
+	/** A TWO-LINE ROW (a ruby or kenten list's - the author, 11-01: "as KCM's"): what the lower line draws for the match instead of its part above - the text alone, where a
+	    reader of the row's label and Copy have base<<reading>> - and what stands over it on the upper line. Off for every other row. */
+	virtual void SetTwoLines(bool on, const PMString& drawMatch, const KFCRowUpper& upper) = 0;
+
+	/** Is it one, and what SetTwoLines was given. */
+	virtual bool GetTwoLines(PMString& outDrawMatch, KFCRowUpper& outUpper) const = 0;
 };
 
 #endif // __KFCColorTextView_h__

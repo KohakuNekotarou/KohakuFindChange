@@ -4021,6 +4021,7 @@ enum OwnTabRefusal
 	kOwnTabEdited,		// its text has been edited since (a table row: or holds no table now)
 	kOwnTabNoStyle,		// its document has no table style of the Change side's name
 	kOwnTabAsAsked,		// it already reads as the Change side asks: counted, not written
+	kOwnTabBaseDiffers,	// its text is not what the Ruby part's base boxes hold
 	kOwnTabRefusalCount
 };
 
@@ -4036,6 +4037,7 @@ const char* OwnTabRefusalWords(OwnTabRefusal why)
 		case kOwnTabEdited:			return "edited since";
 		case kOwnTabNoStyle:		return "no such table style";
 		case kOwnTabAsAsked:		return "already as asked";
+		case kOwnTabBaseDiffers:	return "base text differs";
 		default:					return "";
 	}
 }
@@ -4053,6 +4055,7 @@ const char* OwnTabRefusalSentence(OwnTabRefusal why)
 		case kOwnTabEdited:			return "this row has been edited since the search.";
 		case kOwnTabNoStyle:		return "this document has no table style of that name.";
 		case kOwnTabAsAsked:		return "this row already reads as its tab asks.";
+		case kOwnTabBaseDiffers:	return "this row's text is not what the Base Text boxes hold - clear those boxes to give the reading to the whole row.";
 		default:					return "this row cannot be replaced.";
 	}
 }
@@ -4092,8 +4095,8 @@ public:
 	virtual void EnterDocument(IDataBase* db) = 0;
 	/** kOwnTabOk = write it; sets row.item if its Undo is told by one. */
 	virtual OwnTabRefusal RowDoor(const UIDRef& storyRef, OwnTabRow& row) = 0;
-	/** Inside the step: writes the row, outWords what it draws after it (empty: its own text). */
-	virtual ErrorCode WriteRow(const UIDRef& storyRef, const OwnTabRow& row, PMString& outWords) = 0;
+	/** Inside the step: writes the row, outWords what it draws after it (empty: its own text), outUpper what stands above it on a two-line row. */
+	virtual ErrorCode WriteRow(const UIDRef& storyRef, const OwnTabRow& row, PMString& outWords, KFCRowUpper& outUpper) = 0;
 	/** Inside the step: writes a document's rows - each by WriteRow, marked. A way whose write moves text writes them its own way (MarksWrite). False = InDesign would not write a row. */
 	virtual bool WriteChapter(OwnTabChapter& chapter);
 	/** What is said when it would not (a way that knows why says so). */
@@ -4133,7 +4136,7 @@ public:
 		row.item = ::GetUID(table);		// (a table's write need not move its story's version)
 		return kOwnTabOk;
 	}
-	virtual ErrorCode WriteRow(const UIDRef& /*storyRef*/, const OwnTabRow& row, PMString& outWords)
+	virtual ErrorCode WriteRow(const UIDRef& /*storyRef*/, const OwnTabRow& row, PMString& outWords, KFCRowUpper& /*outUpper*/)
 	{
 		InterfacePtr<ITableModel> table(fDB, row.item, UseDefaultIID());
 		if (table == nil)
@@ -4154,31 +4157,46 @@ private:
 	IDataBase*			fDB;
 };
 
-// THE RUBY TAB'S: the reading as the Change side has it, or the ruby off (Remove Ruby over Change Ruby To - R7).
+// THE RUBY TAB'S: what the Change boxes say over the row's text (KFCRubyChangePlan.h) - their readings, or the ruby off when they read nothing (the author, 11-01).
 class RubyWrite : public OwnTabWrite
 {
 public:
-	RubyWrite() { (void)KFCRubySearch::IsTabCurrent(&fAsked); }
+	RubyWrite()
+	{
+		(void)KFCRubySearch::IsTabCurrent(&fAsked);
+		fPieces = KFCRubySearch::PlanPieces(fAsked);
+	}
 	virtual const char* NothingToChange() const
 	{
-		return (fAsked.changeTo.IsEmpty() && !fAsked.removeRuby)
-			? "Replace: nothing to change on the Kohaku+ tab - type Change Ruby To or choose Remove Ruby in Edit > Find/Change." : nil;
+		return (KFCRubyChangePlan::Check(fPieces) == KFCRubyChangePlan::kReadingOverNoBase)
+			? "Replace: a Change Ruby To box on the Kohaku+ tab stands over no Base Text - type it in that column's Base Text box, or join the column to the one beside it, in Edit > Find/Change." : nil;
 	}
 	virtual void EnterDocument(IDataBase* /*db*/) {}
 	virtual OwnTabRefusal RowDoor(const UIDRef& storyRef, OwnTabRow& row)
 	{
-		const WideString now(KFCRubySearch::ReadingOn(storyRef, row.start, row.end));
-		if (fAsked.removeRuby)
-			return now.empty() ? kOwnTabAsAsked : kOwnTabOk;
-		return (now == WideString(fAsked.changeTo)) ? kOwnTabAsAsked : kOwnTabOk;
+		std::vector<KFCRubyChangePlan::Run> runs;
+		switch (KFCRubySearch::PlanForRow(storyRef, row.start, row.end, fPieces, runs))
+		{
+			case KFCRubyChangePlan::kRemove:
+				return KFCRubySearch::HasRubyOn(storyRef, row.start, row.end) ? kOwnTabOk : kOwnTabAsAsked;
+			case KFCRubyChangePlan::kWrite:
+				return KFCRubySearch::ReadsAsPlanned(storyRef, row.start, row.end, runs) ? kOwnTabAsAsked : kOwnTabOk;
+			default:
+				return kOwnTabBaseDiffers;
+		}
 	}
-	virtual ErrorCode WriteRow(const UIDRef& storyRef, const OwnTabRow& row, PMString& outWords)
+	virtual ErrorCode WriteRow(const UIDRef& storyRef, const OwnTabRow& row, PMString& outWords, KFCRowUpper& outUpper)
 	{
-		const WideString reading(fAsked.removeRuby ? WideString() : WideString(fAsked.changeTo));
-		const ErrorCode wrote = fAsked.removeRuby ? KFCRubySearch::Remove(storyRef, row.start, row.end)
-			: KFCRubySearch::Apply(storyRef, row.start, row.end, reading);
+		std::vector<KFCRubyChangePlan::Run> runs;
+		const KFCRubyChangePlan::Result plan = KFCRubySearch::PlanForRow(storyRef, row.start, row.end, fPieces, runs);
+		const ErrorCode wrote = (plan == KFCRubyChangePlan::kRemove) ? KFCRubySearch::Remove(storyRef, row.start, row.end)
+			: KFCRubySearch::WritePlan(storyRef, row.start, row.end, runs);
 		if (wrote == kSuccess)
-			outWords = KFCRubySearch::RowWords(storyRef, row.start, row.end, reading);
+		{
+			outWords = KFCRubySearch::RowWords(storyRef, row.start, row.end);
+			outUpper = KFCRubySearch::UpperOn(storyRef, row.start, row.end);
+			outUpper.gone = (plan == KFCRubyChangePlan::kRemove);
+		}
 		return wrote;
 	}
 	virtual int32 RowMark() const { return kKFCSpecialRubyChange; }
@@ -4187,7 +4205,8 @@ public:
 	virtual const char* Verb() const { return "Changed ruby on"; }
 	virtual const char* Noun() const { return "rows"; }
 private:
-	KFCRubyConditions	fAsked;
+	KFCRubyConditions						fAsked;
+	std::vector<KFCRubyChangePlan::Piece>	fPieces;
 };
 
 // THE KENTEN KIND'S: the kind of mark on a row's text, the look of the marks left as it stands - or, Remove Kenten, the marks taken off whole (KFCKentenSearch::Remove).
@@ -4205,11 +4224,15 @@ public:
 	{
 		return (KFCKentenSearch::MarkOn(storyRef, row.start, row.end) == Wanted()) ? kOwnTabAsAsked : kOwnTabOk;
 	}
-	virtual ErrorCode WriteRow(const UIDRef& storyRef, const OwnTabRow& row, PMString& outWords)
+	virtual ErrorCode WriteRow(const UIDRef& storyRef, const OwnTabRow& row, PMString& outWords, KFCRowUpper& outUpper)
 	{
 		const ErrorCode wrote = fAsked.removeKenten ? KFCKentenSearch::Remove(storyRef, row.start, row.end) : KFCKentenSearch::Write(storyRef, row.start, row.end, Wanted());
 		if (wrote == kSuccess)
+		{
 			outWords = KFCKentenSearch::RowWords(storyRef, row.start, row.end, Wanted());
+			outUpper.mark = Wanted();
+			outUpper.gone = (Wanted() == IKentenStyle::Kenten_None);
+		}
 		return wrote;
 	}
 	virtual int32 RowMark() const { return kKFCSpecialKentenChange; }
@@ -4235,12 +4258,13 @@ bool OwnTabWrite::WriteChapter(OwnTabChapter& chapter)
 		const UIDRef storyRef(db, row.story);
 		PMString words;
 		words.SetTranslatable(kFalse);
-		if (WriteRow(storyRef, row, words) != kSuccess)
+		KFCRowUpper upper;
+		if (WriteRow(storyRef, row, words, upper) != kSuccess)
 			return false;
 		KFC_DIAG_LOG("OWNTABWRITE %s chapter=%d row=%d story=%u at=%d", StepName(), chapter.chapterIdx, row.hit, row.story.Get(), (int)row.start);
 		row.done = true;
 		++chapter.written;
-		KFCResultModel::MarkHitOwnChange(chapter.chapterIdx, row.hit, RowMark(), words);
+		KFCResultModel::MarkHitOwnChange(chapter.chapterIdx, row.hit, RowMark(), words, upper);
 	}
 	return true;
 }
@@ -4259,7 +4283,7 @@ public:
 		WideString reading;
 		return KFCRubySearch::ReadMark(storyRef, row.start, row.end, baseOffset, baseLength, reading) ? kOwnTabOk : kOwnTabAsAsked;
 	}
-	virtual ErrorCode WriteRow(const UIDRef& /*storyRef*/, const OwnTabRow& /*row*/, PMString& /*outWords*/) { return kFailure; }	// (WriteChapter's own)
+	virtual ErrorCode WriteRow(const UIDRef& /*storyRef*/, const OwnTabRow& /*row*/, PMString& /*outWords*/, KFCRowUpper& /*outUpper*/) { return kFailure; }	// (WriteChapter's own)
 	virtual bool WriteChapter(OwnTabChapter& chapter)
 	{
 		IDataBase* const db = chapter.docRef.GetDataBase();
@@ -4324,8 +4348,8 @@ public:
 			KFCResultModel::SetHitRange(chapterIdx, row.hit, row.story, s, s + place.length);
 			KFCSearchEngine::RereadRowText(chapterIdx, row.hit, storyRef, s, s + place.length);
 			if (row.done)
-				KFCResultModel::MarkHitOwnChange(chapterIdx, row.hit, RowMark(),
-					KFCRubySearch::RowWords(storyRef, s, s + place.length, KFCRubySearch::ReadingOn(storyRef, s, s + place.length)));
+				KFCResultModel::MarkHitOwnChange(chapterIdx, row.hit, RowMark(), KFCRubySearch::RowWords(storyRef, s, s + place.length),
+					KFCRubySearch::UpperOn(storyRef, s, s + place.length));
 		}
 		for (std::set<UID>::const_iterator st = chapter.stories.begin(); st != chapter.stories.end(); ++st)
 			KFCSearchEngine::RereadStoryLead(chapterIdx, UIDRef(db, *st));
@@ -4554,6 +4578,128 @@ static bool ReplaceOwnTabRows(const KFCRowsByChapter& rowsByChapter, PMString& o
 	}
 	TableWrite table;
 	return WriteOwnTabRows(table, rowsByChapter, outStatus);
+}
+
+bool KFCReplaceEngine::WriteFaceTables(const std::vector<FaceTable>& tables, bool clearOverrides, PMString& outWhy)
+{
+	KFC_DIAG_WRITTEN_DOCS_CHECK("table-buttons");	// (test builds: after DocsAfterWrite, below - KFCDiagWrittenDocs.h)
+	outWhy.Clear();
+	outWhy.SetTranslatable(kFalse);
+	if (tables.empty())
+		return false;
+	const WriteUnderWay writing;
+	DocsAfterWrite docsAfter;
+	std::vector<UIDRef> docs;
+	for (size_t t = 0; t < tables.size(); ++t)
+	{
+		if (std::find(docs.begin(), docs.end(), tables[t].doc) != docs.end())
+			continue;
+		docs.push_back(tables[t].doc);
+		docsAfter.Reached(tables[t].doc, true);
+	}
+
+	// THE TABLE LIST'S ROWS OF THESE TABLES: marked in this step, and only then is the step followed - a write with no row of the list has nothing for an Undo to put back on it.
+	struct ListRow
+	{
+		int32	chapter;
+		int32	hit;
+		size_t	table;
+	};
+	std::vector<ListRow> listRows;
+	std::vector<int32> chapterIdxs;
+	std::map<int32, std::set<UID> > storiesOfChapter;
+	std::set<IDataBase*> followed;
+	if (KFCResultModel::ListIsTables())
+	{
+		const int32 chapterCount = KFCResultModel::GetChapterCount();
+		for (int32 c = 0; c < chapterCount; ++c)
+		{
+			UIDRef chapterDoc;
+			IDFile file;
+			if (!KFCResultModel::GetChapterLocation(c, chapterDoc, file))
+				continue;
+			std::map<UID, size_t> theirs;
+			for (size_t t = 0; t < tables.size(); ++t)
+				if (tables[t].doc == chapterDoc)
+					theirs[tables[t].table] = t;
+			if (theirs.empty())
+				continue;
+			const int32 hitCount = KFCResultModel::GetHitCount(c);
+			for (int32 h = 0; h < hitCount; ++h)
+			{
+				const std::map<UID, size_t>::const_iterator one = theirs.find(KFCResultModel::GetHitTable(c, h));
+				if (one == theirs.end())
+					continue;
+				const ListRow row = { c, h, one->second };
+				listRows.push_back(row);
+				storiesOfChapter[c].insert(tables[one->second].story);
+			}
+			if (storiesOfChapter.count(c) != 0)
+			{
+				chapterIdxs.push_back(c);
+				followed.insert(chapterDoc.GetDataBase());
+			}
+		}
+	}
+	KFCUndoFollow::StepRecorder recorder(chapterIdxs);
+	recorder.SetName("Apply Table Style");
+	for (size_t r = 0; r < listRows.size(); ++r)
+		recorder.RecordItem(listRows[r].chapter, tables[listRows[r].table].table);
+
+	bool ok = false;
+	{
+		WriteStep step;
+		if (!BeginWriteStep(docs.size() > 1, step, kKFCTableStyleStepKey, "Apply Table Style"))
+		{
+			outWhy.Append("InDesign would not start an undoable step - nothing was changed.");
+			return false;
+		}
+		bool failed = false;
+		std::vector<PMString> words(tables.size());
+		for (size_t t = 0; t < tables.size() && !failed; ++t)
+		{
+			InterfacePtr<ITableModel> table(tables[t].doc.GetDataBase(), tables[t].table, UseDefaultIID());
+			if (table == nil || KFCTableSearch::Write(table, tables[t].style, clearOverrides) != kSuccess)
+				failed = true;
+			else
+				words[t] = KFCTableSearch::TableWords(table);
+		}
+		ok = !failed && ErrorUtils::PMGetGlobalErrorCode() == kSuccess;
+		if (ok)
+		{
+			for (size_t r = 0; r < listRows.size(); ++r)
+				KFCResultModel::MarkHitOwnChange(listRows[r].chapter, listRows[r].hit, kKFCSpecialTableStyle, words[listRows[r].table]);
+			for (std::set<IDataBase*>::const_iterator db = followed.begin(); db != followed.end(); ++db)
+				KFCUndoFollow::MarkWrite(*db);	// in this step, so its Undo / Redo is heard
+			for (std::map<int32, std::set<UID> >::const_iterator c = storiesOfChapter.begin(); c != storiesOfChapter.end(); ++c)
+				for (std::set<UID>::const_iterator s = c->second.begin(); s != c->second.end(); ++s)
+					KFCRowFoci::ReanchorStory(c->first, *s, true);
+		}
+		EndWriteStep(step, ok);
+	}
+	if (!ok)
+	{
+		KFCResultModel::RollBackRows();
+		for (std::map<int32, std::set<UID> >::const_iterator c = storiesOfChapter.begin(); c != storiesOfChapter.end(); ++c)
+			for (std::set<UID>::const_iterator s = c->second.begin(); s != c->second.end(); ++s)
+				KFCRowFoci::ReanchorStory(c->first, *s);
+		outWhy.Append("InDesign would not write a table - nothing was changed.");
+		return false;
+	}
+	for (std::map<int32, std::set<UID> >::const_iterator c = storiesOfChapter.begin(); c != storiesOfChapter.end(); ++c)
+	{
+		UIDRef chapterDoc;
+		IDFile file;
+		if (KFCResultModel::GetChapterLocation(c->first, chapterDoc, file))
+			NoteStoryVersions(c->first, chapterDoc.GetDataBase(), c->second);	// as KFC left them
+	}
+	recorder.Keep();
+	for (size_t d = 0; d < docs.size(); ++d)
+	{
+		docsAfter.Wrote(docs[d]);
+		KFC_DIAG_NOTE_WRITE(docs[d]);
+	}
+	return true;
 }
 
 // ======================================================================================================

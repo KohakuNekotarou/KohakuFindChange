@@ -144,6 +144,9 @@ DECLARE_PMID(kInterfaceIDSpace, IID_IKFCAPPBARMIRROROBSERVER, kKFCUIPrefix + 10)
 // dialog is open. Its own IID: it sits on the dialog's boss beside the dialog's observer (IID_IOBSERVER), which
 // attaches and detaches it. + 11: the next after the highest spent.
 DECLARE_PMID(kInterfaceIDSpace, IID_IKFCQUERYSCOPEOBSERVER, kKFCUIPrefix + 11)
+// The Kohaku tab's face following the selection while it is shown (KFCKohakuTab.cpp - the Table part's Change greys as the selection leaves what Find Next found): an
+// ActiveSelectionObserver under an IID of its own, beside the face's own observer of its widgets.
+DECLARE_PMID(kInterfaceIDSpace, IID_IKFCKOHAKUSELECTIONOBSERVER, kKFCUIPrefix + 12)
 
 
 // ImplementationIDs:
@@ -244,6 +247,7 @@ DECLARE_PMID(kImplementationIDSpace, kKFCKohakuTabObserverImpl, kKFCUIPrefix + 6
 DECLARE_PMID(kImplementationIDSpace, kKFCKohakuTabControllerImpl, kKFCUIPrefix + 63)
 DECLARE_PMID(kImplementationIDSpace, kKFCKohakuQueryWatchImpl, kKFCUIPrefix + 64)
 DECLARE_PMID(kImplementationIDSpace, kKFCKohakuSaveFilterEHImpl, kKFCUIPrefix + 65)
+DECLARE_PMID(kImplementationIDSpace, kKFCKohakuTabSelectionObserverImpl, kKFCUIPrefix + 66)
 
 
 // ActionIDs:
@@ -586,10 +590,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCTableTabClearOverridesWidgetID, kKFCUIPrefix + 
 DECLARE_PMID(kWidgetIDSpace, kKFCKohakuTableSectionWidgetID, kKFCUIPrefix + 69)
 DECLARE_PMID(kWidgetIDSpace, kKFCKohakuRubySectionWidgetID, kKFCUIPrefix + 70)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyTabKindWidgetID, kKFCUIPrefix + 71)
-DECLARE_PMID(kWidgetIDSpace, kKFCRubyTabBaseWidgetID, kKFCUIPrefix + 72)
-DECLARE_PMID(kWidgetIDSpace, kKFCRubyTabReadingWidgetID, kKFCUIPrefix + 73)
-DECLARE_PMID(kWidgetIDSpace, kKFCRubyTabChangeWidgetID, kKFCUIPrefix + 74)
-DECLARE_PMID(kWidgetIDSpace, kKFCRubyTabRemoveWidgetID, kKFCUIPrefix + 75)
+// (+ 72 was the Ruby part's Base Text: field and + 73 its Ruby: field, boxes now - below. + 72 is Find Table Style:'s words, which stand under Search: in the head and only on Table; + 73 is free.)
+DECLARE_PMID(kWidgetIDSpace, kKFCTableTabFindLabelWidgetID, kKFCUIPrefix + 72)
 DECLARE_PMID(kWidgetIDSpace, kKFCKohakuKentenSectionWidgetID, kKFCUIPrefix + 76)
 DECLARE_PMID(kWidgetIDSpace, kKFCKentenTabKindWidgetID, kKFCUIPrefix + 77)
 DECLARE_PMID(kWidgetIDSpace, kKFCKentenTabBaseWidgetID, kKFCUIPrefix + 78)
@@ -598,6 +600,79 @@ DECLARE_PMID(kWidgetIDSpace, kKFCKentenTabChangeWidgetID, kKFCUIPrefix + 80)
 DECLARE_PMID(kWidgetIDSpace, kKFCKentenTabRemoveWidgetID, kKFCUIPrefix + 81)
 // Save Query's name (the value dialog's view for it)
 DECLARE_PMID(kWidgetIDSpace, kKFCValueQueryNameWidgetID, kKFCUIPrefix + 82)
+// A hit row on two lines (a ruby or kenten list's - KFCResultListWidgetMgr)
+DECLARE_PMID(kWidgetIDSpace, kKFCResultTallHitNodeWidgetID, kKFCUIPrefix + 83)
+// The Table part's buttons, beside Find Next (kKFCQRTabFindNextWidgetID), and its two lines
+DECLARE_PMID(kWidgetIDSpace, kKFCTableTabChangeWidgetID, kKFCUIPrefix + 84)
+DECLARE_PMID(kWidgetIDSpace, kKFCTableTabChangeAllWidgetID, kKFCUIPrefix + 85)
+DECLARE_PMID(kWidgetIDSpace, kKFCTableTabChangeFindWidgetID, kKFCUIPrefix + 86)
+DECLARE_PMID(kWidgetIDSpace, kKFCTableTabStatusWidgetID, kKFCUIPrefix + 87)
+DECLARE_PMID(kWidgetIDSpace, kKFCTableTabNoteWidgetID, kKFCUIPrefix + 88)
+// THE RUBY PART'S BOXES (KFCKohakuTab.cpp - kKFCRubyBoxColumnsMost columns; the author, 11-01). Find's: a Ruby: box and a Base Text: box a column, a chain between neighbours, and the + and -. Change's, which follow them: a Change Ruby To box and, under it, the column's base text as words - no box.
+// Numbered in a row: the column is the offset from the first of each (the retired Change Ruby To field and Remove Ruby box, + 74 and + 75, are the grid and its +).
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyGridWidgetID, kKFCUIPrefix + 74)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyGridPlusWidgetID, kKFCUIPrefix + 75)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyGridMinusWidgetID, kKFCUIPrefix + 89)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyReadingBox0WidgetID, kKFCUIPrefix + 90)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyReadingBox1WidgetID, kKFCUIPrefix + 91)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyReadingBox2WidgetID, kKFCUIPrefix + 92)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyReadingBox3WidgetID, kKFCUIPrefix + 93)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyReadingBox4WidgetID, kKFCUIPrefix + 94)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyReadingBox5WidgetID, kKFCUIPrefix + 95)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyReadingBox6WidgetID, kKFCUIPrefix + 96)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyReadingBox7WidgetID, kKFCUIPrefix + 97)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyReadingBox8WidgetID, kKFCUIPrefix + 98)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyReadingBox9WidgetID, kKFCUIPrefix + 99)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyReadingBox10WidgetID, kKFCUIPrefix + 100)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyReadingBox11WidgetID, kKFCUIPrefix + 101)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyBaseBox0WidgetID, kKFCUIPrefix + 102)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyBaseBox1WidgetID, kKFCUIPrefix + 103)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyBaseBox2WidgetID, kKFCUIPrefix + 104)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyBaseBox3WidgetID, kKFCUIPrefix + 105)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyBaseBox4WidgetID, kKFCUIPrefix + 106)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyBaseBox5WidgetID, kKFCUIPrefix + 107)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyBaseBox6WidgetID, kKFCUIPrefix + 108)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyBaseBox7WidgetID, kKFCUIPrefix + 109)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyBaseBox8WidgetID, kKFCUIPrefix + 110)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyBaseBox9WidgetID, kKFCUIPrefix + 111)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyBaseBox10WidgetID, kKFCUIPrefix + 112)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyBaseBox11WidgetID, kKFCUIPrefix + 113)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyJoin0WidgetID, kKFCUIPrefix + 114)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyJoin1WidgetID, kKFCUIPrefix + 115)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyJoin2WidgetID, kKFCUIPrefix + 116)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyJoin3WidgetID, kKFCUIPrefix + 117)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyJoin4WidgetID, kKFCUIPrefix + 118)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyJoin5WidgetID, kKFCUIPrefix + 119)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyJoin6WidgetID, kKFCUIPrefix + 120)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyJoin7WidgetID, kKFCUIPrefix + 121)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyJoin8WidgetID, kKFCUIPrefix + 122)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyJoin9WidgetID, kKFCUIPrefix + 123)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyJoin10WidgetID, kKFCUIPrefix + 124)
+// (This prefix's widget ids run out at + 127. The model half's prefix, the 128 numbers below this one, has no widget of its own: its WidgetID + 0 ... + 30 are spent - KFCID.h says so - and those after them are free. + 128 ON IS THIS PREFIX: kKFCUIPrefix is kKFCPrefix + 128.)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBox0WidgetID, kKFCPrefix + 40)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBox1WidgetID, kKFCPrefix + 41)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBox2WidgetID, kKFCPrefix + 42)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBox3WidgetID, kKFCPrefix + 43)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBox4WidgetID, kKFCPrefix + 44)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBox5WidgetID, kKFCPrefix + 45)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBox6WidgetID, kKFCPrefix + 46)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBox7WidgetID, kKFCPrefix + 47)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBox8WidgetID, kKFCPrefix + 48)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBox9WidgetID, kKFCPrefix + 49)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBox10WidgetID, kKFCPrefix + 50)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBox11WidgetID, kKFCPrefix + 51)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBase0WidgetID, kKFCPrefix + 52)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBase1WidgetID, kKFCPrefix + 53)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBase2WidgetID, kKFCPrefix + 54)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBase3WidgetID, kKFCPrefix + 55)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBase4WidgetID, kKFCPrefix + 56)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBase5WidgetID, kKFCPrefix + 57)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBase6WidgetID, kKFCPrefix + 58)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBase7WidgetID, kKFCPrefix + 59)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBase8WidgetID, kKFCPrefix + 60)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBase9WidgetID, kKFCPrefix + 61)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBase10WidgetID, kKFCPrefix + 62)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBase11WidgetID, kKFCPrefix + 63)
 
 
 // "About Plug-ins" sub-menu:
@@ -805,7 +880,9 @@ DECLARE_PMID(kWidgetIDSpace, kKFCValueQueryNameWidgetID, kKFCUIPrefix + 82)
 #define kKFCRubyTabBaseKey				kKFCStringPrefix "kKFCRubyTabBaseKey"
 #define kKFCRubyTabReadingKey			kKFCStringPrefix "kKFCRubyTabReadingKey"
 #define kKFCRubyTabChangeKey			kKFCStringPrefix "kKFCRubyTabChangeKey"
-#define kKFCRubyTabTakeOffKey			kKFCStringPrefix "kKFCRubyTabTakeOffKey"
+#define kKFCTableTabChangeKey			kKFCStringPrefix "kKFCTableTabChangeKey"
+#define kKFCTableTabChangeAllKey		kKFCStringPrefix "kKFCTableTabChangeAllKey"
+#define kKFCTableTabChangeFindKey		kKFCStringPrefix "kKFCTableTabChangeFindKey"
 #define kKFCRubyTabGuideFindKey			kKFCStringPrefix "kKFCRubyTabGuideFindKey"
 #define kKFCKohakuTabKentenKey			kKFCStringPrefix "kKFCKohakuTabKentenKey"
 #define kKFCKentenTabWithKey			kKFCStringPrefix "kKFCKentenTabWithKey"
@@ -1026,6 +1103,7 @@ DECLARE_PMID(kWidgetIDSpace, kKFCValueQueryNameWidgetID, kKFCUIPrefix + 82)
 // resource ID (kSDKDefPanelResourceID), like the KESCL report panel's row resources.
 #define kKFCResultChapterNodeWidgetRsrcID	(kSDKDefPanelResourceID + 20)
 #define kKFCResultHitNodeWidgetRsrcID		(kSDKDefPanelResourceID + 21)
+#define kKFCResultTallHitNodeWidgetRsrcID	(kSDKDefPanelResourceID + 34)
 // The query dialog: its view - the SDK's place for a plug-in's dialog, which KFC had not used - and the
 // row its two lists are made of (next to the result tree's rows).
 #define kKFCQueryDialogRsrcID				kSDKDefDialogResourceID
@@ -1067,6 +1145,15 @@ DECLARE_PMID(kWidgetIDSpace, kKFCValueQueryNameWidgetID, kKFCUIPrefix + 82)
 //   measured on this panel's own rows, which carry a palette font at a size the stock tree node
 //   was not laid out for. Adobe's constant is the right SHAPE to copy, not the right VALUE.
 #define kKFCResultRowHeight		19
+// A hit row of a ruby or kenten list, on two lines (the author, 11-01: as KCM's rows): two rows' height, so the panel's rounding (to one row) still leaves no half row.
+#define kKFCResultTallRowHeight	38
+
+// THE RUBY PART'S CHANGE BOXES (KFCKohakuTab.cpp, KFCUI.fr): the most columns (the widgets are all in the resource, shown or not - KFCUIID.h's numbered IDs), the number it starts with, and InDesign's
+// own + and - of its Links panel's Captions dialog (LinksUIResDefs.h - kLinksUIAddRowIconRsrcID, kLinksUIDeleteRowIconRsrcID, in kLinksUIPluginID's resources; the buttons as its AddDeleteCaptionRowButtonWidget, 22 x 20).
+#define kKFCRubyBoxColumnsMost		12
+#define kKFCRubyBoxColumnsAtFirst	5
+#define kKFCRubyGridAddIconRsrcID	650
+#define kKFCRubyGridDeleteIconRsrcID	660
 
 // THE MESSAGE BLOCK AT THE TOP OF THE PANEL, AND THE EDGE THE ILLUSTRATIONS AND THE TREE LINE UP ON.
 //

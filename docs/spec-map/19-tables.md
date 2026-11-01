@@ -17,8 +17,8 @@
 - **TBL-03** 一覧は**前面の文書に付いていく**（面を見せている間に前面の文書が変わる・表スタイルが増える・消える）。前面の文書に無い表スタイルを選んだままなら、一覧の末尾に残す（探すのは名前で全部の文書）。グループの中の表スタイルは `グループ:名前`（本体の区切りは U+E00B＝`KFCStylePathWords`）。（T2・T3）回帰 `tb-face-follows`・`tb-face-new-style`・`tb-face-asked-kept`・`tb-grouped`・`tb-grouped-any`
   - 訂正:
 
-- **TBL-04** 面に Find Next は**無い**（設計の T13 を実装で取りやめた＝パネルの Find と Next Result で足りる・文字の範囲への着地は行のクリックの内部）。作者が欲しければ足す。
-  - 訂正:
+- **TBL-04** ★面の右上に**本体と同じ4つのボタン**（11-01 作者の試用「公式のテキスト検索と同様の」）＝7 章。
+  - 訂正: 10-31 は「面に Find Next は無い」（設計の T13 を実装で取りやめた）だった＝作者が欲しいと言った。
 
 - **TBL-05** ~~タブが8枚で帯の両端が切れる~~ ⇒ 10-31 に Kohaku+ の1枚へまとめて解消（KOHAKU-01）。
   - 訂正:
@@ -76,4 +76,30 @@
   - 訂正:
 
 - **TBL-51** 新しい段の行はふつうの文字の行＝Replace・Search These Results Again・Search This Story Again が効く（同じ表を、今の中身で）。Search This Document Again は灰色。表の中の表は一度だけ数える。消えた表は数えて言う。ブックの閉じた章は開いて歩いて閉じる。（K10）回帰 `tb-text-replace`・`tb-text-again`・`tb-text-story-again`・`tb-text-doc-grey`・`tb-text-nested`・`tb-text-nested-inner`・`tb-text-gone`・`tb-text-book`
+  - 訂正:
+
+## 7. 面のボタン（作者 11-01 の試用＝`docs/superpowers/specs/2026-11-01-kfc-kohaku-trial-fixes-design.md` F1〜F9。本体の実測＝`docs/ai-notes/kfc-native-text-tab-measure-2026-11-01.md`。コード＝`model/KFCTableSearch.cpp` の `Next`・`ChangeFound`・`ChangeAll`・`KFCReplaceEngine::WriteFaceTables`・`ui/KFCJump.cpp` の `LandOnTable`・`ui/KFCKohakuTab.cpp` の `Table*`）
+
+- **TBL-60** ★面の右上に上から **Find Next／Change／Change All／Change/Find**＝本体と同じ 116×26・間隔5・面の上から 15／46／77／108（方向を付けない本体の Object タブの形）。4つとも頭の行の右の列（部品を重ねない＝QR の行と Ruby の欄は幅 456 のまま）。`Find Table Style:` の語は頭の左の列の一番下（Table のときだけ）。下に2行＝見つけた物・したこと／選べなかった理由（QR の2行の形）。（F1・F2・F9）回帰 `tb-btn-place`
+  - 訂正:
+
+- **TBL-61** ★**Find Next**＝`Search:` の範囲の表を一覧と同じ順に（文書ごと・ページ順）、押すたびに歩き直す。**どこから**（本体の Text タブの実測）＝選択が前の着地のままなら次の表／動かしていれば同じ物語の後ろの表→無ければその物語の最後の表の次→物語に表が無い・文字の選択が無いなら前に見つけた表の次→先頭。最後の次は黙って先頭。一致なしは本体の文のアラート `Cannot find a match.`。Book Scope は見ない（ダイアログのボタンはブックを知らない＝QR と同じ）。（F3）回帰 `tb-btn-next`・`tb-btn-moved`・`tb-btn-none`・`tb-btn-all-docs`
+  - 訂正:
+
+- **TBL-62** ★**範囲は選択が動いた時に読み直し、前の着地のままなら覚えたものを使う**（着地で選択が表に変わるので、毎回読むと Story や Selection が表1つに縮む）。今の選択で選べない範囲はドキュメント全体＋面の2行目で言う（KOHAKU-12 と同じ文）。（F4）回帰 `tb-btn-story`・`tb-btn-selection`
+  - 訂正:
+
+- **TBL-63** 着地＝行のクリックと同じ＝表の文字を選ぶ（Type ツール）。ロック＝見せて印、選ばない。非表示のスプレッド＝何も動かさない。overset・非表示のレイヤー＝選んで言う。理由は面の2行目。（F5）回帰 `tb-btn-locked`・`tb-btn-overset`・`tb-btn-hidden-layer`
+  - 訂正:
+
+- **TBL-64** ★**Change**＝見つけた表に Change 側（1回の Ctrl+Z）。押せるのは見つけた表を選んでいて Change 側に何かあるとき＝選択を動かすと灰色（`ActiveSelectionObserver`＝選択が前の着地のままかを読む）・当てた後も灰色（本体の Text タブと同じ）。**Change/Find**＝当てて次へ（当てられなくても次へ・理由は2行目）。既にそのとおり・文書にその名前が無い・ロックは面の行で言う。（F6）回帰 `tb-btn-grey`・`tb-btn-change`・`tb-btn-change-find`・`tb-btn-change-as-asked`・`tb-btn-doc-closed`
+  - 訂正:
+
+- **TBL-65** ★**Change All**＝範囲の条件に合う表全部に Change 側（全部で Ctrl+Z 1回）。アラート `Search is completed. N table(s) changed.`（本体の文に合わせる）。一致なしは `Cannot find a match.`。ロック・既にそのとおり・その名前が無い文書の表は飛ばし、面の行で数えて言う。押せるのは Change 側に何かあるとき。（F7）回帰 `tb-btn-change-all`・`tb-btn-change-all-style`
+  - 訂正:
+
+- **TBL-66** ★一覧に同じ表の行があれば、行も `Styled`＋書いた後の字になり Ctrl+Z で一緒に戻る（行の Replace と同じ＝一覧とページを食い違わせない）。**別の種類の一覧・一覧なしのときは一覧に触らない**（一覧を捨てない）。（F8）回帰 `tb-btn-rows-follow`
+  - 訂正:
+
+- **TBL-67** 別の種類で窓を開いてから Table にしても押せる（列の大きさを支柱で持つ＝KOHAKU-02 と同じ守り）。走っている最中は断り、面の1行目で言う。（Review Focus）回帰 `tb-btn-after-another-kind`
   - 訂正:

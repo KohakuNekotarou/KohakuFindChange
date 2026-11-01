@@ -102,6 +102,7 @@ REGISTER_PMINTERFACE(KFCValueDialogObserver, kKFCValueDialogObserverImpl)
 REGISTER_PMINTERFACE(KFCKohakuTabPanelCreator, kKFCKohakuTabPanelCreatorImpl)
 REGISTER_PMINTERFACE(KFCKohakuTabObserver, kKFCKohakuTabObserverImpl)
 REGISTER_PMINTERFACE(KFCKohakuTabController, kKFCKohakuTabControllerImpl)
+REGISTER_PMINTERFACE(KFCKohakuTabSelectionObserver, kKFCKohakuTabSelectionObserverImpl)
 // The Kohaku+ tab's queries in Find/Change's own Query menu.
 REGISTER_PMINTERFACE(KFCKohakuQueryWatch, kKFCKohakuQueryWatchImpl)
 REGISTER_PMINTERFACE(KFCKohakuSaveFilterEH, kKFCKohakuSaveFilterEHImpl)

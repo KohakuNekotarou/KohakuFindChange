@@ -50,8 +50,11 @@ namespace KFCResultTree
 		PMString	match;
 		PMString	post;
 		bool		kept;		// a hit row's eye (RowDisplay::kept - the row eye): a kept tier's copy draws it as it was
+		bool		twoLines;	// a hit row of a ruby or kenten list (the author, 11-01: on two lines, as KCM's): a kept copy stays so
+		PMString	drawMatch;	// ...the text its lower line draws for the match (`match` keeps base<<reading>>: the label a reader walks, and Copy)
+		KFCRowUpper	upper;		// ...what stands over it
 
-		RowLook() : hit(false), shift(0.0), kept(false) {}
+		RowLook() : hit(false), shift(0.0), kept(false), twoLines(false) {}
 	};
 
 	/** The look of a row of the LIVE list - a book, document, story or hit row, or the live tier's row - read off the

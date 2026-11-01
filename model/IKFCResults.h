@@ -145,6 +145,8 @@ public:
 	virtual bool ListHasOwnChangeTab() = 0;
 	/** = KFCResultModel::ListIsTables (appended - Search Text in These Tables) - the live list is a Table kind's (the heading's Search Text in These Tables, grey over any other, kept per tier). */
 	virtual bool ListIsTables() = 0;
+	/** = KFCResultModel::ListDrawsTwoLines (appended) - the live list's hit rows stand on two lines (ruby, kenten): how tall a row is, and whether the tree may be promised one height. */
+	virtual bool ListDrawsTwoLines() = 0;
 };
 
 #endif // __IKFCResults_h__

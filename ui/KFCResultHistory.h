@@ -159,6 +159,10 @@ namespace KFCResultHistory
 	bool GetKeptLook(int32 tier, int32 row, KFCResultTree::RowLook& out);
 	/** Is that kept row a hit row - drawn in the colour cell? */
 	bool IsKeptHit(int32 tier, int32 row);
+	/** Is it one drawn on two lines (a ruby or kenten list's) - a taller row? */
+	bool IsKeptTall(int32 tier, int32 row);
+	/** Is any kept row one? (The tree is told its rows are one height only when none is - KFCResultTree::Rebuild.) */
+	bool AnyKeptTall();
 
 	/** BEFORE THE TREE FORGETS ITS ROWS (KFCResultTree::Rebuild's ClearTree; a switch, before anything moves): which kept
 	    tiers are open, and which of their rows - asked only of the tiers the last rebuild drew (a tier kept since was the

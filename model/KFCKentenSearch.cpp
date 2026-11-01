@@ -214,8 +214,10 @@ bool WalkDoc(const UIDRef& docRef, const KFCKentenConditions& asked, const std::
 	for (size_t h = 0; asked.kind == kKFCKentenFindWith && h < outHits.size() && h < places.size(); ++h)
 	{
 		const UIDRef storyRef(db, places[h].story);
-		outHits[h].runChain = KFCKentenSearch::RowWords(storyRef, places[h].start, places[h].end, KFCKentenSearch::MarkOn(storyRef, places[h].start, places[h].end));
+		const int32 mark = KFCKentenSearch::MarkOn(storyRef, places[h].start, places[h].end);
+		outHits[h].runChain = KFCKentenSearch::RowWords(storyRef, places[h].start, places[h].end, mark);
 		outHits[h].runChain.SetTranslatable(kFalse);
+		outHits[h].upper.mark = mark;
 	}
 	return true;
 }

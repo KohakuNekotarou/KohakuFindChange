@@ -12,8 +12,12 @@
 
 // Interface includes:
 #include "IActiveContext.h"
+#include "IApplication.h"				// the keyboard - a box that goes takes its focus with it
 #include "IControlView.h"
 #include "IDropDownListController.h"	// the face's lists' entries
+#include "IEventHandler.h"				// ...the focus's handler
+#include "IKeyBoard.h"
+#include "IObserver.h"					// the selection observer, attached with the face
 #include "IPanelControlData.h"
 #include "ISelectableDialogSwitcher.h"	// the dialog's current face, asked of the face's own parent
 #include "ISession.h"
@@ -30,9 +34,12 @@
 
 // General includes:
 #include "AbstractDialogObserver.h"		// a selectable dialog face's observer (its header says so)
+#include "CAlert.h"						// the Table part's Cannot find a match and Search is completed, InDesign's own words
 #include "LocaleSetting.h"				// the UI language - Ruby is a Japanese InDesign's
 #include "CDialogController.h"
 #include "CPanelCreator.h"
+#include "PMRect.h"						// the Ruby part's boxes' frames
+#include "SelectionObserver.h"			// ActiveSelectionObserver - the Table part's Change greys when the selection leaves what Find Next found
 #include "TablesID.h"					// IID_ITABLESTYLEGROUPMANAGER
 #include "UIDList.h"
 
@@ -44,9 +51,12 @@
 #include "KFCDiag.h"					// KFC_DIAG_LOG - the face's calls, in a test build's trace (QRTAB / TBLTAB / RUBYTAB lines)
 #include "KFCPanelTitle.h"				// Update - the panel's title names the kind and its Search:
 #include "KFCAppBarSearchEnter.h"		// KFCMirrorAppBarFieldNow - the Application Bar's field shows the tab's nothing
-#include "KFCJump.h"					// LandOnQRCode - Find Next lands as an object row's click does
+#include "KFCJump.h"					// LandOnQRCode, LandOnTable - Find Next lands as a row's click does
 #include "KFCModelAccess.h"				// KFCRuns()->QRCodeNext - the QR code after the one found last (the model's)
 #include "KFCKohakuQueryMenu.h"			// the face shown and hidden, and what it asks changed: Find/Change's own Query menu
+#include "KFCResultTree.h"				// RefreshRows - a list's row of a table the Table part's Change wrote
+#include "KFCRubyChangePlan.h"			// IsSpace - what the base boxes leave out, as the row's text is compared
+#include "KFCTextCut.h"					// KFCIsAttachedMark - a base box takes a character with its marks
 
 namespace
 {
@@ -81,6 +91,23 @@ KFCTableConditions gTable;	// what the Table part asks, kept from its widgets (i
 KFCRubyConditions gRuby;	// what the Ruby part asks
 KFCKentenConditions gKenten;	// what the Kenten part asks
 
+// THE RUBY PART'S BOXES (docs/superpowers/specs/2026-11-01-kfc-kohaku-trial-fixes-design.md F14 - F16): what each holds, as gRuby holds it (KeepFromBoxes). The widgets' own text is the same - the face can be hidden and written (a saved query) with
+// none to read. Find's Ruby: and Base Text: a column each, the Change side's reading over the same columns; its base text is Find's.
+PMString gCellFindRuby[kKFCRubyBoxColumnsMost];
+PMString gCellBase[kKFCRubyBoxColumnsMost];
+PMString gCellChange[kKFCRubyBoxColumnsMost];
+bool gJoin[kKFCRubyBoxColumnsMost];				// gJoin[k]: column k and the next are one reading - k's boxes, over both base boxes - in Find and Change alike
+int32 gCols = kKFCRubyBoxColumnsAtFirst;		// how many stand
+
+// THE TABLE PART'S FIND NEXT (F3 - F6): the table it found last and how it left things - let go with gLastFound, and for gLastFound's reason.
+KFCTableFound gFoundTable;
+bool gFoundSelected = false;				// the landing left it selected
+bool gFoundWritten = false;					// Change or Change All has written since
+UIDRef gLeftStory;							// the text selection the landing left (gNull: none) - it is "as left" while it still reads so
+TextIndex gLeftStart = kInvalidTextIndex;
+TextIndex gLeftEnd = kInvalidTextIndex;
+void BoxesFromKept();
+
 // THE FULL PATHS BEHIND THE STYLE LISTS' ENTRIES (entry n = gFindPaths[n - 1] - entry 0 asks for nothing), as FillStyles wrote them.
 std::vector<PMString> gFindPaths;
 std::vector<PMString> gChangePaths;
@@ -89,6 +116,18 @@ std::vector<PMString> gChangePaths;
 // a closed document's database address can be a document opened later (memory uidref-reuse-after-close), and a QR code of the same UID there would be taken for it. NOT let go when a document
 // closes and another opens while the face stays shown - tried once, the address was not reused (docs/ai-notes/kfc-qr-recheck-2026-10-28.md O21-1).
 UIDRef gLastFound;
+
+// What Find Next found, on either part, let go (gLastFound's note says when).
+void ForgetFound()
+{
+	gLastFound = UIDRef();
+	gFoundTable = KFCTableFound();
+	gFoundSelected = false;
+	gFoundWritten = false;
+	gLeftStory = UIDRef::gNull;
+	gLeftStart = kInvalidTextIndex;
+	gLeftEnd = kInvalidTextIndex;
+}
 
 // TEST BUILDS: the one-shot fault switch kohaku-tab-reset (KFCDiag.h) - what the tab keeps as at launch: a case's saved query left its conditions, as it should, and the next case's Find would ask them.
 void TakeTestReset()
@@ -101,6 +140,7 @@ void TakeTestReset()
 		gTable = KFCTableConditions();
 		gRuby = KFCRubyConditions();
 		gKenten = KFCKentenConditions();
+		BoxesFromKept();
 	}
 #endif
 }
@@ -185,6 +225,172 @@ void FindNext(IPMUnknown* face)
 	KFC_DIAG_LOG("QRTAB findnext %s%s%s", words.GetUTF8String().c_str(), note.IsEmpty() ? "" : "  ",
 		note.GetUTF8String().c_str());
 	SayOnFace(face, words, note);
+}
+
+// ----- the Table part's buttons (docs/superpowers/specs/2026-11-01-kfc-kohaku-trial-fixes-design.md F1 - F9)
+
+// IS THE TEXT SELECTION AS THE LAST LANDING LEFT IT? (A place, read now: a flag raised by the selection's own messages would have to tell the landing's from the person's.)
+bool SelectionAsLeft()
+{
+	UIDRef story;
+	TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
+	(void)KFCJump::ReadTextSelection(story, start, end);
+	return story == gLeftStory && start == gLeftStart && end == gLeftEnd;
+}
+
+// Change and Change/Find are for the table Find Next found, while it is selected and has not been written; all of them want something on the Change side. Grey otherwise, as the Text tab's after the selection moves or a Change.
+void ShowTableButtons(IPanelControlData* panel)
+{
+	if (panel == nil || gKind != kKindTable)
+		return;
+	const bool asks = !gTable.changeStyle.IsEmpty() || gTable.clearOverrides;
+	const bool onFound = asks && gFoundTable.doc != UIDRef::gNull && gFoundSelected && !gFoundWritten && SelectionAsLeft();
+	IControlView* const change = panel->FindWidget(kKFCTableTabChangeWidgetID);
+	if (change != nil)
+		change->Enable(onFound ? kTrue : kFalse);
+	IControlView* const changeFind = panel->FindWidget(kKFCTableTabChangeFindWidgetID);
+	if (changeFind != nil)
+		changeFind->Enable(onFound ? kTrue : kFalse);
+	IControlView* const changeAll = panel->FindWidget(kKFCTableTabChangeAllWidgetID);
+	if (changeAll != nil)
+		changeAll->Enable(asks ? kTrue : kFalse);
+}
+
+// The part's two lines (the QR Code part's way).
+void SayOnTablePart(IPMUnknown* face, const PMString& found, const PMString& note)
+{
+	InterfacePtr<IPanelControlData> panel(face, UseDefaultIID());
+	SetFaceLine(panel, kKFCTableTabStatusWidgetID, found);
+	SetFaceLine(panel, kKFCTableTabNoteWidgetID, note);
+}
+
+// Where the model goes on from.
+KFCTableLook TableLookNow()
+{
+	KFCTableLook look;
+	look.lastDoc = gFoundTable.doc;
+	look.lastStory = gFoundTable.story;
+	look.lastAt = gFoundTable.at;
+	look.onLast = (gFoundTable.doc != UIDRef::gNull) && SelectionAsLeft();
+	TextIndex start = kInvalidTextIndex;
+	(void)KFCJump::ReadTextSelection(look.selStory, start, look.selEnd);
+	return look;
+}
+
+void InformationAlertOf(const char* words, int32 count)
+{
+	PMString said(words);
+	said.SetTranslatable(kFalse);
+	if (count >= 0)
+	{
+		said.AppendNumber(count);
+		said.Append(" table(s) changed.");
+	}
+	CAlert::InformationAlert(said);
+}
+
+// FIND NEXT ON TABLE: the next table of Search: (KFCTableSearch::Next says from where), landed on as a table row's click lands. One it cannot select is named on the second line; none at all is InDesign's own alert.
+void TableFindNext(IPMUnknown* face)
+{
+	InterfacePtr<IPanelControlData> panel(face, UseDefaultIID());
+	PMString words, note;
+	words.SetTranslatable(kFalse);
+	note.SetTranslatable(kFalse);
+	if (KFCRuns()->IsAnyRunning())
+	{
+		words.Append(KFCRuns()->BusyMessage());
+		SayOnTablePart(face, words, note);
+		return;
+	}
+	KFCTableFound found;
+	const KFCTableLook look(TableLookNow());
+	if (!KFCRuns()->TableNext(look, found))
+	{
+		gFoundTable = KFCTableFound();
+		gFoundSelected = false;
+		gFoundWritten = false;
+		SayOnTablePart(face, found.words, note);
+		KFC_DIAG_LOG("TBLTAB findnext none %s", found.words.GetUTF8String().c_str());
+		ShowTableButtons(panel);
+		if (found.words.IsEmpty())
+			InformationAlertOf("Cannot find a match.", -1);
+		return;
+	}
+	bool selected = false;
+	KFCJump::LandOnTable(found.story, found.at, found.end, found.reach, note, selected);
+	gFoundTable = found;
+	gFoundSelected = selected;
+	gFoundWritten = false;
+	(void)KFCJump::ReadTextSelection(gLeftStory, gLeftStart, gLeftEnd);
+	// (Why it could not be selected first: that is what stops the person now. Over a Search: searched as Document.)
+	if (note.IsEmpty())
+		note = found.note;
+	KFC_DIAG_LOG("TBLTAB findnext %s%s%s selected=%d", found.words.GetUTF8String().c_str(), note.IsEmpty() ? "" : "  ", note.GetUTF8String().c_str(), selected ? 1 : 0);
+	SayOnTablePart(face, found.words, note);
+	ShowTableButtons(panel);
+}
+
+// CHANGE: the Change side on the table Find Next found. thenNext (Change/Find): on to the next, written or not - the reason it was not on the second line.
+void TableChange(IPMUnknown* face, bool thenNext)
+{
+	InterfacePtr<IPanelControlData> panel(face, UseDefaultIID());
+	PMString words;
+	words.SetTranslatable(kFalse);
+	if (KFCRuns()->IsAnyRunning())
+	{
+		words.Append(KFCRuns()->BusyMessage());
+		PMString none;
+		SayOnTablePart(face, words, none);
+		return;
+	}
+	const bool wrote = KFCRuns()->TableChangeFound(gFoundTable, words);
+	KFC_DIAG_LOG("TBLTAB change wrote=%d %s", wrote ? 1 : 0, words.GetUTF8String().c_str());
+	if (wrote)
+	{
+		gFoundWritten = true;
+		KFCResultTree::RefreshRows();		// (a row of the list that stands for it reads as written)
+	}
+	if (thenNext)
+	{
+		TableFindNext(face);
+		if (!wrote)
+			SetFaceLine(panel, kKFCTableTabNoteWidgetID, words);
+		return;
+	}
+	PMString none;
+	SayOnTablePart(face, words, none);
+	ShowTableButtons(panel);
+}
+
+// CHANGE ALL: every table of Search: given the Change side, one Ctrl+Z, said as InDesign says it.
+void TableChangeAll(IPMUnknown* face)
+{
+	InterfacePtr<IPanelControlData> panel(face, UseDefaultIID());
+	PMString words;
+	words.SetTranslatable(kFalse);
+	PMString none;
+	if (KFCRuns()->IsAnyRunning())
+	{
+		words.Append(KFCRuns()->BusyMessage());
+		SayOnTablePart(face, words, none);
+		return;
+	}
+	int32 changed = 0, matched = 0;
+	const bool ran = KFCRuns()->TableChangeAll(TableLookNow(), changed, matched, words);
+	KFC_DIAG_LOG("TBLTAB changeall ran=%d changed=%d matched=%d %s", ran ? 1 : 0, static_cast<int>(changed), static_cast<int>(matched), words.GetUTF8String().c_str());
+	if (ran && changed > 0)
+	{
+		gFoundWritten = true;
+		KFCResultTree::RefreshRows();
+	}
+	SayOnTablePart(face, words, none);
+	ShowTableButtons(panel);
+	if (!ran)
+		return;
+	if (matched == 0)
+		InformationAlertOf("Cannot find a match.", -1);
+	else
+		InformationAlertOf("Search is completed. ", changed);
 }
 
 // ----- the Table part
@@ -285,19 +491,299 @@ void SetField(IPanelControlData* panel, const WidgetID& widget, const PMString& 
 		field->SetString(words, kTrue, kFalse);
 }
 
-// Ruby: means nothing to Text Without Ruby, nor the Change side to ruby from marks - the reading is in the mark: grey there.
+// ----- the Ruby part's Change boxes (KFCUI.fr's grid; F14 - F16)
+
+// The numbered rows of widgets.
+WidgetID ReadingBoxID(int32 k)
+{
+	return WidgetID(kKFCRubyReadingBox0WidgetID + k);
+}
+
+WidgetID BaseBoxID(int32 k)
+{
+	return WidgetID(kKFCRubyBaseBox0WidgetID + k);
+}
+
+WidgetID JoinID(int32 k)
+{
+	return WidgetID(kKFCRubyJoin0WidgetID + k);
+}
+
+WidgetID ChangeBoxID(int32 k)
+{
+	return WidgetID(kKFCRubyChangeBox0WidgetID + k);
+}
+
+WidgetID ChangeBaseID(int32 k)
+{
+	return WidgetID(kKFCRubyChangeBase0WidgetID + k);
+}
+
+// Which of a numbered row this widget is, or -1.
+int32 ColumnOf(const WidgetID& widget, const WidgetID& first, int32 count)
+{
+	const int32 n = static_cast<int32>(widget.Get()) - static_cast<int32>(first.Get());
+	return (n >= 0 && n < count) ? n : -1;
+}
+
+// A text's characters as a base box takes them: a mark that belongs to a character stays with it, and a space is no character of it (the row's text is compared without them - KFCRubyChangePlan).
+std::vector<PMString> CharsOf(const PMString& words)
+{
+	std::vector<PMString> out;
+	const WideString wide(words);
+	for (WideString::const_iterator at = wide.begin(); at != wide.end(); ++at)
+	{
+		const uint32 code = static_cast<uint32>(*at);
+		if (KFCRubyChangePlan::IsSpace(static_cast<char32_t>(code)))
+			continue;
+		if (!out.empty() && KFCIsAttachedMark(UTF32TextChar(code)))
+		{
+			out.back().AppendW(UTF32TextChar(code));
+			continue;
+		}
+		PMString one;
+		one.SetTranslatable(kFalse);
+		one.AppendW(UTF32TextChar(code));
+		out.push_back(one);
+	}
+	return out;
+}
+
+// THE BASE BOXES FROM A BASE TEXT THAT CAME WHOLE (a saved query from before the boxes), a character a box, the columns grown to hold them - past the last box, all the rest in it.
+void FillBaseFromKept()
+{
+	const std::vector<PMString> chars(CharsOf(gRuby.base));
+	for (int32 k = 0; k < kKFCRubyBoxColumnsMost; ++k)
+	{
+		gCellBase[k].Clear();
+		gCellBase[k].SetTranslatable(kFalse);
+	}
+	for (size_t c = 0; c < chars.size(); ++c)
+		gCellBase[(static_cast<int32>(c) < kKFCRubyBoxColumnsMost) ? static_cast<int32>(c) : kKFCRubyBoxColumnsMost - 1].Append(chars[c]);
+	if (static_cast<int32>(chars.size()) > gCols)
+		gCols = (static_cast<int32>(chars.size()) < kKFCRubyBoxColumnsMost) ? static_cast<int32>(chars.size()) : kKFCRubyBoxColumnsMost;
+}
+
+// WHAT THE BOXES ASK, KEPT. A search reads base and reading, every box's words run together: Find's boxes say how the Change side's stand, and a mono ruby and a group ruby of the same words are found alike. A row's Replace reads the pieces: one for each joined run of
+// columns, its Change reading over the base boxes of those columns. A column holding nothing asks nothing.
+void KeepFromBoxes()
+{
+	gRuby.change.clear();
+	gRuby.base.Clear();
+	gRuby.base.SetTranslatable(kFalse);
+	gRuby.reading.Clear();
+	gRuby.reading.SetTranslatable(kFalse);
+	for (int32 k = 0; k < gCols; ++k)
+	{
+		KFCRubyChangePiece piece;
+		piece.reading = gCellChange[k];
+		piece.reading.SetTranslatable(kFalse);
+		piece.findReading = gCellFindRuby[k];
+		piece.findReading.SetTranslatable(kFalse);
+		piece.base = gCellBase[k];
+		while (k + 1 < gCols && gJoin[k])
+		{
+			++k;
+			piece.base.Append(gCellBase[k]);
+		}
+		piece.base.SetTranslatable(kFalse);
+		gRuby.reading.Append(piece.findReading);
+		gRuby.base.Append(piece.base);
+		if (!piece.reading.IsEmpty() || !piece.findReading.IsEmpty() || !piece.base.IsEmpty())
+			gRuby.change.push_back(piece);
+	}
+}
+
+// THE BOXES FROM WHAT IS KEPT - a saved query's pieces, a character of base text a box and those of one piece joined (one reading over them). A file from before Find's boxes holds Ruby: whole: it comes back in the first box. One from before the boxes has no base text in its
+// pieces: its readings in the first boxes and its base text spread over the base boxes - one reading over all of it, as it read.
+void BoxesFromKept()
+{
+	for (int32 k = 0; k < kKFCRubyBoxColumnsMost; ++k)
+	{
+		gCellFindRuby[k].Clear();
+		gCellFindRuby[k].SetTranslatable(kFalse);
+		gCellBase[k].Clear();
+		gCellBase[k].SetTranslatable(kFalse);
+		gCellChange[k].Clear();
+		gCellChange[k].SetTranslatable(kFalse);
+		gJoin[k] = false;
+	}
+	gCols = kKFCRubyBoxColumnsAtFirst;
+	bool anyBase = false, anyFindReading = false;
+	int32 readings = 0;
+	for (size_t p = 0; p < gRuby.change.size(); ++p)
+	{
+		anyBase = anyBase || !CharsOf(gRuby.change[p].base).empty();
+		anyFindReading = anyFindReading || !gRuby.change[p].findReading.IsEmpty();
+		if (!gRuby.change[p].reading.IsEmpty())
+			++readings;
+	}
+	if (!anyFindReading)
+		gCellFindRuby[0] = gRuby.reading;
+	int32 col = 0;
+	if (!anyBase)
+	{
+		for (size_t p = 0; p < gRuby.change.size() && col < kKFCRubyBoxColumnsMost; ++p)
+		{
+			gCellChange[col] = gRuby.change[p].reading;
+			if (anyFindReading)
+				gCellFindRuby[col] = gRuby.change[p].findReading;
+			++col;
+		}
+		if (col > gCols)
+			gCols = col;
+		FillBaseFromKept();
+		if (readings == 1)
+			for (int32 k = 0; k + 1 < gCols; ++k)
+				gJoin[k] = !gCellBase[k + 1].IsEmpty();
+		return;
+	}
+	for (size_t p = 0; p < gRuby.change.size(); ++p)
+	{
+		const std::vector<PMString> chars(CharsOf(gRuby.change[p].base));
+		if (col >= kKFCRubyBoxColumnsMost)
+		{
+			for (size_t c = 0; c < chars.size(); ++c)
+				gCellBase[kKFCRubyBoxColumnsMost - 1].Append(chars[c]);
+			continue;
+		}
+		gCellChange[col] = gRuby.change[p].reading;
+		gCellChange[col].SetTranslatable(kFalse);
+		if (anyFindReading)
+		{
+			gCellFindRuby[col] = gRuby.change[p].findReading;
+			gCellFindRuby[col].SetTranslatable(kFalse);
+		}
+		for (size_t c = 0; c < chars.size(); ++c)
+		{
+			const int32 at = col + static_cast<int32>(c);
+			if (at >= kKFCRubyBoxColumnsMost)
+			{
+				gCellBase[kKFCRubyBoxColumnsMost - 1].Append(chars[c]);
+				continue;
+			}
+			gCellBase[at] = chars[c];
+			if (c > 0)
+				gJoin[at - 1] = true;
+		}
+		col += chars.empty() ? 1 : static_cast<int32>(chars.size());
+		if (col > kKFCRubyBoxColumnsMost)
+			col = kKFCRubyBoxColumnsMost;
+	}
+	if (col > gCols)
+		gCols = col;
+}
+
+// WHERE A COLUMN STANDS IN THE GRID (KFCUI.fr): the labels to 110, the + and - from 428, the columns sharing what is between.
+const int32 kGridColumnsLeft = 115;
+const int32 kGridColumnsRight = 422;
+const int32 kGridBoxGap = 2;
+
+int32 GridColumnLeft(int32 k)
+{
+	return kGridColumnsLeft + ((kGridColumnsRight - kGridColumnsLeft + kGridBoxGap) * k) / gCols;
+}
+
+// A widget of the grid put where it goes, or away: hidden is disabled too (ShowPart's rule).
+void PlaceGridWidget(IPanelControlData* panel, const WidgetID& widget, bool shown, bool enabled, int32 left, int32 top, int32 right, int32 bottom)
+{
+	IControlView* const view = (panel != nil) ? panel->FindWidget(widget) : nil;
+	if (view == nil)
+		return;
+	if (shown)
+		view->SetFrame(PMRect(PMReal(left), PMReal(top), PMReal(right), PMReal(bottom)));
+	view->Enable((shown && enabled) ? kTrue : kFalse);
+	view->ShowView(shown ? kTrue : kFalse);
+}
+
+// THE GRID AS THE COLUMNS AND THE JOINS NOW SAY (the frames set here, no EVE layout: the window keeps its size - InDesign's LinkInfoPanelObserver places its widgets the same way). Each column's base box and its words on the Change side are its own; a reading box - Find's, and
+// Change's, which follow it (the author, 11-01) - runs over the columns joined to it, and the boxes it runs over are away. GREY: Find's Ruby: with Text Without Ruby, whose search has no reading; the Change side and the chains with Ruby Marks in Text - the reading is in the mark -
+// and all of it with the part hidden.
+void LayOutRubyGrid(IPanelControlData* panel)
+{
+	const bool part = (gKind == kKindRuby);
+	const bool findReads = part && gRuby.kind != kKFCRubyFindWithout;
+	const bool changes = part && gRuby.kind != kKFCRubyFindMarks;
+	for (int32 k = 0; k < kKFCRubyBoxColumnsMost; ++k)
+	{
+		const bool stands = (k < gCols);
+		int32 last = k;
+		while (stands && last + 1 < gCols && gJoin[last])
+			++last;
+		const bool overLeft = stands && k > 0 && gJoin[k - 1];
+		const int32 left = stands ? GridColumnLeft(k) : 0;
+		const int32 readingRight = stands ? GridColumnLeft(last + 1) - kGridBoxGap : 0;
+		const int32 columnRight = stands ? GridColumnLeft(k + 1) - kGridBoxGap : 0;
+		PlaceGridWidget(panel, ReadingBoxID(k), stands && !overLeft, findReads, left, 0, readingRight, 21);
+		PlaceGridWidget(panel, BaseBoxID(k), stands, part, left, 41, columnRight, 62);
+		PlaceGridWidget(panel, ChangeBoxID(k), stands && !overLeft, changes, left, 72, readingRight, 93);
+		PlaceGridWidget(panel, ChangeBaseID(k), stands, changes, left, 96, columnRight, 116);
+		if (k + 1 < kKFCRubyBoxColumnsMost)
+		{
+			const bool between = (k + 1 < gCols);
+			const int32 middle = between ? GridColumnLeft(k + 1) - (kGridBoxGap / 2) : 0;
+			PlaceGridWidget(panel, JoinID(k), between, changes, middle - 10, 21, middle + 10, 41);
+		}
+	}
+	IControlView* const plus = (panel != nil) ? panel->FindWidget(kKFCRubyGridPlusWidgetID) : nil;
+	if (plus != nil)
+		plus->Enable((part && gCols < kKFCRubyBoxColumnsMost) ? kTrue : kFalse);
+	IControlView* const minus = (panel != nil) ? panel->FindWidget(kKFCRubyGridMinusWidgetID) : nil;
+	if (minus != nil)
+		minus->Enable((part && gCols > 1) ? kTrue : kFalse);
+}
+
+// EVERY BOX AND ITS WORDS WRITTEN FROM WHAT IS KEPT. Not heard (notifyOfChange kFalse).
+void WriteBoxes(IPanelControlData* panel)
+{
+	for (int32 k = 0; k < kKFCRubyBoxColumnsMost; ++k)
+	{
+		SetField(panel, ReadingBoxID(k), gCellFindRuby[k]);
+		SetField(panel, BaseBoxID(k), gCellBase[k]);
+		SetField(panel, ChangeBoxID(k), gCellChange[k]);
+		SetField(panel, ChangeBaseID(k), gCellBase[k]);
+		if (k + 1 < kKFCRubyBoxColumnsMost)
+			SetBox(panel, JoinID(k), gJoin[k]);
+	}
+}
+
+// A BOX THAT IS GOING MUST NOT KEEP THE KEYBOARD (AddDeleteCaptionRowButtonObserver's rule - the keys would go on into a box no one sees): let go now, and the box to take it is answered - its row's, of the column that stands after this - or kInvalidWidgetID when no box is going.
+WidgetID LetGoOfGoingBox()
+{
+	ISession* const session = GetExecutionContextSession();
+	InterfacePtr<IApplication> application((session != nil) ? session->QueryApplication() : nil);
+	InterfacePtr<IKeyBoard> keyboard(application, UseDefaultIID());
+	InterfacePtr<IControlView> focus((keyboard != nil) ? keyboard->GetKeyFocus() : nil, UseDefaultIID());
+	if (focus == nil)
+		return kInvalidWidgetID;
+	const WidgetID held = focus->GetWidgetID();
+	WidgetID (*boxOf)(int32) = ReadingBoxID;
+	bool joins = true;	// (a reading box runs over the columns joined to it; a base box stands by itself)
+	int32 col = ColumnOf(held, ReadingBoxID(0), kKFCRubyBoxColumnsMost);
+	if (col < 0)
+	{
+		boxOf = ChangeBoxID;
+		col = ColumnOf(held, ChangeBoxID(0), kKFCRubyBoxColumnsMost);
+	}
+	if (col < 0)
+	{
+		boxOf = BaseBoxID;
+		joins = false;
+		col = ColumnOf(held, BaseBoxID(0), kKFCRubyBoxColumnsMost);
+	}
+	if (col < 0 || (col < gCols && !(joins && col > 0 && gJoin[col - 1])))
+		return kInvalidWidgetID;
+	keyboard->RelinquishKeyFocus();
+	int32 to = (col < gCols) ? col : gCols - 1;
+	while (joins && to > 0 && gJoin[to - 1])
+		--to;
+	return boxOf(to);
+}
+
+// (What each Look For: greys - LayOutRubyGrid.)
 void ShowRubyKind(IPanelControlData* panel)
 {
-	IControlView* const reading = (panel != nil) ? panel->FindWidget(kKFCRubyTabReadingWidgetID) : nil;
-	if (reading != nil)
-		reading->Enable(gRuby.kind == kKFCRubyFindWithout ? kFalse : kTrue);
-	const bool changes = (gRuby.kind != kKFCRubyFindMarks);
-	IControlView* const change = (panel != nil) ? panel->FindWidget(kKFCRubyTabChangeWidgetID) : nil;
-	if (change != nil)
-		change->Enable(changes ? kTrue : kFalse);
-	IControlView* const remove = (panel != nil) ? panel->FindWidget(kKFCRubyTabRemoveWidgetID) : nil;
-	if (remove != nil)
-		remove->Enable(changes ? kTrue : kFalse);
+	LayOutRubyGrid(panel);
 }
 
 // Kenten: means nothing to Text Without Kenten: grey there.
@@ -413,12 +899,17 @@ void ShowKind(IPMUnknown* face)
 {
 	InterfacePtr<IPanelControlData> panel(face, UseDefaultIID());
 	ShowPart(panel, kKFCKohakuQRSectionWidgetID, gKind == kKindQRCode);
-	ShowPart(panel, kKFCQRTabFindNextWidgetID, gKind == kKindQRCode);
+	ShowPart(panel, kKFCQRTabFindNextWidgetID, gKind == kKindQRCode || gKind == kKindTable);
+	ShowPart(panel, kKFCTableTabChangeWidgetID, gKind == kKindTable);
+	ShowPart(panel, kKFCTableTabChangeAllWidgetID, gKind == kKindTable);
+	ShowPart(panel, kKFCTableTabChangeFindWidgetID, gKind == kKindTable);
+	ShowPart(panel, kKFCTableTabFindLabelWidgetID, gKind == kKindTable);
 	ShowPart(panel, kKFCKohakuTableSectionWidgetID, gKind == kKindTable);
 	ShowPart(panel, kKFCKohakuRubySectionWidgetID, gKind == kKindRuby);
 	ShowPart(panel, kKFCKohakuKentenSectionWidgetID, gKind == kKindKenten);
 	ShowRubyKind(panel);		// (their own greys stand whatever their panels were told)
 	ShowKentenKind(panel);
+	ShowTableButtons(panel);
 	ShowScopeEntries(face);
 }
 
@@ -432,10 +923,7 @@ void FillKept(IPMUnknown* face)
 	InterfacePtr<IDropDownListController> rubyKind(QueryList(face, kKFCRubyTabKindWidgetID));
 	if (rubyKind != nil)
 		rubyKind->Select(gRuby.kind, kTrue, kFalse);
-	SetField(panel, kKFCRubyTabBaseWidgetID, gRuby.base);
-	SetField(panel, kKFCRubyTabReadingWidgetID, gRuby.reading);
-	SetField(panel, kKFCRubyTabChangeWidgetID, gRuby.changeTo);
-	SetBox(panel, kKFCRubyTabRemoveWidgetID, gRuby.removeRuby);
+	WriteBoxes(panel);
 	InterfacePtr<IDropDownListController> kentenKind(QueryList(face, kKFCKentenTabKindWidgetID));
 	if (kentenKind != nil)
 		kentenKind->Select(gKenten.kind, kTrue, kFalse);
@@ -502,6 +990,8 @@ void KFCKohakuTab::StateQuery(const KFCKohakuQueryData& query, bool forItsFind, 
 	{
 		gKind = kKindRuby;
 		gRuby = query.ruby;
+		BoxesFromKept();
+		KFC_DIAG_LOG("RUBYTAB stated base=%s reading=%s", gRuby.base.GetUTF8String().c_str(), gRuby.reading.GetUTF8String().c_str());
 	}
 	else if (query.mode == kKFCKentenSearchMode)
 	{
@@ -511,7 +1001,7 @@ void KFCKohakuTab::StateQuery(const KFCKohakuQueryData& query, bool forItsFind, 
 	else
 		gKind = kKindQRCode;
 	gYield = false;
-	gLastFound = UIDRef();		// (Find Next starts from the first again)
+	ForgetFound();		// (Find Next starts from the first again)
 	if (forItsFind)
 	{
 		gStated = true;
@@ -550,6 +1040,13 @@ void KFCKohakuTab::ShutdownCleanup()
 	gKenten = KFCKentenConditions();
 	gFindPaths = std::vector<PMString>();
 	gChangePaths = std::vector<PMString>();
+	gFoundTable = KFCTableFound();
+	for (int32 k = 0; k < kKFCRubyBoxColumnsMost; ++k)
+	{
+		gCellFindRuby[k] = PMString();
+		gCellBase[k] = PMString();
+		gCellChange[k] = PMString();
+	}
 }
 
 //========================================================================================
@@ -589,7 +1086,7 @@ public:
 		// ON EVERY CLOSE, on whatever face (measured): does it close on this one - shown now, or so its switcher says? The dialog opens on it again, so KFC's Find goes on looking for what its Find:
 		// says. Nothing is walked here, and nothing of KFC's that walks is run from here (the header's hazard) - the panel's title already names it.
 		gClosedOnIt = gShown || SwitcherShowsFace(this);
-		gLastFound = UIDRef();		// Find Next starts again at the next open (gLastFound's note)
+		ForgetFound();		// Find Next starts again at the next open (gLastFound's note)
 		KFC_DIAG_LOG("%s closing on-it=%d", KindWord(), gClosedOnIt ? 1 : 0);
 		CDialogController::ClosingDialog(context);
 	}
@@ -614,22 +1111,31 @@ public:
 		gShownFace = this;
 		gClosedOnIt = false;
 		gYield = false;
-		gLastFound = UIDRef();		// Find Next starts from the first again (gLastFound's note)
+		ForgetFound();		// Find Next starts from the first again (gLastFound's note)
 		InterfacePtr<IPanelControlData> panel(this, UseDefaultIID());
 		if (panel != nil)
 		{
 			AttachToWidget(kKFCKohakuTabKindWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
 			AttachToWidget(kKFCKohakuTabScopeWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
 			AttachToWidget(kKFCQRTabFindNextWidgetID, IID_IBOOLEANCONTROLDATA, panel);
+			AttachToWidget(kKFCTableTabChangeWidgetID, IID_IBOOLEANCONTROLDATA, panel);
+			AttachToWidget(kKFCTableTabChangeAllWidgetID, IID_IBOOLEANCONTROLDATA, panel);
+			AttachToWidget(kKFCTableTabChangeFindWidgetID, IID_IBOOLEANCONTROLDATA, panel);
+			for (int32 k = 0; k < kKFCRubyBoxColumnsMost; ++k)
+			{
+				AttachToWidget(ReadingBoxID(k), IID_ITEXTCONTROLDATA, panel);
+				AttachToWidget(BaseBoxID(k), IID_ITEXTCONTROLDATA, panel);
+				AttachToWidget(ChangeBoxID(k), IID_ITEXTCONTROLDATA, panel);
+				if (k + 1 < kKFCRubyBoxColumnsMost)
+					AttachToWidget(JoinID(k), IID_ITRISTATECONTROLDATA, panel);
+			}
+			AttachToWidget(kKFCRubyGridPlusWidgetID, IID_ITRISTATECONTROLDATA, panel);
+			AttachToWidget(kKFCRubyGridMinusWidgetID, IID_ITRISTATECONTROLDATA, panel);
 			AttachToWidget(kKFCTableTabFindStyleWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
 			AttachToWidget(kKFCTableTabChangeStyleWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
 			AttachToWidget(kKFCTableTabOverridesOnlyWidgetID, IID_ITRISTATECONTROLDATA, panel);
 			AttachToWidget(kKFCTableTabClearOverridesWidgetID, IID_ITRISTATECONTROLDATA, panel);
 			AttachToWidget(kKFCRubyTabKindWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
-			AttachToWidget(kKFCRubyTabBaseWidgetID, IID_ITEXTCONTROLDATA, panel);
-			AttachToWidget(kKFCRubyTabReadingWidgetID, IID_ITEXTCONTROLDATA, panel);
-			AttachToWidget(kKFCRubyTabChangeWidgetID, IID_ITEXTCONTROLDATA, panel);
-			AttachToWidget(kKFCRubyTabRemoveWidgetID, IID_ITRISTATECONTROLDATA, panel);
 			AttachToWidget(kKFCKentenTabKindWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
 			AttachToWidget(kKFCKentenTabBaseWidgetID, IID_ITEXTCONTROLDATA, panel);
 			AttachToWidget(kKFCKentenTabMarkWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
@@ -645,6 +1151,10 @@ public:
 		fWorkspace = UIDRef::gNull;
 		FollowWorkspace(context);
 		FillKept(this);
+		// THE SELECTION, FOLLOWED WHILE SHOWN: Change greys as it leaves what Find Next found.
+		InterfacePtr<IObserver> selectionObserver(this, IID_IKFCKOHAKUSELECTIONOBSERVER);
+		if (selectionObserver != nil)
+			selectionObserver->AutoAttach();
 		KFC_DIAG_LOG("%s shown scope=%d", KindWord(), static_cast<int>(ScopeForKind()));
 		KFCKohakuQueryMenu::FaceShown();
 		// THE PANEL'S TITLE NAMES THE KIND NOW, AND THE APPLICATION BAR'S FIELD SHOWS ITS NOTHING (QR-22): no notification of Find/Change's settings comes with a switch to it (measured), so both are
@@ -658,6 +1168,9 @@ public:
 		// HIDDEN - by another face, or by the dialog's close (after its ClosingDialog). Only let go of what is attached: nothing is walked here and nothing of KFC's is run from here (the header's
 		// hazard). A switch to InDesign's own face writes the panel's title through Find/Change's own notifications.
 		AbstractDialogObserver::AutoDetach();		// (the base first, as AutoAttach's)
+		InterfacePtr<IObserver> selectionObserver(this, IID_IKFCKOHAKUSELECTIONOBSERVER);
+		if (selectionObserver != nil)
+			selectionObserver->AutoDetach();
 		gShown = false;
 		gShownFace = nil;
 		KFC_DIAG_LOG("%s hidden", KindWord());
@@ -675,15 +1188,24 @@ public:
 		DetachFromWidget(kKFCKohakuTabKindWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
 		DetachFromWidget(kKFCKohakuTabScopeWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
 		DetachFromWidget(kKFCQRTabFindNextWidgetID, IID_IBOOLEANCONTROLDATA, panel);
+		DetachFromWidget(kKFCTableTabChangeWidgetID, IID_IBOOLEANCONTROLDATA, panel);
+		DetachFromWidget(kKFCTableTabChangeAllWidgetID, IID_IBOOLEANCONTROLDATA, panel);
+		DetachFromWidget(kKFCTableTabChangeFindWidgetID, IID_IBOOLEANCONTROLDATA, panel);
+		for (int32 k = 0; k < kKFCRubyBoxColumnsMost; ++k)
+		{
+			DetachFromWidget(ReadingBoxID(k), IID_ITEXTCONTROLDATA, panel);
+			DetachFromWidget(BaseBoxID(k), IID_ITEXTCONTROLDATA, panel);
+			DetachFromWidget(ChangeBoxID(k), IID_ITEXTCONTROLDATA, panel);
+			if (k + 1 < kKFCRubyBoxColumnsMost)
+				DetachFromWidget(JoinID(k), IID_ITRISTATECONTROLDATA, panel);
+		}
+		DetachFromWidget(kKFCRubyGridPlusWidgetID, IID_ITRISTATECONTROLDATA, panel);
+		DetachFromWidget(kKFCRubyGridMinusWidgetID, IID_ITRISTATECONTROLDATA, panel);
 		DetachFromWidget(kKFCTableTabFindStyleWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
 		DetachFromWidget(kKFCTableTabChangeStyleWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
 		DetachFromWidget(kKFCTableTabOverridesOnlyWidgetID, IID_ITRISTATECONTROLDATA, panel);
 		DetachFromWidget(kKFCTableTabClearOverridesWidgetID, IID_ITRISTATECONTROLDATA, panel);
 		DetachFromWidget(kKFCRubyTabKindWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
-		DetachFromWidget(kKFCRubyTabBaseWidgetID, IID_ITEXTCONTROLDATA, panel);
-		DetachFromWidget(kKFCRubyTabReadingWidgetID, IID_ITEXTCONTROLDATA, panel);
-		DetachFromWidget(kKFCRubyTabChangeWidgetID, IID_ITEXTCONTROLDATA, panel);
-		DetachFromWidget(kKFCRubyTabRemoveWidgetID, IID_ITRISTATECONTROLDATA, panel);
 		DetachFromWidget(kKFCKentenTabKindWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
 		DetachFromWidget(kKFCKentenTabBaseWidgetID, IID_ITEXTCONTROLDATA, panel);
 		DetachFromWidget(kKFCKentenTabMarkWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
@@ -710,7 +1232,7 @@ public:
 			if (entry >= kKindQRCode && entry <= kKindKenten)
 				gKind = entry;
 			gYield = false;
-			gLastFound = UIDRef();		// (Find Next starts from the first again)
+			ForgetFound();		// (Find Next starts from the first again)
 			ShowKind(this);
 			KFC_DIAG_LOG("%s shown scope=%d", KindWord(), static_cast<int>(ScopeForKind()));
 			KFCPanelTitle::Update();
@@ -727,7 +1249,18 @@ public:
 			KFCPanelTitle::Update();
 		}
 		else if (widget == kKFCQRTabFindNextWidgetID && theChange == kTrueStateMessage)
-			FindNext(this);
+		{
+			if (gKind == kKindTable)
+				TableFindNext(this);
+			else
+				FindNext(this);
+		}
+		else if (widget == kKFCTableTabChangeWidgetID && theChange == kTrueStateMessage)
+			TableChange(this, false);
+		else if (widget == kKFCTableTabChangeFindWidgetID && theChange == kTrueStateMessage)
+			TableChange(this, true);
+		else if (widget == kKFCTableTabChangeAllWidgetID && theChange == kTrueStateMessage)
+			TableChangeAll(this);
 		else if (widget == kKFCTableTabFindStyleWidgetID)
 		{
 			InterfacePtr<IDropDownListController> list(view, UseDefaultIID());
@@ -739,6 +1272,8 @@ public:
 			InterfacePtr<IDropDownListController> list(view, UseDefaultIID());
 			KeepStyleOf(list, gChangePaths, gTable.changeStyle);
 			KFC_DIAG_LOG("TBLTAB change=%s", gTable.changeStyle.GetUTF8String().c_str());
+			InterfacePtr<IPanelControlData> panel(this, UseDefaultIID());
+			ShowTableButtons(panel);
 		}
 		else if (widget == kKFCTableTabOverridesOnlyWidgetID && (theChange == kTrueStateMessage || theChange == kFalseStateMessage))
 		{
@@ -749,6 +1284,8 @@ public:
 		{
 			gTable.clearOverrides = (theChange == kTrueStateMessage);
 			KFC_DIAG_LOG("TBLTAB clear=%d", gTable.clearOverrides ? 1 : 0);
+			InterfacePtr<IPanelControlData> panel(this, UseDefaultIID());
+			ShowTableButtons(panel);
 		}
 		else if (widget == kKFCRubyTabKindWidgetID)
 		{
@@ -760,25 +1297,90 @@ public:
 			ShowRubyKind(panel);
 			KFC_DIAG_LOG("RUBYTAB kind=%d", static_cast<int>(gRuby.kind));
 		}
-		else if (widget == kKFCRubyTabBaseWidgetID)
+		else if (ColumnOf(widget, ReadingBoxID(0), kKFCRubyBoxColumnsMost) >= 0)
 		{
-			gRuby.base = WordsOf(view);
-			KFC_DIAG_LOG("RUBYTAB base=%s", gRuby.base.GetUTF8String().c_str());
-		}
-		else if (widget == kKFCRubyTabReadingWidgetID)
-		{
-			gRuby.reading = WordsOf(view);
+			// A BOX OF FIND'S RUBY: - the search reads them all run together (KeepFromBoxes).
+			const int32 k = ColumnOf(widget, ReadingBoxID(0), kKFCRubyBoxColumnsMost);
+			gCellFindRuby[k] = WordsOf(view);
+			KeepFromBoxes();
 			KFC_DIAG_LOG("RUBYTAB reading=%s", gRuby.reading.GetUTF8String().c_str());
 		}
-		else if (widget == kKFCRubyTabChangeWidgetID)
+		else if (ColumnOf(widget, BaseBoxID(0), kKFCRubyBoxColumnsMost) >= 0)
 		{
-			gRuby.changeTo = WordsOf(view);
-			KFC_DIAG_LOG("RUBYTAB change=%s", gRuby.changeTo.GetUTF8String().c_str());
+			// A BOX OF FIND'S BASE TEXT: - and the Change side's words under its column, which are this box's.
+			const int32 k = ColumnOf(widget, BaseBoxID(0), kKFCRubyBoxColumnsMost);
+			gCellBase[k] = WordsOf(view);
+			KeepFromBoxes();
+			InterfacePtr<IPanelControlData> panel(this, UseDefaultIID());
+			SetField(panel, ChangeBaseID(k), gCellBase[k]);
+			KFC_DIAG_LOG("RUBYTAB base=%s", gRuby.base.GetUTF8String().c_str());
 		}
-		else if (widget == kKFCRubyTabRemoveWidgetID && (theChange == kTrueStateMessage || theChange == kFalseStateMessage))
+		else if (ColumnOf(widget, ChangeBoxID(0), kKFCRubyBoxColumnsMost) >= 0)
 		{
-			gRuby.removeRuby = (theChange == kTrueStateMessage);
-			KFC_DIAG_LOG("RUBYTAB remove=%d", gRuby.removeRuby ? 1 : 0);
+			const int32 k = ColumnOf(widget, ChangeBoxID(0), kKFCRubyBoxColumnsMost);
+			gCellChange[k] = WordsOf(view);
+			KeepFromBoxes();
+			KFC_DIAG_LOG("RUBYTAB box r%d=%s", static_cast<int>(k), gCellChange[k].GetUTF8String().c_str());
+		}
+		else if (ColumnOf(widget, JoinID(0), kKFCRubyBoxColumnsMost - 1) >= 0 && (theChange == kTrueStateMessage || theChange == kFalseStateMessage))
+		{
+			// A CHAIN PRESSED (F16). Joined: the right column's reading goes to the end of the left's - the box they now share - in Find and Change alike. Let go: the left's box keeps what it has, the right's stands empty.
+			const int32 k = ColumnOf(widget, JoinID(0), kKFCRubyBoxColumnsMost - 1);
+			gJoin[k] = (theChange == kTrueStateMessage);
+			InterfacePtr<IPanelControlData> panel(this, UseDefaultIID());
+			if (gJoin[k])
+			{
+				int32 first = k;
+				while (first > 0 && gJoin[first - 1])
+					--first;
+				gCellFindRuby[first].Append(gCellFindRuby[k + 1]);
+				gCellFindRuby[k + 1].Clear();
+				SetField(panel, ReadingBoxID(first), gCellFindRuby[first]);
+				SetField(panel, ReadingBoxID(k + 1), gCellFindRuby[k + 1]);
+				gCellChange[first].Append(gCellChange[k + 1]);
+				gCellChange[k + 1].Clear();
+				SetField(panel, ChangeBoxID(first), gCellChange[first]);
+				SetField(panel, ChangeBoxID(k + 1), gCellChange[k + 1]);
+			}
+			KeepFromBoxes();
+			const WidgetID focusTo(LetGoOfGoingBox());
+			LayOutRubyGrid(panel);
+			if (focusTo != kInvalidWidgetID && panel != nil)
+				panel->SetKeyboardFocus(focusTo);
+			KFC_DIAG_LOG("RUBYTAB join %d=%d", static_cast<int>(k), gJoin[k] ? 1 : 0);
+		}
+		else if (widget == kKFCRubyGridPlusWidgetID && theChange == kTrueStateMessage)
+		{
+			if (gCols < kKFCRubyBoxColumnsMost)
+				++gCols;
+			KeepFromBoxes();
+			InterfacePtr<IPanelControlData> panel(this, UseDefaultIID());
+			LayOutRubyGrid(panel);
+			KFC_DIAG_LOG("RUBYTAB cols=%d", static_cast<int>(gCols));
+		}
+		else if (widget == kKFCRubyGridMinusWidgetID && theChange == kTrueStateMessage)
+		{
+			// THE LAST COLUMN GOES, what it held with it (the Captions dialog's - no asking), and the chain before it: the next + brings a clean one.
+			InterfacePtr<IPanelControlData> panel(this, UseDefaultIID());
+			if (gCols > 1)
+			{
+				--gCols;
+				gCellFindRuby[gCols].Clear();
+				gCellBase[gCols].Clear();
+				gCellChange[gCols].Clear();
+				gJoin[gCols - 1] = false;
+				SetField(panel, ReadingBoxID(gCols), gCellFindRuby[gCols]);
+				SetField(panel, BaseBoxID(gCols), gCellBase[gCols]);
+				SetField(panel, ChangeBoxID(gCols), gCellChange[gCols]);
+				SetField(panel, ChangeBaseID(gCols), gCellBase[gCols]);
+				SetBox(panel, JoinID(gCols - 1), false);
+			}
+			KeepFromBoxes();
+			const WidgetID focusTo(LetGoOfGoingBox());
+			LayOutRubyGrid(panel);
+			if (focusTo != kInvalidWidgetID && panel != nil)
+				panel->SetKeyboardFocus(focusTo);
+			KFC_DIAG_LOG("RUBYTAB cols=%d", static_cast<int>(gCols));
 		}
 		else if (widget == kKFCKentenTabKindWidgetID)
 		{
@@ -816,8 +1418,10 @@ public:
 			gKenten.removeKenten = (theChange == kTrueStateMessage);
 			KFC_DIAG_LOG("KENTAB remove=%d", gKenten.removeKenten ? 1 : 0);
 		}
-		// WHAT A QUERY HOLDS WAS CHANGED BY HAND: Find/Change's Query menu says [Custom], as a change on InDesign's own tabs does. (Search: is no part of a query, as InDesign's own Search: is none of its menu's; Find Next changes nothing.)
-		if (widget != kKFCKohakuTabScopeWidgetID && widget != kKFCQRTabFindNextWidgetID
+		// WHAT A QUERY HOLDS WAS CHANGED BY HAND: Find/Change's Query menu says [Custom], as a change on InDesign's own tabs does. (Search: is no part of a query, as InDesign's own Search: is none of its menu's; Find Next changes nothing, nor do the
+		// Table part's other buttons - what they write is the document - nor a + - a box more holds nothing.)
+		if (widget != kKFCKohakuTabScopeWidgetID && widget != kKFCQRTabFindNextWidgetID && widget != kKFCTableTabChangeWidgetID && widget != kKFCTableTabChangeAllWidgetID
+			&& widget != kKFCTableTabChangeFindWidgetID && widget != kKFCRubyGridPlusWidgetID
 			&& (protocol != IID_ITRISTATECONTROLDATA || theChange == kTrueStateMessage || theChange == kFalseStateMessage))
 			KFCKohakuQueryMenu::FaceChanged();
 	}
@@ -858,5 +1462,34 @@ private:
 	UIDRef fWorkspace;
 };
 CREATE_PMINTERFACE(KFCKohakuTabObserver, kKFCKohakuTabObserverImpl)
+
+/** The selection, while the face is shown (KFCQueryScopeObserver's shape: an ActiveSelectionObserver under an IID of its own, beside the face's observer of its widgets - the face's AutoAttach and AutoDetach drive it). It only greys: the Table part's Change and
+    Change/Find, once the selection leaves what Find Next found (F6). */
+class KFCKohakuTabSelectionObserver : public ActiveSelectionObserver
+{
+public:
+	KFCKohakuTabSelectionObserver(IPMUnknown* boss) : ActiveSelectionObserver(boss, IID_IKFCKOHAKUSELECTIONOBSERVER) {}
+	virtual ~KFCKohakuTabSelectionObserver() {}
+
+protected:
+	virtual void HandleSelectionChanged(const ISelectionMessage* /*message*/)
+	{
+		Show();
+	}
+
+	// Every caret step: a caret moved off the table, or a person's text selection.
+	virtual void HandleFrequentSelectionChanged()
+	{
+		Show();
+	}
+
+private:
+	void Show()
+	{
+		InterfacePtr<IPanelControlData> panel(gShownFace, UseDefaultIID());
+		ShowTableButtons(panel);
+	}
+};
+CREATE_PMINTERFACE(KFCKohakuTabSelectionObserver, kKFCKohakuTabSelectionObserverImpl)
 
 // End, KFCKohakuTab.cpp.

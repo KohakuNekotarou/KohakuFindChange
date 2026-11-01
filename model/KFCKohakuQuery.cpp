@@ -76,6 +76,7 @@ std::string Escaped(const std::string& value)
 			case '"':	out.append("&quot;"); break;
 			case '\n':	out.append("&#10;"); break;
 			case '\r':	out.append("&#13;"); break;
+			case '\t':	out.append("&#9;"); break;
 			default:	out.push_back(c); break;
 		}
 	}
@@ -106,6 +107,8 @@ std::string Unescaped(const std::string& value)
 			out.push_back('\n');
 		else if (name == "#13")
 			out.push_back('\r');
+		else if (name == "#9")
+			out.push_back('\t');
 		else
 		{
 			out.push_back('&');		// (not one this file writes: as it stands)
@@ -133,6 +136,57 @@ void Attribute(std::string& io, const char* key, int32 value)
 	io.append(std::to_string(value));
 	io.append("\"");
 }
+
+// THE RUBY PART'S BOXES IN A FILE: the Change side's readings, the bases and Find's readings, a box each, by tabs (no box can hold one). A file from before the boxes has one reading and no bases - over the row's whole text - or rubyRemove="1"; one from before Find's boxes has no rubyFind, and
+// its Ruby: comes back whole, in the first box (KFCKohakuTab's BoxesFromKept).
+std::vector<std::string> SplitAtTabs(const std::string& words)
+{
+	std::vector<std::string> out;
+	size_t from = 0;
+	for (size_t tab = words.find('\t'); tab != std::string::npos; tab = words.find('\t', from))
+	{
+		out.push_back(words.substr(from, tab - from));
+		from = tab + 1;
+	}
+	out.push_back(words.substr(from));
+	return out;
+}
+
+std::string JoinedReadings(const std::vector<KFCRubyChangePiece>& pieces)
+{
+	std::string out;
+	for (size_t p = 0; p < pieces.size(); ++p)
+	{
+		if (p > 0)
+			out.push_back('\t');
+		out.append(pieces[p].reading.GetUTF8String());
+	}
+	return out;
+}
+
+std::string JoinedBases(const std::vector<KFCRubyChangePiece>& pieces)
+{
+	std::string out;
+	for (size_t p = 0; p < pieces.size(); ++p)
+	{
+		if (p > 0)
+			out.push_back('\t');
+		out.append(pieces[p].base.GetUTF8String());
+	}
+	return out;
+}
+
+std::string JoinedFindReadings(const std::vector<KFCRubyChangePiece>& pieces)
+{
+	std::string out;
+	for (size_t p = 0; p < pieces.size(); ++p)
+	{
+		if (p > 0)
+			out.push_back('\t');
+		out.append(pieces[p].findReading.GetUTF8String());
+	}
+	return out;
+}
 }	// anonymous namespace
 
 bool KFCKohakuQuery::Read(const IDFile& file, KFCKohakuQueryData& out)
@@ -148,6 +202,8 @@ bool KFCKohakuQuery::Read(const IDFile& file, KFCKohakuQueryData& out)
 	const size_t end = text.find('>', at);
 	if (end == std::string::npos)
 		return false;
+	std::string rubyReadings, rubyBases, rubyFinds;
+	bool rubyRemoved = false;
 	// key="value" pairs, up to the element's end.
 	while (at < end)
 	{
@@ -185,9 +241,13 @@ bool KFCKohakuQuery::Read(const IDFile& file, KFCKohakuQueryData& out)
 		else if (key == "ruby")
 			out.ruby.reading = Words(value);
 		else if (key == "rubyChange")
-			out.ruby.changeTo = Words(value);
+			rubyReadings = value;
+		else if (key == "rubyChangeBase")
+			rubyBases = value;
+		else if (key == "rubyFind")
+			rubyFinds = value;
 		else if (key == "rubyRemove")
-			out.ruby.removeRuby = (number != 0);
+			rubyRemoved = (number != 0);
 		else if (key == "kentenLook")
 			out.kenten.kind = number;
 		else if (key == "kentenBase")
@@ -199,6 +259,22 @@ bool KFCKohakuQuery::Read(const IDFile& file, KFCKohakuQueryData& out)
 		else if (key == "kentenRemove")
 			out.kenten.removeKenten = (number != 0);
 		at = close + 1;
+	}
+	if (!(rubyReadings.empty() && rubyBases.empty() && rubyFinds.empty()))
+	{
+		const std::vector<std::string> readings(SplitAtTabs(rubyReadings)), bases(SplitAtTabs(rubyBases)), finds(SplitAtTabs(rubyFinds));
+		size_t boxes = (readings.size() > bases.size()) ? readings.size() : bases.size();
+		if (finds.size() > boxes)
+			boxes = finds.size();
+		for (size_t b = 0; b < boxes; ++b)
+		{
+			KFCRubyChangePiece piece;
+			// (rubyRemove="1": a file from before the boxes, which took the ruby off whatever Change Ruby To said - no reading, as the boxes say it.)
+			piece.reading = Words((b < readings.size() && !rubyRemoved) ? readings[b] : std::string());
+			piece.base = Words((b < bases.size()) ? bases[b] : std::string());
+			piece.findReading = Words((b < finds.size()) ? finds[b] : std::string());
+			out.ruby.change.push_back(piece);
+		}
 	}
 	// A FILE IS WHAT ANYONE MADE OF IT, AND THE FACE SELECTS BY THESE: a number its list has no entry for reads as the list's first (the lists - KFCUI.fr: Kenten: is Any and every kind, Change Kenten To: has no Custom).
 	if (out.ruby.kind < kKFCRubyFindWith || out.ruby.kind > kKFCRubyFindMarks)
@@ -231,8 +307,9 @@ std::string KFCKohakuQuery::FileText(const KFCKohakuQueryData& query)
 		Attribute(element, "rubyLook", query.ruby.kind);
 		Attribute(element, "rubyBase", query.ruby.base);
 		Attribute(element, "ruby", query.ruby.reading);
-		Attribute(element, "rubyChange", query.ruby.changeTo);
-		Attribute(element, "rubyRemove", query.ruby.removeRuby ? 1 : 0);
+		Attribute(element, "rubyChange", Words(JoinedReadings(query.ruby.change)));
+		Attribute(element, "rubyChangeBase", Words(JoinedBases(query.ruby.change)));
+		Attribute(element, "rubyFind", Words(JoinedFindReadings(query.ruby.change)));
 	}
 	else if (query.mode == kKFCKentenSearchMode)
 	{
@@ -292,7 +369,7 @@ bool KFCKohakuQuery::HasChangeSide(const KFCKohakuQueryData& query)
 	if (query.mode == kKFCTableSearchMode)
 		return !query.table.changeStyle.IsEmpty() || query.table.clearOverrides;
 	if (query.mode == kKFCRubySearchMode)
-		return query.ruby.kind == kKFCRubyFindMarks || !query.ruby.changeTo.IsEmpty() || query.ruby.removeRuby;		// (ruby from marks: the reading is in the mark)
+		return true;		// (ruby from marks: the reading is in the mark; any other: boxes reading nothing take the ruby off - the author, as an empty Change To deletes)
 	if (query.mode == kKFCKentenSearchMode)
 		return query.kenten.changeTo != 0 || query.kenten.removeKenten;
 	return false;		// (a QR code's list writes nothing)

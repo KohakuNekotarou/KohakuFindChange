@@ -9,9 +9,9 @@
 //  Edit > Find/Change - "Ruby" - is the tab Find/Change is on (IsTabCurrent), the panel's Find lists the text with ruby (its base and its reading each "contains"), or
 //  the occurrences of a text without ruby, or - Ruby Marks in Text - ruby a manuscript wrote out: a bar, a base, and its reading in book title marks, as Aozora Bunko writes it (the bar
 //  full-width or ASCII; with none, the kanji just before the reading). A row is a TEXT row on the ruby's run (on the mark); what it draws there is the base and the reading
-//  (Hit::runChain - "base<reading>"; a mark's row draws its text).
-//  Its Replace gives the run the reading the tab's Change side says, or takes the ruby off (KFCReplaceEngine's own-tab rows - Apply, Remove below). A reading a person
-//  cannot see is no ruby: a footnote's marker inherits one. Text a condition hides is not searched. No setting of Find/Change's is read or touched. The main thread only.
+//  (Hit::runChain - "base<reading>"; a mark's row draws its text - Hit::upper the reading above it).
+//  Its Replace gives the row what the tab's Change boxes say (KFCRubyChangePlan.h - WritePlan), and takes its ruby off when they read nothing (Remove below - KFCReplaceEngine's own-tab rows). A reading a
+//  person cannot see is no ruby: a footnote's marker inherits one. Text a condition hides is not searched. No setting of Find/Change's is read or touched. The main thread only.
 //
 //========================================================================================
 
@@ -28,14 +28,31 @@
 #include "KFCBookScope.h"		// ChapterDoc, SkippedChapter - a run's targets
 #include "KFCModelTypes.h"		// KFCRubyConditions
 #include "KFCResultModel.h"		// Hit - a row
+#include "KFCRubyChangePlan.h"	// what the Change boxes write over a row's text
 #include "KFCSearchEngine.h"	// CollectTally - a walk's count
 
 namespace KFCRubySearch
 {
 	/** IS THE RUBY TAB FIND/CHANGE'S TAB NOW, and what it asks (outConditions, when given - the tab's as it stands, whichever tab is shown: a row's Replace reads its
 	    Change side). Asked of the UI half (IKFCUIServices::RubyTabConditions - ui/KFCKohakuTab.h); no UI half = not the Ruby tab. A TEST BUILD asks its fault switch
-	    ruby-tab first: on = the Ruby tab, its file's lines kind=without, base=, ruby=, change=, remove=1, scope=all|story|toend|selection the conditions. */
+	    ruby-tab first: on = the Ruby tab, its file's lines kind=without, base=, ruby=, change=<a reading over the row's whole text>, piece=<base>=<reading> (a box, in order), remove=1 (no box reads
+	    anything), scope=all|story|toend|selection the conditions. */
 	bool IsTabCurrent(KFCRubyConditions* outConditions = nil);
+
+	/** The Change boxes as KFCRubyChangePlan takes them. */
+	std::vector<KFCRubyChangePlan::Piece> PlanPieces(const KFCRubyConditions& asked);
+
+	/** What the boxes write over [start, end) of the story: the plan's answer, runs by code point from start. */
+	KFCRubyChangePlan::Result PlanForRow(const UIDRef& story, TextIndex start, TextIndex end, const std::vector<KFCRubyChangePlan::Piece>& pieces, std::vector<KFCRubyChangePlan::Run>& outRuns);
+
+	/** Does [start, end) of the story read as the runs say - each its reading, nothing between them? Asked before a write: a row that does is not written. */
+	bool ReadsAsPlanned(const UIDRef& story, TextIndex start, TextIndex end, const std::vector<KFCRubyChangePlan::Run>& runs);
+
+	/** WRITES THE RUNS OVER [start, end) OF THE STORY inside the caller's step: ruby off the characters between them that have any (Remove), then each by Apply. kSuccess = done. */
+	ErrorCode WritePlan(const UIDRef& story, TextIndex start, TextIndex end, const std::vector<KFCRubyChangePlan::Run>& runs);
+
+	/** WHAT STANDS ABOVE A ROW ON [start, end): its readings, by characters from start. */
+	KFCRowUpper UpperOn(const UIDRef& story, TextIndex start, TextIndex end);
 
 	/** THE TAB'S WALK OVER A RUN'S TARGETS (KFCTableSearch::CollectTargets' shape). part (KFCSearchEngine::PartStretches): a run with ruby its stretches touch - the reading is over the whole of it; an
 	    occurrence or a mark they hold whole, as a text search finds none a selection cuts. nil = the whole of each target. */
@@ -46,14 +63,16 @@ namespace KFCRubySearch
 	bool WalkOneDocument(const UIDRef& docRef, const PMString& name, size_t limit, const KFCRubyConditions& asked,
 		std::vector<KFCResultModel::Hit>& outHits, std::map<UID, uint32>& outVersions, bool& outCapped, bool& outCancelled);
 
-	/** The reading a person can see on [start, end) of the story - empty for none (no strand, the ruby off, or a reading of control characters). */
-	WideString ReadingOn(const UIDRef& story, TextIndex start, TextIndex end);
+	/** Is there a reading a person can see anywhere on [start, end) of the story (no strand, the ruby off, or a reading of control characters = none)? */
+	bool HasRubyOn(const UIDRef& story, TextIndex start, TextIndex end);
 
-	/** What a row draws for a run: "base<reading>" (the book title marks U+300A and U+300B), cut to what a row holds; empty with no reading (the row draws its own text). */
-	PMString RowWords(const UIDRef& story, TextIndex start, TextIndex end, const WideString& reading);
+	/** What a row's words are for [start, end): each ruby's "base<reading>" (the book title marks U+300A and U+300B) and the text between them, each cut to what a row holds; empty with no ruby on it
+	    (the row draws its own text). A reader of the widgets and Copy read these; the row draws Hit::upper over its text. */
+	PMString RowWords(const UIDRef& story, TextIndex start, TextIndex end);
 
-	/** Gives [start, end) the reading, inside the caller's step: its strand made first if the story has none; the flag and the string written, the ruby's look left alone. A run
-	    that had no ruby and has several characters is made a group ruby (its reading over the whole of it); one that had keeps what it was. kSuccess = done. */
+	/** Gives [start, end) the reading, inside the caller's step: its strand made first if the story has none; the flag and the string written, the ruby's look left alone. Several characters
+	    are made a group ruby - a reading over the whole of them - whatever they were: a per-character ruby holding a reading with no space puts all of it on the first character, with no word from
+	    InDesign (the spec's F19). One character's kind is left alone: over one, the two compose the same. kSuccess = done. */
 	ErrorCode Apply(const UIDRef& story, TextIndex start, TextIndex end, const WideString& reading);
 
 	/** IS [start, end) OF THE STORY ONE WHOLE MARK STILL (a row's door)? out* = what it holds, by its offset from start. */

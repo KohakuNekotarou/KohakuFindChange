@@ -11,13 +11,13 @@
 - **RUBY-01** ★本体の「検索と置換」の **Kohaku+ タブ**（21 章）の Find: を **Ruby** にしているとき（日本語で起動しているときだけ出る＝KOHAKU-03）、KFC の Find in … はルビの一覧を作る。閉じる時にそうなら閉じている間も同じ。（R1・K1）回帰 `rb-face-shown`・`rb-face-find`・`rb-face-closed`・`rb-face-done`・`rb-face-switch-back`
   - 訂正:
 
-- **RUBY-02** 部品＝**Look For:**（Text With Ruby／Text Without Ruby／Ruby Marks in Text）・**Base Text:**・**Ruby:**（Without のとき灰色）・**Change Ruby To:**・**Remove Ruby**・案内の2行。**Search:** は 5つ（KOHAKU-10）。文字欄は1打鍵ごとに控える。値は KFC が覚える（起動している間だけ）。（R2・K5）回帰 `rb-face-base`・`rb-face-reading`・`rb-face-kind`・`rb-face-change`・`rb-face-remove`・`rb-face-scope`・`rb-part-face`
-  - 訂正:
+- **RUBY-02** 部品＝**Look For:**（Text With Ruby／Text Without Ruby／Ruby Marks in Text）・**Ruby:**（Without のとき灰色）・**Base Text:**・**Change Ruby To の欄**（RUBY-33）・案内の2行。**Search:** は 5つ（KOHAKU-10）。文字欄は1打鍵ごとに控える。値は KFC が覚える（起動している間だけ）。（R2・K5）回帰 `rb-face-base`・`rb-face-reading`・`rb-face-kind`・`rb-face-change`・`rb-face-empty`・`rb-face-scope`・`rb-part-face`
+  - 訂正: 11-01 作者の試用＝Remove Ruby は無くした・Ruby を Base Text の上に・Change は□の欄に。
 
 ## 2. 探す
 
 - **RUBY-10** ★**Text With Ruby**＝ルビの strand の連続が1行（`IRubyAttrStrand::GetRubyRun`）。Base Text は親文字、Ruby は読みに「含まれる」か（そのまま比べる）。空は何でも。（R3）回帰 `rb-any`・`rb-reading`・`rb-base`・`rb-both`・`rb-none`
-  - 訂正:
+  - 訂正: ★11-01＝**Base Text があるとき、行＝その出現＋それに触れるルビの全部**（1字ずつ付けた太郎も、太にだけ付けた太るも1行＝付けた後も同じ条件で見つかる）。一字も触れていなければ行にしない。Base Text が空なら今のまま1本のルビが1行。Ruby: は行の読みをつないだ字（空白を除く）に含まれるか。（試用の直し F22）回帰 `rb-box-found-after`
 
 - **RUBY-11** ★**Text Without Ruby**＝Base Text の出現のうちルビが掛かっていないもの。Base Text が空なら断る。（R3）回帰 `rb-without`・`rb-without-nobase`
   - 訂正:
@@ -36,12 +36,24 @@
 - **RUBY-20** ★行は文字の行。一致の部分に `親文字《読み》`（長ければ切る＝親文字 20・読み 28 字）＝`Hit::runChain`。Without の行はふつうの字。着地・ページ・ロック・編集に付いていく・Copy・Clear はふつうの文字の行のまま。（R6）回帰 `rb-click`・`rb-next`・`rb-long`・`rb-copy`・`rb-clear`・`rb-edit-moved`・`rb-locked`・`rb-click-native-scope`
   - 訂正:
 
-## 4. Replace
-
-- **RUBY-30** ★行の右クリックの Replace と Return＝**その時の面の Change 側**。Change Ruby To＝読みを付ける（`kTARubyAttrBoss`・`kTARubyStringBoss` だけ＝ルビの見た目は触らない。新しく付ける複数文字はグループルビ）。Remove Ruby＝ルビの属性を全部外す（30 個・KIDMCP の `ClearRubyOn` と同じ一覧と同じ `ClearOverridesCmd`・Change Ruby To より優先）。スタイルはルビそのもの（フラグ・読み）を持てない（DOM に無い＝10-31 実測）＝スタイルの見た目は残す。回帰 `rb-remove-all`・`rb-style`・`rb-remove-keeps-style-look`・`rb-undo-remove-all`。物語に strand が無ければ先に作る。（R7）回帰 `rb-change-one`・`rb-change-all`・`rb-without-apply`・`rb-no-strand`・`rb-remove`・`rb-remove-wins`・`rb-return`・`rb-cell-change`・`rb-book-replace`
+- **RUBY-21** ★**行は2行で描く**（作者 11-01「KCM の様に」）＝高さ 38px（他の一覧は 19px のまま）。下の段＝ふつうの行（場所・文脈・一致は親文字だけ）、上の段＝一致の真上に読み（同じ大きさ・全の濃さ）。複数の塊は塊ごとに真上（`太《た》郎《ろう》`）・横にあふれたら次を押す（重ねない）・モノルビを空白入りの1本で持つ行は字ごとに。Without・印の行も同じ高さ（Replace で読みが付いても高さを変えない＝KCM の理由）。ルビを消した行は上の段に棒。⚠部品の文字（KIDMCP が読む）と Copy は `[太郎《たろう》]` のまま。段（灰色の写し）も同じ見た目。行のリソース `kKFCResultTallHitNodeWidgetRsrcID`・`KFCResultListWidgetMgr::DrawsTall`（行の種類・リソース・高さは同じ問いの答え）・`ChangeRoot(kFalse)`。（F10〜F13）回帰 `rb-two-*`
   - 訂正:
 
-- **RUBY-31** 断り＝Change 側に何も無い／既にそのとおり（数える＝書かない）。ロックされた行は灰色。（R7）回帰 `rb-nothing`・`rb-same`・`rb-locked`
+## 4. Replace
+
+- **RUBY-30** ★行の右クリックの Replace と Return＝**その時の面の Change 側**。読み＝`kTARubyAttrBoss`・`kTARubyStringBoss`（ルビの見た目は触らない）。**読みが全部空＝ルビの属性を全部外す**（30 個・KIDMCP の `ClearRubyOn` と同じ一覧と同じ `ClearOverridesCmd`）。スタイルはルビそのもの（フラグ・読み）を持てない（DOM に無い＝10-31 実測）＝スタイルの見た目は残す。回帰 `rb-remove-all`・`rb-style`・`rb-remove-keeps-style-look`・`rb-undo-remove-all`。物語に strand が無ければ先に作る。（R7）回帰 `rb-change-one`・`rb-change-all`・`rb-without-apply`・`rb-no-strand`・`rb-remove`・`rb-nothing`・`rb-return`・`rb-cell-change`・`rb-book-replace`
+  - 訂正: 11-01 作者＝「Change に何も入っていなければ削除」＝Remove Ruby の箱は無くした。
+
+- **RUBY-31** 断り＝既にそのとおり（数える＝書かない）／行の字が親文字の□と違う（`base text differs`）／読みの下に親文字が無い□があるのに他の□には親文字がある（全部の行を断る）／親文字が全部空で読みの数が1でも字数でもない。ロックされた行は灰色。（R7・F20）回帰 `rb-same`・`rb-locked`・`rb-box-differs`・`rb-box-over-nothing`・`rb-box-nobase-count`
+  - 訂正:
+
+- **RUBY-33** ★★**□の欄**（作者 11-01「□□□□□ のような入力欄に漢字やルビを入力／＋で増やせる／結合できる」・触った後の指示＝検索側も□・Change は連動）＝検索の段は読みの□（Ruby:）の下に親文字の□（Base Text:＝★**1字だけ**）。Change の段は読みの□（Change Ruby To）の下に親文字の字（枠なし・編集できない＝検索の親文字の□の字）。列はそろう。始めは5列・＋で増やし−で減らす（検索側だけ・最大 12・最小 1・列の幅は窓の幅を列の数で割る）。隣り合う□の間の鎖＝読みの□がつながる（グループルビ）＝検索と Change が同じ形。読みの字は左へ寄せ、解くと左に残る。親文字の□は結合しない。灰色＝Text Without Ruby のとき検索の読み／Ruby Marks in Text のとき Change の段と鎖。⚠**探すときは□の字をつないで比べる**（モノルビとグループルビを区別しない＝私の判断）。⚠`.fr` に上限の数を置いて出し入れする（`LayOutRubyGrid`＝`SetFrame`・`ShowView`・`Enable`・窓の大きさを動かさない）。（F14〜F17）回帰 `rb-box-words`・`rb-box-one-char`・`rb-box-find-together`・`rb-box-follow`・`rb-box-group`・`rb-box-join-left`・`rb-box-plus-minus`・`rb-box-marks-grey`・`rb-box-without-grey`
+  - 訂正:
+
+- **RUBY-34** ★**付け方**（`model/KFCRubyChangePlan.h`＝std だけで単体試験 `work/note-scripts/2026-11-01-kfc-kohaku-fixes/plan_test.ps1`）＝読みの□1つ＝1本のルビ、その下の親文字（結合なら全部の列）に付く。親文字が2字以上＝グループ（`kTAMojiRubyBoss` kFalse）。別々の□＝別々のルビ。空の読みの下の字はルビなし（`太る`＝`[ふと][  ]`／`[太][る]`）＝もともと付いていた字からは消す。親文字が全部空なら行の字全部に＝読みが1つならグループ・数が字数と同じなら1字ずつ。1つの読みに空白があって塊の数が字数と同じなら1字ずつ（本体のモノルビの書き方を貼られたとき）。（F18〜F21）回帰 `rb-box-each`・`rb-box-part`・`rb-box-nobase-each`・`rb-box-spaces`
+  - 訂正:
+
+- **RUBY-35** クエリの形＝`rubyChange`（Change の読み）・`rubyChangeBase`（親文字）・`rubyFind`（検索の読み）を□ごとにタブ区切りで（`ruby`・`rubyBase` はつないだ字＝探す条件）。試用中に作られた古い形（`rubyChange` 1つ・`rubyRemove`）も読む。（F23）回帰 `kq-save-boxes`・`kq-pick-ruby`・`kq-pick-remove`
   - 訂正:
 
 - **RUBY-32** ★全部の行で **Ctrl+Z 1回**（段の名前 `Change Ruby`）。行は `Changed`＋書いた後の字（置換済みの灰色にはしない＝もう一度書ける）。取り消しで行の字も戻り、やり直しでまた `Changed`。（R8）回帰 `rb-undo`・`rb-undo-remove`

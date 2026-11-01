@@ -314,6 +314,7 @@
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCQRSearch.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCTableSearch.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCRubySearch.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCRubyChangePlan.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCKentenSearch.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCKohakuQuery.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCNarrow.h"/>

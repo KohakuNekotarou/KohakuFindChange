@@ -46,6 +46,7 @@
 // Project includes:
 #include "KFCUIID.h"
 #include "KFCColorTextView.h"
+#include "KFCKentenMark.h"		// a kenten row's marks - and KFCMarkPassView, this cell's base
 #include "KFCPanelTextDraw.h"	// the context's fade, the '&' flags and the bar - shared with the message area
 #include "KFCModelAccess.h"		// the model half, through its session interfaces
 
@@ -91,8 +92,23 @@ static bool16 KFCViewOrParentIsHilited(const IControlView* view, int32 stepsLeft
 class KFCRowData : public CPMUnknown<IKFCRowData>
 {
 public:
-	KFCRowData(IPMUnknown* boss) : CPMUnknown<IKFCRowData>(boss) {}
+	KFCRowData(IPMUnknown* boss) : CPMUnknown<IKFCRowData>(boss), fTwoLines(false) {}
 	virtual ~KFCRowData() {}
+
+	virtual void SetTwoLines(bool on, const PMString& drawMatch, const KFCRowUpper& upper)
+	{
+		fTwoLines = on;
+		fDrawMatch = drawMatch;
+		fDrawMatch.SetTranslatable(kFalse);
+		fUpper = upper;
+	}
+
+	virtual bool GetTwoLines(PMString& outDrawMatch, KFCRowUpper& outUpper) const
+	{
+		outDrawMatch = fDrawMatch;
+		outUpper = fUpper;
+		return fTwoLines;
+	}
 
 	virtual void SetSegments(const PMString& locator, const PMString& flag, const PMString& pre,
 		const PMString& match, const PMString& post)
@@ -154,6 +170,9 @@ private:
 	PMString fPre;
 	PMString fMatch;
 	PMString fPost;
+	bool fTwoLines;			// a two-line row (SetTwoLines)
+	PMString fDrawMatch;	// ...what its lower line draws for the match
+	KFCRowUpper fUpper;		// ...and what stands over it
 };
 
 CREATE_PMINTERFACE(KFCRowData, kKFCRowDataImpl)
@@ -163,9 +182,9 @@ CREATE_PMINTERFACE(KFCRowData, kKFCRowDataImpl)
 //----------------------------------------------------------------------------------------
 
 /** Implements IControlView: draws a hit line with the matched part highlighted. */
-class KFCColorTextView : public DVControlView
+class KFCColorTextView : public KFCMarkPassView
 {
-	typedef DVControlView inherited;
+	typedef KFCMarkPassView inherited;
 public:
 	KFCColorTextView(IPMUnknown* boss) : inherited(boss) {}
 	virtual ~KFCColorTextView() {}
@@ -189,6 +208,14 @@ void KFCColorTextView::DV_Draw(dvaui::drawbot::Drawbot* drawbotP) const
 
 	PMString locator, flag, pre, match, post;
 	data->GetSegments(locator, flag, pre, match, post);
+
+	// A TWO-LINE ROW: the lower line draws the match's text alone (the label a reader walks keeps base<<reading>>), what stands over it on the upper line. Offsets over the text, one
+	// character to one: MarkUpBreaksForDisplay below puts a mark where a break is.
+	PMString twoLineMatch;
+	KFCRowUpper upper;
+	const bool twoLines = data->GetTwoLines(twoLineMatch, upper);
+	if (twoLines)
+		match = twoLineMatch;
 
 	// Break characters become visible marks BEFORE anything is measured or ellipsized below: every
 	// width taken from here on has to be the width of what is actually drawn.
@@ -216,6 +243,10 @@ void KFCColorTextView::DV_Draw(dvaui::drawbot::Drawbot* drawbotP) const
 	const PMRect frame = this->GetInnerContentFrame();
 	const PMReal rightEdge = frame.Right();
 	PMReal x = frame.Left();
+	// THE LINE THE ROW'S RUNS STAND ON: the cell's whole height - on a two-line row, its lower half, the upper half what stands over the match (kKFCResultTallRowHeight).
+	const PMReal upperLineHeight = twoLines ? frame.Height() / PMReal(2.0) : PMReal(0.0);
+	const PMReal lineTop = frame.Top() + upperLineHeight;
+	const PMReal lineBottom = frame.Bottom();
 
 	// Is this cell's row the selected one? A self-drawing cell has to answer that itself: a stock
 	// StaticText is handed four colours in the .fr (text / hilite text / background / hilite
@@ -301,33 +332,41 @@ void KFCColorTextView::DV_Draw(dvaui::drawbot::Drawbot* drawbotP) const
 	{
 		if (s.IsEmpty())
 			return;
-		StringUtils::PMDrawStringRGB(drawbotP, PMRect(x, frame.Top(), rightEdge, frame.Bottom()), kAlignLeft, s, fontInfo, c,
+		StringUtils::PMDrawStringRGB(drawbotP, PMRect(x, lineTop, rightEdge, lineBottom), kAlignLeft, s, fontInfo, c,
 			kKFCDontConvertAmpersand, kTrue /*centerVertically*/, kKFCNoUnderline, kKFCTextSmoothing);
 		x += KFCDrawnWidth(s, fontInfo);
 	};
 
+	// WHERE THE LINE STARTS, BEFORE ANYTHING IS DRAWN: a kenten row's marks are painted first (KFCMarkPassView - its pass blits over the whole cell), and where they go is where the match lands.
 	const PMReal kLocatorGap(8.0);		// space between the locator and the line text
-	if (x < rightEdge)
-		drawRun(locator, kMatchColor);
+	PMReal lineX = x;
+	if (lineX < rightEdge)
+		lineX += KFCDrawnWidth(locator, fontInfo);
 	// Its own run so it can carry its own colour, with the separating space inside it - the
 	// locator is built without this word for exactly that reason (KFCResultModel::BuildHitLocator).
-	if (!flag.IsEmpty() && x < rightEdge)
+	PMString flagRun;
+	flagRun.SetTranslatable(kFalse);
+	if (!flag.IsEmpty() && lineX < rightEdge)
 	{
-		PMString flagRun(" ");
-		flagRun.SetTranslatable(kFalse);
+		flagRun.Append(" ");
 		flagRun.Append(flag);
-		drawRun(flagRun, kAccentColor);
+		lineX += KFCDrawnWidth(flagRun, fontInfo);
 	}
-	if (x > frame.Left())
-		x += kLocatorGap;
+	if (lineX > frame.Left())
+		lineX += kLocatorGap;
 
 	// The line, left to right. convertAmpersand=kFalse on draw AND measure so a literal '&' is
 	// neither underlined nor dropped. If the whole line fits it is drawn as-is; when it overflows
 	// the match is kept at full strength and the context is ellipsized around it. The matched run
 	// is the full theme text colour; the context runs are faded.
-	const PMReal availWidth = rightEdge - x;
+	const PMReal availWidth = rightEdge - lineX;
 	if (availWidth <= PMReal(0.0))
-		return;		// the locator consumed the cell; no room left for the line
+	{
+		// the locator consumed the cell; no room left for the line
+		drawRun(locator, kMatchColor);
+		drawRun(flagRun, kAccentColor);
+		return;
+	}
 
 	// AN EMPTY MATCH IS A PLACE, AND IT IS DRAWN AS A BAR (the author's request: "the bar KCM draws").
 	// A row replaced with nothing, and a zero-width match (^, $, a lookaround), have no characters at the
@@ -350,38 +389,24 @@ void KFCColorTextView::DV_Draw(dvaui::drawbot::Drawbot* drawbotP) const
 	const PMReal matchW = KFCDrawnWidth(wantCaret ? KFCCaretPlaceholder() : match, fontInfo);
 	const PMReal postW  = KFCDrawnWidth(post, fontInfo);
 
-	// The match at the running x: its characters, or the bar in their place - spanning the cell a pixel
-	// short of each edge, as KCM's one-line change row draws it.
-	auto drawMatch = [&](const PMString& s)
-	{
-		if (!wantCaret)
-		{
-			drawRun(s, kMatchColor);
-			return;
-		}
-		KFCDrawCaret(drawbotP, kMatchColor, x, matchW, frame.Top() + PMReal(1.0), frame.Height() - PMReal(2.0));
-		x += matchW;
-	};
-
+	// THE THREE RUNS AS THEY WILL BE DRAWN.
+	PMString preRun, matchRun(match), postRun;
+	preRun.SetTranslatable(kFalse);
+	postRun.SetTranslatable(kFalse);
 	if (preW + matchW + postW <= availWidth)
 	{
-		// The whole line fits: draw the three runs unchanged.
-		drawRun(pre, kContextColor);
-		drawMatch(match);
-		drawRun(post, kContextColor);
+		// The whole line fits: the three runs unchanged.
+		preRun = pre;
+		postRun = post;
 	}
 	else if (matchW >= availWidth)
 	{
 		// The match alone overflows the cell: ellipsize the match itself (tail) and drop the context.
 		// (A bar is one space wide and is drawn as it is.)
-		if (wantCaret)
-			drawMatch(match);
-		else
-		{
-			// (KFCEllipsize, as the two cuts below: the SDK's call never comes back from some widths, and its new
-			// string is marked "do not translate" again - KFCPanelTextDraw.h says why for both)
-			drawRun(KFCEllipsize(availWidth, match, fontInfo, kEllipsizeEnd), kMatchColor);
-		}
+		// (KFCEllipsize, as the two cuts below: the SDK's call never comes back from some widths, and its new
+		// string is marked "do not translate" again - KFCPanelTextDraw.h says why for both)
+		if (!wantCaret)
+			matchRun = KFCEllipsize(availWidth, match, fontInfo, kEllipsizeEnd);
 	}
 	else
 	{
@@ -393,17 +418,92 @@ void KFCColorTextView::DV_Draw(dvaui::drawbot::Drawbot* drawbotP) const
 		// (Both widths are what a subtraction leaves - the kind KFCEllipsize keeps from the SDK's call when it
 		// lands where that call never comes back.)
 		const PMReal rem = availWidth - matchW;
-		const PMString preCut = KFCEllipsize(rem, pre, fontInfo, kEllipsizeBeginning);
-		const PMReal preCutW = KFCDrawnWidth(preCut, fontInfo);
-
-		const PMReal postBudget = rem - preCutW;
-		PMString postCut;
+		preRun = KFCEllipsize(rem, pre, fontInfo, kEllipsizeBeginning);
+		const PMReal postBudget = rem - KFCDrawnWidth(preRun, fontInfo);
 		if (!post.IsEmpty() && postBudget > PMReal(0.0))
-			postCut = KFCEllipsize(postBudget, post, fontInfo, kEllipsizeEnd);
+			postRun = KFCEllipsize(postBudget, post, fontInfo, kEllipsizeEnd);
+	}
 
-		drawRun(preCut, kContextColor);
-		drawMatch(match);
-		drawRun(postCut, kContextColor);
+	// WHERE THE MATCH LANDS, AND THE PART OF IT THAT IS CHARACTERS OF ITS OWN (a cut one ends in dots no mark or reading stands over).
+	const PMReal matchX = lineX + KFCDrawnWidth(preRun, fontInfo);
+	int32 matchChars = 0;
+	if (twoLines && !wantCaret)
+	{
+		const int32 most = (matchRun.CharCount() < match.CharCount()) ? matchRun.CharCount() : match.CharCount();
+		while (matchChars < most && matchRun.GetWChar(matchChars) == match.GetWChar(matchChars))
+			++matchChars;
+	}
+	// How far a character of the match stands from its start, as the line draws it.
+	auto widthToChar = [&](int32 n) -> PMReal
+	{
+		if (n <= 0)
+			return PMReal(0.0);
+		PMString head(matchRun);
+		head.SetTranslatable(kFalse);
+		if (n < head.CharCount())
+			head.Remove(n, head.CharCount() - n);
+		return KFCDrawnWidth(head, fontInfo);
+	};
+
+	// THE MARKS, PAINTED FIRST: KFCMarkPassView's pass blits over the whole cell, so anything drawn before it could be painted over. A row whose mark has gone draws a bar instead (below).
+	KFCKentenMark::Marks marks;
+	if (twoLines && !upper.gone && upper.mark != 0 && matchChars > 0)
+		KFCKentenMark::PlanOverRun(fontInfo, upper.mark, matchX, widthToChar(matchChars), matchChars, upperLineHeight,
+			frame.Top() + (upperLineHeight / PMReal(2.0)), rightEdge, kFullColor, marks);
+	this->PaintMarks(drawbotP, marks);
+
+	// The lower line: the locator, its flag, the line.
+	drawRun(locator, kMatchColor);
+	drawRun(flagRun, kAccentColor);
+	x = lineX;
+	drawRun(preRun, kContextColor);
+	// The match at the running x: its characters, or the bar in their place - spanning the line a pixel
+	// short of each edge, as KCM's one-line change row draws it.
+	if (wantCaret)
+	{
+		KFCDrawCaret(drawbotP, kMatchColor, x, matchW, lineTop + PMReal(1.0), (lineBottom - lineTop) - PMReal(2.0));
+		x += matchW;
+	}
+	else
+		drawRun(matchRun, kMatchColor);
+	drawRun(postRun, kContextColor);
+
+	if (!twoLines)
+		return;
+
+	// THE UPPER LINE (KCM's): its box, a pixel short of the cell's top, the strings centred in it by the draw itself.
+	const PMRect upperBox(frame.Left(), frame.Top(), rightEdge, lineTop);
+	// A ROW WHOSE RUBY OR KENTEN WAS TAKEN OFF: a bar over the match - what is gone is said where it stood, as KCM's row says it.
+	if (upper.gone)
+	{
+		const PMReal barW = KFCDrawnWidth(KFCCaretPlaceholder(), fontInfo);
+		KFCDrawCaret(drawbotP, kFullColor, matchX, barW, frame.Top() + PMReal(1.0), upperLineHeight - PMReal(2.0));
+		return;
+	}
+	KFCKentenMark::WriteGlyphs(drawbotP, fontInfo, marks, upperBox.Top(), upperBox.Bottom());
+	// THE READINGS: each over its own characters, centred on them, starting no further left than the cell or the reading before it (spec F12: a long one pushes the next rather than stands on it).
+	PMReal nextFree = frame.Left();
+	for (size_t r = 0; r < upper.runs.size(); ++r)
+	{
+		const KFCRowUpperRun& run = upper.runs[r];
+		if (run.reading.IsEmpty() || run.offset >= matchChars)
+			continue;		// (a run beyond where the cut line ended)
+		const int32 runEnd = (run.offset + run.length < matchChars) ? run.offset + run.length : matchChars;
+		const PMReal runLeft = matchX + widthToChar(run.offset);
+		const PMReal runRight = matchX + widthToChar(runEnd);
+		const PMReal readingW = KFCDrawnWidth(run.reading, fontInfo);
+		PMReal readingX = (runLeft + runRight - readingW) / PMReal(2.0);
+		if (readingX < nextFree)
+			readingX = nextFree;
+		if (readingX >= rightEdge)
+			break;
+		PMString shown(run.reading);
+		shown.SetTranslatable(kFalse);
+		if (readingX + readingW > rightEdge)
+			shown = KFCEllipsize(rightEdge - readingX, run.reading, fontInfo, kEllipsizeEnd);
+		StringUtils::PMDrawStringRGB(drawbotP, PMRect(readingX, upperBox.Top(), rightEdge, upperBox.Bottom()), kAlignLeft, shown, fontInfo, kFullColor,
+			kKFCDontConvertAmpersand, kTrue /*centerVertically*/, kKFCNoUnderline, kKFCTextSmoothing);
+		nextFree = readingX + KFCDrawnWidth(shown, fontInfo) + PMReal(2.0);
 	}
 }
 

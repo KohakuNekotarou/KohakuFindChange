@@ -108,6 +108,7 @@ namespace
 		virtual void GetRunNames(PMString& out) { out.Clear(); }
 		virtual bool ListHasOwnChangeTab() { return false; }
 		virtual bool ListIsTables() { return false; }
+		virtual bool ListDrawsTwoLines() { return false; }
 	};
 
 	class KFCRunsStandInImpl : public IKFCRuns
@@ -186,6 +187,15 @@ namespace
 		virtual bool ReadKohakuQuery(const IDFile&, KFCKohakuQueryData& out) { out = KFCKohakuQueryData(); return false; }
 		virtual void KohakuQueryText(const KFCKohakuQueryData&, PMString& outText) { outText.Clear(); }
 		virtual bool KohakuQueryFile(int32, const PMString&, IDFile&) { return false; }
+		virtual bool TableNext(const KFCTableLook&, KFCTableFound& out) { out = KFCTableFound(); SayWhy(out.words); return false; }
+		virtual bool TableChangeFound(const KFCTableFound&, PMString& outWords) { SayWhy(outWords); return false; }
+		virtual bool TableChangeAll(const KFCTableLook&, int32& outChanged, int32& outMatched, PMString& outWords)
+		{
+			outChanged = 0;
+			outMatched = 0;
+			SayWhy(outWords);
+			return false;
+		}
 	};
 
 	class KFCChaptersStandInImpl : public IKFCChapters

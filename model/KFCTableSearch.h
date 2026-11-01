@@ -56,6 +56,19 @@ namespace KFCTableSearch
 	/** A QUERY RUN'S WRITE OF ONE DOCUMENT (KFCKohakuQuery::WriteDocument): the tables the conditions list, given their Change side, with no rows. outCount = the tables written. False = InDesign would not write one. */
 	bool WriteDocument(const UIDRef& docRef, const KFCTableConditions& asked, const std::vector<KFCSearchEngine::ListedPlace>* part, int32& outCount);
 
+	/** THE PART'S FIND NEXT (docs/superpowers/specs/2026-11-01-kfc-kohaku-trial-fixes-design.md F3, F4): the next table of its Search: in the list's own order - document by document, each in page order - walked anew at every press, what was added or taken away met. From
+	    where (InDesign's Text tab, measured): the selection as the last landing left it = the table after that one; moved = the first after it in its story, else the one after its story's last table, else - no table in that story, or no text selected - the one after the table
+	    found last; and after the last the first, silently. Story, To End of Story and Selection are read when the selection has moved and kept while it has not: a landing moves the selection onto a table, and read again they would shrink to it. A Search: the selection does not
+	    offer goes over the document (out.note says so, the Text tab's words). Read only; Book Scope is not asked (QR Code's Find Next's rule: the dialog's buttons know no book). False = no table: out.words empty, or why it did not look. */
+	bool Next(const KFCTableLook& look, KFCTableFound& out);
+
+	/** THE PART'S CHANGE: the table Find Next found given its Change side, in one undoable step (KFCReplaceEngine::WriteFaceTables). outWords = what it did, or why it did not. */
+	bool ChangeFound(const KFCTableFound& found, PMString& outWords);
+
+	/** THE PART'S CHANGE ALL: every table of the Search: (Next's range) given it, in one undoable step - a locked one, one that already reads so and one whose document has no such style left, and counted in outWords. outMatched = the tables the conditions found, outChanged = those written.
+	    False = no document, or InDesign would not write one: nothing was changed, outWords says so. */
+	bool ChangeAll(const KFCTableLook& look, int32& outChanged, int32& outMatched, PMString& outWords);
+
 	/** What a row draws for a table: "<rows>x<columns> <style>", " +" for overrides of its own. */
 	PMString TableWords(ITableModel* table);
 

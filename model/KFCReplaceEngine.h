@@ -283,6 +283,19 @@ namespace KFCReplaceEngine
 	    changed since it, the row replaced / locked / not a work row, its document closed, its story changed, a run
 	    going - or the write did not land. The UI shows it on the message area when the row is selected. */
 	bool PreviewHit(int32 chapterIdx, int32 hitIdx, PMString& outAfter);
+
+	/** ONE TABLE THE TABLE PART'S BUTTONS WRITE (KFCTableSearch::ChangeFound, ChangeAll - docs/superpowers/specs/2026-11-01-kfc-kohaku-trial-fixes-design.md F6 - F8). Its document is open: the caller asked. */
+	struct FaceTable
+	{
+		UIDRef	doc;
+		UID		story;
+		UID		table;
+		UID		style;		// the Change side's style in its document; kInvalidUID = it keeps its own
+	};
+
+	/** THESE TABLES GIVEN THE CHANGE SIDE - no row asked for it - in one undoable step, across documents too. A row of the table list that stands for one of them reads as its own Replace would leave it (Styled,
+	    what it draws now) and goes back with the step's Ctrl+Z, so the list and the page do not disagree (F8). False = InDesign would not write one: nothing was changed, outWhy says so. */
+	bool WriteFaceTables(const std::vector<FaceTable>& tables, bool clearOverrides, PMString& outWhy);
 }
 
 #endif // __KFCReplaceEngine_h__

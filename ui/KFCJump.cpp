@@ -41,6 +41,8 @@
 #include "ISelectionUtils.h"		// GetActiveSelection - the active context's selection (the document the jump fronted)
 #include "ITextModel.h"
 #include "ITextSelectionSuite.h"	// SetTextSelection - a click selects its row's match (SelectMatchOnClick)
+#include "IConcreteSelection.h"		// ReadTextSelection - the text selection's concrete boss
+#include "ITextTarget.h"			// ...its story and range
 #include "ITool.h"					// IsToolOfType(kTextSelectionTool) - is a text tool already active?
 #include "IToolBoxUtils.h"			// QueryActiveTool / QueryTool / SetActiveTool
 #include "IWaxStrand.h"
@@ -1041,6 +1043,7 @@ const char* NotSelectedWords(NotSelected why)
 // put on, as Find Next does (PutTypeToolOn - the author's call); the keyboard stays on the list - the row's LButtonUp
 // acquires it after the jump, the walk takes it back - so the arrows walk on and Return replaces. The document is in
 // front and composed, inside JumpToHit's dirty guard, its selection cleared.
+NotSelected SelectRangeNow(const UIDRef& storyRef, TextIndex start, TextIndex end, bool hidden);
 NotSelected SelectMatchOnClick(int32 chapterIdx, int32 hitIdx, const UIDRef& storyRef, TextIndex start, TextIndex end,
 	bool found)
 {
@@ -1053,6 +1056,12 @@ NotSelected SelectMatchOnClick(int32 chapterIdx, int32 hitIdx, const UIDRef& sto
 	KFCResults()->GetHitReach(chapterIdx, hitIdx, locked, hidden);
 	if (locked)
 		return kNotSelectedLocked;
+	return SelectRangeNow(storyRef, start, end, hidden);
+}
+
+// [start, end) OF THE STORY SELECTED, THE TYPE TOOL ON (SelectMatchOnClick's, the Table part's Find Next's). Asks no lock.
+NotSelected SelectRangeNow(const UIDRef& storyRef, TextIndex start, TextIndex end, bool hidden)
+{
 	InterfacePtr<ITextModel> textModel(storyRef, UseDefaultIID());
 	if (textModel == nil)
 		return kNotSelectedQuietly;
@@ -1607,6 +1616,86 @@ bool KFCJump::LandOnQRCode(const UIDRef& frameRef, int32 reach, PMString& outNot
 		return true;
 	}
 	SelectItem(frameRef);
+	return true;
+}
+
+void KFCJump::LandOnTable(const UIDRef& storyRef, TextIndex start, TextIndex end, int32 reach, PMString& outNote, bool& outSelected)
+{
+	outNote.Clear();
+	outNote.SetTranslatable(kFalse);
+	outSelected = false;
+	if (gActivating)
+		return;		// a landing still under way (gActivating) - the next press lands
+	IDataBase* const db = storyRef.GetDataBase();
+	if (db == nil)
+		return;
+	const ActivationGuard activating;
+	MarkerUnlessRaised marker;		// a text row's marker still up goes, unless this one raises its own (a locked table's)
+	// ON A HIDDEN SPREAD NOTHING MOVES (JumpToHit's rule, and InDesign's Find Next's).
+	if ((reach & kKFCQRReachHiddenSpread) != 0)
+	{
+		outNote.Append("That table is on a hidden spread - not shown, not selected.");
+		return;
+	}
+	// Search: of InDesign's own tab as it is BEFORE this landing fronts a document or selects (ScopeKeep, above JumpToHit).
+	ArmNativeScopeKeep();
+	IDataBase::SaveRestoreModifiedState dirtyGuard(db);
+	RecomposeIfDamaged(storyRef);
+	// Its document in front - no previous chapter hidden: Find Next walks open documents, not a book's list.
+	if (!FrontChapter(UIDRef(db, db->GetRootUID()), false))
+		return;
+	ClearSelection();
+	InterfacePtr<IControlView> frontView(Utils<ILayoutUIUtils>()->QueryFrontView());
+	EnsureSpreadInView(frontView, storyRef, start);
+	const bool overset = (reach & kKFCQRReachOverset) != 0;
+	const bool locked = (reach & kKFCQRReachLocked) != 0;
+	const bool hidden = (reach & kKFCQRReachHidden) != 0;
+	PMRect pbRect;
+	bool drawn = false;
+	if (overset)
+	{
+		const KFCOversetLoc loc = KFCRuns()->FindOversetLocator(storyRef, start);
+		if (loc.found)
+			ScrollViewToPoint(frontView, loc.outportPb);
+	}
+	else if (GetFirstChunkPasteboardRect(storyRef, start, end, pbRect))
+	{
+		drawn = true;
+		ScrollViewToPoint(frontView, PBPMPoint((pbRect.Left() + pbRect.Right()) / PMReal(2.0), (pbRect.Top() + pbRect.Bottom()) / PMReal(2.0)));
+	}
+	if (locked)
+	{
+		if (drawn)
+			marker.Raise(db, storyRef.GetUID(), start, end);
+		outNote.Append("That table is locked - not selected.");
+		return;
+	}
+	outSelected = (SelectRangeNow(storyRef, start, end, hidden) != kNotSelectedQuietly);
+	if (overset)
+		outNote.Append("(Overset Text) The table is selected, past the end of its frames - nothing of it shows on the page.");
+	else if (hidden)
+		outNote.Append("The table is selected, on a hidden layer - nothing of it shows.");
+}
+
+bool KFCJump::ReadTextSelection(UIDRef& outStory, TextIndex& outStart, TextIndex& outEnd)
+{
+	outStory = UIDRef::gNull;
+	outStart = kInvalidTextIndex;
+	outEnd = kInvalidTextIndex;
+	ISelectionManager* const selection = Utils<ISelectionUtils>()->GetActiveSelection();
+	if (selection == nil || !selection->SelectionExists(kTextSelectionBoss, ISelectionManager::kAnySelection))
+		return false;
+	InterfacePtr<IConcreteSelection> concrete(selection->QueryConcreteSelectionBoss(kTextSelectionBoss));
+	InterfacePtr<ITextTarget> target(concrete, UseDefaultIID());
+	if (target == nil)
+		return false;
+	const UIDRef story(target->GetTextModel());
+	if (story == UIDRef::gNull)
+		return false;
+	const RangeData range(target->GetRange());
+	outStory = story;
+	outStart = range.Start(nil);
+	outEnd = range.End();
 	return true;
 }
 

@@ -16,9 +16,12 @@
 //             InDesign's faces' buttons) and two lines for what it says.
 //    Table    Find Table Style: ([Any Table Style] and the front document's table styles), With Overrides Only, Change to Table Style: ([Leave As It Is] and the styles), Clear Overrides. A
 //             style is held by its full path, untranslated: a list's search and a row's Replace read it by name in each document (KFCTableSearch). The lists follow the front document and its
-//             styles while the face is shown, and a style the front document does not have stays on the list while it is asked for.
-//    Ruby     Look For: (Text With Ruby / Text Without Ruby / Ruby Marks in Text), Base Text:, Ruby:, Change Ruby To:, Remove Ruby. The fields are kept at every key stroke: the panel's Find may be
-//             pressed with one still focused.
+//             styles while the face is shown, and a style the front document does not have stays on the list while it is asked for. BESIDE THEM InDesign's four buttons, its place and size
+//             (docs/superpowers/specs/2026-11-01-kfc-kohaku-trial-fixes-design.md F1 - F9): Find Next (KFCTableSearch::Next, KFCJump::LandOnTable), Change and Change/Find - grey until it has found a table, and once the selection leaves that
+//             table or it is written, as the Text tab's - and Change All (KFCTableSearch::ChangeFound, ChangeAll), and two lines for what they say.
+//    Ruby     Look For: (Text With Ruby / Text Without Ruby / Ruby Marks in Text), and the boxes (the author, 11-01): Find's Ruby: over its Base Text:, more or fewer with + and -, a chain between neighbours that makes their reading one - group ruby - and Change Ruby To's, which
+//             follow them, column for column and join for join, the column's base text under each as words. A search reads the boxes' words run together. No Change reading at all takes the ruby off (KFCRubyChangePlan.h). The fields are kept at every key stroke: the panel's
+//             Find may be pressed with one still focused.
 //    Kenten   Look For: (Text With Kenten / Text Without Kenten), Base Text:, Kenten: ([Any Kenten] and the kinds), Change Kenten To: ([Leave As It Is] and the kinds), Remove Kenten.
 //  While the face is the dialog's tab - or was when the dialog closed, the face it opens on again - KFC's Find looks for what its Find: says (KFCQRSearch, KFCTableSearch, KFCRubySearch in the model
 //  half, which ask through IKFCUIServices).

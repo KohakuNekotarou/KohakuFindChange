@@ -30,6 +30,9 @@
 - **KENTEN-20** ★行は文字の行。一致の部分に `親文字《印》`（`﹅﹆◉●•◎▲△○◦`、Custom は `✱`）。着地・ページ・ロック・編集に付いていく・Copy・Clear はふつうの文字の行のまま。（K21）回帰 `kt-click`・`kt-next`・`kt-copy`・`kt-clear`・`kt-edit-moved`・`kt-locked`
   - 訂正:
 
+- **KENTEN-21** ★**行は2行で描く**（作者 11-01「KCM の様に」・RUBY-21 と同じ作り）＝下の段に親文字、上の段に文字ごとの印＝KCM の描き方＝字でなく図形（`ui/KFCKentenMark.*`＝`KFCMarkPassView`・AGM で字より先に）。Custom は `✱` を字で書く。圏点を消した行は上の段に棒。⚠部品の文字と Copy は `親文字《印》` のまま。（F10〜F13）回帰 `kt-two-*`
+  - 訂正:
+
 ## 4. Replace
 
 - **KENTEN-30** ★行の右クリックの Replace と Return＝**その時の面の Change 側**。Change Kenten To＝その種類（Custom は無い）。書くのは種類の属性だけ＝見た目は触らない。Remove Kenten＝★**圏点の属性を全部外す**（19個＝`ClearOverridesCmd`・Change Kenten To より優先・サイズ・フォント・色なども本文に残さない＝作者 10-31「圏点の方もしっかり消せるか」）。文字スタイル・段落スタイルの圏点は、その文字の上で種類を「なし」にする（スタイルは他の文字のもの）。一緒に Ctrl+Z 1回で戻る。（K22）回帰 `kt-change-one`・`kt-change-all`・`kt-without-apply`・`kt-remove`・`kt-remove-wins`・`kt-remove-style`・`kt-remove-all`・`kt-remove-style-all`・`kt-remove-parastyle`・`kt-undo-remove-all`・`kt-undo-remove-style`・`kt-change-keeps-look`・`kt-return`・`kt-cell-change`

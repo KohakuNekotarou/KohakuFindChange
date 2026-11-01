@@ -44,6 +44,7 @@
 #include "IDList.fh"		// the Kohaku tab's offer to Find/Change (IDList / IDListPair - KFCKohakuTab.cpp)
 #include "IDListPair.fh"
 #include "FindChangeID.h"	// kFindChangeMiniTabbedDialogService - the dialog the QR Code tab is offered to
+#include "LinksUIID.h"		// kLinksUIPluginID - the Ruby part's + and -, the Captions dialog's own icons
 
 // Project includes:
 #include "KFCUIID.h"
@@ -629,6 +630,7 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 			IID_IPANELCREATOR, kKFCKohakuTabPanelCreatorImpl,
 			IID_IOBSERVER, kKFCKohakuTabObserverImpl,
 			IID_IDIALOGCONTROLLER, kKFCKohakuTabControllerImpl,
+			IID_IKFCKOHAKUSELECTIONOBSERVER, kKFCKohakuTabSelectionObserverImpl,	// the selection, while the face is shown - Change grey once it leaves what Find Next found (the face's AutoAttach attaches it)
 		}
 	},
 
@@ -2016,6 +2018,14 @@ resource LocaleIndex (kKFCResultHitNodeWidgetRsrcID)
 	}
 };
 
+resource LocaleIndex (kKFCResultTallHitNodeWidgetRsrcID)
+{
+	kViewRsrcType,
+	{
+		kWildFS, k_Wild, 	kKFCResultTallHitNodeWidgetRsrcID + index_enUS
+	}
+};
+
 /*  
  * Type definition.
  */
@@ -2378,6 +2388,43 @@ resource KFCResultNodeWidget(kKFCResultHitNodeWidgetRsrcID + index_enUS)
 			kKFCResultTextWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
 			kBindLeft | kBindRight,			// Frame binding: take the rest of the row
 			Frame(26, 1, 292, 17),			// Frame (indented; the widget manager re-places it)
+			kTrue, kTrue,					// Visible, Enabled
+			"",								// Panel name
+			{
+			}
+		),
+	}
+};
+
+/*
+ * A HIT ROW ON TWO LINES (a ruby or kenten list's - the author, 11-01: as KCM's change rows): the hit row above, twice as tall - the cell draws what stands above the match on its upper line. Its eye on the
+ * lower line, beside the row's text. The widget manager places both across (LayOutHitRow), as it does the hit row's.
+ */
+resource KFCResultNodeWidget(kKFCResultTallHitNodeWidgetRsrcID + index_enUS)
+{
+	__FILE__, __LINE__,
+	kKFCResultTallHitNodeWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+	kBindLeft | kBindRight,				// Frame binding: follow the list's width
+	Frame(0, 0, 296, kKFCResultTallRowHeight),	// Frame (left, top, right, bottom)
+	kTrue, kTrue,						// Visible, Enabled
+	"",									// Panel name
+	{
+		KFCResultEyeWidget
+		(
+			kKFCResultEyeWidgetID,				// WidgetId
+			kEyeballIcon,						// RsrcId
+			kApplicationRsrcPluginID,
+			kBindNone,							// Frame binding
+			Frame(2, 20, 18, 36),				// Frame (left, top, right, bottom)
+			kTrue, kTrue,						// Visible, Enabled
+			kStyledIconSuiteFlushedButtonType,	// flat, as the hit row's
+			0,									// no associated widget
+		),
+		KFCColorTextWidget
+		(
+			kKFCResultTextWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+			kBindLeft | kBindRight,			// Frame binding: take the rest of the row
+			Frame(26, 2, 292, 36),			// Frame - two lines of 17, the hit row's height for one
 			kTrue, kTrue,					// Visible, Enabled
 			"",								// Panel name
 			{
@@ -3662,12 +3709,21 @@ resource LocaleIndex (kKFCKohakuTabRsrcID)
 	}
 };
 
+// A box of the Ruby part, a chain between two, and a column's base text on the Change side (the grid in the face, below): the same widget every time, only the place differs.
+#define KFC_RUBY_BOX(boxID, boxTop, boxBottom) EVETextEditBoxWidget(boxID, kSysEditBoxPMRsrcId, kBindNone, Frame(115, boxTop, 175, boxBottom) kTrue, kTrue, kInvalidWidgetID, 1.0, 10.0, 0, kFalse, kTrue, kFalse, kTrue, 0, 0, "", kEVENoSpaceAfter,)
+// (A base box takes one character - the author, 11-01: a reading goes over the characters of its columns, and joining is how it goes over more. IEditBoxAttributes::SetMaxNumChars' number, the box's own limit: the editbox prevents users from entering more.)
+#define KFC_RUBY_BASE_BOX(boxID) EVETextEditBoxWidget(boxID, kSysEditBoxPMRsrcId, kBindNone, Frame(115, 41, 175, 62) kTrue, kTrue, kInvalidWidgetID, 1.0, 10.0, 1, kFalse, kTrue, kFalse, kTrue, 0, 0, "", kEVENoSpaceAfter,)
+#define KFC_RUBY_CHAIN(chainID) EVEChainButtonWidget(chainID, kChainIconConstrained, kApplicationRsrcPluginID, kBindNone, Frame(165, 21, 185, 41) kTrue, kTrue, kADBEIconSuiteButtonType, kEVENoSpaceAfter,)
+#define KFC_RUBY_WORDS(wordsID) KFCQueryFixedTextWidget(wordsID, kSysStaticTextPMRsrcId, kBindNone, Frame(115, 96, 175, 116) kTrue, kTrue, kAlignCenter, kEllipsizeEnd, kFalse, "", kInvalidWidgetID kEVENoSpaceAfter,)
+
 /*
  * THE FACE: Find: and Search: over the part Find: chooses, the parts stacked one on another (KFCKohakuTab.cpp shows one and hides and disables the others). No Done: the dialog's frame has one on every
  * tab (QR-24 - measured).
  * LAID OUT AS INDESIGN'S OWN FACES (the author's call: "match the Object tab's button sizes and positions" - measured on its Object tab, the face 486 x 356): a margin of 15 all round; the left part
- * 330 wide - "Find:" and "Search:" (55, no room beside them: the author's call) and their lists (170) in a row each, 5 apart - and 10 to the buttons' column, whose button is 116 x 26 from the top right
- * (15 + 330 + 10 + 116 + 15 = 486, the face's width).
+ * 330 wide - "Find:" and "Search:", each with its list (170) under its word (the author, 11-01; nothing else on the face stands so but the Table part's own) - and 10 to the buttons' column, whose buttons are 116 x 26, 5 apart, from the top right
+ * (15 + 330 + 10 + 116 + 15 = 486, the face's width; at 15, 46, 77 and 108 from the face's top, as the Object tab's Find Next, Change, Change All and Change/Find - docs/ai-notes/kfc-native-text-tab-measure-2026-11-01.md).
+ * THE COLUMN STANDS WHOLE IN THE HEAD, AND NOTHING STANDS OVER ANYTHING: the head is its height, so the parts start under it - 138 from the face's top - with the whole width (the QR Code part's lines, the Ruby part's fields). The left part reaches as far down as the column, and Find
+ * Table Style:'s words stand there, shown on Table alone: its part takes all the height the face has (356 - 15 under it; a face taller than InDesign's is not measured), so its lines are a little closer than the other parts' too.
  */
 resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 {
@@ -3687,122 +3743,202 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 			kBindNone,
 			Frame(0, 0, 456, 0)
 			kTrue, kTrue,
-			kEVEAlignLeft | kEVELargeSpaceAfter | kEVEArrangeChildrenInRow | kEVENoMargin,
+			kEVEAlignLeft | kEVESmallSpaceAfter | kEVEArrangeChildrenInRow | kEVENoMargin,
 			{
 				EVEGenericPanelWidget
 				(
 					kInvalidWidgetID, kPMRsrcID_None,
 					kBindNone,
-					Frame(0, 0, 330, 0)
+					Frame(0, 0, 330, 120)
 					kTrue, kTrue,
 					kEVEAlignLeft | kEVELargeSpaceAfter | kEVEArrangeChildrenInColumn | kEVENoMargin,
 					{
-						// Find: [QR Code]
-						EVEGenericPanelWidget
-						(
-							kInvalidWidgetID, kPMRsrcID_None,
-							kBindNone,
-							Frame(0, 0, 230, 21)
-							kTrue, kTrue,
-							kEVEAlignLeft | kEVERegularSpaceAfter | kEVEArrangeChildrenInRow | kEVENoMargin,
-							{
-								EVEStaticTextWidget
-								(
-									kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone,
-									Frame(0, 0, 55, 21)
-									kTrue, kTrue, kAlignLeft,
-									kDontEllipsize, kTrue,
-									kKFCKohakuFindLabelKey,		// "Find:"
-									0,
-									kEVERegularSpaceAfter,
-								),
-								EVEDropDownListWidget
-								(
-									kKFCKohakuTabKindWidgetID, kSysDropDownPMRsrcId, kBindNone,
-									Frame(0, 0, 170, 21)
-									kTrue, kTrue,
-									{{
-										kKFCKohakuTabQRCodeKey,
-										kKFCKohakuTabTableKey,
-									}}
-									kEVENoSpaceAfter,
-								),
-							}
-						),
-						// (the left part's width, the lists being narrower: what keeps Find Next at the top right)
+						// Find: over [QR Code]. (Its word is the left part's width, the lists being narrower: what keeps the column at the top right.)
 						KFCQueryFixedTextWidget
 						(
 							kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone,
-							Frame(0, 0, 330, 1)
+							Frame(0, 0, 330, 20)
 							kTrue, kTrue, kAlignLeft,
 							kEllipsizeEnd, kFalse,
-							"",
+							kKFCKohakuFindLabelKey,		// "Find:"
+							kInvalidWidgetID
+							kEVESmallSpaceAfter,
+						),
+						EVEDropDownListWidget
+						(
+							kKFCKohakuTabKindWidgetID, kSysDropDownPMRsrcId, kBindNone,
+							Frame(0, 0, 170, 21)
+							kTrue, kTrue,
+							{{
+								kKFCKohakuTabQRCodeKey,
+								kKFCKohakuTabTableKey,
+							}}
+							kEVERegularSpaceAfter,
+						),
+						// Search: over [Document] - its three more for what stands in a story's text: KFCKohakuTab.cpp's ShowScopeEntries
+						KFCQueryFixedTextWidget
+						(
+							kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone,
+							Frame(0, 0, 330, 21)
+							kTrue, kTrue, kAlignLeft,
+							kEllipsizeEnd, kFalse,
+							kKFCKohakuTabSearchKey,		// "Search:"
+							kInvalidWidgetID
+							kEVESmallSpaceAfter,
+						),
+						EVEDropDownListWidget
+						(
+							kKFCKohakuTabScopeWidgetID, kSysDropDownPMRsrcId, kBindNone,
+							Frame(0, 0, 170, 21)		// the faces' Search: list
+							kTrue, kTrue,
+							{{
+								kKFCKohakuTabAllDocumentsKey,
+								kKFCKohakuDocumentKey,
+							}}
+							kEVERegularSpaceAfter,
+						),
+						// (Table's, its list under it in its part - this frame's note says why here. KFCKohakuTab.cpp shows it with that part.)
+						KFCQueryFixedTextWidget
+						(
+							kKFCTableTabFindLabelWidgetID, kSysStaticTextPMRsrcId, kBindNone,
+							Frame(0, 0, 330, 21)
+							kTrue, kTrue, kAlignLeft,
+							kEllipsizeEnd, kFalse,
+							kKFCTableTabFindStyleKey,
 							kInvalidWidgetID
 							kEVENoSpaceAfter,
 						),
-						// Search: [Document] - its three more for what stands in a story's text: KFCKohakuTab.cpp's ShowScopeEntries
-						EVEGenericPanelWidget
-						(
-							kInvalidWidgetID, kPMRsrcID_None,
-							kBindNone,
-							Frame(0, 0, 230, 21)
-							kTrue, kTrue,
-							kEVEAlignLeft | kEVENoSpaceAfter | kEVEArrangeChildrenInRow | kEVENoMargin,
-							{
-								EVEStaticTextWidget
-								(
-									kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone,
-									Frame(0, 0, 55, 21)			// the faces' label (their "Search (S) :")
-									kTrue, kTrue, kAlignLeft,
-									kDontEllipsize, kTrue,
-									kKFCKohakuTabSearchKey,		// "Search:"
-									0,
-									kEVERegularSpaceAfter,
-								),
-								EVEDropDownListWidget
-								(
-									kKFCKohakuTabScopeWidgetID, kSysDropDownPMRsrcId, kBindNone,
-									Frame(0, 0, 170, 21)		// the faces' Search: list
-									kTrue, kTrue,
-									{{
-										kKFCKohakuTabAllDocumentsKey,
-										kKFCKohakuDocumentKey,
-									}}
-									kEVENoSpaceAfter,
-								),
-							}
-						),
 					}
 				),
-				// the buttons' column: Find Next, as the faces' Find Next (116 x 26, top right). THE STRUT UNDER IT holds the column's size: once, in a long session, the column stood 0 x 0 with Find Next outside it, visible,
-				// enabled and taking no click (2026-10-31). What brought it on is not known - the flows tried do not - so this guards, it does not cure.
+				// the buttons' column (116 x 26, top right): Find Next, QR Code's and Table's, and Table's other three. EACH BUTTON STANDS ON A STRUT that holds its place's size: once, in a long session, the column stood 0 x 0 with Find Next outside it,
+				// visible, enabled and taking no click (2026-10-31). What brought it on is not known - the flows tried do not - so this guards, it does not cure.
 				EVEGenericPanelWidget
 				(
 					kInvalidWidgetID, kPMRsrcID_None,
 					kBindNone,
-					Frame(0, 0, 116, 26)
+					Frame(0, 0, 116, 119)
 					kTrue, kTrue,
-					kEVEAlignLeft | kEVENoSpaceAfter | kEVEArrangeChildrenStacked | kEVENoMargin,
+					kEVEAlignLeft | kEVENoSpaceAfter | kEVEArrangeChildrenInColumn | kEVENoMargin,
 					{
-						KFCQueryFixedTextWidget
+						EVEGenericPanelWidget
 						(
-							kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone,
+							kInvalidWidgetID, kPMRsrcID_None,
+							kBindNone,
 							Frame(0, 0, 116, 26)
-							kTrue, kTrue, kAlignLeft,
-							kEllipsizeEnd, kFalse,
-							"",
-							kInvalidWidgetID
-							kEVENoSpaceAfter,
+							kTrue, kTrue,
+							kEVEAlignLeft | kEVERegularSpaceAfter | kEVEArrangeChildrenStacked | kEVENoMargin,
+							{
+								KFCQueryFixedTextWidget
+								(
+									kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone,
+									Frame(0, 0, 116, 26)
+									kTrue, kTrue, kAlignLeft,
+									kEllipsizeEnd, kFalse,
+									"",
+									kInvalidWidgetID
+									kEVENoSpaceAfter,
+								),
+								EVEButtonWidget
+								(
+									kKFCQRTabFindNextWidgetID,	// WidgetId
+									kSysButtonPMRsrcId,			// RsrcId
+									kBindNone,					// Frame binding
+									Frame(0, 0, 116, 26)		// Frame
+									kTrue, kTrue,				// Visible, Enabled
+									kKFCQRTabFindNextKey,		// "Find Next"
+									kEVENoSpaceAfter,
+								),
+							}
 						),
-						EVEButtonWidget
+						EVEGenericPanelWidget
 						(
-							kKFCQRTabFindNextWidgetID,	// WidgetId
-							kSysButtonPMRsrcId,			// RsrcId
-							kBindNone,					// Frame binding
-							Frame(0, 0, 116, 26)		// Frame
-							kTrue, kTrue,				// Visible, Enabled
-							kKFCQRTabFindNextKey,		// "Find Next"
-							kEVENoSpaceAfter,
+							kInvalidWidgetID, kPMRsrcID_None,
+							kBindNone,
+							Frame(0, 0, 116, 26)
+							kTrue, kTrue,
+							kEVEAlignLeft | kEVERegularSpaceAfter | kEVEArrangeChildrenStacked | kEVENoMargin,
+							{
+								KFCQueryFixedTextWidget
+								(
+									kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone,
+									Frame(0, 0, 116, 26)
+									kTrue, kTrue, kAlignLeft,
+									kEllipsizeEnd, kFalse,
+									"",
+									kInvalidWidgetID
+									kEVENoSpaceAfter,
+								),
+								EVEButtonWidget
+								(
+									kKFCTableTabChangeWidgetID,	// WidgetId
+									kSysButtonPMRsrcId,			// RsrcId
+									kBindNone,					// Frame binding
+									Frame(0, 0, 116, 26)		// Frame
+									kTrue, kTrue,				// Visible, Enabled
+									kKFCTableTabChangeKey,		// "Change"
+									kEVENoSpaceAfter,
+								),
+							}
+						),
+						EVEGenericPanelWidget
+						(
+							kInvalidWidgetID, kPMRsrcID_None,
+							kBindNone,
+							Frame(0, 0, 116, 26)
+							kTrue, kTrue,
+							kEVEAlignLeft | kEVERegularSpaceAfter | kEVEArrangeChildrenStacked | kEVENoMargin,
+							{
+								KFCQueryFixedTextWidget
+								(
+									kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone,
+									Frame(0, 0, 116, 26)
+									kTrue, kTrue, kAlignLeft,
+									kEllipsizeEnd, kFalse,
+									"",
+									kInvalidWidgetID
+									kEVENoSpaceAfter,
+								),
+								EVEButtonWidget
+								(
+									kKFCTableTabChangeAllWidgetID,	// WidgetId
+									kSysButtonPMRsrcId,				// RsrcId
+									kBindNone,						// Frame binding
+									Frame(0, 0, 116, 26)			// Frame
+									kTrue, kTrue,					// Visible, Enabled
+									kKFCTableTabChangeAllKey,		// "Change All"
+									kEVENoSpaceAfter,
+								),
+							}
+						),
+						EVEGenericPanelWidget
+						(
+							kInvalidWidgetID, kPMRsrcID_None,
+							kBindNone,
+							Frame(0, 0, 116, 26)
+							kTrue, kTrue,
+							kEVEAlignLeft | kEVENoSpaceAfter | kEVEArrangeChildrenStacked | kEVENoMargin,
+							{
+								KFCQueryFixedTextWidget
+								(
+									kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone,
+									Frame(0, 0, 116, 26)
+									kTrue, kTrue, kAlignLeft,
+									kEllipsizeEnd, kFalse,
+									"",
+									kInvalidWidgetID
+									kEVENoSpaceAfter,
+								),
+								EVEButtonWidget
+								(
+									kKFCTableTabChangeFindWidgetID,	// WidgetId
+									kSysButtonPMRsrcId,				// RsrcId
+									kBindNone,						// Frame binding
+									Frame(0, 0, 116, 26)			// Frame
+									kTrue, kTrue,					// Visible, Enabled
+									kKFCTableTabChangeFindKey,		// "Change/Find"
+									kEVENoSpaceAfter,
+								),
+							}
 						),
 					}
 				),
@@ -3854,7 +3990,8 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 						),
 					}
 				),
-				// TABLE: each list under its words (the author's call), long enough for a group's path. No Find Next (the design's T13): the two lines at the foot say where the finding is done.
+				// TABLE: each list under its words (the author's call - the first's words stand in the head), long enough for a group's path. Under those the two lines the buttons speak on (the QR Code part's way), and the two
+				// that say where else its finding and writing are done.
 				EVEGenericPanelWidget
 				(
 					kKFCKohakuTableSectionWidgetID, kPMRsrcID_None,
@@ -3863,16 +4000,6 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 					kTrue, kTrue,
 					kEVEAlignLeft | kEVENoSpaceAfter | kEVEArrangeChildrenInColumn | kEVENoMargin,
 					{
-						EVEStaticTextWidget
-						(
-							kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone,
-							Frame(0, 0, 330, 21)
-							kTrue, kTrue, kAlignLeft,
-							kDontEllipsize, kTrue,
-							kKFCTableTabFindStyleKey,
-							0,
-							kEVESmallSpaceAfter,
-						),
 						EVEDropDownListWidget
 						(
 							kKFCTableTabFindStyleWidgetID, kSysDropDownPMRsrcId, kBindNone,
@@ -3917,12 +4044,34 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 							Frame(0, 0, 200, 19)
 							kTrue, kTrue, kAlignLeft,
 							kKFCTableTabClearOverridesKey,
-							kEVELargeSpaceAfter,
+							kEVERegularSpaceAfter,
+						),
+						KFCQueryFixedTextWidget
+						(
+							kKFCTableTabStatusWidgetID,	// WidgetId - what Find Next found, or what a button did (KFCKohakuTab.cpp)
+							kSysStaticTextPMRsrcId, kBindNone,
+							Frame(0, 0, 456, 17)
+							kTrue, kTrue, kAlignLeft,
+							kEllipsizeEnd, kFalse,
+							"",
+							kInvalidWidgetID
+							kEVEAlignFill | kEVENoSpaceAfter,
+						),
+						KFCQueryFixedTextWidget
+						(
+							kKFCTableTabNoteWidgetID,	// WidgetId - why it could not be selected (KFCKohakuTab.cpp)
+							kSysStaticTextPMRsrcId, kBindNone,
+							Frame(0, 0, 456, 17)
+							kTrue, kTrue, kAlignLeft,
+							kEllipsizeEnd, kFalse,
+							"",
+							kInvalidWidgetID
+							kEVEAlignFill | kEVERegularSpaceAfter,
 						),
 						KFCQueryFixedTextWidget
 						(
 							kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone,
-							Frame(0, 0, 456, 20)
+							Frame(0, 0, 456, 17)
 							kTrue, kTrue, kAlignLeft,
 							kEllipsizeEnd, kFalse,
 							kKFCTableTabGuideFindKey,
@@ -3932,7 +4081,7 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 						KFCQueryFixedTextWidget
 						(
 							kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone,
-							Frame(0, 0, 456, 20)
+							Frame(0, 0, 456, 17)
 							kTrue, kTrue, kAlignLeft,
 							kEllipsizeEnd, kFalse,
 							kKFCTableTabGuideReplaceKey,
@@ -3983,51 +4132,16 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 								),
 							}
 						),
-						// Base Text: [ ]
+						// THE BOXES (the author, 11-01: boxes for the ruby and the kanji, more with a +, joined - Find's, and Change Ruby To's following them). Not arranged: KFCKohakuTab.cpp places each by its column (LayOutRubyGrid - the frames here are the column-less
+						// default) and shows as many as there are. Find: a Ruby: box over a Base Text: box, a chain between neighbours, the + and - at the right: InDesign's own (its Scale dialog's chain, its Captions dialog's + and -). Change: a Change Ruby To box, and the
+						// column's base text under it, as words: it is Find's, not to be edited.
 						EVEGenericPanelWidget
 						(
-							kInvalidWidgetID, kPMRsrcID_None,
+							kKFCRubyGridWidgetID, kPMRsrcID_None,
 							kBindNone,
-							Frame(0, 0, 456, 21)
+							Frame(0, 0, 456, 116)
 							kTrue, kTrue,
-							kEVEAlignLeft | kEVERegularSpaceAfter | kEVEArrangeChildrenInRow | kEVENoMargin,
-							{
-								EVEStaticTextWidget
-								(
-									kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone,
-									Frame(0, 0, 110, 21)
-									kTrue, kTrue, kAlignLeft,
-									kDontEllipsize, kTrue,
-									kKFCRubyTabBaseKey,
-									0,
-									kEVERegularSpaceAfter,
-								),
-								EVETextEditBoxWidget
-								(
-									kKFCRubyTabBaseWidgetID, kSysEditBoxPMRsrcId, kBindNone,
-									Frame(0, 0, 300, 0)		// a height of 0: the field's own
-									kTrue, kTrue,
-									kInvalidWidgetID,		// Nudge control (none)
-									1.0, 10.0,				// Small / large nudge
-									0,						// Max chars (no limit)
-									kFalse,					// Read only
-									kTrue,					// Notify every key stroke
-									kFalse,					// Range checking
-									kTrue,					// Blank entry allowed
-									0, 0,					// Upper / lower limits
-									"",						// Initial text (the face fills it)
-									kEVENoSpaceAfter,
-								),
-							}
-						),
-						// Ruby: [ ]
-						EVEGenericPanelWidget
-						(
-							kInvalidWidgetID, kPMRsrcID_None,
-							kBindNone,
-							Frame(0, 0, 456, 21)
-							kTrue, kTrue,
-							kEVEAlignLeft | kEVELargeSpaceAfter | kEVEArrangeChildrenInRow | kEVENoMargin,
+							kEVEAlignLeft | kEVELargeSpaceAfter | kEVEDontArrangeChildren | kEVENoMargin,
 							{
 								EVEStaticTextWidget
 								(
@@ -4037,70 +4151,116 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 									kDontEllipsize, kTrue,
 									kKFCRubyTabReadingKey,
 									0,
-									kEVERegularSpaceAfter,
-								),
-								EVETextEditBoxWidget
-								(
-									kKFCRubyTabReadingWidgetID, kSysEditBoxPMRsrcId, kBindNone,
-									Frame(0, 0, 300, 0)
-									kTrue, kTrue,
-									kInvalidWidgetID,
-									1.0, 10.0,
-									0,
-									kFalse,
-									kTrue,
-									kFalse,
-									kTrue,
-									0, 0,
-									"",
 									kEVENoSpaceAfter,
 								),
-							}
-						),
-						// Change Ruby To: [ ]
-						EVEGenericPanelWidget
-						(
-							kInvalidWidgetID, kPMRsrcID_None,
-							kBindNone,
-							Frame(0, 0, 456, 21)
-							kTrue, kTrue,
-							kEVEAlignLeft | kEVERegularSpaceAfter | kEVEArrangeChildrenInRow | kEVENoMargin,
-							{
 								EVEStaticTextWidget
 								(
 									kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone,
-									Frame(0, 0, 110, 21)
+									Frame(0, 41, 110, 62)
+									kTrue, kTrue, kAlignLeft,
+									kDontEllipsize, kTrue,
+									kKFCRubyTabBaseKey,
+									0,
+									kEVENoSpaceAfter,
+								),
+								EVEStaticTextWidget
+								(
+									kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone,
+									Frame(0, 72, 110, 93)
 									kTrue, kTrue, kAlignLeft,
 									kDontEllipsize, kTrue,
 									kKFCRubyTabChangeKey,
 									0,
-									kEVERegularSpaceAfter,
-								),
-								EVETextEditBoxWidget
-								(
-									kKFCRubyTabChangeWidgetID, kSysEditBoxPMRsrcId, kBindNone,
-									Frame(0, 0, 300, 0)
-									kTrue, kTrue,
-									kInvalidWidgetID,
-									1.0, 10.0,
-									0,
-									kFalse,
-									kTrue,
-									kFalse,
-									kTrue,
-									0, 0,
-									"",
 									kEVENoSpaceAfter,
 								),
+								EVEStaticTextWidget
+								(
+									kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone,
+									Frame(0, 96, 110, 116)
+									kTrue, kTrue, kAlignLeft,
+									kDontEllipsize, kTrue,
+									kKFCRubyTabBaseKey,
+									0,
+									kEVENoSpaceAfter,
+								),
+								KFC_RUBY_BOX(kKFCRubyReadingBox0WidgetID, 0, 21),
+								KFC_RUBY_BOX(kKFCRubyReadingBox1WidgetID, 0, 21),
+								KFC_RUBY_BOX(kKFCRubyReadingBox2WidgetID, 0, 21),
+								KFC_RUBY_BOX(kKFCRubyReadingBox3WidgetID, 0, 21),
+								KFC_RUBY_BOX(kKFCRubyReadingBox4WidgetID, 0, 21),
+								KFC_RUBY_BOX(kKFCRubyReadingBox5WidgetID, 0, 21),
+								KFC_RUBY_BOX(kKFCRubyReadingBox6WidgetID, 0, 21),
+								KFC_RUBY_BOX(kKFCRubyReadingBox7WidgetID, 0, 21),
+								KFC_RUBY_BOX(kKFCRubyReadingBox8WidgetID, 0, 21),
+								KFC_RUBY_BOX(kKFCRubyReadingBox9WidgetID, 0, 21),
+								KFC_RUBY_BOX(kKFCRubyReadingBox10WidgetID, 0, 21),
+								KFC_RUBY_BOX(kKFCRubyReadingBox11WidgetID, 0, 21),
+								KFC_RUBY_CHAIN(kKFCRubyJoin0WidgetID),
+								KFC_RUBY_CHAIN(kKFCRubyJoin1WidgetID),
+								KFC_RUBY_CHAIN(kKFCRubyJoin2WidgetID),
+								KFC_RUBY_CHAIN(kKFCRubyJoin3WidgetID),
+								KFC_RUBY_CHAIN(kKFCRubyJoin4WidgetID),
+								KFC_RUBY_CHAIN(kKFCRubyJoin5WidgetID),
+								KFC_RUBY_CHAIN(kKFCRubyJoin6WidgetID),
+								KFC_RUBY_CHAIN(kKFCRubyJoin7WidgetID),
+								KFC_RUBY_CHAIN(kKFCRubyJoin8WidgetID),
+								KFC_RUBY_CHAIN(kKFCRubyJoin9WidgetID),
+								KFC_RUBY_CHAIN(kKFCRubyJoin10WidgetID),
+								KFC_RUBY_BASE_BOX(kKFCRubyBaseBox0WidgetID),
+								KFC_RUBY_BASE_BOX(kKFCRubyBaseBox1WidgetID),
+								KFC_RUBY_BASE_BOX(kKFCRubyBaseBox2WidgetID),
+								KFC_RUBY_BASE_BOX(kKFCRubyBaseBox3WidgetID),
+								KFC_RUBY_BASE_BOX(kKFCRubyBaseBox4WidgetID),
+								KFC_RUBY_BASE_BOX(kKFCRubyBaseBox5WidgetID),
+								KFC_RUBY_BASE_BOX(kKFCRubyBaseBox6WidgetID),
+								KFC_RUBY_BASE_BOX(kKFCRubyBaseBox7WidgetID),
+								KFC_RUBY_BASE_BOX(kKFCRubyBaseBox8WidgetID),
+								KFC_RUBY_BASE_BOX(kKFCRubyBaseBox9WidgetID),
+								KFC_RUBY_BASE_BOX(kKFCRubyBaseBox10WidgetID),
+								KFC_RUBY_BASE_BOX(kKFCRubyBaseBox11WidgetID),
+								EVERollOverIconButtonWidget
+								(
+									kKFCRubyGridPlusWidgetID, kKFCRubyGridAddIconRsrcID, kLinksUIPluginID,	// WidgetId, RsrcId
+									kBindNone,
+									Frame(428, 0, 450, 20)		// the Captions dialog's size
+									kTrue, kTrue,
+									kADBEIconSuiteButtonType,
+									kEVENoSpaceAfter,
+								),
+								EVERollOverIconButtonWidget
+								(
+									kKFCRubyGridMinusWidgetID, kKFCRubyGridDeleteIconRsrcID, kLinksUIPluginID,	// WidgetId, RsrcId
+									kBindNone,
+									Frame(428, 41, 450, 61)
+									kTrue, kTrue,
+									kADBEIconSuiteButtonType,
+									kEVENoSpaceAfter,
+								),
+								KFC_RUBY_BOX(kKFCRubyChangeBox0WidgetID, 72, 93),
+								KFC_RUBY_BOX(kKFCRubyChangeBox1WidgetID, 72, 93),
+								KFC_RUBY_BOX(kKFCRubyChangeBox2WidgetID, 72, 93),
+								KFC_RUBY_BOX(kKFCRubyChangeBox3WidgetID, 72, 93),
+								KFC_RUBY_BOX(kKFCRubyChangeBox4WidgetID, 72, 93),
+								KFC_RUBY_BOX(kKFCRubyChangeBox5WidgetID, 72, 93),
+								KFC_RUBY_BOX(kKFCRubyChangeBox6WidgetID, 72, 93),
+								KFC_RUBY_BOX(kKFCRubyChangeBox7WidgetID, 72, 93),
+								KFC_RUBY_BOX(kKFCRubyChangeBox8WidgetID, 72, 93),
+								KFC_RUBY_BOX(kKFCRubyChangeBox9WidgetID, 72, 93),
+								KFC_RUBY_BOX(kKFCRubyChangeBox10WidgetID, 72, 93),
+								KFC_RUBY_BOX(kKFCRubyChangeBox11WidgetID, 72, 93),
+								KFC_RUBY_WORDS(kKFCRubyChangeBase0WidgetID),
+								KFC_RUBY_WORDS(kKFCRubyChangeBase1WidgetID),
+								KFC_RUBY_WORDS(kKFCRubyChangeBase2WidgetID),
+								KFC_RUBY_WORDS(kKFCRubyChangeBase3WidgetID),
+								KFC_RUBY_WORDS(kKFCRubyChangeBase4WidgetID),
+								KFC_RUBY_WORDS(kKFCRubyChangeBase5WidgetID),
+								KFC_RUBY_WORDS(kKFCRubyChangeBase6WidgetID),
+								KFC_RUBY_WORDS(kKFCRubyChangeBase7WidgetID),
+								KFC_RUBY_WORDS(kKFCRubyChangeBase8WidgetID),
+								KFC_RUBY_WORDS(kKFCRubyChangeBase9WidgetID),
+								KFC_RUBY_WORDS(kKFCRubyChangeBase10WidgetID),
+								KFC_RUBY_WORDS(kKFCRubyChangeBase11WidgetID),
 							}
-						),
-						EVECheckBoxWidget
-						(
-							kKFCRubyTabRemoveWidgetID, kSysCheckBoxPMRsrcId, kBindNone,
-							Frame(0, 0, 200, 19)
-							kTrue, kTrue, kAlignLeft,
-							kKFCRubyTabTakeOffKey,
-							kEVELargeSpaceAfter,
 						),
 						KFCQueryFixedTextWidget
 						(

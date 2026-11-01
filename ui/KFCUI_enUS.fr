@@ -190,6 +190,9 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCKohakuTabToEndKey,			"To End of Story",
                 kKFCKohakuSelectionKey,		"Selection",
                 kKFCQRTabFindNextKey,			"Find Next",
+                kKFCTableTabChangeKey,			"Change",
+                kKFCTableTabChangeAllKey,		"Change All",
+                kKFCTableTabChangeFindKey,		"Change/Find",
                 kKFCTableTabFindStyleKey,		"Find Table Style:",
                 kKFCTableTabAnyStyleKey,		"[Any Table Style]",
                 kKFCTableTabOverridesOnlyKey,	"With Overrides Only",
@@ -224,7 +227,6 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCRubyTabBaseKey,				"Base Text:",
                 kKFCRubyTabReadingKey,			"Ruby:",
                 kKFCRubyTabChangeKey,			"Change Ruby To:",
-                kKFCRubyTabTakeOffKey,			"Remove Ruby",
                 kKFCRubyTabGuideFindKey,		"Find: the Find button of the Kohaku Find/Change panel lists the text.",
                 // The message line as a freshly opened panel shows it - the plug-in has no search
                 // box of its own, so the first thing to say is where the query is typed.

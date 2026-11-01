@@ -92,6 +92,13 @@ namespace KFCJump
 	    outNote = the tab's second line when it could not be selected (no alert - QR-20). True when it was shown. */
 	bool LandOnQRCode(const UIDRef& frameRef, int32 reach, PMString& outNote);
 
+	/** THE TABLE PART'S FIND NEXT LANDS (docs/superpowers/specs/2026-11-01-kfc-kohaku-trial-fixes-design.md F5): as a table row's click lands - its document in front, the view on it, the table's character selected. `reach` = what keeps it from being selected (kKFCQRReach* bits):
+	    locked = shown and marked, not selected; on a hidden spread = nothing moves; overset or on a hidden layer = selected, and said. outNote = the part's second line for all of them. outSelected = the table is selected now. */
+	void LandOnTable(const UIDRef& storyRef, TextIndex start, TextIndex end, int32 reach, PMString& outNote, bool& outSelected);
+
+	/** THE TEXT SELECTION OF THE FRONT DOCUMENT NOW, a caret too: its story and range. False = none (outStory gNull): nothing selected, or something that is not text. */
+	bool ReadTextSelection(UIDRef& outStory, TextIndex& outStart, TextIndex& outEnd);
+
 	/** A layout view put on ONE SPREAD the way a row's jump puts it there (kSetSpreadCmdBoss - the view's own document
 	    only, the caller's error state kept): for a view put back where it stood before an object walk
 	    (IKFCUIServices::RestoreViewPlaces). Nothing for kInvalidUID, or a view on that spread already. */

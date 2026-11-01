@@ -200,6 +200,7 @@ namespace KFCResultModel
 		PMString	runChain;	// a row of a query run's list (KFCRunList - RowDisplay::runChain): what its place has been, in the
 								// row's words, cut for the row
 		PMString	runNames;	// ...and the queries that wrote it, in the run's order (RowDisplay::runNames)
+		KFCRowUpper	upper;		// a ruby or kenten row's upper line (RowDisplay::upper): what stands above its match as its walk or its Replace left it
 		UID			matchFrame;	// a TEXT row's match's own frame (the parcel's - IParcelList::GetParcelFrameUID), kInvalidUID when
 								// it has none placed: what Frames of These Matches climbs to the frame the person selects
 		UID			pageUID;	// the page the row names (a text row's frame's - the "+" frame's for an overset match -, an object
@@ -443,6 +444,8 @@ namespace KFCResultModel
 	/** IS THE LIST ONE OF A TAB OF KFC'S THAT HAS A CHANGE SIDE - Table, Ruby? Its rows are text rows standing for something no text row's other write means anything to: a
 	    Replace is that tab's (KFCReplaceEngine's WriteOwnTabRows), and the list is not narrowed. */
 	bool ListHasOwnChangeTab();
+	/** IS THE LIST ONE WHOSE HIT ROWS STAND ON TWO LINES (ruby, kenten - the author, 11-01)? Every row of it: a Replace gives a row with nothing above it a reading, and a row keeps its height. */
+	bool ListDrawsTwoLines();
 	/** Is the list a FRAMES OF THESE MATCHES list - object rows found by a text search, not by the Object tab's (its
 	    Replace writes with the Object tab's Change Object Format alone - KFCObjectReplace, the narrow-down
 	    spec's N6)? */
@@ -823,8 +826,8 @@ namespace KFCResultModel
 	void MarkHitSpecial(int32 chapterIdx, int32 hitIdx, int32 op);
 
 	/** A ROW ITS OWN TAB'S REPLACE WROTE (the table tab spec's T9, the ruby tab spec's R8): MarkHitSpecial's marks (op - its word), and what it draws as the write left it
-	    (Hit::runChain - empty: its own text). Backed up first, so an Undo puts both back. */
-	void MarkHitOwnChange(int32 chapterIdx, int32 hitIdx, int32 op, const PMString& words);
+	    (Hit::runChain - empty: its own text - and Hit::upper). Backed up first, so an Undo puts both back. */
+	void MarkHitOwnChange(int32 chapterIdx, int32 hitIdx, int32 op, const PMString& words, const KFCRowUpper& upper = KFCRowUpper());
 
 	/** A chapter's document binding and file. The replace pass works chapter at a time, so it
 	    needs this without going through a hit. false = index out of range. */

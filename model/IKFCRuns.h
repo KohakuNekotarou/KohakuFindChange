@@ -199,6 +199,12 @@ public:
 	virtual void KohakuQueryText(const KFCKohakuQueryData& query, PMString& outText) = 0;
 	/** = KFCKohakuQuery::FileOf (appended) - the file of a query of this kind and name. */
 	virtual bool KohakuQueryFile(int32 mode, const PMString& name, IDFile& out) = 0;
+	/** = KFCTableSearch::Next (appended - docs/superpowers/specs/2026-11-01-kfc-kohaku-trial-fixes-design.md F3) - the Table part's Find Next. */
+	virtual bool TableNext(const KFCTableLook& look, KFCTableFound& out) = 0;
+	/** = KFCTableSearch::ChangeFound (appended - F6) - its Change. */
+	virtual bool TableChangeFound(const KFCTableFound& found, PMString& outWords) = 0;
+	/** = KFCTableSearch::ChangeAll (appended - F7) - its Change All. */
+	virtual bool TableChangeAll(const KFCTableLook& look, int32& outChanged, int32& outMatched, PMString& outWords) = 0;
 };
 
 #endif // __IKFCRuns_h__

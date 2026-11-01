@@ -11,8 +11,8 @@
 - **KOHAKU-01** ★本体の「検索と置換」のタブの行に、KFC のタブは **`Kohaku+` の1枚**（本体の6枚と合わせて7枚＝日本語版の窓の幅で切れない）。（K1）回帰 `kh-one-tab`
   - 訂正:
 
-- **KOHAKU-02** ★面の上に **Find:**（QR Code／Table／Ruby／Kenten）と **Search:**。その下に選んだ種類の部品だけが出る。`Find Next` は QR Code のときだけ右上（窓を別の種類で開いてから QR Code にしても押せる）。（K2）回帰 `kh-part-shown`・`kh-findnext-after-another-kind`
-  - 訂正:
+- **KOHAKU-02** ★面の上に **Find:**（QR Code／Table／Ruby／Kenten）と **Search:**。その下に選んだ種類の部品だけが出る。右上のボタン＝QR Code は `Find Next` だけ・Table は本体と同じ4つ（TBL-60）・Ruby と Kenten は無し（窓を別の種類で開いてから変えても押せる）。（K2）回帰 `kh-part-shown`・`kh-findnext-after-another-kind`・`tb-btn-after-another-kind`
+  - 訂正: 11-01＝Table にもボタン（作者の試用）。
 
 - **KOHAKU-03** ★**Ruby と Kenten は日本語で起動しているときだけ** Find: に出る（他の言語では QR Code・Table の2つ）。（K11）回帰 `kh-japanese`・`kh-not-japanese`・`kh-not-japanese-on-ruby`
   - 訂正:
@@ -48,8 +48,8 @@
 
 ## 3. 面の並び
 
-- **KOHAKU-20** `Find:`・`Search:` のラベルの横に空きを作らない。`Find Table Style:`・`Change to Table Style:` は語の下に一覧。Ruby・Kenten はラベルと欄の横並び。（K12）
-  - 訂正:
+- **KOHAKU-20** `Find:`・`Search:` は語の下に一覧（作者 11-01「Find: と Search: だけ」）。`Find Table Style:`・`Change to Table Style:` も語の下に一覧。Ruby・Kenten はラベルと欄の横並び。（K12）
+  - 訂正: 10-31 は `Find:`・`Search:` もラベルの横に一覧（空きを作らない）だった。
 
 ## 4. クエリ（作者 10-31「公式ダイアログで選択可能？ 選択するとそれぞれのタブが開いて設定される」＝ `ui/KFCKohakuQueryMenu.h`・本体の欄の仕組みと実測＝`docs/ai-notes/kfc-native-query-menu-2026-10-31.md`）
 
