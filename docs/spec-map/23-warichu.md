@@ -39,7 +39,7 @@
 - **WARI-20** 行は文字の行（一致の部分に `[割注の字]`）。Search This Document Again は同じ行を出す。回帰 `wr-find`・`wr-doc-again`
   - 訂正:
 
-- **WARI-21** ★行の **Replace は効かない**＝灰色。Return も書かずに言う（`Replace: Find: Warichu lists the warichu and changes nothing - a row is not replaced.`）。パネルの Change All も書かずに言う（`Change All: the Find/Change dialog is on Warichu on the Kohaku+ tab. This panel lists the warichu there - nothing to change.`）。回帰 `wr-replace-grey`
+- **WARI-21** ★行の **Replace は効かない**＝灰色。Return も何もしない（灰色と同じ問い＝`KFCResultTree::ReplaceRows` の `CanReplaceAny`）。メニューと Return 以外の道で来ても、モデルの扉が書かずに言う（`Replace: Find: Warichu lists the warichu and changes nothing - a row is not replaced.`＝`RefuseWarichuRow`）。パネルの Change All in Book は灰色（Kohaku+ の種類には走らせるクエリが無い＝KENTEN-40 と同じ）。扉でも書かずに言う（`Change All: the Find/Change dialog is on Warichu on the Kohaku+ tab. This panel lists the warichu there - nothing to change.`）。回帰 `wr-replace-grey`
   - 訂正:
 
 - **WARI-22** ★行の **Special Operations ▸ Tate-chu-yoko** は効く（本文の一致＝REP-41）。回帰 `wr-tcy`
@@ -63,6 +63,6 @@
 この章を書くにあたって**確かめていない**もの。「書いていない＝そういう決まりが無い」ではない。
 
 - 本体の割注設定（行数・行間・大きさの比率など）は見ない＝割注が付いているかどうか（`kTAWarichuAttrBoss` の真偽）だけで探す。設定ごとに分けて探す口は作っていない。
-- パネルの Change All（WARI-21 の2つ目の文）と、行の Return での断り（1つ目の文）は、コードで読んだだけで試験が無い（灰色の Replace は `wr-replace-grey`）。
+- Change All in Book の灰色と扉の文、Return で何もしないこと、モデルの扉の文（WARI-21）は、コードで読んだだけで試験が無い（灰色の Replace は `wr-replace-grey`）。
 - Search: の Story／To End of Story／Selection は割注では試験していない（作りは圏点と同じ＝範囲に触れていれば行＝KOHAKU-14・`KFCSearchEngine::StretchesTouch`）。
 - 縦組みの文書の割注の行を、実機の絵では見ていない。
