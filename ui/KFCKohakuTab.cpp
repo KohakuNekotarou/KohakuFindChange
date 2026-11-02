@@ -13,6 +13,7 @@
 // Interface includes:
 #include "IActiveContext.h"
 #include "IApplication.h"				// the keyboard - a box that goes takes its focus with it
+#include "ICallbackTimer.h"				// the base boxes settle at the next idle (kEndOfTime comes with it)
 #include "IControlView.h"
 #include "IDropDownListController.h"	// the face's lists' entries
 #include "IEditBoxAttributes.h"			// SelectRange - a base box's caret, when what was typed goes on into it
@@ -972,19 +973,14 @@ bool InputMethodComposing()
 	return bytes > 0;
 }
 
-// WHAT A BASE BOX WAS GIVEN (the author, 11-02: "more than one character typed goes on into the next box"): one character stays; more - typed, pasted, an input method's confirming - one a box from this one on, over what those hold, the columns grown as far as they go and past the
-// last box all the rest in it (FillBaseFromKept's rule). A space is no character of it (CharsOf). THE KEYBOARD GOES WITH THEM if this box still has it - to the last box written, its caret after its character, so the next key goes on from there (a box hears a change when it loses the
-// keyboard too: then it stays where the person put it).
-void TakeBaseBox(IPanelControlData* panel, int32 k, const PMString& typed)
+// WHAT A BASE BOX WAS GIVEN, SPREAD (the author, 11-02: "more than one character typed goes on into the next box"): one character stays; more - typed, pasted, an input method's confirming - one a box from this one on, over what those hold, the columns grown as far as they go and past
+// the last box all the rest in it (FillBaseFromKept's rule). A space is no character of it (CharsOf). THE KEYBOARD GOES WITH THEM if this box still has it - to the last box written, its caret after its character, so the next key goes on from there (a box hears a change when it loses
+// the keyboard too: then it stays where the person put it). Only ever from SettleBaseBoxes - never while what was given is still arriving.
+void SpreadBaseBox(IPanelControlData* panel, int32 k, const PMString& typed)
 {
 	gCellBase[k] = typed;
 	if (panel == nil)
 		return;
-	if (InputMethodComposing())
-	{
-		KFC_DIAG_LOG("RUBYTAB base box %d composing", static_cast<int>(k));
-		return;
-	}
 	const std::vector<PMString> chars(CharsOf(typed));
 	if (chars.size() <= 1)
 	{
@@ -1031,6 +1027,78 @@ void TakeBaseBox(IPanelControlData* panel, int32 k, const PMString& typed)
 	InterfacePtr<IEditBoxAttributes> box(panel->FindWidget(BaseBoxID(last)), UseDefaultIID());
 	if (box != nil)
 		box->SelectRange(gCellBase[last].CharCount(), gCellBase[last].CharCount());
+}
+
+// ----- THE BASE BOXES SETTLE AT IDLE (the author's bug, 11-02: three kanji typed with the Japanese input method came out as the third, then the first). An input method hands a box what it confirms a character at a time, every one of them to that
+// box, before the first is read - spread at the second, the third went into the first box at its start, where a write leaves the caret; and a box's notification comes while the person is still composing, before IMM says so
+// (measured - docs/superpowers/specs/2026-11-02-kfc-kohaku-face-buttons-design.md I1). So a change is only kept where it is heard, and what a box was given is spread at the next idle, all of it at once - while the person is
+// still composing, asked again a little later.
+ICallbackTimer* gSettleTimer = nil;		// made on first use; given back by ShutdownCleanup (its callback is a raw pointer into this .pln)
+uint32 gPendingBase = 0;				// bit k: base box k changed since it was last settled
+const uint32 kSettleComposingMs = 100;	// while the person composes: asked again this much later (the callback's return re-arms it - measured on 21.0, memory icallbacktimer)
+const uint32 kSettleArrivingMs = 30;	// while characters are still on their way: the same, sooner
+
+PMString WordsOf(IControlView* view);	// (below, with the face's widgets)
+
+// IS MORE OF WHAT IS BEING TYPED STILL ON ITS WAY - a key, a character, an input method's message queued for this thread? InDesign runs its idle tasks between them (measured: a burst of three posted characters was settled after
+// each one), so the next idle is not yet the end of a burst. Looked at, not taken (PM_NOREMOVE).
+bool InputStillArriving()
+{
+	MSG msg;
+	return ::PeekMessageW(&msg, nullptr, WM_KEYFIRST, WM_KEYLAST, PM_NOREMOVE | PM_NOYIELD) != FALSE
+		|| ::PeekMessageW(&msg, nullptr, WM_IME_STARTCOMPOSITION, WM_IME_KEYLAST, PM_NOREMOVE | PM_NOYIELD) != FALSE
+		|| ::PeekMessageW(&msg, nullptr, WM_IME_CHAR, WM_IME_CHAR, PM_NOREMOVE | PM_NOYIELD) != FALSE;
+}
+
+uint32 SettleBaseBoxes(void* /*refPtr*/)
+{
+	if (gPendingBase == 0 || gShownFace == nil)
+	{
+		gPendingBase = 0;
+		return IIdleTask::kEndOfTime;
+	}
+	if (InputStillArriving())
+	{
+		KFC_DIAG_LOG("RUBYTAB base arriving");
+		return kSettleArrivingMs;
+	}
+	if (InputMethodComposing())
+	{
+		KFC_DIAG_LOG("RUBYTAB base composing");
+		return kSettleComposingMs;
+	}
+	InterfacePtr<IPanelControlData> panel(gShownFace, UseDefaultIID());
+	const uint32 pending = gPendingBase;
+	gPendingBase = 0;
+	for (int32 k = 0; k < kKFCRubyBoxColumnsMost && panel != nil; ++k)
+	{
+		if ((pending & (1u << k)) == 0)
+			continue;
+		IControlView* const box = panel->FindWidget(BaseBoxID(k));
+		if (box != nil)
+			SpreadBaseBox(panel, k, WordsOf(box));
+	}
+	KeepFromBoxes();
+	KFC_DIAG_LOG("RUBYTAB base=%s", gRuby.base.GetUTF8String().c_str());
+	return IIdleTask::kEndOfTime;
+}
+
+// A BASE BOX HEARD: what it holds kept as it stands, and its column's words on the Change side - to be spread at the next idle (SettleBaseBoxes).
+void NoteBaseBox(IPanelControlData* panel, int32 k, const PMString& typed)
+{
+	gCellBase[k] = typed;
+	gCellBase[k].SetTranslatable(kFalse);
+	SetField(panel, ChangeBaseID(k), gCellBase[k]);
+	gPendingBase |= (1u << k);
+	if (gSettleTimer == nil)
+		gSettleTimer = ::CreateObject2<ICallbackTimer>(kCallbackTimerBoss, IID_ICALLBACKTIMER);
+	if (gSettleTimer == nil)
+	{
+		(void)SettleBaseBoxes(nil);		// (no timer to be had: spread now, as before - composing, it stays as typed)
+		return;
+	}
+	gSettleTimer->StopTimer();		// (never a booking over a live one - memory icallbacktimer)
+	gSettleTimer->StartTimer(SettleBaseBoxes, 0, nil);
 }
 
 // (What each Look For: greys and takes away - LayOutRubyGrid - and what a list says of itself.)
@@ -1434,6 +1502,14 @@ void KFCKohakuTab::QueryOfFace(KFCKohakuQueryData& out)
 
 void KFCKohakuTab::ShutdownCleanup()
 {
+	// THE BASE BOXES' TIMER, its booking stopped first: its callback is a raw pointer into this .pln (ICallbackTimer.h).
+	if (gSettleTimer != nil)
+	{
+		gSettleTimer->StopTimer();
+		gSettleTimer->Release();
+		gSettleTimer = nil;
+	}
+	gPendingBase = 0;
 	// Fresh values, so the storage goes too.
 	gTable = KFCTableConditions();
 	gRuby = KFCRubyConditions();
@@ -1756,12 +1832,12 @@ public:
 		}
 		else if (ColumnOf(widget, BaseBoxID(0), kKFCRubyBoxColumnsMost) >= 0)
 		{
-			// A BOX OF FIND'S BASE TEXT: - and the Change side's words under its column, which are this box's.
+			// A BOX OF FIND'S BASE TEXT: - and the Change side's words under its column, which are this box's. Spread over the boxes at the next idle (SettleBaseBoxes).
 			const int32 k = ColumnOf(widget, BaseBoxID(0), kKFCRubyBoxColumnsMost);
 			InterfacePtr<IPanelControlData> panel(this, UseDefaultIID());
-			TakeBaseBox(panel, k, WordsOf(view));
+			NoteBaseBox(panel, k, WordsOf(view));
 			KeepFromBoxes();
-			KFC_DIAG_LOG("RUBYTAB base=%s", gRuby.base.GetUTF8String().c_str());
+			KFC_DIAG_LOG("RUBYTAB base heard %d=%s", static_cast<int>(k), gCellBase[k].GetUTF8String().c_str());
 		}
 		else if (ColumnOf(widget, ChangeBoxID(0), kKFCRubyBoxColumnsMost) >= 0)
 		{
