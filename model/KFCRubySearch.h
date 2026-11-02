@@ -24,6 +24,7 @@
 #include "WideString.h"
 
 #include <map>
+#include <set>
 #include <vector>
 
 #include "KFCBookScope.h"		// ChapterDoc, SkippedChapter - a run's targets
@@ -37,17 +38,17 @@ namespace KFCRubySearch
 	/** IS THE RUBY TAB FIND/CHANGE'S TAB NOW, and what it asks (outConditions, when given - the tab's as it stands, whichever tab is shown: a row's Replace reads its
 	    Change side). Asked of the UI half (IKFCUIServices::RubyTabConditions - ui/KFCKohakuTab.h); no UI half = not the Ruby tab. A TEST BUILD asks its fault switch
 	    ruby-tab first: on = the Ruby tab, its file's lines kind=without, base=, ruby=, change=<a reading over the row's whole text>, piece=<base>=<reading> (a box, in order), remove=1 (no box reads
-	    anything), scope=all|story|toend|selection the conditions. */
+	    anything), scope=all|story|toend|selection, first=story|document|book, on=<icon>, off=<icon> (KFCOwnScopeDiagLine) the conditions. */
 	bool IsTabCurrent(KFCRubyConditions* outConditions = nil);
 
 	/** The Change boxes as KFCRubyChangePlan takes them. */
 	std::vector<KFCRubyChangePlan::Piece> PlanPieces(const KFCRubyConditions& asked);
 
 	/** What the boxes write over [start, end) of the story: the plan's answer, runs by code point from start. */
-	KFCRubyChangePlan::Result PlanForRow(const UIDRef& story, TextIndex start, TextIndex end, const std::vector<KFCRubyChangePlan::Piece>& pieces, std::vector<KFCRubyChangePlan::Run>& outRuns);
+	KFCRubyChangePlan::Result PlanForRow(const UIDRef& story, TextIndex start, TextIndex end, const std::vector<KFCRubyChangePlan::Piece>& pieces, std::vector<KFCRubyChangePlan::Run>& outRuns, const KFCOwnSwitches& switches);
 
-	/** WHAT A RUBY LIST WRITES OVER [start, end) of the story: its word's runs, or false - the text there is no word of the list's (a row edited since). */
-	bool ListPlanForRow(const KFCRubyList::Words& words, const UIDRef& story, TextIndex start, TextIndex end, std::vector<KFCRubyChangePlan::Run>& outRuns);
+	/** WHAT A RUBY LIST WRITES OVER [start, end) of the story: its word's runs - as the list's search compared them (switches: Kana Sensitive, Width Sensitive) - or false: the text there is no word of the list's (a row edited since). */
+	bool ListPlanForRow(const KFCRubyList::Words& words, const KFCOwnSwitches& switches, const UIDRef& story, TextIndex start, TextIndex end, std::vector<KFCRubyChangePlan::Run>& outRuns);
 
 	/** Does [start, end) of the story read as the runs say - each its reading, nothing between them? Asked before a write: a row that does is not written. */
 	bool ReadsAsPlanned(const UIDRef& story, TextIndex start, TextIndex end, const std::vector<KFCRubyChangePlan::Run>& runs);
@@ -87,8 +88,8 @@ namespace KFCRubySearch
 	ErrorCode WriteMark(const UIDRef& story, TextIndex at, int32 length, int32& outBaseLength, bool& outStillThere);
 
 	/** A QUERY RUN'S WRITE OF ONE DOCUMENT (KFCKohakuQuery::WriteDocument): what the conditions list, given their Change side (ruby from marks: its mark's), with no rows. outCount = the places written. False = InDesign would
-	    not write one - Track Changes keeps the marks a run would take out (WriteMark). */
-	bool WriteDocument(const UIDRef& docRef, const KFCRubyConditions& asked, const std::vector<KFCSearchEngine::ListedPlace>* part, int32& outCount);
+	    not write one - Track Changes keeps the marks a run would take out (WriteMark). ioBookSeen: a list's First in Book over a book's chapters - the query's one set over the run's documents (nil: each document's own). */
+	bool WriteDocument(const UIDRef& docRef, const KFCRubyConditions& asked, const std::vector<KFCSearchEngine::ListedPlace>* part, int32& outCount, std::set<size_t>* ioBookSeen = nil);
 
 	/** Takes the ruby off [start, end) inside the caller's step: every ruby attribute's override removed - the official snippet only turns the flag off, which leaves the
 	    reading behind (KIDMCPRuby.cpp's ClearRubyOn, the same thirty). A style cannot give text a ruby - it has no flag and no reading (measured, 10-31), unlike a kenten's kind - so nothing is left to turn off; a style's look stays. kSuccess = done. */

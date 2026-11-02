@@ -55,6 +55,7 @@ REGISTER_PMINTERFACE(KFCPanelObserver, kKFCPanelObserverImpl)
 REGISTER_PMINTERFACE(KFCPanelView, kKFCPanelViewImpl)
 // The panel illustration's tooltip (the URL a click on it opens).
 REGISTER_PMINTERFACE(KFCIconTip, kKFCIconTipImpl)
+REGISTER_PMINTERFACE(KFCSwitchIconTip, kKFCSwitchIconTipImpl)
 // "Translucent Panel": the observer that re-applies the alpha when the panel's window is rebuilt,
 // and the roll-over that takes it off while the pointer is on the panel (KFCPanelAlpha.cpp).
 // !The roll-over fails SILENTLY without its line here - CREATE_PMINTERFACE alone is not enough.

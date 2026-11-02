@@ -38,6 +38,8 @@
 #include "KFCKentenSearch.h"
 #include "IKFCUIServices.h"				// the tab itself is the UI half's
 #include "KFCDiag.h"
+#include "KFCFold.h"					// what Kana Sensitive and Width Sensitive take for the same
+#include "KFCOwnScope.h"				// what the icons take in
 #include "KFCProgressBar.h"				// KFCSetCountedTask too - the bar's line
 #include "KFCTextCut.h"					// KFCSafeCut
 
@@ -102,13 +104,14 @@ bool Holds(const std::u32string& words, const std::u32string& part)
 }
 
 // THE STRETCHES OF MARKS OF ONE STORY, by the conditions: each thread's on its own (a table's cells are threads of its own, and the scanner would run on across them), cut where StopsRow stands.
-void WalkWithKenten(const UIDRef& storyRef, ITextModel* model, const KFCKentenConditions& asked, const std::vector<KFCSearchEngine::ListedPlace>* part, size_t limit,
+void WalkWithKenten(const UIDRef& storyRef, ITextModel* model, const KFCKentenConditions& asked, KFCOwnScope& taken, const std::vector<KFCSearchEngine::ListedPlace>* part, size_t limit,
 	std::vector<KFCSearchEngine::ListedPlace>& ioPlaces, bool& outCapped)
 {
 	InterfacePtr<IComposeScanner> scanner(model, UseDefaultIID());
 	if (scanner == nil)
 		return;
-	const std::u32string wantedBase(U32Of(asked.base));
+	const KFCFold::Flags flags(KFCFoldFlagsOf(asked.switches));
+	const std::u32string wantedBase(KFCFold::TextOf(U32Of(asked.base), flags));
 	const TextIndex total = model->TotalLength();
 	TextIndex at = 0;
 	while (at < total)
@@ -132,8 +135,9 @@ void WalkWithKenten(const UIDRef& storyRef, ITextModel* model, const KFCKentenCo
 					continue;
 				const TextIndex start = at + static_cast<TextIndex>(from);
 				const TextIndex end = at + static_cast<TextIndex>(k);
-				if (k > from && Holds(std::u32string(text, from, k - from), wantedBase)
-					&& (part == nil || KFCSearchEngine::StretchesTouch(*part, storyRef.GetUID(), start, end)))
+				if (k > from && Holds(KFCFold::TextOf(std::u32string(text, from, k - from), flags), wantedBase)
+					&& (part == nil || KFCSearchEngine::StretchesTouch(*part, storyRef.GetUID(), start, end))
+					&& taken.Takes(storyRef, model, start))
 				{
 					if (ioPlaces.size() >= limit)
 					{
@@ -154,21 +158,24 @@ void WalkWithKenten(const UIDRef& storyRef, ITextModel* model, const KFCKentenCo
 }
 
 // THE OCCURRENCES OF THE BASE TEXT IN ONE STORY WITH NO MARK ON THEM.
-void WalkWithoutKenten(const UIDRef& storyRef, ITextModel* model, const KFCKentenConditions& asked, const std::vector<KFCSearchEngine::ListedPlace>* part, size_t limit,
+void WalkWithoutKenten(const UIDRef& storyRef, ITextModel* model, const KFCKentenConditions& asked, KFCOwnScope& taken, const std::vector<KFCSearchEngine::ListedPlace>* part, size_t limit,
 	std::vector<KFCSearchEngine::ListedPlace>& ioPlaces, bool& outCapped)
 {
-	const std::u32string text(U32Of(KFCSearchEngine::ReadText(storyRef, 0, model->TotalLength())));
-	const std::u32string wanted(U32Of(asked.base));
+	const KFCFold::Flags flags(KFCFoldFlagsOf(asked.switches));
+	const KFCFold::Folded folded(KFCFold::Fold(U32Of(KFCSearchEngine::ReadText(storyRef, 0, model->TotalLength())), flags));
+	const std::u32string wanted(KFCFold::TextOf(U32Of(asked.base), flags));
 	InterfacePtr<IComposeScanner> scanner(model, UseDefaultIID());
 	if (wanted.empty() || scanner == nil)
 		return;
-	for (size_t found = text.find(wanted); found != std::u32string::npos; found = text.find(wanted, found + wanted.size()))
+	for (size_t found = folded.text.find(wanted); found != std::u32string::npos; found = folded.text.find(wanted, found + wanted.size()))
 	{
-		const TextIndex start = static_cast<TextIndex>(found);
-		const TextIndex end = start + static_cast<int32>(wanted.size());
+		const TextIndex start = static_cast<TextIndex>(folded.from[found]);
+		const TextIndex end = static_cast<TextIndex>(folded.from[found + wanted.size()]);
 		if (StandsInSetAsideText(model, start))
 			continue;
 		if (part != nil && !KFCSearchEngine::StretchesHold(*part, storyRef.GetUID(), start, end))
+			continue;
+		if (!taken.Takes(storyRef, model, start))
 			continue;
 		if (MarkAnywhereIn(scanner, start, end))
 			continue;
@@ -197,17 +204,18 @@ bool WalkDoc(const UIDRef& docRef, const KFCKentenConditions& asked, const std::
 	// Composing to read a row's page dirties nothing the person made (a search's walk's rule).
 	IDataBase::SaveRestoreModifiedState dirtyGuard(db);
 	std::vector<KFCSearchEngine::ListedPlace> places;
+	KFCOwnScope taken(asked.switches);
 	const int32 count = stories->GetAllTextModelCount();
 	for (int32 s = 0; s < count && !outCapped; ++s)
 	{
 		const UIDRef storyRef(stories->GetNthTextModelUID(s));
 		InterfacePtr<ITextModel> model(storyRef, UseDefaultIID());
-		if (model == nil || (part != nil && !KFCSearchEngine::StretchesTouch(*part, storyRef.GetUID(), 0, kMaxInt32)))
+		if (model == nil || (part != nil && !KFCSearchEngine::StretchesTouch(*part, storyRef.GetUID(), 0, kMaxInt32)) || !taken.TakesStory(storyRef))
 			continue;
 		if (asked.kind == kKFCKentenFindWithout)
-			WalkWithoutKenten(storyRef, model, asked, part, limit, places, outCapped);
+			WalkWithoutKenten(storyRef, model, asked, taken, part, limit, places, outCapped);
 		else
-			WalkWithKenten(storyRef, model, asked, part, limit, places, outCapped);
+			WalkWithKenten(storyRef, model, asked, taken, part, limit, places, outCapped);
 	}
 	KFCSearchEngine::BuildListedHits(docRef, places, outHits, outVersions);
 	// What the rows with marks draw there; a row without any draws its text.
@@ -263,6 +271,8 @@ bool KFCKentenSearch::IsTabCurrent(KFCKentenConditions* outConditions)
 				conditions.scope = IWalkerScopeFactoryUtils::kToEndOfStoryScope;
 			else if (line == "scope=selection")
 				conditions.scope = IWalkerScopeFactoryUtils::kSelectionScope;
+			else
+				KFCOwnScopeDiagLine(line, conditions.switches);
 		}
 	}
 #endif

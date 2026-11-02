@@ -24,6 +24,7 @@
 #include "FileUtils.h"
 #include "TextWalkerServiceProviderID.h"	// kClearFindChangeOptionsCmdBoss
 
+#include <set>
 #include <string>
 #include <vector>
 
@@ -429,6 +430,8 @@ int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 					break;
 				}
 			}
+			// (A ruby list's First in Book over a book's chapters: the words of the documents written before, the query's own. Elsewhere each document is its own.)
+			std::set<size_t> bookSeen;
 			// ONE DOCUMENT AT A TIME - every one already open and held: nothing is opened or closed between the writes.
 			for (size_t d = 0; d < targets.size() && !cancelled && !failed; ++d)
 			{
@@ -478,7 +481,7 @@ int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 				if (!objectQuery && !ownQuery)
 					runList.RecordBefore(d, static_cast<int32>(q), writeScope, scopeOptions);		// (just before: the same text, the same walk)
 				const bool wrote = ownQuery
-					? KFCKohakuQuery::WriteDocument(targets[d].docRef, own, ownOverPart ? &ownPart : nil, count)
+					? KFCKohakuQuery::WriteDocument(targets[d].docRef, own, ownOverPart ? &ownPart : nil, count, scope.fromBook ? &bookSeen : nil)
 					: objectQuery
 					? KFCObjectReplace::ReplaceAllInDoc(targets[d].docRef, count, partial)
 					: KFCChangeAll::WriteDocument(targets[d].docRef, writeScope, scopeOptions, count);

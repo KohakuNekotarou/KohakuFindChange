@@ -36,7 +36,7 @@ KFCQueryCopy::KFCQueryCopy()
 	  replaceGlyph(kInvalidGlyphID), objectType(0), findParaStyle(kInvalidUID), findCharStyle(kInvalidUID),
 	  changeParaStyle(kInvalidUID), changeCharStyle(kInvalidUID), objectFindStyle(kInvalidUID),
 	  objectChangeStyle(kInvalidUID), attrDB(nil), changeConditionsMode(0), useFindROS(kFalse), useReplaceROS(kFalse),
-	  valid(false), tableOverridesOnly(false), rubyKind(0), kentenKind(0), kentenMark(0)
+	  valid(false), tableOverridesOnly(false), rubyKind(0), rubyListFirst(0), kentenKind(0), kentenMark(0)
 {
 }
 

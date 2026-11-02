@@ -119,6 +119,8 @@ DECLARE_PMID(kClassIDSpace, kKFCKohakuQueryWatchBoss, kKFCUIPrefix + 34)
 DECLARE_PMID(kClassIDSpace, kKFCKohakuSaveFilterBoss, kKFCUIPrefix + 35)
 // The Kenten part's sample: the mark its list says (KFCKentenSample.cpp).
 DECLARE_PMID(kClassIDSpace, kKFCKentenSampleWidgetBoss, kKFCUIPrefix + 36)
+// The Ruby and Kenten parts' icons, InDesign's Text tab's own (KFCSwitchIcon.cpp): a toggling icon button, with their tips.
+DECLARE_PMID(kClassIDSpace, kKFCSwitchIconWidgetBoss, kKFCUIPrefix + 37)
 
 
 // InterfaceIDs:
@@ -251,6 +253,7 @@ DECLARE_PMID(kImplementationIDSpace, kKFCKohakuQueryWatchImpl, kKFCUIPrefix + 64
 DECLARE_PMID(kImplementationIDSpace, kKFCKohakuSaveFilterEHImpl, kKFCUIPrefix + 65)
 DECLARE_PMID(kImplementationIDSpace, kKFCKohakuTabSelectionObserverImpl, kKFCUIPrefix + 66)
 DECLARE_PMID(kImplementationIDSpace, kKFCKentenSampleViewImpl, kKFCUIPrefix + 67)
+DECLARE_PMID(kImplementationIDSpace, kKFCSwitchIconTipImpl, kKFCUIPrefix + 68)
 
 
 // ActionIDs:
@@ -689,6 +692,17 @@ DECLARE_PMID(kWidgetIDSpace, kKFCRubyGridLabelChangeBaseWidgetID, kKFCPrefix + 6
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyListLabelWidgetID, kKFCPrefix + 68)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyListNameWidgetID, kKFCPrefix + 69)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyListStatusWidgetID, kKFCPrefix + 70)
+// ...which occurrences it takes (the author, 11-02: First in Story, First in Document, First in Book - KFCModelTypes.h).
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyListFirstLabelWidgetID, kKFCPrefix + 71)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyListFirstWidgetID, kKFCPrefix + 72)
+// THE RUBY AND KENTEN PARTS' ICONS (the author, 11-02), in the order of InDesign's Text tab: the row under Search:, where Table's words stand on Table. KFCOwnSwitches says what each is.
+DECLARE_PMID(kWidgetIDSpace, kKFCSwitchLockedLayersWidgetID, kKFCPrefix + 73)
+DECLARE_PMID(kWidgetIDSpace, kKFCSwitchLockedStoriesWidgetID, kKFCPrefix + 74)
+DECLARE_PMID(kWidgetIDSpace, kKFCSwitchHiddenWidgetID, kKFCPrefix + 75)
+DECLARE_PMID(kWidgetIDSpace, kKFCSwitchMasterWidgetID, kKFCPrefix + 76)
+DECLARE_PMID(kWidgetIDSpace, kKFCSwitchFootnotesWidgetID, kKFCPrefix + 77)
+DECLARE_PMID(kWidgetIDSpace, kKFCSwitchKanaWidgetID, kKFCPrefix + 78)
+DECLARE_PMID(kWidgetIDSpace, kKFCSwitchWidthWidgetID, kKFCPrefix + 79)
 
 
 // "About Plug-ins" sub-menu:
@@ -897,6 +911,11 @@ DECLARE_PMID(kWidgetIDSpace, kKFCRubyListStatusWidgetID, kKFCPrefix + 70)
 #define kKFCRubyTabFileListKey			kKFCStringPrefix "kKFCRubyTabFileListKey"
 #define kKFCRubyListWordKey				kKFCStringPrefix "kKFCRubyListWordKey"
 #define kKFCRubyListChooseFileKey		kKFCStringPrefix "kKFCRubyListChooseFileKey"
+#define kKFCRubyListWhichKey			kKFCStringPrefix "kKFCRubyListWhichKey"
+#define kKFCRubyListEveryKey			kKFCStringPrefix "kKFCRubyListEveryKey"
+#define kKFCRubyListInStoryKey			kKFCStringPrefix "kKFCRubyListInStoryKey"
+#define kKFCRubyListInDocumentKey		kKFCStringPrefix "kKFCRubyListInDocumentKey"
+#define kKFCRubyListInBookKey			kKFCStringPrefix "kKFCRubyListInBookKey"
 #define kKFCRubyListDialogTitleKey		kKFCStringPrefix "kKFCRubyListDialogTitleKey"
 #define kKFCRubyListFileTypeKey			kKFCStringPrefix "kKFCRubyListFileTypeKey"
 #define kKFCRubyTabBaseKey				kKFCStringPrefix "kKFCRubyTabBaseKey"

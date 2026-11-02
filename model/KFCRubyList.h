@@ -19,9 +19,11 @@
 #include <algorithm>
 #include <cstddef>
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
+#include "KFCFold.h"				// what a word and the text take for the same
 #include "KFCRubyChangePlan.h"		// Run - a list's word writes as the Change boxes do
 #include "KFCRubyMarkText.h"
 
@@ -59,7 +61,66 @@ namespace KFCRubyList
 		std::vector<Entry>						entries;
 		std::map<char32_t, std::vector<size_t> >	byFirst;	// a word's first character: its entries, the longest first
 		std::map<std::u32string, size_t>		byWord;
+		// THE SAME WORDS AS THEY ARE COMPARED with Kana Sensitive or Width Sensitive off (KFCFold.h): each word folded, its runs over the folded characters - ForFlags. Made as the file is read: a file's words are read once for a search, and looked at once for every place in the text.
+		std::shared_ptr<const Words>			kanaOff;
+		std::shared_ptr<const Words>			widthOff;
+		std::shared_ptr<const Words>			bothOff;
 	};
+
+	/** The look-up tables of a set of entries. */
+	inline void IndexWords(Words& words)
+	{
+		words.byFirst.clear();
+		for (size_t e = 0; e < words.entries.size(); ++e)
+			words.byFirst[words.entries[e].word[0]].push_back(e);
+		for (std::map<char32_t, std::vector<size_t> >::iterator first = words.byFirst.begin(); first != words.byFirst.end(); ++first)
+		{
+			const std::vector<Entry>& entries = words.entries;
+			std::stable_sort(first->second.begin(), first->second.end(), [&entries](size_t a, size_t b) { return entries[a].word.size() > entries[b].word.size(); });
+		}
+	}
+
+	/** THE WORDS AS THEY ARE COMPARED. Two lines' words that fold as one are one word, the earlier line's: the file is right as it stands (a word with two readings is said as it is read), and which of two spellings a person meant is not asked here. */
+	inline std::shared_ptr<const Words> FoldedWords(const Words& raw, const KFCFold::Flags& flags)
+	{
+		std::shared_ptr<Words> out(new Words());
+		for (size_t e = 0; e < raw.entries.size(); ++e)
+		{
+			const Entry& entry = raw.entries[e];
+			const KFCFold::Folded folded(KFCFold::Fold(entry.word, flags));
+			if (folded.text.empty() || out->byWord.find(folded.text) != out->byWord.end())
+				continue;
+			Entry each;
+			each.word = folded.text;
+			each.line = entry.line;
+			for (size_t r = 0; r < entry.runs.size(); ++r)
+			{
+				const KFCRubyChangePlan::Run& run = entry.runs[r];
+				const size_t first = static_cast<size_t>(std::lower_bound(folded.from.begin(), folded.from.end(), run.start) - folded.from.begin());
+				const size_t past = static_cast<size_t>(std::lower_bound(folded.from.begin(), folded.from.end(), run.start + run.length) - folded.from.begin());
+				if (past > first)
+				{
+					KFCRubyChangePlan::Run foldedRun = { first, past - first, run.reading };
+					each.runs.push_back(foldedRun);
+				}
+			}
+			if (each.runs.empty())
+				continue;
+			out->byWord[each.word] = out->entries.size();
+			out->entries.push_back(each);
+		}
+		IndexWords(*out);
+		return out;
+	}
+
+	/** The words to look with, as the switches say - words' own with both on. */
+	inline const Words& ForFlags(const Words& words, const KFCFold::Flags& flags)
+	{
+		if (flags.kanaSensitive && flags.widthSensitive)
+			return words;
+		const std::shared_ptr<const Words>& folded = (!flags.kanaSensitive && !flags.widthSensitive) ? words.bothOff : (!flags.kanaSensitive) ? words.kanaOff : words.widthOff;
+		return (folded != nullptr) ? *folded : words;
+	}
 
 	/** THE OTHER WAYS OF WRITING THE MARKS, AS THE MARKS: doubled full-width or ASCII less-than and greater-than (U+FF1C U+FF1E, < >), and the much-less-than signs U+226A U+226B, which an input method offers beside them. */
 	inline std::u32string WithMarks(const std::u32string& cell)
@@ -245,13 +306,10 @@ namespace KFCRubyList
 				break;
 			from = end + ((text[end] == 0x0D && end + 1 < text.size() && text[end + 1] == 0x0A) ? 2 : 1);
 		}
-		for (size_t e = 0; e < out.entries.size(); ++e)
-			out.byFirst[out.entries[e].word[0]].push_back(e);
-		for (std::map<char32_t, std::vector<size_t> >::iterator first = out.byFirst.begin(); first != out.byFirst.end(); ++first)
-		{
-			const std::vector<Entry>& entries = out.entries;
-			std::stable_sort(first->second.begin(), first->second.end(), [&entries](size_t a, size_t b) { return entries[a].word.size() > entries[b].word.size(); });
-		}
+		IndexWords(out);
+		out.kanaOff = FoldedWords(out, KFCFold::Flags(false, true));
+		out.widthOff = FoldedWords(out, KFCFold::Flags(true, false));
+		out.bothOff = FoldedWords(out, KFCFold::Flags(false, false));
 	}
 
 	/** THE LONGEST WORD STANDING AT `at` IN THE TEXT, or nullptr. */
@@ -276,6 +334,23 @@ namespace KFCRubyList
 	{
 		const std::map<std::u32string, size_t>::const_iterator found = words.byWord.find(word);
 		return (found != words.byWord.end()) ? &words.entries[found->second] : nullptr;
+	}
+
+	/** THE WORD A ROW'S TEXT IS, AS THE SWITCHES COMPARE IT, and the rubies it takes over the row's own characters: outRuns. False = no word of the list (the row's text has been edited). */
+	inline bool RowPlan(const Words& words, const KFCFold::Flags& flags, const std::u32string& rowText, std::vector<KFCRubyChangePlan::Run>& outRuns)
+	{
+		outRuns.clear();
+		const KFCFold::Folded row(KFCFold::Fold(rowText, flags));
+		const Entry* const entry = FindWord(ForFlags(words, flags), row.text);
+		if (entry == nullptr)
+			return false;
+		for (size_t r = 0; r < entry->runs.size(); ++r)
+		{
+			const KFCRubyChangePlan::Run& run = entry->runs[r];
+			KFCRubyChangePlan::Run each = { row.from[run.start], row.from[run.start + run.length] - row.from[run.start], run.reading };
+			outRuns.push_back(each);
+		}
+		return true;
 	}
 
 	/** A FILE'S BYTES AS UNICODE, when they say so: a UTF-16 BOM, or whole UTF-8 (RFC 3629's table - with its BOM or not). False = neither: the caller's next guess is what a Japanese Windows writes, CP932. */

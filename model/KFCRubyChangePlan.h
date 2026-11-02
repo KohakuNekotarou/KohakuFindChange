@@ -23,6 +23,8 @@
 #include <string>
 #include <vector>
 
+#include "KFCFold.h"		// what a base box and a row's text take for the same
+
 namespace KFCRubyChangePlan
 {
 	/** One reading box and the base text under it. */
@@ -129,8 +131,8 @@ namespace KFCRubyChangePlan
 		out.push_back(run);
 	}
 
-	/** THE RUNS OF ONE ROW. rowText = the row's whole text. */
-	inline Result Make(const std::vector<Piece>& pieces, const std::u32string& rowText, std::vector<Run>& out)
+	/** THE RUNS OF ONE ROW. rowText = the row's whole text. The base boxes are compared with it as the search compared them (flags - KFCFold.h: a row found with Kana Sensitive off holds katakana where the box holds hiragana). */
+	inline Result Make(const std::vector<Piece>& pieces, const std::u32string& rowText, std::vector<Run>& out, const KFCFold::Flags& flags = KFCFold::Flags())
 	{
 		out.clear();
 		const Result asked = Check(pieces);
@@ -176,17 +178,21 @@ namespace KFCRubyChangePlan
 			}
 			return kWrite;
 		}
-		if (Compact(rowText) != allBase)
+		// (A box's count is of compared characters; a run goes over the row's characters they came from - two, for a half-width voiced pair found with Width Sensitive off.)
+		const KFCFold::Folded row(KFCFold::Fold(Compact(rowText), flags));
+		if (row.text != KFCFold::TextOf(allBase, flags))
 			return kBaseDiffers;
 		size_t next = 0;
 		for (size_t p = 0; p < pieces.size(); ++p)
 		{
-			const size_t count = Compact(pieces[p].base).size();
+			const size_t count = KFCFold::TextOf(Compact(pieces[p].base), flags).size();
 			if (count == 0)
 				continue;
+			if (next + count >= row.from.size())
+				return kBaseDiffers;		// (a box that holds half of what the whole folds as one)
 			const std::u32string reading(Trimmed(pieces[p].reading));
 			if (!reading.empty())
-				AddRuns(reading, at, next, count, out);
+				AddRuns(reading, at, row.from[next], row.from[next + count] - row.from[next], out);
 			next += count;
 		}
 		return kWrite;

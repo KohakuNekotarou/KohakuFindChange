@@ -243,6 +243,18 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	},
 
 	/*
+	 * THE RUBY AND KENTEN PARTS' ICONS (KFCSwitchIcon.cpp): a toggling icon button as InDesign's Text tab's own (kIncludeHiddenLayersROButtonWidgetBoss and its fellows - their own bosses write InDesign's settings, so not those), with their tips.
+	 */
+	Class
+	{
+		kKFCSwitchIconWidgetBoss,
+		kRollOverIconButtonBoss,
+		{
+			IID_ITIP, kKFCSwitchIconTipImpl,
+		}
+	},
+
+	/*
 	 * A HIT ROW'S EYE (docs/superpowers/specs/2026-10-17-kfc-row-eye-keep-design.md - the row eye, D-13): an icon button
 	 * that draws InDesign's own eyeball while the row is kept and nothing while it is not (KFCResultListWidgetMgr sets
 	 * which, row by row), with a click handler of its own (KFCResultEyeEH) - the SDK's way of a tree row's icon
@@ -2103,6 +2115,7 @@ type KFCQueryRowWidget(kViewRsrcType) : PrimaryResourcePanelWidget(ClassID = kKF
 type KFCQueryRowTextWidget(kViewRsrcType) : InfoStaticTextWidget(ClassID = kKFCQueryRowTextWidgetBoss) { };
 type KFCQueryFixedTextWidget(kViewRsrcType) : EVEStaticTextWidget(ClassID = kKFCQueryFixedTextWidgetBoss) { };
 type KFCKentenSampleWidget(kViewRsrcType) : EVEGenericPanelWidget(ClassID = kKFCKentenSampleWidgetBoss) { };
+type KFCSwitchIconWidget(kViewRsrcType) : EVERollOverIconButtonWidget(ClassID = kKFCSwitchIconWidgetBoss) { };
 // The value dialogs (KFCSpecialDialogs.cpp): DialogBoss with WidgetEveInfo, as the query dialog - EVE lays them out.
 type KFCValueDialogWidget(kViewRsrcType) : DialogBoss(ClassID = kKFCValueDialogBoss)
 {
@@ -3832,16 +3845,45 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 							}}
 							kEVERegularSpaceAfter,
 						),
-						// (Table's, its list under it in its part - this frame's note says why here. KFCKohakuTab.cpp shows it with that part.)
-						KFCQueryFixedTextWidget
+						// THE LINE UNDER SEARCH:, the kind's own. (Table's words, its list under it in its part - this frame's note says why here; the Ruby and Kenten parts' icons - the author, 11-02: what InDesign's Text tab has under its Search:, in its order, its
+						// icons and sizes (26 x 22, the last two 30, 5 apart, measured), a pixel lower here as the line has 21. KFCKohakuTab.cpp shows each with its parts.)
+						EVEGenericPanelWidget
 						(
-							kKFCTableTabFindLabelWidgetID, kSysStaticTextPMRsrcId, kBindNone,
+							kInvalidWidgetID, kPMRsrcID_None,
+							kBindNone,
 							Frame(0, 0, 330, 21)
-							kTrue, kTrue, kAlignLeft,
-							kEllipsizeEnd, kFalse,
-							kKFCTableTabFindStyleKey,
-							kInvalidWidgetID
-							kEVENoSpaceAfter,
+							kTrue, kTrue,
+							kEVEAlignLeft | kEVENoSpaceAfter | kEVEArrangeChildrenStacked | kEVENoMargin,
+							{
+								KFCQueryFixedTextWidget
+								(
+									kKFCTableTabFindLabelWidgetID, kSysStaticTextPMRsrcId, kBindNone,
+									Frame(0, 0, 330, 21)
+									kTrue, kTrue, kAlignLeft,
+									kEllipsizeEnd, kFalse,
+									kKFCTableTabFindStyleKey,
+									kInvalidWidgetID
+									kEVENoSpaceAfter,
+								),
+								EVEGenericPanelWidget
+								(
+									kInvalidWidgetID, kPMRsrcID_None,
+									kBindNone,
+									Frame(0, 0, 330, 21)
+									kTrue, kTrue,
+									kEVEAlignLeft | kEVENoSpaceAfter | kEVEArrangeChildrenInRow | kEVENoMargin,
+									{
+										// (The numbers: the icons of InDesign's Find/Change plug-in, as its Text tab's widgets name them - measured with KIDMCP inspect_ui; SDK's FindChangeID.h gives them no name.)
+										KFCSwitchIconWidget(kKFCSwitchLockedLayersWidgetID, 104, kFindChangePluginID, kBindNone, Frame(0, 0, 26, 21) kTrue, kTrue, kADBEIconSuiteButtonDrawWellType, kEVERegularSpaceAfter,),
+										KFCSwitchIconWidget(kKFCSwitchLockedStoriesWidgetID, 105, kFindChangePluginID, kBindNone, Frame(0, 0, 26, 21) kTrue, kTrue, kADBEIconSuiteButtonDrawWellType, kEVERegularSpaceAfter,),
+										KFCSwitchIconWidget(kKFCSwitchHiddenWidgetID, 103, kFindChangePluginID, kBindNone, Frame(0, 0, 26, 21) kTrue, kTrue, kADBEIconSuiteButtonDrawWellType, kEVERegularSpaceAfter,),
+										KFCSwitchIconWidget(kKFCSwitchMasterWidgetID, 106, kFindChangePluginID, kBindNone, Frame(0, 0, 26, 21) kTrue, kTrue, kADBEIconSuiteButtonDrawWellType, kEVERegularSpaceAfter,),
+										KFCSwitchIconWidget(kKFCSwitchFootnotesWidgetID, 107, kFindChangePluginID, kBindNone, Frame(0, 0, 26, 21) kTrue, kTrue, kADBEIconSuiteButtonDrawWellType, kEVERegularSpaceAfter,),
+										KFCSwitchIconWidget(kKFCSwitchKanaWidgetID, 110, kFindChangePluginID, kBindNone, Frame(0, 0, 30, 21) kTrue, kTrue, kADBEIconSuiteButtonDrawWellType, kEVERegularSpaceAfter,),
+										KFCSwitchIconWidget(kKFCSwitchWidthWidgetID, 111, kFindChangePluginID, kBindNone, Frame(0, 0, 30, 21) kTrue, kTrue, kADBEIconSuiteButtonDrawWellType, kEVENoSpaceAfter,),
+									}
+								),
+							}
 						),
 					}
 				),
@@ -4259,6 +4301,30 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 									kEllipsizeEnd, kFalse,
 									"",
 									kInvalidWidgetID
+									kEVENoSpaceAfter,
+								),
+								// ...and which occurrences it takes (the entries' order: KFCModelTypes.h).
+								EVEStaticTextWidget
+								(
+									kKFCRubyListFirstLabelWidgetID, kSysStaticTextPMRsrcId, kBindNone,
+									Frame(0, 52, 110, 73)
+									kTrue, kTrue, kAlignLeft,
+									kDontEllipsize, kTrue,
+									kKFCRubyListWhichKey,
+									0,
+									kEVENoSpaceAfter,
+								),
+								EVEDropDownListWidget
+								(
+									kKFCRubyListFirstWidgetID, kSysDropDownPMRsrcId, kBindNone,
+									Frame(115, 52, 285, 73)
+									kTrue, kTrue,
+									{{
+										kKFCRubyListEveryKey,
+										kKFCRubyListInStoryKey,
+										kKFCRubyListInDocumentKey,
+										kKFCRubyListInBookKey,
+									}}
 									kEVENoSpaceAfter,
 								),
 								KFC_RUBY_BOX(kKFCRubyReadingBox0WidgetID, 0, 21),

@@ -32,6 +32,8 @@
 
 #include <memory>				// a ruby list's words
 
+#include "KFCModelTypes.h"		// KFCOwnSwitches
+
 class IDataBase;
 namespace KFCRubyList { struct Words; }
 
@@ -88,10 +90,13 @@ struct KFCQueryCopy
 	PMString	rubyReading;
 	PMString	rubyListPath;			// kKFCRubyFindList: its file
 	std::shared_ptr<const KFCRubyList::Words>	rubyList;	// ...and its words as the list found them: its rows write these and its searches again look for these, whatever the file says by then
+	int32		rubyListFirst;			// ...and which occurrences: kKFCRubyListAll ...
 	// A KENTEN LIST'S (CaptureKenten): the same.
 	int32		kentenKind;				// kKFCKentenFindWith ... (KFCModelTypes.h)
 	PMString	kentenBase;
 	int32		kentenMark;
+	// A RUBY OR KENTEN LIST'S: what its search took in and took for the same. (Not the five bool16s above: those are a tab of InDesign's, read and stated back; these were never any of InDesign's.)
+	KFCOwnSwitches	ownSwitches;
 
 	KFCQueryCopy();
 };

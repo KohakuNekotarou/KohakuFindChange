@@ -238,6 +238,14 @@ bool KFCKohakuQuery::Read(const IDFile& file, KFCKohakuQueryData& out)
 			out.ruby.kind = number;
 		else if (key == "rubyList")
 			out.ruby.listPath = Words(value);
+		else if (key == "rubyFirst")
+			out.ruby.listFirst = number;
+		else if (key == "switches")
+		{
+			// (Each kind's own, and a file holds one kind. What the file has no word of, as the tab starts: the file of a version before the icons.)
+			out.ruby.switches.SetBits(number);
+			out.kenten.switches.SetBits(number);
+		}
 		else if (key == "rubyBase")
 			out.ruby.base = Words(value);
 		else if (key == "ruby")
@@ -281,6 +289,8 @@ bool KFCKohakuQuery::Read(const IDFile& file, KFCKohakuQueryData& out)
 	// A FILE IS WHAT ANYONE MADE OF IT, AND THE FACE SELECTS BY THESE: a number its list has no entry for reads as the list's first (the lists - KFCUI.fr: Kenten: is Any and every kind, Change Kenten To: has no Custom).
 	if (out.ruby.kind < kKFCRubyFindWith || out.ruby.kind > kKFCRubyFindList)
 		out.ruby.kind = kKFCRubyFindWith;
+	if (out.ruby.listFirst < kKFCRubyListAll || out.ruby.listFirst > kKFCRubyListFirstInBook)
+		out.ruby.listFirst = kKFCRubyListAll;
 	if (out.kenten.kind < kKFCKentenFindWith || out.kenten.kind > kKFCKentenFindWithout)
 		out.kenten.kind = kKFCKentenFindWith;
 	if (out.kenten.mark < 0 || out.kenten.mark > IKentenStyle::Kenten_Custom)
@@ -308,6 +318,8 @@ std::string KFCKohakuQuery::FileText(const KFCKohakuQueryData& query)
 	{
 		Attribute(element, "rubyLook", query.ruby.kind);
 		Attribute(element, "rubyList", query.ruby.listPath);
+		Attribute(element, "rubyFirst", query.ruby.listFirst);
+		Attribute(element, "switches", query.ruby.switches.Bits());
 		Attribute(element, "rubyBase", query.ruby.base);
 		Attribute(element, "ruby", query.ruby.reading);
 		Attribute(element, "rubyChange", Words(JoinedReadings(query.ruby.change)));
@@ -317,6 +329,7 @@ std::string KFCKohakuQuery::FileText(const KFCKohakuQueryData& query)
 	else if (query.mode == kKFCKentenSearchMode)
 	{
 		Attribute(element, "kentenLook", query.kenten.kind);
+		Attribute(element, "switches", query.kenten.switches.Bits());
 		Attribute(element, "kentenBase", query.kenten.base);
 		Attribute(element, "kentenMark", query.kenten.mark);
 		Attribute(element, "kentenChange", query.kenten.changeTo);
@@ -378,13 +391,13 @@ bool KFCKohakuQuery::HasChangeSide(const KFCKohakuQueryData& query)
 	return false;		// (a QR code's list writes nothing)
 }
 
-bool KFCKohakuQuery::WriteDocument(const UIDRef& docRef, const KFCKohakuQueryData& query, const std::vector<KFCSearchEngine::ListedPlace>* part, int32& outCount)
+bool KFCKohakuQuery::WriteDocument(const UIDRef& docRef, const KFCKohakuQueryData& query, const std::vector<KFCSearchEngine::ListedPlace>* part, int32& outCount, std::set<size_t>* ioBookSeen)
 {
 	outCount = 0;
 	if (query.mode == kKFCTableSearchMode)
 		return KFCTableSearch::WriteDocument(docRef, query.table, part, outCount);
 	if (query.mode == kKFCRubySearchMode)
-		return KFCRubySearch::WriteDocument(docRef, query.ruby, part, outCount);
+		return KFCRubySearch::WriteDocument(docRef, query.ruby, part, outCount, ioBookSeen);
 	if (query.mode == kKFCKentenSearchMode)
 		return KFCKentenSearch::WriteDocument(docRef, query.kenten, part, outCount);
 	return false;

@@ -3957,6 +3957,8 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 			rubyAsked.reading = againCopy->rubyReading;
 			rubyAsked.listPath = againCopy->rubyListPath;
 			rubyAsked.listWords = againCopy->rubyList;
+			rubyAsked.listFirst = againCopy->rubyListFirst;
+			rubyAsked.switches = againCopy->ownSwitches;
 		}
 		else
 		{
@@ -3972,6 +3974,7 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 			kentenAsked.kind = againCopy->kentenKind;
 			kentenAsked.base = againCopy->kentenBase;
 			kentenAsked.mark = againCopy->kentenMark;
+			kentenAsked.switches = againCopy->ownSwitches;
 		}
 		else
 			(void)KFCKentenSearch::IsTabCurrent(&kentenAsked);
@@ -3988,9 +3991,14 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 			KFCQueryCopier::CaptureRuby(copy, rubyAsked.kind, rubyAsked.base, rubyAsked.reading);
 			copy.rubyListPath = rubyAsked.listPath;
 			copy.rubyList = rubyAsked.listWords;
+			copy.rubyListFirst = rubyAsked.listFirst;
+			copy.ownSwitches = rubyAsked.switches;
 		}
 		else if (kentenTab)
+		{
 			KFCQueryCopier::CaptureKenten(copy, kentenAsked.kind, kentenAsked.base, kentenAsked.mark);
+			copy.ownSwitches = kentenAsked.switches;
+		}
 		else
 			KFCQueryCopier::Capture(copy);
 		if (copy.valid)
@@ -5617,6 +5625,16 @@ bool KFCSearchEngine::SearchDocumentAgain(int32 chapterIdx, PMString& outStatus)
 		outStatus.Append(") - search again.");
 		return false;
 	}
+	// EACH WORD'S FIRST IN THE BOOK: what is first in this document turns on the chapters before it, which this walk does not read (the list's others are searched whole - Search These Results Again).
+	if (KFCResultModel::ListIsRuby() && KFCResultModel::GetSearchScope() == KFCResultModel::kScopeBook)
+	{
+		const std::shared_ptr<const KFCQueryCopy> asked(KFCResultModel::GetQueryCopy());
+		if (asked != nil && asked->rubyKind == kKFCRubyFindList && asked->rubyListFirst == kKFCRubyListFirstInBook)
+		{
+			outStatus.Append("First in Book turns on the whole book - Search These Results Again.");
+			return false;
+		}
+	}
 	// Asked, not refused - and the tab the walk runs in stated (QueryUnchangedForAgain).
 	if (!QueryUnchangedForAgain(outStatus))
 		return false;
@@ -5663,6 +5681,8 @@ bool KFCSearchEngine::SearchDocumentAgain(int32 chapterIdx, PMString& outStatus)
 				listAsked.reading = asked->rubyReading;
 				listAsked.listPath = asked->rubyListPath;
 				listAsked.listWords = asked->rubyList;
+				listAsked.listFirst = asked->rubyListFirst;
+				listAsked.switches = asked->ownSwitches;
 			}
 			walked = KFCRubySearch::WalkOneDocument(docRef, name, limit, listAsked, hits, storyVersions, capped, cancelled);
 		}
@@ -5675,6 +5695,7 @@ bool KFCSearchEngine::SearchDocumentAgain(int32 chapterIdx, PMString& outStatus)
 				listAsked.kind = asked->kentenKind;
 				listAsked.base = asked->kentenBase;
 				listAsked.mark = asked->kentenMark;
+				listAsked.switches = asked->ownSwitches;
 			}
 			walked = KFCKentenSearch::WalkOneDocument(docRef, name, limit, listAsked, hits, storyVersions, capped, cancelled);
 		}

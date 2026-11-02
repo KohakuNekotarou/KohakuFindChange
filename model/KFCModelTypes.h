@@ -266,18 +266,55 @@ struct KFCRubyChangePiece
 	PMString	findReading;
 };
 
+/** WHICH OCCURRENCES WORDS IN A RUBY LIST TAKES: every one, or each word's first alone (the author, 11-02: "that I always wanted"; the first as a row would stand first in the list, in that much of what is searched - a story's, a document's, a book's). The list's entries' order (KFCUI.fr). */
+enum { kKFCRubyListAll = 0, kKFCRubyListFirstInStory = 1, kKFCRubyListFirstInDocument = 2, kKFCRubyListFirstInBook = 3 };
+
+/** WHAT A RUBY OR KENTEN SEARCH TAKES IN AND TAKES FOR THE SAME (the author, 11-02: the icons InDesign's Text tab has under its Search:, on the Kohaku+ tab's Ruby and Kenten, each kind's its own): at their defaults as InDesign's tab holds them (measured with app.findChangeTextOptions -
+    docs/superpowers/specs/2026-11-02-kfc-ruby-list-design.md). Locked layers and locked stories are Search Only: a row found there is listed locked and its Replace is refused. */
+struct KFCOwnSwitches
+{
+	bool	lockedLayers;		// Include Locked Layers and Locked Objects
+	bool	lockedStories;		// Include Locked Stories
+	bool	hiddenLayers;		// Include Hidden Layers and Hidden Objects
+	bool	masterPages;		// Include Master Pages
+	bool	footnotes;			// Include Footnotes
+	bool	kanaSensitive;		// Kana Sensitive (KFCFold.h)
+	bool	widthSensitive;		// Width Sensitive
+
+	KFCOwnSwitches() : lockedLayers(false), lockedStories(false), hiddenLayers(false), masterPages(false), footnotes(true), kanaSensitive(true), widthSensitive(true) {}
+
+	/** One number, as a query file holds them. */
+	int32 Bits() const
+	{
+		return (lockedLayers ? 1 : 0) | (lockedStories ? 2 : 0) | (hiddenLayers ? 4 : 0) | (masterPages ? 8 : 0) | (footnotes ? 16 : 0) | (kanaSensitive ? 32 : 0) | (widthSensitive ? 64 : 0);
+	}
+
+	void SetBits(int32 bits)
+	{
+		lockedLayers = (bits & 1) != 0;
+		lockedStories = (bits & 2) != 0;
+		hiddenLayers = (bits & 4) != 0;
+		masterPages = (bits & 8) != 0;
+		footnotes = (bits & 16) != 0;
+		kanaSensitive = (bits & 32) != 0;
+		widthSensitive = (bits & 64) != 0;
+	}
+};
+
 /** WHAT THE RUBY TAB ASKS (the face's - KFCKohakuTab, read by IKFCUIServices::RubyTabConditions; a ruby list keeps its find side in its query copy). */
 struct KFCRubyConditions
 {
 	int32		kind;			// Look For: - kKFCRubyFindWith, kKFCRubyFindWithout (the occurrences of base with none on them), kKFCRubyFindMarks, kKFCRubyFindList
 	PMString	listPath;		// kKFCRubyFindList: the file
 	std::shared_ptr<const KFCRubyList::Words>	listWords;	// ...its words, as the model half read them for a search (KFCRubyListFile::Load) - nil elsewhere: the rows of a list write what it found them with
+	int32		listFirst;		// ...and which occurrences: kKFCRubyListAll ...
+	KFCOwnSwitches	switches;	// the icons
 	PMString	base;			// its base contains this; empty = any (Text Without Ruby: what it looks for - refused empty)
 	PMString	reading;		// its reading contains this; empty = any (not Text Without Ruby)
 	std::vector<KFCRubyChangePiece>	change;	// what a row's Replace gives it: the boxes in order. No box reading anything = its Replace takes the ruby off (the author, 11-01)
 	int32		scope;			// its Search: - IWalkerScopeFactoryUtils::kDocumentScope (at launch), kAllDocumentScope, or over part of the front document kStoryScope, kToEndOfStoryScope, kSelectionScope
 
-	KFCRubyConditions() : kind(kKFCRubyFindWith), scope(0) {}
+	KFCRubyConditions() : kind(kKFCRubyFindWith), listFirst(kKFCRubyListAll), scope(0) {}
 };
 
 /** THE KENTEN KIND'S "SEARCH MODE" (the author, 10-31 - KFCKentenSearch.h): the Ruby kind's for its own (KFCKentenSearch::IsTabCurrent). KFC'S ALONE. */
@@ -294,6 +331,7 @@ struct KFCKentenConditions
 	int32		mark;			// Kenten: - 0 = any, or an IKentenStyle::KentenKind (not Text Without Kenten)
 	int32		changeTo;		// Change Kenten To: - the IKentenStyle::KentenKind a row's Replace gives it; 0 = none given
 	bool		removeKenten;	// ...or its Replace takes the marks off - over changeTo
+	KFCOwnSwitches	switches;	// the icons
 	int32		scope;			// its Search: - as KFCRubyConditions::scope
 
 	KFCKentenConditions() : kind(kKFCKentenFindWith), mark(0), changeTo(0), removeKenten(false), scope(0) {}

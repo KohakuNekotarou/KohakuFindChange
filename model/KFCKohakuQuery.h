@@ -20,6 +20,7 @@
 #include "PMString.h"
 #include "UIDRef.h"
 
+#include <set>
 #include <string>
 #include <vector>
 
@@ -50,8 +51,8 @@ namespace KFCKohakuQuery
 	bool HasChangeSide(const KFCKohakuQueryData& query);
 
 	/** THE RUN'S WRITE OF ONE DOCUMENT: what the query's kind lists - of part alone, given one (KFCSearchEngine::PartStretches) - given its Change side, a locked one and one that already reads so left. Inside
-	    the caller's command sequence. outCount = what was written. False = InDesign would not write one. */
-	bool WriteDocument(const UIDRef& docRef, const KFCKohakuQueryData& query, const std::vector<KFCSearchEngine::ListedPlace>* part, int32& outCount);
+	    the caller's command sequence. outCount = what was written. False = InDesign would not write one. ioBookSeen: the query's one set over a book's documents - a ruby list's First in Book (KFCRubySearch::WriteDocument). */
+	bool WriteDocument(const UIDRef& docRef, const KFCKohakuQueryData& query, const std::vector<KFCSearchEngine::ListedPlace>* part, int32& outCount, std::set<size_t>* ioBookSeen = nil);
 }
 
 #endif // __KFCKohakuQuery_h__

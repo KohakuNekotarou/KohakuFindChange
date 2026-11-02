@@ -723,7 +723,9 @@ void LayOutRubyGrid(IPanelControlData* panel)
 	PlaceGridWidget(panel, kKFCRubyListLabelWidgetID, listing, listing, 0, 0, 110, 21);
 	PlaceGridWidget(panel, kKFCRubyListNameWidgetID, listing, listing, 115, 0, 456, 21);
 	PlaceGridWidget(panel, kKFCRubyListStatusWidgetID, listing, listing, 0, 26, 456, 47);
-	// (Choose List... and How to Use... stand in the head's column.)
+	PlaceGridWidget(panel, kKFCRubyListFirstLabelWidgetID, listing, listing, 0, 52, 110, 73);
+	PlaceGridWidget(panel, kKFCRubyListFirstWidgetID, listing, listing, 115, 52, 285, 73);
+	// (Choose List... stands in the head's column.)
 	IControlView* const choose = (panel != nil) ? panel->FindWidget(kKFCRubyListChooseWidgetID) : nil;
 	if (choose != nil)
 	{
@@ -1069,6 +1071,48 @@ void ShowHowTo()
 	gHowTo->ShowView(shown ? kTrue : kFalse);
 }
 
+// ----- The icons under Search: (the author, 11-02), each kind's own: nothing a kind asks has to do with what the other asks.
+
+// The widget and which of KFCOwnSwitches it says.
+struct SwitchIcon
+{
+	WidgetID			widget;
+	bool KFCOwnSwitches::*	value;
+};
+
+const SwitchIcon kSwitchIcons[] =
+{
+	{ kKFCSwitchLockedLayersWidgetID, &KFCOwnSwitches::lockedLayers },
+	{ kKFCSwitchLockedStoriesWidgetID, &KFCOwnSwitches::lockedStories },
+	{ kKFCSwitchHiddenWidgetID, &KFCOwnSwitches::hiddenLayers },
+	{ kKFCSwitchMasterWidgetID, &KFCOwnSwitches::masterPages },
+	{ kKFCSwitchFootnotesWidgetID, &KFCOwnSwitches::footnotes },
+	{ kKFCSwitchKanaWidgetID, &KFCOwnSwitches::kanaSensitive },
+	{ kKFCSwitchWidthWidgetID, &KFCOwnSwitches::widthSensitive },
+};
+const int32 kSwitchIconCount = static_cast<int32>(sizeof(kSwitchIcons) / sizeof(kSwitchIcons[0]));
+
+bool IsSwitchIcon(const WidgetID& widget)
+{
+	for (int32 k = 0; k < kSwitchIconCount; ++k)
+		if (widget == kSwitchIcons[k].widget)
+			return true;
+	return false;
+}
+
+// The icons of the kind now: shown for Ruby and Kenten, each as that kind holds it. Not heard (notifyOfChange kFalse).
+void ShowSwitches(IPanelControlData* panel)
+{
+	const bool shown = (gKind == kKindRuby || gKind == kKindKenten);
+	const KFCOwnSwitches& kept = (gKind == kKindKenten) ? gKenten.switches : gRuby.switches;
+	for (int32 k = 0; k < kSwitchIconCount; ++k)
+	{
+		ShowPart(panel, kSwitchIcons[k].widget, shown);
+		if (shown)
+			SetBox(panel, kSwitchIcons[k].widget, kept.*(kSwitchIcons[k].value));
+	}
+}
+
 // THE CHOSEN KIND'S PART, the others away, and Search: for it.
 void ShowKind(IPMUnknown* face)
 {
@@ -1080,6 +1124,7 @@ void ShowKind(IPMUnknown* face)
 	ShowPart(panel, kKFCTableTabChangeAllWidgetID, gKind == kKindTable);
 	ShowPart(panel, kKFCTableTabChangeFindWidgetID, gKind == kKindTable);
 	ShowPart(panel, kKFCTableTabFindLabelWidgetID, gKind == kKindTable);
+	ShowSwitches(panel);
 	ShowPart(panel, kKFCKohakuTableSectionWidgetID, gKind == kKindTable);
 	ShowPart(panel, kKFCKohakuRubySectionWidgetID, gKind == kKindRuby);
 	ShowPart(panel, kKFCKohakuKentenSectionWidgetID, gKind == kKindKenten);
@@ -1099,6 +1144,9 @@ void FillKept(IPMUnknown* face)
 	InterfacePtr<IDropDownListController> rubyKind(QueryList(face, kKFCRubyTabKindWidgetID));
 	if (rubyKind != nil)
 		rubyKind->Select(gRuby.kind, kTrue, kFalse);
+	InterfacePtr<IDropDownListController> rubyFirst(QueryList(face, kKFCRubyListFirstWidgetID));
+	if (rubyFirst != nil)
+		rubyFirst->Select(gRuby.listFirst, kTrue, kFalse);
 	WriteBoxes(panel);
 	InterfacePtr<IDropDownListController> kentenKind(QueryList(face, kKFCKentenTabKindWidgetID));
 	if (kentenKind != nil)
@@ -1283,7 +1331,7 @@ CREATE_PMINTERFACE(KFCKohakuTabController, kKFCKohakuTabControllerImpl)
 class KFCKohakuTabObserver : public AbstractDialogObserver
 {
 public:
-	KFCKohakuTabObserver(IPMUnknown* boss) : AbstractDialogObserver(boss), fHowTo(nil) {}
+	KFCKohakuTabObserver(IPMUnknown* boss) : AbstractDialogObserver(boss), fHowTo(nil), fIconTurnedOn(false) {}
 	virtual ~KFCKohakuTabObserver() {}
 
 	virtual void AutoAttach()
@@ -1304,6 +1352,9 @@ public:
 			AttachToWidget(kKFCKohakuTabScopeWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
 			AttachToWidget(kKFCQRTabFindNextWidgetID, IID_IBOOLEANCONTROLDATA, panel);
 			AttachToWidget(kKFCRubyListChooseWidgetID, IID_IBOOLEANCONTROLDATA, panel);
+			AttachToWidget(kKFCRubyListFirstWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
+			for (int32 k = 0; k < kSwitchIconCount; ++k)
+				AttachToWidget(kSwitchIcons[k].widget, IID_ITRISTATECONTROLDATA, panel);
 			AttachToWidget(kKFCTableTabChangeWidgetID, IID_IBOOLEANCONTROLDATA, panel);
 			AttachToWidget(kKFCTableTabChangeAllWidgetID, IID_IBOOLEANCONTROLDATA, panel);
 			AttachToWidget(kKFCTableTabChangeFindWidgetID, IID_IBOOLEANCONTROLDATA, panel);
@@ -1392,6 +1443,9 @@ public:
 		DetachFromWidget(kKFCKohakuTabScopeWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
 		DetachFromWidget(kKFCQRTabFindNextWidgetID, IID_IBOOLEANCONTROLDATA, panel);
 		DetachFromWidget(kKFCRubyListChooseWidgetID, IID_IBOOLEANCONTROLDATA, panel);
+		DetachFromWidget(kKFCRubyListFirstWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
+		for (int32 k = 0; k < kSwitchIconCount; ++k)
+			DetachFromWidget(kSwitchIcons[k].widget, IID_ITRISTATECONTROLDATA, panel);
 		DetachFromWidget(kKFCTableTabChangeWidgetID, IID_IBOOLEANCONTROLDATA, panel);
 		DetachFromWidget(kKFCTableTabChangeAllWidgetID, IID_IBOOLEANCONTROLDATA, panel);
 		DetachFromWidget(kKFCTableTabChangeFindWidgetID, IID_IBOOLEANCONTROLDATA, panel);
@@ -1516,6 +1570,31 @@ public:
 			InterfacePtr<IPanelControlData> panel(this, UseDefaultIID());
 			ShowRubyKind(panel);
 			KFC_DIAG_LOG("RUBYTAB kind=%d", static_cast<int>(gRuby.kind));
+		}
+		else if (widget == kKFCRubyListFirstWidgetID)
+		{
+			InterfacePtr<IDropDownListController> list(view, UseDefaultIID());
+			const int32 entry = (list != nil) ? list->GetSelected() : -1;
+			if (entry >= kKFCRubyListAll && entry <= kKFCRubyListFirstInBook)
+				gRuby.listFirst = entry;
+			KFC_DIAG_LOG("RUBYTAB first=%d", static_cast<int>(gRuby.listFirst));
+		}
+		else if (protocol == IID_ITRISTATECONTROLDATA && (theChange == kTrueStateMessage || theChange == kFalseStateMessage) && IsSwitchIcon(widget))
+		{
+			// AN ICON, THE KIND'S OWN: a push button that ends every press off (memory tool-activation-and-selection-sync 4; measured here: one that is off says on, then off - one that is on, off alone). So the press's end says what it comes to, and it is written back on the icon then.
+			KFCOwnSwitches& kept = (gKind == kKindKenten) ? gKenten.switches : gRuby.switches;
+			if (theChange == kTrueStateMessage)
+				fIconTurnedOn = true;
+			else
+			{
+				for (int32 k = 0; k < kSwitchIconCount; ++k)
+					if (widget == kSwitchIcons[k].widget)
+						kept.*(kSwitchIcons[k].value) = fIconTurnedOn;
+				fIconTurnedOn = false;
+				InterfacePtr<IPanelControlData> panel(this, UseDefaultIID());
+				ShowSwitches(panel);
+				KFC_DIAG_LOG("%s switches=%d", KindWord(), static_cast<int>(kept.Bits()));
+			}
 		}
 		else if (ColumnOf(widget, ReadingBoxID(0), kKFCRubyBoxColumnsMost) >= 0)
 		{
@@ -1687,6 +1766,7 @@ private:
 
 	UIDRef fWorkspace;
 	InterfacePtr<IControlView> fHowTo;	// How to Use..., while the face is shown (gHowTo)
+	bool fIconTurnedOn;					// an icon's press has said on, and has not ended
 };
 CREATE_PMINTERFACE(KFCKohakuTabObserver, kKFCKohakuTabObserverImpl)
 

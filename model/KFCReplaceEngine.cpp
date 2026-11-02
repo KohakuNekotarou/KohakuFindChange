@@ -4165,10 +4165,13 @@ private:
 class RubyWrite : public OwnTabWrite
 {
 public:
-	RubyWrite()
+	explicit RubyWrite(const KFCQueryCopy* list)
 	{
 		(void)KFCRubySearch::IsTabCurrent(&fAsked);
 		fPieces = KFCRubySearch::PlanPieces(fAsked);
+		// (The Change side is the tab's as it stands; the base boxes are compared with a row's text as its list's search compared them.)
+		if (list != nil)
+			fSwitches = list->ownSwitches;
 	}
 	virtual const char* NothingToChange() const
 	{
@@ -4179,7 +4182,7 @@ public:
 	virtual OwnTabRefusal RowDoor(const UIDRef& storyRef, OwnTabRow& row)
 	{
 		std::vector<KFCRubyChangePlan::Run> runs;
-		switch (KFCRubySearch::PlanForRow(storyRef, row.start, row.end, fPieces, runs))
+		switch (KFCRubySearch::PlanForRow(storyRef, row.start, row.end, fPieces, runs, fSwitches))
 		{
 			case KFCRubyChangePlan::kRemove:
 				return KFCRubySearch::HasRubyOn(storyRef, row.start, row.end) ? kOwnTabOk : kOwnTabAsAsked;
@@ -4194,7 +4197,7 @@ public:
 	virtual ErrorCode WriteRow(const UIDRef& storyRef, const OwnTabRow& row, PMString& outWords, KFCRowUpper& outUpper)
 	{
 		std::vector<KFCRubyChangePlan::Run> runs;
-		const KFCRubyChangePlan::Result plan = KFCRubySearch::PlanForRow(storyRef, row.start, row.end, fPieces, runs);
+		const KFCRubyChangePlan::Result plan = KFCRubySearch::PlanForRow(storyRef, row.start, row.end, fPieces, runs, fSwitches);
 		const ErrorCode wrote = (plan == KFCRubyChangePlan::kRemove) ? KFCRubySearch::Remove(storyRef, row.start, row.end)
 			: KFCRubySearch::WritePlan(storyRef, row.start, row.end, runs);
 		if (wrote == kSuccess)
@@ -4213,26 +4216,27 @@ public:
 private:
 	KFCRubyConditions						fAsked;
 	std::vector<KFCRubyChangePlan::Piece>	fPieces;
+	KFCOwnSwitches							fSwitches;
 };
 
 // A RUBY LIST'S (KFCRubyList.h): what the line of the row's word says, whatever the Change side does - and the words the list was found with, not the file as it stands now: what a row draws over it is what it gets.
 class RubyListWrite : public OwnTabWrite
 {
 public:
-	explicit RubyListWrite(const std::shared_ptr<const KFCRubyList::Words>& words) : fWords(words) {}
+	RubyListWrite(const std::shared_ptr<const KFCRubyList::Words>& words, const KFCOwnSwitches& switches) : fWords(words), fSwitches(switches) {}
 	virtual const char* NothingToChange() const { return nil; }
 	virtual void EnterDocument(IDataBase* /*db*/) {}
 	virtual OwnTabRefusal RowDoor(const UIDRef& storyRef, OwnTabRow& row)
 	{
 		std::vector<KFCRubyChangePlan::Run> runs;
-		if (fWords == nullptr || !KFCRubySearch::ListPlanForRow(*fWords, storyRef, row.start, row.end, runs))
+		if (fWords == nullptr || !KFCRubySearch::ListPlanForRow(*fWords, fSwitches, storyRef, row.start, row.end, runs))
 			return kOwnTabEdited;
 		return KFCRubySearch::ReadsAsPlanned(storyRef, row.start, row.end, runs) ? kOwnTabAsAsked : kOwnTabOk;
 	}
 	virtual ErrorCode WriteRow(const UIDRef& storyRef, const OwnTabRow& row, PMString& outWords, KFCRowUpper& outUpper)
 	{
 		std::vector<KFCRubyChangePlan::Run> runs;
-		if (fWords == nullptr || !KFCRubySearch::ListPlanForRow(*fWords, storyRef, row.start, row.end, runs))
+		if (fWords == nullptr || !KFCRubySearch::ListPlanForRow(*fWords, fSwitches, storyRef, row.start, row.end, runs))
 			return kFailure;
 		const ErrorCode wrote = KFCRubySearch::WritePlan(storyRef, row.start, row.end, runs);
 		if (wrote == kSuccess)
@@ -4249,6 +4253,7 @@ public:
 	virtual const char* Noun() const { return "rows"; }
 private:
 	std::shared_ptr<const KFCRubyList::Words>	fWords;
+	KFCOwnSwitches								fSwitches;
 };
 
 // THE KENTEN KIND'S: the kind of mark on a row's text, the look of the marks left as it stands - or, Remove Kenten, the marks taken off whole (KFCKentenSearch::Remove).
@@ -4617,10 +4622,10 @@ static bool ReplaceOwnTabRows(const KFCRowsByChapter& rowsByChapter, PMString& o
 		}
 		if (asked != nil && asked->rubyKind == kKFCRubyFindList)
 		{
-			RubyListWrite list(asked->rubyList);
+			RubyListWrite list(asked->rubyList, asked->ownSwitches);
 			return WriteOwnTabRows(list, rowsByChapter, outStatus);
 		}
-		RubyWrite ruby;
+		RubyWrite ruby(asked.get());
 		return WriteOwnTabRows(ruby, rowsByChapter, outStatus);
 	}
 	TableWrite table;

@@ -263,6 +263,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCQRSearch.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCTableSearch.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCRubySearch.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCOwnScope.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCRubyListFile.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCKentenSearch.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCKohakuQuery.cpp"/>
@@ -315,6 +316,8 @@
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCQRSearch.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCTableSearch.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCRubySearch.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCFold.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCOwnScope.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCRubyMarkText.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCRubyList.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCRubyListFile.h"/>

@@ -712,6 +712,8 @@ namespace
 				listName.SetTranslatable(kFalse);
 				label.Append("[Ruby List] ");
 				label.Append(listName);
+				if (asked.listFirst != kKFCRubyListAll)
+					label.Append((asked.listFirst == kKFCRubyListFirstInStory) ? " (First in Story)" : (asked.listFirst == kKFCRubyListFirstInDocument) ? " (First in Document)" : " (First in Book)");
 			}
 			else if (asked.base.IsEmpty() && asked.reading.IsEmpty())
 				label.Append((asked.kind == kKFCRubyFindMarks) ? "[Ruby Marks]" : "[Any Ruby]");
