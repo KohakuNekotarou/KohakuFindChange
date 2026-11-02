@@ -39,6 +39,9 @@ namespace KFCKentenSearch
 	bool WalkOneDocument(const UIDRef& docRef, const PMString& name, size_t limit, const KFCKentenConditions& asked,
 		std::vector<KFCResultModel::Hit>& outHits, std::map<UID, uint32>& outVersions, bool& outCapped, bool& outCancelled);
 
+	/** THE FACE BUTTONS' WALK OF ONE DOCUMENT (KFCFaceText - Find Next, Change All): every row a search of the conditions would list there, no list's limit. False = no story list to walk. */
+	bool WalkForFace(const UIDRef& docRef, const KFCKentenConditions& asked, const std::vector<KFCSearchEngine::ListedPlace>* part, std::vector<KFCResultModel::Hit>& outHits);
+
 	/** The kind of mark on [start, end) of the story, when one kind runs over the whole of it (Kenten_None = none on it); -1 when it changes inside. */
 	int32 MarkOn(const UIDRef& story, TextIndex start, TextIndex end);
 

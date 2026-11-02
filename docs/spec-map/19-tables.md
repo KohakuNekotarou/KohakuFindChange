@@ -80,7 +80,7 @@
 
 ## 7. 面のボタン（作者 11-01 の試用＝`docs/superpowers/specs/2026-11-01-kfc-kohaku-trial-fixes-design.md` F1〜F9。本体の実測＝`docs/ai-notes/kfc-native-text-tab-measure-2026-11-01.md`。コード＝`model/KFCTableSearch.cpp` の `Next`・`ChangeFound`・`ChangeAll`・`KFCReplaceEngine::WriteFaceTables`・`ui/KFCJump.cpp` の `LandOnTable`・`ui/KFCKohakuTab.cpp` の `Table*`）
 
-- **TBL-60** ★面の右上に上から **Find Next／Change／Change All／Change/Find**＝本体と同じ 116×26・間隔5・面の上から 15／46／77／108（方向を付けない本体の Object タブの形）。4つとも頭の行の右の列（部品を重ねない＝QR の行と Ruby の欄は幅 456 のまま）。`Find Table Style:` の語は頭の左の列の一番下（Table のときだけ）。下に2行＝見つけた物・したこと／選べなかった理由（QR の2行の形）。（F1・F2・F9）回帰 `tb-btn-place`
+- **TBL-60** ★面の右の列に上から **Find Next／Change／Change All／Change/Find**＝本体と同じ 116×26・間隔5・面の上から 15／46／77／108（方向を付けない本体の Object タブの形）。★11-02 から**右の列は種類で共通**（KOHAKU-02＝Ruby・Kenten も同じボタン、QR Code は Find Next だけ）。`Find Table Style:` の語は Search: の下の行（Table のときだけ）。下に面の共通の2行（KOHAKU-37）。（F1・F2・F9・L1）回帰 `tb-btn-place`・`rb-face-columns`
   - 訂正:
 
 - **TBL-61** ★**Find Next**＝`Search:` の範囲の表を一覧と同じ順に（文書ごと・ページ順）、押すたびに歩き直す。**どこから**（本体の Text タブの実測）＝選択が前の着地のままなら次の表／動かしていれば同じ物語の後ろの表→無ければその物語の最後の表の次→物語に表が無い・文字の選択が無いなら前に見つけた表の次→先頭。最後の次は黙って先頭。一致なしは本体の文のアラート `Cannot find a match.`。Book Scope は見ない（ダイアログのボタンはブックを知らない＝QR と同じ）。（F3）回帰 `tb-btn-next`・`tb-btn-moved`・`tb-btn-none`・`tb-btn-all-docs`

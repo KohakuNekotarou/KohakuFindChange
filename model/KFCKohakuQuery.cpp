@@ -240,6 +240,8 @@ bool KFCKohakuQuery::Read(const IDFile& file, KFCKohakuQueryData& out)
 			out.ruby.listPath = Words(value);
 		else if (key == "rubyFirst")
 			out.ruby.listFirst = number;
+		else if (key == "rubyOther")
+			out.ruby.listOtherRuby = (number != 0);		// (11-02 - the author's proposal 2: a file from before it has none, and lists none)
 		else if (key == "switches")
 		{
 			// (Each kind's own, and a file holds one kind. What the file has no word of, as the tab starts: the file of a version before the icons.)
@@ -287,7 +289,7 @@ bool KFCKohakuQuery::Read(const IDFile& file, KFCKohakuQueryData& out)
 		}
 	}
 	// A FILE IS WHAT ANYONE MADE OF IT, AND THE FACE SELECTS BY THESE: a number its list has no entry for reads as the list's first (the lists - KFCUI.fr: Kenten: is Any and every kind, Change Kenten To: has no Custom).
-	if (out.ruby.kind < kKFCRubyFindWith || out.ruby.kind > kKFCRubyFindList)
+	if (out.ruby.kind < kKFCRubyFindWith || out.ruby.kind > kKFCRubyFindVaries)
 		out.ruby.kind = kKFCRubyFindWith;
 	if (out.ruby.listFirst < kKFCRubyListAll || out.ruby.listFirst > kKFCRubyListFirstInBook)
 		out.ruby.listFirst = kKFCRubyListAll;
@@ -319,6 +321,7 @@ std::string KFCKohakuQuery::FileText(const KFCKohakuQueryData& query)
 		Attribute(element, "rubyLook", query.ruby.kind);
 		Attribute(element, "rubyList", query.ruby.listPath);
 		Attribute(element, "rubyFirst", query.ruby.listFirst);
+		Attribute(element, "rubyOther", query.ruby.listOtherRuby ? 1 : 0);
 		Attribute(element, "switches", query.ruby.switches.Bits());
 		Attribute(element, "rubyBase", query.ruby.base);
 		Attribute(element, "ruby", query.ruby.reading);

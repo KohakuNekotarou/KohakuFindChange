@@ -198,6 +198,15 @@ namespace
 		}
 		virtual bool RubyListCheck(const PMString&, int32& outWords, PMString& outWhy) { outWords = 0; SayWhy(outWhy); return false; }
 		virtual bool RubyListText(PMString&, PMString&, PMString& outSaid) { SayWhy(outSaid); return false; }
+		virtual bool FaceTextNext(int32, const KFCTableLook&, KFCTableFound& out) { out = KFCTableFound(); SayWhy(out.words); return false; }
+		virtual bool FaceTextChangeFound(int32, const KFCTableFound&, PMString& outWords) { SayWhy(outWords); return false; }
+		virtual bool FaceTextChangeAll(int32, const KFCTableLook&, int32& outChanged, int32& outMatched, PMString& outWords)
+		{
+			outChanged = 0;
+			outMatched = 0;
+			SayWhy(outWords);
+			return false;
+		}
 	};
 
 	class KFCChaptersStandInImpl : public IKFCChapters

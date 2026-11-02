@@ -209,6 +209,12 @@ public:
 	virtual bool RubyListCheck(const PMString& path, int32& outWords, PMString& outWhy) = 0;
 	/** = KFCRubySearch::SaveListText (appended) - Save List...: the text of a ruby list of what the tab's Search: holds. */
 	virtual bool RubyListText(PMString& outText, PMString& outName, PMString& outSaid) = 0;
+	/** = KFCFaceText::Next (appended - docs/superpowers/specs/2026-11-02-kfc-kohaku-face-buttons-design.md B1) - the Kohaku+ face's Find Next on Ruby or Kenten (mode kKFCRubySearchMode / kKFCKentenSearchMode). */
+	virtual bool FaceTextNext(int32 mode, const KFCTableLook& look, KFCTableFound& out) = 0;
+	/** = KFCFaceText::ChangeFound (appended) - its Change. */
+	virtual bool FaceTextChangeFound(int32 mode, const KFCTableFound& found, PMString& outWords) = 0;
+	/** = KFCFaceText::ChangeAll (appended) - its Change All. */
+	virtual bool FaceTextChangeAll(int32 mode, const KFCTableLook& look, int32& outChanged, int32& outMatched, PMString& outWords) = 0;
 };
 
 #endif // __IKFCRuns_h__

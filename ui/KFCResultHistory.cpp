@@ -714,6 +714,24 @@ namespace
 				label.Append(listName);
 				if (asked.listFirst != kKFCRubyListAll)
 					label.Append((asked.listFirst == kKFCRubyListFirstInStory) ? " (First in Story)" : (asked.listFirst == kKFCRubyListFirstInDocument) ? " (First in Document)" : " (First in Book)");
+				if (asked.listOtherRuby)
+					label.Append(" (With Other Ruby)");		// (Include Text With Other Ruby - the author's proposal 2)
+			}
+			else if (asked.kind == kKFCRubyFindVaries)
+			{
+				// INCONSISTENT RUBY (the author's proposal 3): what Base Text and Ruby: narrow it to, after the kind.
+				label.Append("[Inconsistent Ruby]");
+				if (!asked.base.IsEmpty() || !asked.reading.IsEmpty())
+				{
+					label.Append(" ");
+					label.Append(asked.base);
+					if (!asked.reading.IsEmpty())
+					{
+						label.AppendW(UTF32TextChar(0x300A));		// the book title marks, as a row writes a reading
+						label.Append(asked.reading);
+						label.AppendW(UTF32TextChar(0x300B));
+					}
+				}
 			}
 			else if (asked.kind == kKFCRubyFindMarks)
 				label.Append("[Ruby Marks]");		// (every mark: the boxes ask nothing of it - KFCRubySearch.cpp's WalkMarks)

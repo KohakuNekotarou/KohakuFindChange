@@ -11,8 +11,8 @@
 - **KOHAKU-01** ★本体の「検索と置換」のタブの行に、KFC のタブは **`Kohaku+` の1枚**（本体の6枚と合わせて7枚＝日本語版の窓の幅で切れない）。（K1）回帰 `kh-one-tab`
   - 訂正:
 
-- **KOHAKU-02** ★面の上に **Find:**（QR Code／Table／Ruby／Kenten）と **Search:**。その下に選んだ種類の部品だけが出る。右上のボタン＝QR Code は `Find Next` だけ・Table は本体と同じ4つ（TBL-60）・Ruby と Kenten は無し（Ruby と Kenten のボタンは完了の行＝RUBY-03）（窓を別の種類で開いてから変えても押せる）。（K2）回帰 `kh-part-shown`・`kh-findnext-after-another-kind`・`tb-btn-after-another-kind`
-  - 訂正: 11-01＝Table にもボタン（作者の試用）。
+- **KOHAKU-02** ★面は**2列**（作者 11-02 夕「他のタブと同じように」＝本体の面と同じ＝486×356・余白15）。**左の列（幅330）**＝Find:・Search:（どちらも語の下に一覧＝KOHAKU-20）・その下の行（Table は `Find Table Style:` の語、Ruby・Kenten はアイコン）・選んだ種類の部品。**右の列（左から355・幅116・どれも116×26）**＝上から Find Next・Change・Change All・Change/Find（15／46／77／108＝TBL-60）、10空けて **Find in KFC**（144＝KOHAKU-36）、さらに10空けてその種類のもの＝Ruby は Choose List...・Save List...・How to Use...（180／211／242＝RUBY-03）、Kenten は How to Use...（180＝KENTEN-03）。QR Code は Find Next と Find in KFC だけ（変えるものが無い）。どの種類も両方の列の下に共通の2行（KOHAKU-37）。（窓を別の種類で開いてから変えても押せる）（K2・L1〜L7）回帰 `kh-part-shown`・`kh-findnext-after-another-kind`・`tb-btn-after-another-kind`・`rb-face-columns`・`kt-face-columns`・`kh-face-qr`
+  - 訂正: 11-01＝Table にもボタン（作者の試用）。11-02＝Ruby と Kenten にも同じボタン（作者「FindNextなどのぼたん Ruby、圏点の方にもつけれるかな？」）・本体の枠の行（完了の隣）に差し込んでいたボタンを右の列へ（作者「今完了ボタンのところにあるボタンを Choose Save Howto の並びで縦に並べる。他のタブと同じように」）。
 
 - **KOHAKU-03** ★**Ruby と Kenten は日本語で起動しているときだけ** Find: に出る（他の言語では QR Code・Table の2つ）。（K11）回帰 `kh-japanese`・`kh-not-japanese`・`kh-not-japanese-on-ruby`
   - 訂正:
@@ -48,8 +48,17 @@
 
 ## 3. 面の並び
 
-- **KOHAKU-20** ★`Find:`・`Search:` は語を左に寄せ、そのすぐ右に一覧（作者 11-02「Find：のすぐ横にリストをおきたい、以前は空白があってきになっていた」「Searchも」「Findとかは左寄せ」＝語の幅だけ空けるので2行の一覧の左端は語の長さの分ずれる。11-01 の「語の下に一覧」はこれで外した）。その下に Ruby・Kenten のアイコン。頭の高さは変えない＝下の欄は動かない。`Find Table Style:`・`Change to Table Style:` は語の下に一覧のまま。Ruby・Kenten はラベルを右寄せで欄に付ける（作者 11-02・欄の位置はそのまま）。Search: の下のアイコンは本体のテキストタブと同じ見た目（くぼみなし＝作者 11-02）。（K12）
-  - 訂正: 10-31 は `Find:`・`Search:` もラベルの横に一覧（空きを作らない）だった。
+- **KOHAKU-20** ★`Find:`・`Search:` は**語の下に一覧**（作者 11-02 夕「Find：Searchの横のリスト、ひとつ前のFindなどの下の位置に戻して欲しい」＝同じ日の昼の「語のすぐ右」をやめた）。一覧は本体の面と同じ幅170。その下の行に Ruby・Kenten のアイコン（Table はそこに `Find Table Style:` の語）。部品の頭は面の上から138で変わらない。Ruby・Kenten はラベルを右寄せで欄に付ける（作者 11-02・欄の位置はそのまま）。Search: の下のアイコンは本体のテキストタブと同じ見た目（くぼみなし＝作者 11-02）。（K12・L2）回帰 `rb-face-columns`
+  - 訂正: 10-31 は `Find:`・`Search:` もラベルの横に一覧（空きを作らない）だった。11-02 昼は語のすぐ右（同じ日の夕に語の下へ戻した）。
+
+- **KOHAKU-36** ★**Find in KFC**（作者 11-02「Chooseで読み込んだあとは、ＫＦＣのパネルで検索をするのだと思うのですが判りずらいので」「ＦｉｎｄＦｏｒＫＦＣボタンなど（パネルが閉じていたら開く）」「テーブル検索のタブのボタンの様な配置で」「他のQRコードの検索にも同じボタンを」）＝右の列の Change/Find の下（10空けて144）・どの種類にも。このパネルの Find in … を面の条件で走らせる（パネルの Find とクエリの窓の Find と同じ扉＝`KFCResultHistory::Find`）。パネルが閉じていれば先に開く（キーボードは動かさない）。パネルの言ったことは面の1行目にも出る。走っている間・着地の間は何もしない。クエリの変更に数えない（欄は [カスタム] にならない）。（B2）回帰 `rb-findinkfc`・`rb-findinkfc-closed`・`kh-findinkfc-qr`・`kh-findinkfc-table`・`kt-findinkfc`・`kq-findinkfc-keeps-query`
+  - 訂正:
+
+- **KOHAKU-37** ★**面の下の2行は種類で共通の1組**（作者 11-02「１Ｗｏｒｄなどのメッセージがでますが、これは、他のメッセージと同じところに出て欲しい」）＝1行目＝ボタン・リスト・Find in KFC の言ったこと、2行目＝見つけた物を選べなかった理由（1行ずつなので長い中身が理由を押し出さない）。**種類ごとに覚え**、Find: を変えるとその種類が最後に言った2行に替わる。Table 専用の2行とルビのリスト専用の行は無くした。（L4）回帰 `kh-msg-per-kind`・`rb-list-msg`
+  - 訂正:
+
+- **KOHAKU-38** 面のいちばん下の案内の文（パネルのメニュー・右クリック・Return の説明）は無くした（作者 11-02「一番したのほうの静止テキストは無くす」）。（L5）回帰 `rb-face-columns`・`kh-face-qr`
+  - 訂正:
 
 ## 4. クエリ（作者 10-31「公式ダイアログで選択可能？ 選択するとそれぞれのタブが開いて設定される」＝ `ui/KFCKohakuQueryMenu.h`・本体の欄の仕組みと実測＝`docs/ai-notes/kfc-native-query-menu-2026-10-31.md`）
 

@@ -91,6 +91,7 @@ struct KFCQueryCopy
 	PMString	rubyListPath;			// kKFCRubyFindList: its file
 	std::shared_ptr<const KFCRubyList::Words>	rubyList;	// ...and its words as the list found them: its rows write these and its searches again look for these, whatever the file says by then
 	int32		rubyListFirst;			// ...and which occurrences: kKFCRubyListAll ...
+	bool		rubyListOtherRuby;		// ...and whether its words with other ruby were listed (the author's proposal 2)
 	// A KENTEN LIST'S (CaptureKenten): the same.
 	int32		kentenKind;				// kKFCKentenFindWith ... (KFCModelTypes.h)
 	PMString	kentenBase;

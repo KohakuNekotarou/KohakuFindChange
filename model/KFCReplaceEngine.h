@@ -296,6 +296,34 @@ namespace KFCReplaceEngine
 	/** THESE TABLES GIVEN THE CHANGE SIDE - no row asked for it - in one undoable step, across documents too. A row of the table list that stands for one of them reads as its own Replace would leave it (Styled,
 	    what it draws now) and goes back with the step's Ctrl+Z, so the list and the page do not disagree (F8). False = InDesign would not write one: nothing was changed, outWhy says so. */
 	bool WriteFaceTables(const std::vector<FaceTable>& tables, bool clearOverrides, PMString& outWhy);
+
+	/** A PLACE THE KOHAKU+ FACE'S RUBY AND KENTEN BUTTONS WRITE (KFCFaceText): an open document's text. */
+	struct FacePlace
+	{
+		UIDRef		doc;
+		UID			story;
+		TextIndex	start;		// [start, end)
+		TextIndex	end;
+
+		FacePlace() : story(kInvalidUID), start(kInvalidTextIndex), end(kInvalidTextIndex) {}
+	};
+
+	/** WHAT WRITEFACEPLACES DID: the places written, those already as asked, those the Change side cannot be written on (refusal: the last one's reason, in a sentence) - and why nothing was, when it answers false. */
+	struct FaceWrite
+	{
+		int32		written;
+		int32		asAsked;
+		int32		refused;
+		PMString	refusal;
+		PMString	why;
+
+		FaceWrite() : written(0), asAsked(0), refused(0) {}
+	};
+
+	/** THESE PLACES GIVEN THE KIND'S CHANGE SIDE (docs/superpowers/specs/2026-11-02-kfc-kohaku-face-buttons-design.md B3) - mode kKFCRubySearchMode or kKFCKentenSearchMode - as a row's Replace gives a row of that kind
+	    (ReplaceOwnTabRows' writers): the Change Ruby To boxes, a ruby list's line (ruby.listWords), a mark's own reading, a kind of kenten. ONE undoable step, across documents too. A place already as asked is not
+	    written, nor one the Change side cannot be written on. False = nothing was written, for a reason that is no place's (out.why). */
+	bool WriteFacePlaces(int32 mode, const KFCRubyConditions& ruby, const std::vector<FacePlace>& places, FaceWrite& out);
 }
 
 #endif // __KFCReplaceEngine_h__

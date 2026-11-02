@@ -388,6 +388,14 @@ bool KFCKentenSearch::WriteDocument(const UIDRef& docRef, const KFCKentenConditi
 	return true;
 }
 
+bool KFCKentenSearch::WalkForFace(const UIDRef& docRef, const KFCKentenConditions& asked, const std::vector<KFCSearchEngine::ListedPlace>* part, std::vector<KFCResultModel::Hit>& outHits)
+{
+	outHits.clear();
+	std::map<UID, uint32> versions;
+	bool capped = false;
+	return WalkDoc(docRef, asked, part, static_cast<size_t>(kMaxInt32), outHits, versions, capped);
+}
+
 int32 KFCKentenSearch::MarkOn(const UIDRef& story, TextIndex start, TextIndex end)
 {
 	InterfacePtr<IComposeScanner> scanner(story, UseDefaultIID());

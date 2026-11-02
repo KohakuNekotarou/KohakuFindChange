@@ -263,6 +263,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCQRSearch.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCTableSearch.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCRubySearch.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCFaceText.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCOwnScope.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCRubyListFile.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCKentenSearch.cpp"/>

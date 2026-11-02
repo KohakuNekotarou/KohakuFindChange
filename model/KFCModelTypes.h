@@ -29,7 +29,7 @@
 #include <memory>		// KFCRubyConditions::listWords
 #include <vector>
 
-namespace KFCRubyList { struct Words; }		// (the model half's - KFCRubyList.h; the UI half passes the pointer along and never looks in)
+namespace KFCRubyList { struct Words; struct Readings; }		// (the model half's - KFCRubyList.h; the UI half passes the pointer along and never looks in)
 
 /** ONE READING OVER PART OF A TWO-LINE ROW'S MATCH (KFCRowUpper): by characters from the match's start. */
 struct KFCRowUpperRun
@@ -254,8 +254,9 @@ enum { kKFCTableSearchMode = 102 };
 /** THE RUBY TAB'S "SEARCH MODE" (docs/superpowers/specs/2026-10-31-kfc-ruby-tab-design.md): the Table tab's for its own tab (KFCRubySearch::IsTabCurrent). KFC'S ALONE. */
 enum { kKFCRubySearchMode = 103 };
 
-/** The Ruby tab's Look For: - its entries' order (KFCUI.fr). Marks = ruby written out in the text as a manuscript writes it, a base and its reading in marks (KFCRubySearch.h). List = the words of a ruby list, a file (KFCRubyList.h). */
-enum { kKFCRubyFindWith = 0, kKFCRubyFindWithout = 1, kKFCRubyFindMarks = 2, kKFCRubyFindList = 3 };
+/** The Ruby tab's Look For: - its entries' order (KFCUI.fr). Marks = ruby written out in the text as a manuscript writes it, a base and its reading in marks (KFCRubySearch.h). List = the words of a ruby list, a file (KFCRubyList.h).
+    Varies = Inconsistent Ruby (the author's proposal 3, 11-02): text with ruby whose word is read two ways or more in what is searched - every place of it, rows as Text With Ruby's. */
+enum { kKFCRubyFindWith = 0, kKFCRubyFindWithout = 1, kKFCRubyFindMarks = 2, kKFCRubyFindList = 3, kKFCRubyFindVaries = 4 };
 
 /** ONE COLUMN OF THE RUBY PART'S BOXES, THE COLUMNS JOINED TO IT WITH IT (the author, 11-01: Find's Ruby: and Base Text: are boxes, and Change Ruby To's follow them): the base text - the joined boxes' together - the Change side's reading over it (KFCRubyChangePlan::Piece, in
     PMStrings), and what Find's Ruby: box over it holds. A search reads KFCRubyConditions' base and reading, all the boxes' words run together; findReading is here to bring the boxes back as they stood. */
@@ -308,13 +309,15 @@ struct KFCRubyConditions
 	PMString	listPath;		// kKFCRubyFindList: the file
 	std::shared_ptr<const KFCRubyList::Words>	listWords;	// ...its words, as the model half read them for a search (KFCRubyListFile::Load) - nil elsewhere: the rows of a list write what it found them with
 	int32		listFirst;		// ...and which occurrences: kKFCRubyListAll ...
+	bool		listOtherRuby;	// ...and a word with ruby that reads otherwise than the list is a row too (Include Text With Other Ruby - the author's proposal 2, 11-02); off = only text with none
+	std::shared_ptr<const KFCRubyList::Readings>	varies;	// kKFCRubyFindVaries: how each word is read over all of what is searched (KFCRubySearch counts it first) - nil: each document's own, counted as it is walked
 	KFCOwnSwitches	switches;	// the icons
 	PMString	base;			// its base contains this; empty = any (Text Without Ruby: what it looks for - refused empty)
 	PMString	reading;		// its reading contains this; empty = any (not Text Without Ruby)
 	std::vector<KFCRubyChangePiece>	change;	// what a row's Replace gives it: the boxes in order. No box reading anything = its Replace takes the ruby off (the author, 11-01)
 	int32		scope;			// its Search: - IWalkerScopeFactoryUtils::kDocumentScope (at launch), kAllDocumentScope, or over part of the front document kStoryScope, kToEndOfStoryScope, kSelectionScope
 
-	KFCRubyConditions() : kind(kKFCRubyFindWith), listFirst(kKFCRubyListAll), scope(0) {}
+	KFCRubyConditions() : kind(kKFCRubyFindWith), listFirst(kKFCRubyListAll), listOtherRuby(false), scope(0) {}
 };
 
 /** THE KENTEN KIND'S "SEARCH MODE" (the author, 10-31 - KFCKentenSearch.h): the Ruby kind's for its own (KFCKentenSearch::IsTabCurrent). KFC'S ALONE. */

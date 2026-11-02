@@ -14,8 +14,8 @@
 - **KENTEN-02** ★`Kenten:` と `Change Kenten To:` の右に**選んだ種類の印の見本**（作者 11-02）＝`ui/KFCKentenSample.cpp`・行の上の段と同じ図形（KENTEN-21）。Custom は `✱`。出さない＝`[Any Kenten]`・`[Leave As It Is]`・Text Without Kenten の `Kenten:`・Remove Kenten が入っているときの Change 側。変わるのは選んだ時。回帰 `kt-sample`
   - 訂正:
 
-- **KENTEN-03** ★完了ボタンの左に **How to Use...**（作者 11-02「圏点のほうにもHowToを」・RUBY-03 と同じボタン）＝欄の説明の窓（`KFCHowTo::ShowKenten`）。日本語だけ。回帰 `kt-howto`
-  - 訂正:
+- **KENTEN-03** ★**How to Use...**（作者 11-02「圏点のほうにもHowToを」）＝欄の説明の窓（`KFCHowTo::ShowKenten`）。日本語だけ。★場所＝**面の右の列の Find in KFC の下**（180＝作者 11-02 夕「他のタブと同じように」＝KOHAKU-02）。Ruby の How to Use... とは別の部品。回帰 `kt-howto`・`kt-face-columns`・`rb-howto-place`
+  - 訂正: 11-02 昼は本体の枠の行の完了の左（夕に右の列へ）。
 
 ## 2. 探す
 
@@ -54,6 +54,9 @@
   - 訂正:
 
 - **KENTEN-32** ★全部の行で **Ctrl+Z 1回**（段の名前 `Change Kenten`）。行は `Changed`＋書いた後の字。回帰 `kt-undo`
+  - 訂正:
+
+- **KENTEN-41** ★**面のボタン**（作者 11-02「FindNextなどのぼたん Ruby、圏点の方にもつけれるかな？」）＝Find Next・Change・Change All・Change/Find が Table と同じ働き（TBL-60〜65）。Find Next＝Search: の範囲の圏点の行を一覧と同じ順に、選択から先へ（着地＝行のクリックと同じ）。1行目＝`<字>《<印>》 - page <ページ>`。Change＝見つけた箇所に Change Kenten To（または Remove Kenten）・Change All＝範囲の全部（どれも Ctrl+Z 1回・行の Replace と同じ書き方＝`KFCReplaceEngine::WriteFacePlaces`）。アラートは本体の文（`Search is completed. N replacement(s) made.`／`Cannot find a match.`）。文書が開いていなければ1行目で言う。（B1〜B5）回帰 `kt-btn-next`・`kt-btn-changeall`・`kt-btn-nodoc`・`kt-btn-ja`
   - 訂正:
 
 ## 5. 効かない操作

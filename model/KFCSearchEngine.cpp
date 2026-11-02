@@ -3958,6 +3958,7 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 			rubyAsked.listPath = againCopy->rubyListPath;
 			rubyAsked.listWords = againCopy->rubyList;
 			rubyAsked.listFirst = againCopy->rubyListFirst;
+			rubyAsked.listOtherRuby = againCopy->rubyListOtherRuby;
 			rubyAsked.switches = againCopy->ownSwitches;
 		}
 		else
@@ -3992,6 +3993,7 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 			copy.rubyListPath = rubyAsked.listPath;
 			copy.rubyList = rubyAsked.listWords;
 			copy.rubyListFirst = rubyAsked.listFirst;
+			copy.rubyListOtherRuby = rubyAsked.listOtherRuby;
 			copy.ownSwitches = rubyAsked.switches;
 		}
 		else if (kentenTab)
@@ -4110,7 +4112,8 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	{
 		chapterNotes.Append(" ");
 		chapterNotes.AppendNumber(tally.hadRuby);
-		chapterNotes.Append(" already had ruby and are not listed.");
+		// (With Include Text With Other Ruby - the author's proposal 2 - those left read as the list does, or have ruby running past the word.)
+		chapterNotes.Append(rubyAsked.listOtherRuby ? " already had ruby reading as the list does, or running past the word, and are not listed." : " already had ruby and are not listed.");
 	}
 	if (inObjects)
 		for (size_t k = 0; k < again->notOpen.size(); ++k)
@@ -5682,6 +5685,7 @@ bool KFCSearchEngine::SearchDocumentAgain(int32 chapterIdx, PMString& outStatus)
 				listAsked.listPath = asked->rubyListPath;
 				listAsked.listWords = asked->rubyList;
 				listAsked.listFirst = asked->rubyListFirst;
+				listAsked.listOtherRuby = asked->rubyListOtherRuby;
 				listAsked.switches = asked->ownSwitches;
 			}
 			walked = KFCRubySearch::WalkOneDocument(docRef, name, limit, listAsked, hits, storyVersions, capped, cancelled);

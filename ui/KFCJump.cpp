@@ -1619,7 +1619,7 @@ bool KFCJump::LandOnQRCode(const UIDRef& frameRef, int32 reach, PMString& outNot
 	return true;
 }
 
-void KFCJump::LandOnTable(const UIDRef& storyRef, TextIndex start, TextIndex end, int32 reach, PMString& outNote, bool& outSelected)
+void KFCJump::LandOnPlace(const UIDRef& storyRef, TextIndex start, TextIndex end, int32 reach, const char* what, PMString& outNote, bool& outSelected)
 {
 	outNote.Clear();
 	outNote.SetTranslatable(kFalse);
@@ -1634,7 +1634,9 @@ void KFCJump::LandOnTable(const UIDRef& storyRef, TextIndex start, TextIndex end
 	// ON A HIDDEN SPREAD NOTHING MOVES (JumpToHit's rule, and InDesign's Find Next's).
 	if ((reach & kKFCQRReachHiddenSpread) != 0)
 	{
-		outNote.Append("That table is on a hidden spread - not shown, not selected.");
+		outNote.Append("That ");
+		outNote.Append(what);
+		outNote.Append(" is on a hidden spread - not shown, not selected.");
 		return;
 	}
 	// Search: of InDesign's own tab as it is BEFORE this landing fronts a document or selects (ScopeKeep, above JumpToHit).
@@ -1667,14 +1669,24 @@ void KFCJump::LandOnTable(const UIDRef& storyRef, TextIndex start, TextIndex end
 	{
 		if (drawn)
 			marker.Raise(db, storyRef.GetUID(), start, end);
-		outNote.Append("That table is locked - not selected.");
+		outNote.Append("That ");
+		outNote.Append(what);
+		outNote.Append(" is locked - not selected.");
 		return;
 	}
 	outSelected = (SelectRangeNow(storyRef, start, end, hidden) != kNotSelectedQuietly);
 	if (overset)
-		outNote.Append("(Overset Text) The table is selected, past the end of its frames - nothing of it shows on the page.");
+	{
+		outNote.Append("(Overset Text) The ");
+		outNote.Append(what);
+		outNote.Append(" is selected, past the end of its frames - nothing of it shows on the page.");
+	}
 	else if (hidden)
-		outNote.Append("The table is selected, on a hidden layer - nothing of it shows.");
+	{
+		outNote.Append("The ");
+		outNote.Append(what);
+		outNote.Append(" is selected, on a hidden layer - nothing of it shows.");
+	}
 }
 
 bool KFCJump::ReadTextSelection(UIDRef& outStory, TextIndex& outStart, TextIndex& outEnd)

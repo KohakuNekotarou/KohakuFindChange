@@ -52,6 +52,8 @@
 #include "textiterator.h"			// a range read character by character (TakeRowCopy)
 
 #include <algorithm>		// std::sort - Restore from Copy's rows in text order
+#include <functional>		// std::less - the face's marks written in each story, the later first
+#include <memory>			// std::unique_ptr - the face's writer
 #include <map>
 #include <set>
 #include <vector>
@@ -4169,9 +4171,8 @@ public:
 	{
 		(void)KFCRubySearch::IsTabCurrent(&fAsked);
 		fPieces = KFCRubySearch::PlanPieces(fAsked);
-		// (The Change side is the tab's as it stands; the base boxes are compared with a row's text as its list's search compared them.)
-		if (list != nil)
-			fSwitches = list->ownSwitches;
+		// (The Change side is the tab's as it stands; the base boxes are compared with a row's text as its list's search compared them - with no list, as the tab compares now: the face's buttons.)
+		fSwitches = (list != nil) ? list->ownSwitches : fAsked.switches;
 	}
 	virtual const char* NothingToChange() const
 	{
@@ -4746,6 +4747,138 @@ bool KFCReplaceEngine::WriteFaceTables(const std::vector<FaceTable>& tables, boo
 			NoteStoryVersions(c->first, chapterDoc.GetDataBase(), c->second);	// as KFC left them
 	}
 	recorder.Keep();
+	for (size_t d = 0; d < docs.size(); ++d)
+	{
+		docsAfter.Wrote(docs[d]);
+		KFC_DIAG_NOTE_WRITE(docs[d]);
+	}
+	return true;
+}
+
+bool KFCReplaceEngine::WriteFacePlaces(int32 mode, const KFCRubyConditions& ruby, const std::vector<FacePlace>& places, FaceWrite& out)
+{
+	KFC_DIAG_WRITTEN_DOCS_CHECK("face-places");	// (test builds: after DocsAfterWrite, below - KFCDiagWrittenDocs.h)
+	out = FaceWrite();
+	out.refusal.SetTranslatable(kFalse);
+	out.why.SetTranslatable(kFalse);
+	if (places.empty())
+		return false;
+	const WriteUnderWay writing;
+	// THE WRITER: a row's Replace's, for the kind and its Look For (ReplaceOwnTabRows' choice). A mark's write moves text and has none: its own write, the later places first.
+	const bool marks = (mode == kKFCRubySearchMode && ruby.kind == kKFCRubyFindMarks);
+	std::unique_ptr<OwnTabWrite> how;
+	if (mode == kKFCKentenSearchMode)
+		how.reset(new KentenWrite());
+	else if (ruby.kind == kKFCRubyFindList)
+		how.reset(new RubyListWrite(ruby.listWords, ruby.switches));
+	else if (!marks)
+		how.reset(new RubyWrite(nil));
+	if (how != nullptr)
+	{
+		const char* const nothing = how->NothingToChange();
+		if (nothing != nil)
+		{
+			out.why.Append(nothing);
+			return false;
+		}
+	}
+
+	// THE DOORS, PLACE BY PLACE (the writer's own): nothing written yet.
+	std::vector<std::pair<size_t, OwnTabRow> > toWrite;
+	DocsAfterWrite docsAfter;
+	std::vector<UIDRef> docs;
+	for (size_t p = 0; p < places.size(); ++p)
+	{
+		IDataBase* const db = places[p].doc.GetDataBase();
+		const UIDRef storyRef(db, places[p].story);
+		OwnTabRow row;
+		row.story = places[p].story;
+		row.start = places[p].start;
+		row.end = places[p].end;
+		OwnTabRefusal why = kOwnTabOk;
+		if (marks)
+		{
+			int32 baseOffset = 0, baseLength = 0;
+			WideString reading;
+			why = KFCRubySearch::ReadMark(storyRef, row.start, row.end, baseOffset, baseLength, reading) ? kOwnTabOk : kOwnTabEdited;
+		}
+		else
+		{
+			how->EnterDocument(db);
+			why = how->RowDoor(storyRef, row);
+		}
+		if (why == kOwnTabAsAsked)
+		{
+			++out.asAsked;
+			continue;
+		}
+		if (why != kOwnTabOk)
+		{
+			++out.refused;
+			out.refusal = PMString(OwnTabRefusalSentence(why));
+			out.refusal.SetTranslatable(kFalse);
+			continue;
+		}
+		toWrite.push_back(std::make_pair(p, row));
+		if (std::find(docs.begin(), docs.end(), places[p].doc) == docs.end())
+		{
+			docs.push_back(places[p].doc);
+			docsAfter.Reached(places[p].doc, true);
+		}
+	}
+	if (toWrite.empty())
+		return true;		// (the counts say why)
+	// A MARK'S WRITE TAKES CHARACTERS OUT: in each story the later places first, so the earlier stand.
+	if (marks)
+		std::sort(toWrite.begin(), toWrite.end(), [&places](const std::pair<size_t, OwnTabRow>& a, const std::pair<size_t, OwnTabRow>& b)
+		{
+			const IDataBase* const da = places[a.first].doc.GetDataBase();
+			const IDataBase* const dbb = places[b.first].doc.GetDataBase();
+			if (da != dbb)
+				return std::less<const IDataBase*>()(da, dbb);
+			if (a.second.story != b.second.story)
+				return a.second.story.Get() < b.second.story.Get();
+			return a.second.start > b.second.start;
+		});
+
+	bool ok = false;
+	bool stillThere = false;
+	{
+		WriteStep step;
+		if (!BeginWriteStep(docs.size() > 1, step, (how != nullptr) ? how->StepKey() : kKFCRubyChangeStepKey, (how != nullptr) ? how->StepName() : "Change Ruby"))
+		{
+			out.why.Append("InDesign would not start an undoable step - nothing was changed.");
+			return false;
+		}
+		bool failed = false;
+		for (size_t w = 0; w < toWrite.size() && !failed; ++w)
+		{
+			const FacePlace& place = places[toWrite[w].first];
+			const UIDRef storyRef(place.doc.GetDataBase(), place.story);
+			if (marks)
+			{
+				int32 baseLength = 0;
+				failed = (KFCRubySearch::WriteMark(storyRef, place.start, place.end - place.start, baseLength, stillThere) != kSuccess);
+			}
+			else
+			{
+				PMString words;
+				KFCRowUpper upper;
+				failed = (how->WriteRow(storyRef, toWrite[w].second, words, upper) != kSuccess);
+			}
+			KFC_DIAG_LOG("FACEWRITE mode=%d story=%u at=%d end=%d failed=%d", static_cast<int>(mode), place.story.Get(), static_cast<int>(place.start), static_cast<int>(place.end), failed ? 1 : 0);
+		}
+		// THE ERROR STATE AT THE END (a Replace's rule): anything standing here is a failure nothing reported.
+		ok = !failed && ErrorUtils::PMGetGlobalErrorCode() == kSuccess;
+		EndWriteStep(step, ok);
+	}
+	if (!ok)
+	{
+		out.why.Append(stillThere ? "The marks stay in the text under Track Changes - turn it off for this story to take them out. Nothing was changed."
+			: "InDesign would not write a place - nothing was changed.");
+		return false;
+	}
+	out.written = static_cast<int32>(toWrite.size());
 	for (size_t d = 0; d < docs.size(); ++d)
 	{
 		docsAfter.Wrote(docs[d]);

@@ -35,6 +35,13 @@
 
 namespace KFCRubySearch
 {
+	/** INCONSISTENT RUBY'S COUNT (the author's proposal 3 - KFCRubyList::Readings): how each word of ruby in a document (or the part of it Search: holds, `part`) is read, the icons' switches taking in and comparing, added to ioReadings. */
+	void CountReadings(const UIDRef& docRef, const KFCOwnSwitches& switches, const std::vector<KFCSearchEngine::ListedPlace>* part, KFCRubyList::Readings& ioReadings);
+
+	/** THE FACE BUTTONS' WALK OF ONE DOCUMENT (KFCFaceText - Find Next, Change All): every row a search of the conditions would list there, no list's limit. A ruby list's words are the caller's to read (asked.listWords);
+	    Inconsistent Ruby's count the caller's over its documents (asked.varies - nil: this document's). False = no story list to walk. */
+	bool WalkForFace(const UIDRef& docRef, const KFCRubyConditions& asked, const std::vector<KFCSearchEngine::ListedPlace>* part, std::vector<KFCResultModel::Hit>& outHits);
+
 	/** IS THE RUBY TAB FIND/CHANGE'S TAB NOW, and what it asks (outConditions, when given - the tab's as it stands, whichever tab is shown: a row's Replace reads its
 	    Change side). Asked of the UI half (IKFCUIServices::RubyTabConditions - ui/KFCKohakuTab.h); no UI half = not the Ruby tab. A TEST BUILD asks its fault switch
 	    ruby-tab first: on = the Ruby tab, its file's lines kind=without, base=, ruby=, change=<a reading over the row's whole text>, piece=<base>=<reading> (a box, in order), remove=1 (no box reads

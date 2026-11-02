@@ -68,6 +68,20 @@ namespace KFCRubyList
 		std::shared_ptr<const Words>			bothOff;
 	};
 
+	/** HOW EACH WORD IS READ IN WHAT IS SEARCHED (Inconsistent Ruby - the author's proposal 3, 11-02): a word - the base of rubies that touch one another, folded as the search compares - and how many places read it each way (the
+	    reading folded, its spaces out: characters given their readings one by one and a group reading of the same words read alike). Counted over all of what is searched before a row is made (KFCRubySearch). */
+	struct Readings
+	{
+		std::map<std::u32string, std::map<std::u32string, int32> >	byWord;
+
+		/** Is the word read two ways or more? */
+		bool Varies(const std::u32string& word) const
+		{
+			const std::map<std::u32string, std::map<std::u32string, int32> >::const_iterator it = byWord.find(word);
+			return it != byWord.end() && it->second.size() >= 2;
+		}
+	};
+
 	/** The look-up tables of a set of entries. */
 	inline void IndexWords(Words& words)
 	{

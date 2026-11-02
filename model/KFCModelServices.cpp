@@ -40,6 +40,7 @@
 #include "KFCSavedQueries.h"
 #include "KFCSearchEngine.h"
 #include "KFCTableSearch.h"			// IsTabCurrent - the Table tab, and what it asks
+#include "KFCFaceText.h"				// the Kohaku+ face's Ruby and Kenten buttons
 #include "KFCRubySearch.h"			// IsTabCurrent - the Ruby tab, and what it asks
 #include "KFCRubyListFile.h"		// Load - what the Ruby part says of a ruby list
 #include "KFCKentenSearch.h"		// ...and the Kenten kind
@@ -211,6 +212,9 @@ public:
 		return KFCRubyListFile::Load(path, words, outWords, outWhy);
 	}
 	virtual bool RubyListText(PMString& outText, PMString& outName, PMString& outSaid) { return KFCRubySearch::SaveListText(outText, outName, outSaid); }
+	virtual bool FaceTextNext(int32 mode, const KFCTableLook& look, KFCTableFound& out) { return KFCFaceText::Next(mode, look, out); }
+	virtual bool FaceTextChangeFound(int32 mode, const KFCTableFound& found, PMString& outWords) { return KFCFaceText::ChangeFound(mode, found, outWords); }
+	virtual bool FaceTextChangeAll(int32 mode, const KFCTableLook& look, int32& outChanged, int32& outMatched, PMString& outWords) { return KFCFaceText::ChangeAll(mode, look, outChanged, outMatched, outWords); }
 };
 
 CREATE_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)
