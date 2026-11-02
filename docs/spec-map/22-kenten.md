@@ -25,7 +25,13 @@
 - **KENTEN-11** ★**Text Without Kenten**＝Base Text のうち圏点が無い箇所。Base Text が空なら断る。回帰 `kt-without`・`kt-without-nobase`
   - 訂正:
 
-- **KENTEN-12** 隠した条件の中は出さない。本文・セル・マスターの全部の物語。上限 1000。回帰 `kt-hidden`・`kt-cell`
+- **KENTEN-12** 隠した条件の中は出さない。本文・セル・脚注の物語、★親ページ・ロック・非表示はアイコンの範囲（KENTEN-14＝11-02 に「全部の物語」から変えた）。上限 1000。回帰 `kt-hidden`・`kt-cell`
+  - 訂正:
+
+- **KENTEN-14** ★**Search: の下のアイコン**（作者 11-02）＝RUBY-15 と同じ7つ・Kenten の分は Ruby と別に持つ。回帰 `kt-scope-*`・`rb-switch-face`
+  - 訂正:
+
+- **KENTEN-15** ★カナ・全角半角を区別しないとき＝RUBY-16 と同じ（Base Text）。回帰 `kt-fold-*`
   - 訂正:
 
 - **KENTEN-13** 段の名前＝`[Kenten/Document] Find:"[Any Kenten]"`。保存したクエリの Find はタブを譲る。回帰 `kt-yield-closed`

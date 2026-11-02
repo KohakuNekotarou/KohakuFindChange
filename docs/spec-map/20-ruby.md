@@ -25,13 +25,19 @@
 - **RUBY-11** ★**Text Without Ruby**＝Base Text の出現のうちルビが掛かっていないもの。Base Text が空なら断る。（R3）回帰 `rb-without`・`rb-without-nobase`
   - 訂正:
 
-- **RUBY-12** 見えない読みはルビでない（脚注の印が制御文字を読みとして受け継ぐ）。隠した条件の中は出さない。本文・セル・脚注・マスターの全部の物語。上限 1000。（R4・R5）回帰 `rb-footnote`・`rb-hidden`・`rb-cell`・`rb-book`・`rb-alldocs`
+- **RUBY-12** 見えない読みはルビでない（脚注の印が制御文字を読みとして受け継ぐ）。隠した条件の中は出さない。本文・セル・脚注の物語、★親文字のページ・ロック・非表示はアイコンの範囲（RUBY-15＝11-02 に「全部の物語」から変えた）。上限 1000。（R4・R5）回帰 `rb-footnote`・`rb-hidden`・`rb-cell`・`rb-book`・`rb-alldocs`
   - 訂正:
 
 - **RUBY-13** 段の名前＝`[Ruby/Document] Find:"漢字《かんじ》"`（Without は `Find:"漢字 (no ruby)"`・無条件は `[Any Ruby]`）。保存したクエリにはならない。クエリのダイアログの Find・Run はタブを譲る。（R10）回帰 `rb-yield-closed`・`rb-query-run-scope`
   - 訂正:
 
 - **RUBY-14** アプリケーションバーの欄は空になり、Return で一覧を作る。回帰 `rb-appbar-enter`
+  - 訂正:
+
+- **RUBY-15** ★**Search: の下のアイコン**（作者 11-02）＝本体のテキストタブと同じ7つ・同じ絵・同じ順＝ロックされたレイヤーとオブジェクト／ロックされたストーリー（どちらも検索のみ＝行はロックの印で Replace は灰色）／非表示のレイヤーとオブジェクト／親ページ／脚注／カナを区別／全角・半角を区別。初期値は本体と同じ（前の4つが切・後の3つが入）。Ruby と Kenten で別々に持つ・クエリに `switches`（ビット）・起動している間だけ。範囲の判定は本体の `doc.findText()` と同じ件数になることを文書ごと測った（`own-dom-count.jsx`・`KFCOwnScope`）＝ストーリーのロック→脚注は脚注のスイッチ→枠で親ページ・非表示・ロック。枠の無い文字（あふれ）は常に入る。文末脚注は脚注ではない。⚠ストーリーのロックは DOM から立てられず実測していない（InCopy の経路だけ）。回帰 `rb-scope-*`・`rb-switch-face`・`kq-pick-switches*`
+  - 訂正:
+
+- **RUBY-16** ★**カナ・全角半角を区別しないとき**＝本体と同じ字を同じと見る（Base Text・Ruby:・Ruby Marks の親文字と読み・リストの語・Change の親文字の欄）。規則は全文字を本体で測った（`model/KFCFold.h`＝ゕゖと繰り返し記号は畳まない・`"` `'` `` ` `` は全角と別・半角の濁点は1字にまとまる・ｲﾞｴﾞは別・`ｱﾞ` はアと同じ）。行は本文の字の範囲（`ｶﾞｸ` は3字）を指し、読みはその字に付く。大文字小文字は比べたまま（アイコンを足さない＝作者の一覧に無い）。回帰 `rb-fold-*`・単体 `work/note-scripts/2026-11-02-kfc-ruby-list/list_test.ps1`
   - 訂正:
 
 ## 3. 行
@@ -85,13 +91,19 @@
 
 > 設計書 `docs/superpowers/specs/2026-11-02-kfc-ruby-list-design.md`（L1〜L11）。コード＝`model/KFCRubyList.h`（std だけ・単体試験 `work/note-scripts/2026-11-02-kfc-ruby-list/list_test.ps1`）・`model/KFCRubyListFile.*`（読む）・`KFCRubySearch` の `WalkList`・`KFCReplaceEngine.cpp` の `RubyListWrite`。
 
+- **RUBY-65** ★**Occurrences:**（作者 11-02「それずっと欲しかった」「りすとでえらぶのかな、Storyで初出とか」「documentで初出とか、ブックで初出とか」）＝All／First in Story／First in Document／First in Book。語（リストの行）ごとに最初の1か所だけ行にする。最初＝一覧に並ぶ順の最初（ページ順・同じページは歩いた順・あふれは最後）＝表のセルや脚注は本文より後ろに持っているので物語の中の順では決めない。最初の1か所にルビがあればその語の行は出さない（数を言う）。見る範囲は Search: の範囲とアイコンの範囲の中。Book Scope が切の First in Book は First in Document と同じ。`Search This Document Again` は First in Book のとき断る（前の章を読まない）。段の名前に `(First in Document)`。クエリに `rubyFirst`。実装＝`KFCRubySearch.cpp` の `WalkList`（スレッドごとの最初を候補に）→`KeepFirsts`。回帰 `rb-first-*`・`kq-pick-first`・`kq-qd-run-ruby-list-first`・`kq-qd-run-ruby-list-all`
+  - 訂正:
+
+- **RUBY-66** ★**Save List...**（作者 11-02・右上の列の1段目・Ruby のとき Look For によらず出る）＝Search: の範囲（Book Scope ならブック）のルビをリストのファイルに書き出す。文書は変えない。同じ語は1行・接したルビは1語・同じ語の読みが割れたら多い方を行に（同数は先に出た方）、他は `# another reading, N of M places:` の行。行に書けない読み（印を含む等）は `# no line can hold this` で残す＝書く前に全行を読み戻して確かめる（`KFCRubyList::ListMaker`）。アイコンの範囲に従う。UTF-8（BOM つき）・CRLF・既定の名前 `<文書名> Ruby List.txt`。何も無ければファイルを作らず言う。⚠章を閉じる前に文書の参照を全部手放す＝`rb-save-book` で 11-02 に保護シャットダウン（`CloseDocCmd - document is still referenced`）を踏んだ。回帰 `rb-save-*`
+  - 訂正:
+
 - **RUBY-60** ★Look For: の4つ目。**Choose List...**（右上の列の2段目）でファイルを選ぶ＝1行1語・Ruby Marks in Text と同じ印で書く（`太《た》郎《ろう》`・`太《ふと》る`・`漢字《かんじ》`・`｜食べ物《たべもの》`）。印を除いた字を探し、印の字にだけ付ける（`太《ふと》る`＝太るを探して太にだけ＝作者 11-02）。ファイルでは `＜＜ ＞＞`・`<< >>`・`≪ ≫` も印。空行と `#` の行は飛ばす・CSV とタブ区切りは1列目・UTF-8／UTF-16／Shift_JIS。□の欄は隠れ、ファイル名と「N words.」か断りの文が出る。（L1〜L4・L7・L10）回帰 `rb-list-face`・`rb-list-cp932`
   - 訂正:
 
 - **RUBY-61** ★読めない行が1行でもあればファイルを使わない＝最初の行の番号を言う（印が無い／読みが読めない／同じ語に違う読み＝両方の行）。ファイルを選んでいなければ断る。（L3・L5）回帰 `rb-list-nofile`・`rb-list-bad-line`・`rb-list-bad-mark`・`rb-list-other-reading`
   - 訂正:
 
-- **RUBY-62** ★Find in … ＝語の出現を全部（初出だけは作らない）。**長い語が勝つ**（ファイルの順によらない）。行の上の段に**付く読みを薄く**。段の名前＝`[Ruby/Document] Find:"[Ruby List] 名前.txt"`。★すでにルビが1字でも掛かっている出現は行にせず数を言う（`N already had ruby and are not listed.`＝上書きしない）。隠した条件・削除・ノートの中は出さない。選択範囲は丸ごと入るものだけ。上限 1000。（L6・L9）回帰 `rb-list-find`・`rb-list-longest`・`rb-list-selection`・`rb-list-selection-cut`
+- **RUBY-62** ★Find in … ＝語の出現を全部（Occurrences: が All のとき＝RUBY-65）。**長い語が勝つ**（ファイルの順によらない）。行の上の段に**付く読みを薄く**。段の名前＝`[Ruby/Document] Find:"[Ruby List] 名前.txt"`。★すでにルビが1字でも掛かっている出現は行にせず数を言う（`N already had ruby and are not listed.`＝上書きしない）。隠した条件・削除・ノートの中は出さない。選択範囲は丸ごと入るものだけ。上限 1000。（L6・L9）回帰 `rb-list-find`・`rb-list-longest`・`rb-list-selection`・`rb-list-selection-cut`
   - 訂正:
 
 - **RUBY-63** ★行の Replace・Return＝行の語の読みを書く（Change の□と同じ書き方＝2字以上はグループ・1字は種類を書かない）。Change 側は見ない。全部で Ctrl+Z 1回。**行は一覧を作ったときの語で書く**＝ファイルを後で直しても一覧は変わらない（Search Again も同じ語）。行の字がリストの語でなくなっていれば `edited since`。（L8・L11）回帰 `rb-list-replace-one`・`rb-list-replace-all`・`rb-list-types`・`rb-list-undo`・`rb-list-again`・`rb-list-file-changed`
