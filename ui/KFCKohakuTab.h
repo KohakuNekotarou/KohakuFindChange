@@ -19,10 +19,10 @@
 //             styles while the face is shown, and a style the front document does not have stays on the list while it is asked for. BESIDE THEM InDesign's four buttons, its place and size
 //             (docs/superpowers/specs/2026-11-01-kfc-kohaku-trial-fixes-design.md F1 - F9): Find Next (KFCTableSearch::Next, KFCJump::LandOnTable), Change and Change/Find - grey until it has found a table, and once the selection leaves that
 //             table or it is written, as the Text tab's - and Change All (KFCTableSearch::ChangeFound, ChangeAll), and two lines for what they say.
-//    Ruby     Look For: (Text With Ruby / Text Without Ruby / Ruby Marks in Text), and the boxes (the author, 11-01): Find's Ruby: over its Base Text:, more or fewer with + and -, a chain between neighbours that makes their reading one - group ruby - and Change Ruby To's, which
+//    Ruby     Look For: (Text With Ruby / Text Without Ruby / Ruby Marks in Text / Words in a Ruby List), and the boxes (the author, 11-01): Find's Ruby: over its Base Text:, more or fewer with + and -, a chain between neighbours that makes their reading one - group ruby - and Change Ruby To's, which
 //             follow them, column for column and join for join, the column's base text under each as words. A search reads the boxes' words run together. No Change reading at all takes the ruby off (KFCRubyChangePlan.h). The fields are kept at every key stroke: the panel's
-//             Find may be pressed with one still focused.
-//    Kenten   Look For: (Text With Kenten / Text Without Kenten), Base Text:, Kenten: ([Any Kenten] and the kinds), Change Kenten To: ([Leave As It Is] and the kinds), Remove Kenten.
+//             Find may be pressed with one still focused. WORDS IN A RUBY LIST (KFCRubyList.h): the boxes away, the file's name and what it holds in their place, Choose List... in the head's column. HOW TO USE... on Ruby and Kenten, a page in a Japanese InDesign's one language (the author, 11-02): left of the dialog frame's Done, in Done's own row - the frame's, so the face builds it there as it is shown and hides it as it is hidden.
+//    Kenten   Look For: (Text With Kenten / Text Without Kenten), Base Text:, Kenten: ([Any Kenten] and the kinds), Change Kenten To: ([Leave As It Is] and the kinds), Remove Kenten; a sample of the mark beside each list (KFCKentenSample.cpp).
 //  While the face is the dialog's tab - or was when the dialog closed, the face it opens on again - KFC's Find looks for what its Find: says (KFCQRSearch, KFCTableSearch, KFCRubySearch in the model
 //  half, which ask through IKFCUIServices).
 //  WHAT THE TAB IS IS KEPT FROM THE FACE'S OWN CALLS - NO WINDOW IS WALKED (the QR design's D1, and its measurement's hazard: a face that walked the dialog's windows and widgets while the dialog
@@ -36,6 +36,7 @@
 #define __KFCKohakuTab_h__
 
 #include "KFCModelTypes.h"		// KFCTableConditions, KFCRubyConditions, KFCKentenConditions
+#include "PMTypes.h"			// WidgetID
 
 namespace KFCKohakuTab
 {
@@ -68,6 +69,9 @@ namespace KFCKohakuTab
 
 	/** What the face asks now, as a query (Save Query - KFCKohakuQueryMenu). */
 	void QueryOfFace(KFCKohakuQueryData& out);
+
+	/** WHAT A KENTEN SAMPLE DRAWS (KFCKentenSample.cpp - a sample's widget): an IKentenStyle::KentenKind, or 0 for nothing - what its list asks, while that list counts. */
+	int32 KentenSampleKind(const WidgetID& sample);
 
 	/** Application shutdown: what the face keeps holds PMStrings - released while the session stands (the plug-in's other statics' rule). */
 	void ShutdownCleanup();

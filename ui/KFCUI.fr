@@ -231,6 +231,18 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	},
 
 	/*
+	 * THE KENTEN PART'S SAMPLE: a generic panel widget whose view draws the mark its list says, the shape a kenten row draws (KFCKentenSample.cpp).
+	 */
+	Class
+	{
+		kKFCKentenSampleWidgetBoss,
+		kGenericPanelWidgetBoss,
+		{
+			IID_ICONTROLVIEW, kKFCKentenSampleViewImpl,
+		}
+	},
+
+	/*
 	 * A HIT ROW'S EYE (docs/superpowers/specs/2026-10-17-kfc-row-eye-keep-design.md - the row eye, D-13): an icon button
 	 * that draws InDesign's own eyeball while the row is kept and nothing while it is not (KFCResultListWidgetMgr sets
 	 * which, row by row), with a click handler of its own (KFCResultEyeEH) - the SDK's way of a tree row's icon
@@ -2090,6 +2102,7 @@ type KFCQueryListWidget(kViewRsrcType) : TreeViewWidget(ClassID = kKFCQueryListW
 type KFCQueryRowWidget(kViewRsrcType) : PrimaryResourcePanelWidget(ClassID = kKFCQueryRowWidgetBoss) { };
 type KFCQueryRowTextWidget(kViewRsrcType) : InfoStaticTextWidget(ClassID = kKFCQueryRowTextWidgetBoss) { };
 type KFCQueryFixedTextWidget(kViewRsrcType) : EVEStaticTextWidget(ClassID = kKFCQueryFixedTextWidgetBoss) { };
+type KFCKentenSampleWidget(kViewRsrcType) : EVEGenericPanelWidget(ClassID = kKFCKentenSampleWidgetBoss) { };
 // The value dialogs (KFCSpecialDialogs.cpp): DialogBoss with WidgetEveInfo, as the query dialog - EVE lays them out.
 type KFCValueDialogWidget(kViewRsrcType) : DialogBoss(ClassID = kKFCValueDialogBoss)
 {
@@ -2451,6 +2464,28 @@ resource LocaleIndex (kKFCQueryRowRsrcID)
 	{
 		kWildFS, k_Wild, kKFCQueryRowRsrcID + index_enUS
 	}
+};
+
+/*
+ * THE KOHAKU+ TAB'S HOW TO USE... (the author, 11-02: "left of the Done button"). Done is the dialog frame's, outside every face, so this is no part of the face: KFCKohakuTab.cpp builds it from here into Done's own row. InDesign's own button boss: nothing of
+ * KFC's stays in the frame but this widget. Not visible as built - the face shows it, for Ruby and Kenten.
+ */
+resource LocaleIndex (kKFCKohakuHowToRsrcID)
+{
+	kViewRsrcType,
+	{
+		kWildFS, k_Wild, kKFCKohakuHowToRsrcID + index_enUS
+	}
+};
+
+resource ButtonWidget (kKFCKohakuHowToRsrcID + index_enUS)
+{
+	kKFCKohakuHowToWidgetID,	// WidgetId
+	kSysButtonPMRsrcId,			// RsrcId
+	kBindNone,					// Frame binding (KFCKohakuTab.cpp gives it Done's)
+	Frame(0, 0, 116, 26)		// Frame: its width; the place is beside Done, its height Done's
+	kFalse, kTrue,				// Visible, Enabled
+	kKFCHowToMenuKey,			// "How to Use..."
 };
 
 /*
@@ -3878,6 +3913,17 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 									kKFCTableTabChangeKey,		// "Change"
 									kEVENoSpaceAfter,
 								),
+								// Words in a Ruby List's, in the same place: the file it reads.
+								EVEButtonWidget
+								(
+									kKFCRubyListChooseWidgetID,	// WidgetId
+									kSysButtonPMRsrcId,			// RsrcId
+									kBindNone,					// Frame binding
+									Frame(0, 0, 116, 26)		// Frame
+									kTrue, kTrue,				// Visible, Enabled
+									kKFCRubyListChooseFileKey,	// "Choose List..."
+									kEVENoSpaceAfter,
+								),
 							}
 						),
 						EVEGenericPanelWidget
@@ -4127,6 +4173,7 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 										kKFCRubyTabWithKey,
 										kKFCRubyTabWithoutKey,
 										kKFCRubyTabMarksKey,
+										kKFCRubyTabFileListKey,
 									}}
 									kEVENoSpaceAfter,
 								),
@@ -4145,7 +4192,7 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 							{
 								EVEStaticTextWidget
 								(
-									kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone,
+									kKFCRubyGridLabelReadingWidgetID, kSysStaticTextPMRsrcId, kBindNone,
 									Frame(0, 0, 110, 21)
 									kTrue, kTrue, kAlignLeft,
 									kDontEllipsize, kTrue,
@@ -4155,7 +4202,7 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 								),
 								EVEStaticTextWidget
 								(
-									kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone,
+									kKFCRubyGridLabelBaseWidgetID, kSysStaticTextPMRsrcId, kBindNone,
 									Frame(0, 41, 110, 62)
 									kTrue, kTrue, kAlignLeft,
 									kDontEllipsize, kTrue,
@@ -4165,7 +4212,7 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 								),
 								EVEStaticTextWidget
 								(
-									kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone,
+									kKFCRubyGridLabelChangeWidgetID, kSysStaticTextPMRsrcId, kBindNone,
 									Frame(0, 72, 110, 93)
 									kTrue, kTrue, kAlignLeft,
 									kDontEllipsize, kTrue,
@@ -4175,12 +4222,43 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 								),
 								EVEStaticTextWidget
 								(
-									kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone,
+									kKFCRubyGridLabelChangeBaseWidgetID, kSysStaticTextPMRsrcId, kBindNone,
 									Frame(0, 96, 110, 116)
 									kTrue, kTrue, kAlignLeft,
 									kDontEllipsize, kTrue,
 									kKFCRubyTabBaseKey,
 									0,
+									kEVENoSpaceAfter,
+								),
+								// WORDS IN A RUBY LIST: in the boxes' place, they away (LayOutRubyGrid) - the file's name, and what it holds or why it cannot be used.
+								EVEStaticTextWidget
+								(
+									kKFCRubyListLabelWidgetID, kSysStaticTextPMRsrcId, kBindNone,
+									Frame(0, 0, 110, 21)
+									kTrue, kTrue, kAlignLeft,
+									kDontEllipsize, kTrue,
+									kKFCRubyListWordKey,
+									0,
+									kEVENoSpaceAfter,
+								),
+								KFCQueryFixedTextWidget
+								(
+									kKFCRubyListNameWidgetID, kSysStaticTextPMRsrcId, kBindNone,
+									Frame(115, 0, 456, 21)
+									kTrue, kTrue, kAlignLeft,
+									kEllipsizeMiddle, kFalse,
+									"",
+									kInvalidWidgetID
+									kEVENoSpaceAfter,
+								),
+								KFCQueryFixedTextWidget
+								(
+									kKFCRubyListStatusWidgetID, kSysStaticTextPMRsrcId, kBindNone,
+									Frame(0, 26, 456, 47)
+									kTrue, kTrue, kAlignLeft,
+									kEllipsizeEnd, kFalse,
+									"",
+									kInvalidWidgetID
 									kEVENoSpaceAfter,
 								),
 								KFC_RUBY_BOX(kKFCRubyReadingBox0WidgetID, 0, 21),
@@ -4278,7 +4356,7 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 							Frame(0, 0, 456, 20)
 							kTrue, kTrue, kAlignLeft,
 							kEllipsizeEnd, kFalse,
-							kKFCTableTabGuideReplaceKey,
+							kKFCRubyTabGuideReplaceKey,
 							kInvalidWidgetID
 							kEVEAlignFill | kEVENoSpaceAfter,
 						),
@@ -4400,7 +4478,18 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 										kKFCKentenSmallWhiteKey,
 										kKFCKentenCustomKey,
 									}}
-									kEVENoSpaceAfter,
+									kEVERegularSpaceAfter,
+								),
+								// The mark the list says (the author, 11-02): a name alone does not say what a Fisheye looks like.
+								KFCKentenSampleWidget
+								(
+									kKFCKentenMarkSampleWidgetID, kPMRsrcID_None,
+									kBindNone,
+									Frame(0, 0, 30, 21)
+									kTrue, kTrue,
+									kEVEAlignLeft | kEVENoSpaceAfter | kEVEDontArrangeChildren | kEVENoMargin,
+									{
+									}
 								),
 							}
 						),
@@ -4441,7 +4530,17 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 										kKFCKentenWhiteCircleKey,
 										kKFCKentenSmallWhiteKey,
 									}}
-									kEVENoSpaceAfter,
+									kEVERegularSpaceAfter,
+								),
+								KFCKentenSampleWidget
+								(
+									kKFCKentenChangeSampleWidgetID, kPMRsrcID_None,
+									kBindNone,
+									Frame(0, 0, 30, 21)
+									kTrue, kTrue,
+									kEVEAlignLeft | kEVENoSpaceAfter | kEVEDontArrangeChildren | kEVENoMargin,
+									{
+									}
 								),
 							}
 						),

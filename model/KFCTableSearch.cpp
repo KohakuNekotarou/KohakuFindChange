@@ -229,7 +229,8 @@ bool WalkButtonRange(const KFCTableLook& look, const KFCTableConditions& asked, 
 		std::vector<KFCResultModel::Hit> hits;
 		std::map<UID, uint32> versions;
 		bool capped = false;
-		if (!WalkDoc(outDocs[d].docRef, asked.findStyle, asked.overridesOnly, part, static_cast<size_t>(KFCResultModel::kKFCCollectObjectLimit), hits, versions, capped))
+		// (NO LIST'S LIMIT: these are no rows of a list. Stopped at it, Change All would say it changed them all and leave the rest, and Find Next would never reach them.)
+		if (!WalkDoc(outDocs[d].docRef, asked.findStyle, asked.overridesOnly, part, static_cast<size_t>(kMaxInt32), hits, versions, capped))
 			continue;
 		KFCResultModel::OrderHitsByPage(hits);
 		for (size_t h = 0; h < hits.size(); ++h)

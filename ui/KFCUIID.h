@@ -117,6 +117,8 @@ DECLARE_PMID(kClassIDSpace, kKFCKohakuTabPanelBoss, kKFCUIPrefix + 33)
 // The Kohaku+ tab's queries in Find/Change's own Query menu: the watch on the command processor, and the filter on Save Query's press (KFCKohakuQueryMenu).
 DECLARE_PMID(kClassIDSpace, kKFCKohakuQueryWatchBoss, kKFCUIPrefix + 34)
 DECLARE_PMID(kClassIDSpace, kKFCKohakuSaveFilterBoss, kKFCUIPrefix + 35)
+// The Kenten part's sample: the mark its list says (KFCKentenSample.cpp).
+DECLARE_PMID(kClassIDSpace, kKFCKentenSampleWidgetBoss, kKFCUIPrefix + 36)
 
 
 // InterfaceIDs:
@@ -248,6 +250,7 @@ DECLARE_PMID(kImplementationIDSpace, kKFCKohakuTabControllerImpl, kKFCUIPrefix +
 DECLARE_PMID(kImplementationIDSpace, kKFCKohakuQueryWatchImpl, kKFCUIPrefix + 64)
 DECLARE_PMID(kImplementationIDSpace, kKFCKohakuSaveFilterEHImpl, kKFCUIPrefix + 65)
 DECLARE_PMID(kImplementationIDSpace, kKFCKohakuTabSelectionObserverImpl, kKFCUIPrefix + 66)
+DECLARE_PMID(kImplementationIDSpace, kKFCKentenSampleViewImpl, kKFCUIPrefix + 67)
 
 
 // ActionIDs:
@@ -590,8 +593,9 @@ DECLARE_PMID(kWidgetIDSpace, kKFCTableTabClearOverridesWidgetID, kKFCUIPrefix + 
 DECLARE_PMID(kWidgetIDSpace, kKFCKohakuTableSectionWidgetID, kKFCUIPrefix + 69)
 DECLARE_PMID(kWidgetIDSpace, kKFCKohakuRubySectionWidgetID, kKFCUIPrefix + 70)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyTabKindWidgetID, kKFCUIPrefix + 71)
-// (+ 72 was the Ruby part's Base Text: field and + 73 its Ruby: field, boxes now - below. + 72 is Find Table Style:'s words, which stand under Search: in the head and only on Table; + 73 is free.)
+// (+ 72 was the Ruby part's Base Text: field and + 73 its Ruby: field, boxes now - below. + 72 is Find Table Style:'s words, which stand under Search: in the head and only on Table; + 73 the tab's How to Use..., in the row of the dialog frame's Done on Ruby and Kenten - KFCKohakuTab.cpp.)
 DECLARE_PMID(kWidgetIDSpace, kKFCTableTabFindLabelWidgetID, kKFCUIPrefix + 72)
+DECLARE_PMID(kWidgetIDSpace, kKFCKohakuHowToWidgetID, kKFCUIPrefix + 73)
 DECLARE_PMID(kWidgetIDSpace, kKFCKohakuKentenSectionWidgetID, kKFCUIPrefix + 76)
 DECLARE_PMID(kWidgetIDSpace, kKFCKentenTabKindWidgetID, kKFCUIPrefix + 77)
 DECLARE_PMID(kWidgetIDSpace, kKFCKentenTabBaseWidgetID, kKFCUIPrefix + 78)
@@ -648,6 +652,10 @@ DECLARE_PMID(kWidgetIDSpace, kKFCRubyJoin7WidgetID, kKFCUIPrefix + 121)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyJoin8WidgetID, kKFCUIPrefix + 122)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyJoin9WidgetID, kKFCUIPrefix + 123)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyJoin10WidgetID, kKFCUIPrefix + 124)
+// The Kenten part's samples, beside its two lists (KFCKentenSample.cpp), and the Ruby part's Choose List... - the second of the head's column.
+DECLARE_PMID(kWidgetIDSpace, kKFCKentenMarkSampleWidgetID, kKFCUIPrefix + 125)
+DECLARE_PMID(kWidgetIDSpace, kKFCKentenChangeSampleWidgetID, kKFCUIPrefix + 126)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyListChooseWidgetID, kKFCUIPrefix + 127)
 // (This prefix's widget ids run out at + 127. The model half's prefix, the 128 numbers below this one, has no widget of its own: its WidgetID + 0 ... + 30 are spent - KFCID.h says so - and those after them are free. + 128 ON IS THIS PREFIX: kKFCUIPrefix is kKFCPrefix + 128.)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBox0WidgetID, kKFCPrefix + 40)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBox1WidgetID, kKFCPrefix + 41)
@@ -673,6 +681,14 @@ DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBase8WidgetID, kKFCPrefix + 60)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBase9WidgetID, kKFCPrefix + 61)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBase10WidgetID, kKFCPrefix + 62)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBase11WidgetID, kKFCPrefix + 63)
+// The grid's four labels, away with the boxes when the part looks for a ruby list, and what it says of the list (KFCKohakuTab.cpp's LayOutRubyGrid).
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyGridLabelReadingWidgetID, kKFCPrefix + 64)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyGridLabelBaseWidgetID, kKFCPrefix + 65)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyGridLabelChangeWidgetID, kKFCPrefix + 66)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyGridLabelChangeBaseWidgetID, kKFCPrefix + 67)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyListLabelWidgetID, kKFCPrefix + 68)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyListNameWidgetID, kKFCPrefix + 69)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyListStatusWidgetID, kKFCPrefix + 70)
 
 
 // "About Plug-ins" sub-menu:
@@ -877,6 +893,12 @@ DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBase11WidgetID, kKFCPrefix + 63)
 #define kKFCRubyTabWithKey				kKFCStringPrefix "kKFCRubyTabWithKey"
 #define kKFCRubyTabWithoutKey			kKFCStringPrefix "kKFCRubyTabWithoutKey"
 #define kKFCRubyTabMarksKey				kKFCStringPrefix "kKFCRubyTabMarksKey"
+// (Not "kKFCRubyTabListKey" or "kKFCRubyListChooseKey": one length and one character sum with kKFCRubyTabWithKey and kKFCArrangeSubmenuKey - memory indesign-string-key-hash-collision.)
+#define kKFCRubyTabFileListKey			kKFCStringPrefix "kKFCRubyTabFileListKey"
+#define kKFCRubyListWordKey				kKFCStringPrefix "kKFCRubyListWordKey"
+#define kKFCRubyListChooseFileKey		kKFCStringPrefix "kKFCRubyListChooseFileKey"
+#define kKFCRubyListDialogTitleKey		kKFCStringPrefix "kKFCRubyListDialogTitleKey"
+#define kKFCRubyListFileTypeKey			kKFCStringPrefix "kKFCRubyListFileTypeKey"
 #define kKFCRubyTabBaseKey				kKFCStringPrefix "kKFCRubyTabBaseKey"
 #define kKFCRubyTabReadingKey			kKFCStringPrefix "kKFCRubyTabReadingKey"
 #define kKFCRubyTabChangeKey			kKFCStringPrefix "kKFCRubyTabChangeKey"
@@ -884,6 +906,7 @@ DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBase11WidgetID, kKFCPrefix + 63)
 #define kKFCTableTabChangeAllKey		kKFCStringPrefix "kKFCTableTabChangeAllKey"
 #define kKFCTableTabChangeFindKey		kKFCStringPrefix "kKFCTableTabChangeFindKey"
 #define kKFCRubyTabGuideFindKey			kKFCStringPrefix "kKFCRubyTabGuideFindKey"
+#define kKFCRubyTabGuideReplaceKey		kKFCStringPrefix "kKFCRubyTabGuideReplaceKey"
 #define kKFCKohakuTabKentenKey			kKFCStringPrefix "kKFCKohakuTabKentenKey"
 #define kKFCKentenTabWithKey			kKFCStringPrefix "kKFCKentenTabWithKey"
 #define kKFCKentenTabWithoutKey			kKFCStringPrefix "kKFCKentenTabWithoutKey"
@@ -1122,6 +1145,7 @@ DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBase11WidgetID, kKFCPrefix + 63)
 // IPanelCreator::GetPanelRsrcID hands back).
 #define kKFCKohakuTabRsrcID					(kSDKDefPanelResourceID + 30)
 #define kKFCKohakuTabIDListRsrcID			(kSDKDefPanelResourceID + 32)
+#define kKFCKohakuHowToRsrcID				(kSDKDefPanelResourceID + 36)	// the tab's How to Use..., built into the row of the dialog frame's Done
 #define kKFCValueFieldWidth					84
 // One row of the query dialog's lists: KCM's book comparison dialog's row height (kKCMBookRowHeight), the one other
 // list the Kohaku plug-ins draw in a dialog's font. Read by the row resource, the lists' scroll increments

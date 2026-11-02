@@ -196,6 +196,7 @@ namespace
 			SayWhy(outWords);
 			return false;
 		}
+		virtual bool RubyListCheck(const PMString&, int32& outWords, PMString& outWhy) { outWords = 0; SayWhy(outWhy); return false; }
 	};
 
 	class KFCChaptersStandInImpl : public IKFCChapters

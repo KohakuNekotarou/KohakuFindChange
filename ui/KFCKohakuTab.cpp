@@ -38,17 +38,25 @@
 #include "LocaleSetting.h"				// the UI language - Ruby is a Japanese InDesign's
 #include "CDialogController.h"
 #include "CPanelCreator.h"
+#include "CreateObject.h"				// ::CreateObject2 - How to Use... built into the row of the frame's Done
+#include "FileUtils.h"					// a ruby list's name
+#include "FindChangeID.h"				// kFindMinITabbedDialogOKButtonWidgetID - the frame's Done
+#include "CoreResTypes.h"				// kViewRsrcType
 #include "PMRect.h"						// the Ruby part's boxes' frames
+#include "RsrcSpec.h"					// How to Use...'s resource
+#include "SDKFileHelper.h"				// SDKFileOpenChooser - Choose List...
 #include "SelectionObserver.h"			// ActiveSelectionObserver - the Table part's Change greys when the selection leaves what Find Next found
 #include "TablesID.h"					// IID_ITABLESTYLEGROUPMANAGER
 #include "UIDList.h"
 
+#include <string>		// (test builds: the fault switch ruby-list-file's line)
 #include <vector>
 
 // Project includes:
 #include "KFCKohakuTab.h"
 #include "KFCUIID.h"
 #include "KFCDiag.h"					// KFC_DIAG_LOG - the face's calls, in a test build's trace (QRTAB / TBLTAB / RUBYTAB lines)
+#include "KFCHowTo.h"					// ShowRubyMarks, ShowKenten - the tab's How to Use...
 #include "KFCPanelTitle.h"				// Update - the panel's title names the kind and its Search:
 #include "KFCAppBarSearchEnter.h"		// KFCMirrorAppBarFieldNow - the Application Bar's field shows the tab's nothing
 #include "KFCJump.h"					// LandOnQRCode, LandOnTable - Find Next lands as a row's click does
@@ -85,6 +93,7 @@ bool gYield = false;		// a saved query loaded since states its own tab (YieldToS
 bool gStated = false;		// a saved query of this tab's Find is under way (StateQuery) - until EndStatedFind
 int32 gStatedScope = IWalkerScopeFactoryUtils::kDocumentScope;	// ...over this Search:
 IPMUnknown* gShownFace = nil;	// the face, while shown - from its AutoAttach to its AutoDetach (not AddRef'd): a query stated with it shown writes its widgets
+IControlView* gHowTo = nil;		// How to Use... in the row of the frame's Done, while the face is shown (the face's observer holds the reference: QueryHowTo's note)
 int32 gKind = kKindQRCode;	// its Find: - QR Code at launch, the tab InDesign's dialog first had
 int32 gScope = IWalkerScopeFactoryUtils::kDocumentScope;	// its Search: - Document at launch
 KFCTableConditions gTable;	// what the Table part asks, kept from its widgets (its scope is gScope)
@@ -702,11 +711,28 @@ void PlaceGridWidget(IPanelControlData* panel, const WidgetID& widget, bool show
 void LayOutRubyGrid(IPanelControlData* panel)
 {
 	const bool part = (gKind == kKindRuby);
+	// WORDS IN A RUBY LIST ASKS NOTHING OF THE BOXES: they go, and what it says of its file stands in their place.
+	const bool listing = part && gRuby.kind == kKFCRubyFindList;
+	const bool boxes = !listing;
 	const bool findReads = part && gRuby.kind != kKFCRubyFindWithout;
 	const bool changes = part && gRuby.kind != kKFCRubyFindMarks;
+	PlaceGridWidget(panel, kKFCRubyGridLabelReadingWidgetID, boxes, part, 0, 0, 110, 21);
+	PlaceGridWidget(panel, kKFCRubyGridLabelBaseWidgetID, boxes, part, 0, 41, 110, 62);
+	PlaceGridWidget(panel, kKFCRubyGridLabelChangeWidgetID, boxes, part, 0, 72, 110, 93);
+	PlaceGridWidget(panel, kKFCRubyGridLabelChangeBaseWidgetID, boxes, part, 0, 96, 110, 116);
+	PlaceGridWidget(panel, kKFCRubyListLabelWidgetID, listing, listing, 0, 0, 110, 21);
+	PlaceGridWidget(panel, kKFCRubyListNameWidgetID, listing, listing, 115, 0, 456, 21);
+	PlaceGridWidget(panel, kKFCRubyListStatusWidgetID, listing, listing, 0, 26, 456, 47);
+	// (Choose List... and How to Use... stand in the head's column.)
+	IControlView* const choose = (panel != nil) ? panel->FindWidget(kKFCRubyListChooseWidgetID) : nil;
+	if (choose != nil)
+	{
+		choose->Enable(listing ? kTrue : kFalse);
+		choose->ShowView(listing ? kTrue : kFalse);
+	}
 	for (int32 k = 0; k < kKFCRubyBoxColumnsMost; ++k)
 	{
-		const bool stands = (k < gCols);
+		const bool stands = boxes && (k < gCols);
 		int32 last = k;
 		while (stands && last + 1 < gCols && gJoin[last])
 			++last;
@@ -720,17 +746,77 @@ void LayOutRubyGrid(IPanelControlData* panel)
 		PlaceGridWidget(panel, ChangeBaseID(k), stands, changes, left, 96, columnRight, 116);
 		if (k + 1 < kKFCRubyBoxColumnsMost)
 		{
-			const bool between = (k + 1 < gCols);
+			const bool between = boxes && (k + 1 < gCols);
 			const int32 middle = between ? GridColumnLeft(k + 1) - (kGridBoxGap / 2) : 0;
 			PlaceGridWidget(panel, JoinID(k), between, changes, middle - 10, 21, middle + 10, 41);
 		}
 	}
 	IControlView* const plus = (panel != nil) ? panel->FindWidget(kKFCRubyGridPlusWidgetID) : nil;
 	if (plus != nil)
-		plus->Enable((part && gCols < kKFCRubyBoxColumnsMost) ? kTrue : kFalse);
+	{
+		plus->Enable((part && boxes && gCols < kKFCRubyBoxColumnsMost) ? kTrue : kFalse);
+		plus->ShowView(boxes ? kTrue : kFalse);
+	}
 	IControlView* const minus = (panel != nil) ? panel->FindWidget(kKFCRubyGridMinusWidgetID) : nil;
 	if (minus != nil)
-		minus->Enable((part && gCols > 1) ? kTrue : kFalse);
+	{
+		minus->Enable((part && boxes && gCols > 1) ? kTrue : kFalse);
+		minus->ShowView(boxes ? kTrue : kFalse);
+	}
+}
+
+// WHAT THE PART SAYS OF ITS LIST: the file's name, and how many words it holds or why it cannot be used - read now, as a Find will read it.
+void ShowRubyList(IPanelControlData* panel)
+{
+	if (panel == nil || gKind != kKindRuby || gRuby.kind != kKFCRubyFindList)
+		return;
+	PMString name;
+	if (!gRuby.listPath.IsEmpty())
+		FileUtils::GetFileName(FileUtils::PMStringToSysFile(gRuby.listPath), name);
+	name.SetTranslatable(kFalse);
+	int32 words = 0;
+	PMString said;
+	if (KFCRuns()->RubyListCheck(gRuby.listPath, words, said))
+	{
+		said.Clear();
+		said.AppendNumber(words);
+		said.Append((words == 1) ? " word." : " words.");
+	}
+	said.SetTranslatable(kFalse);
+	SetFaceLine(panel, kKFCRubyListNameWidgetID, name);
+	SetFaceLine(panel, kKFCRubyListStatusWidgetID, said);
+	KFC_DIAG_LOG("RUBYTAB list name=%s said=%s", name.GetUTF8String().c_str(), said.GetUTF8String().c_str());
+}
+
+// CHOOSE LIST...: its file. Text files, and any file - a list may be called anything. (The SDK's own chooser, as Load Order... - KFCQueryOrderFile.cpp. TEST BUILDS - the fault switch ruby-list-file's first line is the file: Windows' dialogs cannot be pressed by a test.)
+// False = none was chosen: nothing the face asks has changed.
+bool ChooseRubyList(IPanelControlData* panel)
+{
+	bool chosen = false;
+#ifdef KFC_DIAG
+	std::string testPath;
+	if (KFCDiagFaultText("ruby-list-file", testPath))
+	{
+		gRuby.listPath.SetUTF8String(testPath);
+		chosen = true;
+		KFC_DIAG_LOG("RUBYTAB list through the fault switch: %s", testPath.c_str());
+	}
+#endif
+	if (!chosen)
+	{
+		SDKFileOpenChooser chooser;
+		chooser.SetTitle(PMString(kKFCRubyListDialogTitleKey));		// "Choose Ruby List"
+		chooser.AddFilter('TEXT', PMString("txt"), PMString(kKFCRubyListFileTypeKey));		// "Ruby List"
+		chooser.AddFilter('TEXT', PMString("csv"), PMString(kKFCRubyListFileTypeKey));
+		chooser.AddAllFiles();
+		chooser.ShowDialog();
+		if (!chooser.IsChosen())
+			return false;
+		gRuby.listPath = chooser.GetPath();
+	}
+	gRuby.listPath.SetTranslatable(kFalse);
+	ShowRubyList(panel);
+	return true;
 }
 
 // EVERY BOX AND ITS WORDS WRITTEN FROM WHAT IS KEPT. Not heard (notifyOfChange kFalse).
@@ -780,10 +866,37 @@ WidgetID LetGoOfGoingBox()
 	return boxOf(to);
 }
 
-// (What each Look For: greys - LayOutRubyGrid.)
+// THE BOXES ARE GOING, ALL OF THEM (Words in a Ruby List): one holding the keyboard lets go - the keys would go on into a box no one sees (LetGoOfGoingBox's rule, below; it answers for the columns that stay).
+void LetGoOfAnyBox()
+{
+	ISession* const session = GetExecutionContextSession();
+	InterfacePtr<IApplication> application((session != nil) ? session->QueryApplication() : nil);
+	InterfacePtr<IKeyBoard> keyboard(application, UseDefaultIID());
+	InterfacePtr<IControlView> focus((keyboard != nil) ? keyboard->GetKeyFocus() : nil, UseDefaultIID());
+	if (focus == nil)
+		return;
+	const WidgetID held = focus->GetWidgetID();
+	if (ColumnOf(held, ReadingBoxID(0), kKFCRubyBoxColumnsMost) >= 0 || ColumnOf(held, BaseBoxID(0), kKFCRubyBoxColumnsMost) >= 0 || ColumnOf(held, ChangeBoxID(0), kKFCRubyBoxColumnsMost) >= 0)
+		keyboard->RelinquishKeyFocus();
+}
+
+// (What each Look For: greys and takes away - LayOutRubyGrid - and what a list says of itself.)
 void ShowRubyKind(IPanelControlData* panel)
 {
 	LayOutRubyGrid(panel);
+	ShowRubyList(panel);
+}
+
+// The samples beside the Kenten part's lists draw what is kept now (KFCKohakuTab::KentenSampleKind).
+void RedrawKentenSamples(IPanelControlData* panel)
+{
+	IControlView* const markSample = (panel != nil) ? panel->FindWidget(kKFCKentenMarkSampleWidgetID) : nil;
+	if (markSample != nil)
+		markSample->Invalidate();
+	IControlView* const changeSample = (panel != nil) ? panel->FindWidget(kKFCKentenChangeSampleWidgetID) : nil;
+	if (changeSample != nil)
+		changeSample->Invalidate();
+	KFC_DIAG_LOG("KENTAB samples mark=%d change=%d", static_cast<int>(KFCKohakuTab::KentenSampleKind(kKFCKentenMarkSampleWidgetID)), static_cast<int>(KFCKohakuTab::KentenSampleKind(kKFCKentenChangeSampleWidgetID)));
 }
 
 // Kenten: means nothing to Text Without Kenten: grey there.
@@ -792,6 +905,7 @@ void ShowKentenKind(IPanelControlData* panel)
 	IControlView* const mark = (panel != nil) ? panel->FindWidget(kKFCKentenTabMarkWidgetID) : nil;
 	if (mark != nil)
 		mark->Enable(gKenten.kind == kKFCKentenFindWithout ? kFalse : kTrue);
+	RedrawKentenSamples(panel);
 }
 
 // A text field's words as they stand now, not translated.
@@ -894,12 +1008,74 @@ void ShowPart(IPanelControlData* panel, const WidgetID& widget, bool shown)
 	view->ShowView(shown ? kTrue : kFalse);
 }
 
+// ----- How to Use... (the author, 11-02: "left of the Done button", on Ruby and on Kenten)
+//
+// DONE IS THE DIALOG FRAME'S, in a row of the frame under the faces' tabs (measured: the row's first widget is on no face), so a child of the face cannot stand beside it. The button is built into that row - the recipe of Adobe's linksui
+// (LinkInfoPanelObserver: ::CreateObject with a RsrcSpec, AddWidget, SetFrame), memory widget-injection-builtin-ui - and it is a plain button of InDesign's (KFCUI.fr). Found and built as the face is shown. HIDING WALKS NOTHING: the face's
+// AutoDetach comes with the dialog's close too, and a face that walked the dialog's widgets there left Find/Change closed and yet standing, for good (the QR spec's D1, measured): the face holds the button for as long as it is shown.
+
+// How far left of Done: the Object tab's Find Next and Change stand 5 apart in a column, and InDesign's dialogs part two buttons in a row by 10 (kEVELargeSpaceAfter).
+const int32 kHowToGapToDone = 10;
+
+// The first panel up from the face that holds the frame's Done: the dialog's own, for the frame is no face's. Nil with no such dialog. (The face is shown: see above.)
+IControlView* FindFrameDone(IPMUnknown* face)
+{
+	InterfacePtr<IWidgetParent> at(face, UseDefaultIID());
+	for (int32 up = 0; up < 32 && at != nil; ++up)
+	{
+		IPMUnknown* const parent = at->GetParent();
+		InterfacePtr<IPanelControlData> panel(parent, UseDefaultIID());
+		IControlView* const done = (panel != nil) ? panel->FindWidget(kFindMinITabbedDialogOKButtonWidgetID) : nil;
+		if (done != nil)
+			return done;
+		InterfacePtr<IWidgetParent> next(parent, UseDefaultIID());
+		at.reset(next.forget());
+	}
+	return nil;
+}
+
+// The button in Done's row (AddRef'd): the one built at an earlier show if the dialog has kept it, or built now, Done's height and binding, its own width left of Done. Nil where the dialog is not as measured: then there is simply no How to Use....
+IControlView* QueryHowTo(IPMUnknown* face)
+{
+	IControlView* const done = FindFrameDone(face);
+	InterfacePtr<IWidgetParent> doneParent(done, UseDefaultIID());
+	InterfacePtr<IPanelControlData> row((doneParent != nil) ? doneParent->GetParent() : nil, UseDefaultIID());
+	if (row == nil)
+		return nil;
+	IControlView* const kept = row->FindWidget(kKFCKohakuHowToWidgetID);
+	if (kept != nil)
+	{
+		kept->AddRef();
+		return kept;
+	}
+	InterfacePtr<IControlView> button(::CreateObject2<IControlView>(::GetDataBase(row), RsrcSpec(LocaleSetting::GetLocale(), kKFCUIPluginID, kViewRsrcType, kKFCKohakuHowToRsrcID)));
+	if (button == nil)
+		return nil;
+	row->AddWidget(button);
+	const PMRect doneFrame = done->GetFrame();
+	const PMReal right = doneFrame.Left() - PMReal(kHowToGapToDone);
+	button->SetFrame(PMRect(right - button->GetFrame().Width(), doneFrame.Top(), right, doneFrame.Bottom()));
+	button->SetFrameBinding(done->GetFrameBinding());
+	return button.forget();
+}
+
+// THE BUTTON FOR THE KIND NOW: Ruby's and Kenten's own, each with its page; a hidden one takes no click. Nothing while the face is hidden (gHowTo).
+void ShowHowTo()
+{
+	if (gHowTo == nil)
+		return;
+	const bool shown = (gKind == kKindRuby || gKind == kKindKenten);
+	gHowTo->Enable(shown ? kTrue : kFalse);
+	gHowTo->ShowView(shown ? kTrue : kFalse);
+}
+
 // THE CHOSEN KIND'S PART, the others away, and Search: for it.
 void ShowKind(IPMUnknown* face)
 {
 	InterfacePtr<IPanelControlData> panel(face, UseDefaultIID());
 	ShowPart(panel, kKFCKohakuQRSectionWidgetID, gKind == kKindQRCode);
 	ShowPart(panel, kKFCQRTabFindNextWidgetID, gKind == kKindQRCode || gKind == kKindTable);
+	ShowHowTo();
 	ShowPart(panel, kKFCTableTabChangeWidgetID, gKind == kKindTable);
 	ShowPart(panel, kKFCTableTabChangeAllWidgetID, gKind == kKindTable);
 	ShowPart(panel, kKFCTableTabChangeFindWidgetID, gKind == kKindTable);
@@ -959,6 +1135,15 @@ bool KFCKohakuTab::IsRubyCurrent(KFCRubyConditions& outConditions)
 	outConditions = gRuby;
 	outConditions.scope = ScopeAsked();
 	return FaceIsCurrent() && gKind == kKindRuby;
+}
+
+int32 KFCKohakuTab::KentenSampleKind(const WidgetID& sample)
+{
+	if (sample == kKFCKentenMarkSampleWidgetID)
+		return (gKenten.kind == kKFCKentenFindWithout) ? 0 : gKenten.mark;
+	if (sample == kKFCKentenChangeSampleWidgetID)
+		return gKenten.removeKenten ? 0 : gKenten.changeTo;
+	return 0;
 }
 
 bool KFCKohakuTab::IsKentenCurrent(KFCKentenConditions& outConditions)
@@ -1098,7 +1283,7 @@ CREATE_PMINTERFACE(KFCKohakuTabController, kKFCKohakuTabControllerImpl)
 class KFCKohakuTabObserver : public AbstractDialogObserver
 {
 public:
-	KFCKohakuTabObserver(IPMUnknown* boss) : AbstractDialogObserver(boss) {}
+	KFCKohakuTabObserver(IPMUnknown* boss) : AbstractDialogObserver(boss), fHowTo(nil) {}
 	virtual ~KFCKohakuTabObserver() {}
 
 	virtual void AutoAttach()
@@ -1118,6 +1303,7 @@ public:
 			AttachToWidget(kKFCKohakuTabKindWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
 			AttachToWidget(kKFCKohakuTabScopeWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
 			AttachToWidget(kKFCQRTabFindNextWidgetID, IID_IBOOLEANCONTROLDATA, panel);
+			AttachToWidget(kKFCRubyListChooseWidgetID, IID_IBOOLEANCONTROLDATA, panel);
 			AttachToWidget(kKFCTableTabChangeWidgetID, IID_IBOOLEANCONTROLDATA, panel);
 			AttachToWidget(kKFCTableTabChangeAllWidgetID, IID_IBOOLEANCONTROLDATA, panel);
 			AttachToWidget(kKFCTableTabChangeFindWidgetID, IID_IBOOLEANCONTROLDATA, panel);
@@ -1150,6 +1336,12 @@ public:
 			contextSubject->AttachObserver(ISubject::kRegularAttachment, this, IID_IACTIVECONTEXT, IID_IOBSERVER);
 		fWorkspace = UIDRef::gNull;
 		FollowWorkspace(context);
+		// HOW TO USE..., held and heard while shown, and shown by FillKept for the kind. (Heard as the face's own buttons are; AttachToWidget would want the row's panel.)
+		fHowTo.reset(QueryHowTo(this));
+		gHowTo = fHowTo;
+		InterfacePtr<ISubject> howToSubject(fHowTo, UseDefaultIID());
+		if (howToSubject != nil && !howToSubject->IsAttached(ISubject::kRegularAttachment, this, IID_IBOOLEANCONTROLDATA, IID_IOBSERVER))
+			howToSubject->AttachObserver(ISubject::kRegularAttachment, this, IID_IBOOLEANCONTROLDATA, IID_IOBSERVER);
 		FillKept(this);
 		// THE SELECTION, FOLLOWED WHILE SHOWN: Change greys as it leaves what Find Next found.
 		InterfacePtr<IObserver> selectionObserver(this, IID_IKFCKOHAKUSELECTIONOBSERVER);
@@ -1176,6 +1368,17 @@ public:
 		KFC_DIAG_LOG("%s hidden", KindWord());
 		KFCKohakuQueryMenu::FaceHidden();
 		StopHearingWorkspace();
+		// HOW TO USE... GOES WITH THE FACE - the button the face holds; no walk to it (the note above QueryHowTo).
+		if (fHowTo != nil)
+		{
+			InterfacePtr<ISubject> howToSubject(fHowTo, UseDefaultIID());
+			if (howToSubject != nil && howToSubject->IsAttached(ISubject::kRegularAttachment, this, IID_IBOOLEANCONTROLDATA, IID_IOBSERVER))
+				howToSubject->DetachObserver(ISubject::kRegularAttachment, this, IID_IBOOLEANCONTROLDATA, IID_IOBSERVER);
+			fHowTo->Disable();
+			fHowTo->HideView();
+		}
+		gHowTo = nil;
+		fHowTo.reset();
 		// (The dialog can go with the application: no session, no context - nothing is attached to a context that has gone.)
 		ISession* const session = GetExecutionContextSession();
 		IActiveContext* const context = (session != nil) ? session->GetActiveContext() : nil;
@@ -1188,6 +1391,7 @@ public:
 		DetachFromWidget(kKFCKohakuTabKindWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
 		DetachFromWidget(kKFCKohakuTabScopeWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
 		DetachFromWidget(kKFCQRTabFindNextWidgetID, IID_IBOOLEANCONTROLDATA, panel);
+		DetachFromWidget(kKFCRubyListChooseWidgetID, IID_IBOOLEANCONTROLDATA, panel);
 		DetachFromWidget(kKFCTableTabChangeWidgetID, IID_IBOOLEANCONTROLDATA, panel);
 		DetachFromWidget(kKFCTableTabChangeAllWidgetID, IID_IBOOLEANCONTROLDATA, panel);
 		DetachFromWidget(kKFCTableTabChangeFindWidgetID, IID_IBOOLEANCONTROLDATA, panel);
@@ -1255,6 +1459,20 @@ public:
 			else
 				FindNext(this);
 		}
+		else if (widget == kKFCKohakuHowToWidgetID && theChange == kTrueStateMessage)
+		{
+			KFC_DIAG_LOG("%s how to", KindWord());
+			if (gKind == kKindKenten)
+				KFCHowTo::ShowKenten();
+			else
+				KFCHowTo::ShowRubyMarks();
+		}
+		else if (widget == kKFCRubyListChooseWidgetID && theChange == kTrueStateMessage)
+		{
+			InterfacePtr<IPanelControlData> panel(this, UseDefaultIID());
+			if (ChooseRubyList(panel))
+				KFCKohakuQueryMenu::FaceChanged();		// (the list is what a query holds; its press alone is nothing - below)
+		}
 		else if (widget == kKFCTableTabChangeWidgetID && theChange == kTrueStateMessage)
 			TableChange(this, false);
 		else if (widget == kKFCTableTabChangeFindWidgetID && theChange == kTrueStateMessage)
@@ -1291,8 +1509,10 @@ public:
 		{
 			InterfacePtr<IDropDownListController> list(view, UseDefaultIID());
 			const int32 entry = (list != nil) ? list->GetSelected() : -1;
-			if (entry >= kKFCRubyFindWith && entry <= kKFCRubyFindMarks)
+			if (entry >= kKFCRubyFindWith && entry <= kKFCRubyFindList)
 				gRuby.kind = entry;
+			if (gRuby.kind == kKFCRubyFindList)
+				LetGoOfAnyBox();
 			InterfacePtr<IPanelControlData> panel(this, UseDefaultIID());
 			ShowRubyKind(panel);
 			KFC_DIAG_LOG("RUBYTAB kind=%d", static_cast<int>(gRuby.kind));
@@ -1404,6 +1624,8 @@ public:
 			if (entry >= 0)
 				gKenten.mark = entry;		// (an entry is its IKentenStyle::KentenKind, 0 = any)
 			KFC_DIAG_LOG("KENTAB mark=%d", static_cast<int>(gKenten.mark));
+			InterfacePtr<IPanelControlData> panel(this, UseDefaultIID());
+			RedrawKentenSamples(panel);
 		}
 		else if (widget == kKFCKentenTabChangeWidgetID)
 		{
@@ -1412,16 +1634,20 @@ public:
 			if (entry >= 0)
 				gKenten.changeTo = entry;		// (an entry is its IKentenStyle::KentenKind, 0 = leave it)
 			KFC_DIAG_LOG("KENTAB change=%d", static_cast<int>(gKenten.changeTo));
+			InterfacePtr<IPanelControlData> panel(this, UseDefaultIID());
+			RedrawKentenSamples(panel);
 		}
 		else if (widget == kKFCKentenTabRemoveWidgetID && (theChange == kTrueStateMessage || theChange == kFalseStateMessage))
 		{
 			gKenten.removeKenten = (theChange == kTrueStateMessage);
 			KFC_DIAG_LOG("KENTAB remove=%d", gKenten.removeKenten ? 1 : 0);
+			InterfacePtr<IPanelControlData> panel(this, UseDefaultIID());
+			RedrawKentenSamples(panel);
 		}
 		// WHAT A QUERY HOLDS WAS CHANGED BY HAND: Find/Change's Query menu says [Custom], as a change on InDesign's own tabs does. (Search: is no part of a query, as InDesign's own Search: is none of its menu's; Find Next changes nothing, nor do the
 		// Table part's other buttons - what they write is the document - nor a + - a box more holds nothing.)
 		if (widget != kKFCKohakuTabScopeWidgetID && widget != kKFCQRTabFindNextWidgetID && widget != kKFCTableTabChangeWidgetID && widget != kKFCTableTabChangeAllWidgetID
-			&& widget != kKFCTableTabChangeFindWidgetID && widget != kKFCRubyGridPlusWidgetID
+			&& widget != kKFCTableTabChangeFindWidgetID && widget != kKFCRubyGridPlusWidgetID && widget != kKFCKohakuHowToWidgetID && widget != kKFCRubyListChooseWidgetID
 			&& (protocol != IID_ITRISTATECONTROLDATA || theChange == kTrueStateMessage || theChange == kFalseStateMessage))
 			KFCKohakuQueryMenu::FaceChanged();
 	}
@@ -1460,6 +1686,7 @@ private:
 	}
 
 	UIDRef fWorkspace;
+	InterfacePtr<IControlView> fHowTo;	// How to Use..., while the face is shown (gHowTo)
 };
 CREATE_PMINTERFACE(KFCKohakuTabObserver, kKFCKohakuTabObserverImpl)
 

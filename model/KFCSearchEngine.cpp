@@ -98,6 +98,7 @@
 #include "KFCModelTypes.h"		// kKFCQRCodeSearchMode
 #include "KFCTableSearch.h"		// the Table tab's walk and its conditions
 #include "KFCRubySearch.h"		// the Ruby tab's
+#include "KFCRubyListFile.h"	// ...and a ruby list's file, read before a search
 #include "KFCKentenSearch.h"	// the Kenten kind's
 #include "KFCTextCut.h"			// KFCSafeCut - where a row's line may be cut (the rule the panel's own cuts follow)
 #include "KFCFindChangeCmds.h"	// the find/change settings' commands, one at a time
@@ -3671,7 +3672,9 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 		AppendNothingToFind(outSummary, tab);
 		return 0;
 	}
-	// THE RUBY TAB'S ONE QUERY THAT NEEDS WORDS: the text with no ruby on it (the ruby tab spec's R3). What a search again asks is its list's - that list had them.
+	// THE RUBY TAB'S QUERIES THAT NEED WORDS: the text with no ruby on it (the ruby tab spec's R3), and a ruby list's file, read now - a list with a wrong line looks for nothing (KFCRubyListFile.h). What a search again asks is its
+	// list's - that list had them.
+	std::shared_ptr<const KFCRubyList::Words> rubyListWords;
 	if (rubyTab && (again == nil || again->freshQuery))
 	{
 		KFCRubyConditions asking;
@@ -3680,6 +3683,16 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 		{
 			outSummary.Append("Text Without Ruby looks for a text: type it in Base Text on the Kohaku+ tab in Edit > Find/Change.");
 			return 0;
+		}
+		if (asking.kind == kKFCRubyFindList)
+		{
+			int32 listCount = 0;
+			PMString listWhy;
+			if (!KFCRubyListFile::Load(asking.listPath, rubyListWords, listCount, listWhy))
+			{
+				outSummary.Append(listWhy);
+				return 0;
+			}
 		}
 	}
 
@@ -3942,9 +3955,14 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 			rubyAsked.kind = againCopy->rubyKind;
 			rubyAsked.base = againCopy->rubyBase;
 			rubyAsked.reading = againCopy->rubyReading;
+			rubyAsked.listPath = againCopy->rubyListPath;
+			rubyAsked.listWords = againCopy->rubyList;
 		}
 		else
+		{
 			(void)KFCRubySearch::IsTabCurrent(&rubyAsked);
+			rubyAsked.listWords = rubyListWords;
+		}
 	}
 	KFCKentenConditions kentenAsked;
 	if (kentenTab)
@@ -3966,7 +3984,11 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 		else if (tableTab)
 			KFCQueryCopier::CaptureTables(copy, tableFindStyle, tableOverridesOnly);
 		else if (rubyTab)
+		{
 			KFCQueryCopier::CaptureRuby(copy, rubyAsked.kind, rubyAsked.base, rubyAsked.reading);
+			copy.rubyListPath = rubyAsked.listPath;
+			copy.rubyList = rubyAsked.listWords;
+		}
 		else if (kentenTab)
 			KFCQueryCopier::CaptureKenten(copy, kentenAsked.kind, kentenAsked.base, kentenAsked.mark);
 		else
@@ -4075,6 +4097,13 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	PMString chapterNotes;
 	chapterNotes.SetTranslatable(kFalse);
 	AppendObjectTextNotes(chapterNotes, tally, again != nil && again->inTables);			// Search Text in These Objects' objects with no text, and gone
+	// WHAT A RUBY LIST LEFT (it gives readings to text with none): said - with rows or with none, when "No matches" would say its words are not in the document at all.
+	if (rubyTab && tally.hadRuby > 0)
+	{
+		chapterNotes.Append(" ");
+		chapterNotes.AppendNumber(tally.hadRuby);
+		chapterNotes.Append(" already had ruby and are not listed.");
+	}
 	if (inObjects)
 		for (size_t k = 0; k < again->notOpen.size(); ++k)
 		{
@@ -4215,6 +4244,10 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 		outSummary.Append(" Click a row to go to its QR code.");
 	else if (tableTab)
 		outSummary.Append(" Click a row to go to its table. Replace gives it the Kohaku+ tab's Change side.");
+	else if (rubyTab && rubyAsked.kind == kKFCRubyFindMarks)
+		outSummary.Append(" Click a row to go to its text. Replace puts its reading on its base and takes the marks out.");	// (the Change side is grey there)
+	else if (rubyTab && rubyAsked.kind == kKFCRubyFindList)
+		outSummary.Append(" Click a row to go to its text. Replace gives it the reading over it, from the list.");
 	else if (rubyTab || kentenTab)
 		outSummary.Append(" Click a row to go to its text. Replace gives it the Kohaku+ tab's Change side.");
 	else
@@ -5628,6 +5661,8 @@ bool KFCSearchEngine::SearchDocumentAgain(int32 chapterIdx, PMString& outStatus)
 				listAsked.kind = asked->rubyKind;
 				listAsked.base = asked->rubyBase;
 				listAsked.reading = asked->rubyReading;
+				listAsked.listPath = asked->rubyListPath;
+				listAsked.listWords = asked->rubyList;
 			}
 			walked = KFCRubySearch::WalkOneDocument(docRef, name, limit, listAsked, hits, storyVersions, capped, cancelled);
 		}

@@ -704,6 +704,15 @@ namespace
 				label.Append(asked.base);
 				label.Append(" (no ruby)");
 			}
+			else if (asked.kind == kKFCRubyFindList)
+			{
+				// THE FILE'S NAME: what was asked (the list's words are its rows).
+				PMString listName;
+				FileUtils::GetFileName(FileUtils::PMStringToSysFile(asked.listPath), listName);
+				listName.SetTranslatable(kFalse);
+				label.Append("[Ruby List] ");
+				label.Append(listName);
+			}
 			else if (asked.base.IsEmpty() && asked.reading.IsEmpty())
 				label.Append((asked.kind == kKFCRubyFindMarks) ? "[Ruby Marks]" : "[Any Ruby]");
 			else

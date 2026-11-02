@@ -42,6 +42,9 @@
 #include "IKFCUIServices.h"				// the tab itself is the UI half's
 #include "KFCDiag.h"
 #include "KFCProgressBar.h"				// KFCSetCountedTask too - the bar's line
+#include "KFCRubyList.h"				// a ruby list's words
+#include "KFCRubyListFile.h"			// ...read from its file
+#include "KFCRubyMarkText.h"			// the marks a manuscript writes
 #include "KFCTextCut.h"					// KFCSafeCut
 
 namespace
@@ -160,69 +163,11 @@ void AppendCut(PMString& ioWords, const PMString& stretch, int32 most)
 	ioWords.Append(shown);
 }
 
-// ----- THE MARKS OF A MANUSCRIPT (the spec's R12). U+FF5C or U+007C the bar, U+300A and U+300B the reading's marks, as Aozora Bunko writes ruby.
-const char32_t kMarkOpen = 0x300A;
-const char32_t kMarkClose = 0x300B;
-
-bool IsBar(char32_t c)
-{
-	return c == 0xFF5C || c == 0x007C;
-}
-
-// What Aozora Bunko's rule takes for a base with no bar: the kanji just before the reading.
-bool IsKanji(char32_t c)
-{
-	return (c >= 0x3400 && c <= 0x9FFF) || (c >= 0xF900 && c <= 0xFAFF) || (c >= 0x20000 && c <= 0x2FFFF)
-		|| c == 0x3005 || c == 0x3006 || c == 0x3007 || c == 0x30F6;
-}
-
-// No mark runs over these: a paragraph's end, a table's or an anchor's character, anything of InDesign's in the text.
-bool StopsMark(char32_t c)
-{
-	return c < 0x20 || c == 0xFEFF || (c >= 0xE000 && c <= 0xF8FF);
-}
-
-struct MarkPlace
-{
-	size_t	first;		// the bar, or the base when there is none
-	size_t	baseStart;
-	size_t	open;		// the opening mark; the base ends here
-	size_t	close;		// the closing mark
-};
-
-// THE MARK WHOSE READING OPENS AT `open`, if it is one: a reading of something, closed before the line ends, after a base - the text from a bar since the last mark (the bar's reach, in
-// Aozora Bunko's rule), or else the kanji just before it.
-bool MarkAtOpen(const std::u32string& text, size_t open, MarkPlace& out)
-{
-	size_t close = open + 1;
-	while (close < text.size() && text[close] != kMarkClose && text[close] != kMarkOpen && !StopsMark(text[close]))
-		++close;
-	if (close >= text.size() || text[close] != kMarkClose || close == open + 1)
-		return false;
-	size_t back = open;
-	while (back > 0 && !IsBar(text[back - 1]) && text[back - 1] != kMarkClose && text[back - 1] != kMarkOpen && !StopsMark(text[back - 1]))
-		--back;
-	if (back > 0 && IsBar(text[back - 1]))
-	{
-		if (back == open)
-			return false;		// a bar and no base
-		out.first = back - 1;
-		out.baseStart = back;
-	}
-	else
-	{
-		size_t kanji = open;
-		while (kanji > 0 && IsKanji(text[kanji - 1]))
-			--kanji;
-		if (kanji == open)
-			return false;		// not the base of anything
-		out.first = kanji;
-		out.baseStart = kanji;
-	}
-	out.open = open;
-	out.close = close;
-	return true;
-}
+// ----- THE MARKS OF A MANUSCRIPT (the spec's R12): KFCRubyMarkText.h.
+using KFCRubyMarkText::kMarkOpen;
+using KFCRubyMarkText::kMarkClose;
+using KFCRubyMarkText::MarkPlace;
+using KFCRubyMarkText::MarkAtOpen;
 
 std::u32string U32Of(const PMString& words)
 {
@@ -308,16 +253,52 @@ void WalkWithRuby(const UIDRef& storyRef, ITextModel* model, const KFCRubyCondit
 		ioPlaces.push_back(place);
 		return true;
 	};
-	if (wantedBase.empty())
+	if (wantedBase.empty() && wantedReading.empty())
 	{
 		for (size_t r = 0; r < runs.size(); ++r)
 		{
 			if (part != nil && !KFCSearchEngine::StretchesTouch(*part, storyRef.GetUID(), runs[r].start, runs[r].end))
 				continue;
-			if (KFCRubyChangePlan::Compact(U32Of(Plain(runs[r].reading))).find(wantedReading) == std::u32string::npos)
-				continue;
 			if (!addRow(runs[r].start, runs[r].end))
 				return;
+		}
+		return;
+	}
+	// RUBY: WITH NO BASE TEXT: the readings of the rubies that stand touching, read together - characters given their readings one by one (the Change boxes' way) are found by the word's whole reading, as a search with a Base Text finds them
+	// and as a group ruby's is (the spec's F22 - measured by reading the code, 11-02: Ruby: and every box's word run together found no such text). A row is the rubies the reading stands on.
+	if (wantedBase.empty())
+	{
+		size_t r = 0;
+		while (r < runs.size())
+		{
+			size_t groupEnd = r + 1;
+			while (groupEnd < runs.size() && runs[groupEnd].start == runs[groupEnd - 1].end)
+				++groupEnd;
+			std::u32string chain;
+			std::vector<size_t> runOfChar;
+			for (size_t g = r; g < groupEnd; ++g)
+			{
+				const std::u32string one(KFCRubyChangePlan::Compact(U32Of(Plain(runs[g].reading))));
+				chain += one;
+				runOfChar.insert(runOfChar.end(), one.size(), g);
+			}
+			size_t at = chain.find(wantedReading);
+			while (at != std::u32string::npos)
+			{
+				const size_t firstRun = runOfChar[at];
+				const size_t lastRun = runOfChar[at + wantedReading.size() - 1];
+				if (part == nil || KFCSearchEngine::StretchesTouch(*part, storyRef.GetUID(), runs[firstRun].start, runs[lastRun].end))
+				{
+					if (!addRow(runs[firstRun].start, runs[lastRun].end))
+						return;
+				}
+				// (On from the ruby after it: a ruby is in one row, however often its reading holds the words.)
+				size_t next = at + wantedReading.size();
+				while (next < chain.size() && runOfChar[next] == lastRun)
+					++next;
+				at = chain.find(wantedReading, next);
+			}
+			r = groupEnd;
 		}
 		return;
 	}
@@ -399,11 +380,82 @@ void WalkWithoutRuby(const UIDRef& storyRef, ITextModel* model, const KFCRubyCon
 	}
 }
 
+// THE WORDS OF A RUBY LIST IN ONE STORY (KFCRubyList.h): the longest at each place, left to right, each a row - but one a ruby stands on already: that is counted (ioHadRuby) and left, whatever it reads, for a list
+// gives readings to text that has none. (A row whose ruby differs is Text With Ruby's to find, and its Replace's to write.) An occurrence a selection cuts is not found, as a text search finds none.
+void WalkList(const UIDRef& storyRef, ITextModel* model, const KFCRubyList::Words& words, const std::vector<KFCSearchEngine::ListedPlace>* part, size_t limit,
+	std::vector<KFCSearchEngine::ListedPlace>& ioPlaces, bool& outCapped, int32& ioHadRuby)
+{
+	const TextIndex total = model->TotalLength();
+	const std::u32string text(U32Of(KFCSearchEngine::ReadText(storyRef, 0, total)));
+	if (static_cast<int32>(text.size()) != total)
+		return;		// (a reading of another length has not told each position's character)
+	InterfacePtr<IRubyAttrStrand> strand(static_cast<IRubyAttrStrand*>(model->QueryStrand(kRubyAttrStrandBoss, IRubyAttrStrand::kDefaultIID)));
+	InterfacePtr<IComposeScanner> scanner(model, UseDefaultIID());
+	size_t at = 0;
+	while (at < text.size())
+	{
+		const KFCRubyList::Entry* const entry = KFCRubyList::LongestAt(words, text, at);
+		if (entry == nullptr)
+		{
+			++at;
+			continue;
+		}
+		const TextIndex start = static_cast<TextIndex>(at);
+		const TextIndex end = start + static_cast<int32>(entry->word.size());
+		at += entry->word.size();
+		if (StandsInSetAsideText(model, start))
+			continue;
+		if (part != nil && !KFCSearchEngine::StretchesHold(*part, storyRef.GetUID(), start, end))
+			continue;
+		if (strand != nil && scanner != nil)
+		{
+			std::vector<RubyRun> on;
+			RunsIn(strand, scanner, start, end, on);
+			if (!on.empty())
+			{
+				++ioHadRuby;
+				continue;
+			}
+		}
+		if (ioPlaces.size() >= limit)
+		{
+			outCapped = true;
+			return;
+		}
+		KFCSearchEngine::ListedPlace place;
+		place.story = storyRef.GetUID();
+		place.start = start;
+		place.end = end;
+		ioPlaces.push_back(place);
+	}
+}
+
+// What the row's words say and what stands over it, given the rubies on it (those it has, or those a list will give it).
+PMString WordsOver(const UIDRef& story, TextIndex start, TextIndex end, const std::vector<RubyRun>& on);
+KFCRowUpper UpperOver(TextIndex start, const std::vector<RubyRun>& on);
+
+// The rubies a list's word will write, as a stretch of the story reads them.
+std::vector<RubyRun> RunsOfPlan(TextIndex start, const std::vector<KFCRubyChangePlan::Run>& plan)
+{
+	std::vector<RubyRun> out;
+	for (size_t r = 0; r < plan.size(); ++r)
+	{
+		RubyRun run;
+		run.start = start + static_cast<TextIndex>(plan[r].start);
+		run.end = run.start + static_cast<int32>(plan[r].length);
+		run.reading = WideOf(plan[r].reading);
+		out.push_back(run);
+	}
+	return out;
+}
+
 // ONE DOCUMENT'S ROWS - of its searched part alone, given one. False = no story list to walk.
 bool WalkDoc(const UIDRef& docRef, const KFCRubyConditions& asked, const std::vector<KFCSearchEngine::ListedPlace>* part, size_t limit, std::vector<KFCResultModel::Hit>& outHits,
-	std::map<UID, uint32>& outVersions, bool& outCapped)
+	std::map<UID, uint32>& outVersions, bool& outCapped, int32& ioHadRuby)
 {
 	outCapped = false;
+	if (asked.kind == kKFCRubyFindList && asked.listWords == nullptr)
+		return false;		// (a list read before any walk: KFCSearchEngine's door, a run's WriteDocument)
 	IDataBase* const db = docRef.GetDataBase();
 	InterfacePtr<IStoryList> stories(db, (db != nil) ? db->GetRootUID() : kInvalidUID, UseDefaultIID());
 	if (stories == nil)
@@ -422,6 +474,8 @@ bool WalkDoc(const UIDRef& docRef, const KFCRubyConditions& asked, const std::ve
 			WalkWithoutRuby(storyRef, model, asked, part, limit, places, outCapped);
 		else if (asked.kind == kKFCRubyFindMarks)
 			WalkMarks(storyRef, model, asked, part, limit, places, outCapped);
+		else if (asked.kind == kKFCRubyFindList)
+			WalkList(storyRef, model, *asked.listWords, part, limit, places, outCapped, ioHadRuby);
 		else
 			WalkWithRuby(storyRef, model, asked, part, limit, places, outCapped);
 	}
@@ -433,6 +487,19 @@ bool WalkDoc(const UIDRef& docRef, const KFCRubyConditions& asked, const std::ve
 		outHits[h].runChain = KFCRubySearch::RowWords(storyRef, places[h].start, places[h].end);
 		outHits[h].runChain.SetTranslatable(kFalse);
 		outHits[h].upper = KFCRubySearch::UpperOn(storyRef, places[h].start, places[h].end);
+	}
+	// A LIST'S ROWS DRAW WHAT THEIR REPLACE WILL GIVE THEM, faint: what the person reads the list for, before a row is written.
+	for (size_t h = 0; asked.kind == kKFCRubyFindList && h < outHits.size() && h < places.size(); ++h)
+	{
+		const UIDRef storyRef(db, places[h].story);
+		const KFCRubyList::Entry* const entry = KFCRubyList::FindWord(*asked.listWords, U32Of(KFCSearchEngine::ReadText(storyRef, places[h].start, places[h].end - places[h].start)));
+		if (entry == nullptr)
+			continue;
+		const std::vector<RubyRun> planned(RunsOfPlan(places[h].start, entry->runs));
+		outHits[h].runChain = WordsOver(storyRef, places[h].start, places[h].end, planned);
+		outHits[h].runChain.SetTranslatable(kFalse);
+		outHits[h].upper = UpperOver(places[h].start, planned);
+		outHits[h].upper.planned = true;
 	}
 	return true;
 }
@@ -480,6 +547,10 @@ bool KFCRubySearch::IsTabCurrent(KFCRubyConditions* outConditions)
 				conditions.kind = kKFCRubyFindWithout;
 			else if (line == "kind=marks")
 				conditions.kind = kKFCRubyFindMarks;
+			else if (line == "kind=list")
+				conditions.kind = kKFCRubyFindList;
+			else if (line.compare(0, 5, "list=") == 0)
+				conditions.listPath = value;
 			else if (line.compare(0, 5, "base=") == 0)
 				conditions.base = value;
 			else if (line.compare(0, 5, "ruby=") == 0)
@@ -561,7 +632,7 @@ void KFCRubySearch::CollectTargets(std::vector<KFCBookScope::ChapterDoc>& target
 		std::vector<KFCResultModel::Hit> hits;
 		std::map<UID, uint32> versions;
 		bool capped = false;
-		const bool walked = WalkDoc(docRef, asked, part, limit - static_cast<size_t>(out.total), hits, versions, capped);
+		const bool walked = WalkDoc(docRef, asked, part, limit - static_cast<size_t>(out.total), hits, versions, capped, out.hadRuby);
 		// A book's chapter goes back now, closed on the spot (one chapter of ours at a time - the other walks' rule).
 		if (fromBook && !KFCBookScope::HandBackHeldDocNow(docRef))
 			out.unclosed.push_back(targets[i].shortName);
@@ -597,7 +668,8 @@ bool KFCRubySearch::WalkOneDocument(const UIDRef& docRef, const PMString& name, 
 	bar.DisableChildProgressBars(kTrue);
 	KFCSetCountedTask(bar, "Document", 0, 1, name);
 	bar.SetPosition(0);
-	const bool walked = WalkDoc(docRef, asked, nil, limit, outHits, outVersions, outCapped);
+	int32 hadRuby = 0;
+	const bool walked = WalkDoc(docRef, asked, nil, limit, outHits, outVersions, outCapped, hadRuby);
 	outCancelled = walked && bar.WasCancelled(kFalse);
 	bar.SetPosition(kRubyDocSpan);
 	return walked && !outCancelled;
@@ -609,11 +681,21 @@ bool KFCRubySearch::WriteDocument(const UIDRef& docRef, const KFCRubyConditions&
 	std::vector<KFCResultModel::Hit> hits;
 	std::map<UID, uint32> versions;
 	bool capped = false;
-	if (!WalkDoc(docRef, asked, part, static_cast<size_t>(kMaxInt32), hits, versions, capped))
+	int32 hadRuby = 0;
+	KFCRubyConditions conditions(asked);
+	if (asked.kind == kKFCRubyFindList && conditions.listWords == nullptr)
+	{
+		// (A run hands it read, and turned the query away if it could not be - KFCQuerySequence. Anyone else's reads it here; one that cannot be read writes nothing.)
+		int32 words = 0;
+		PMString why;
+		if (!KFCRubyListFile::Load(asked.listPath, conditions.listWords, words, why))
+			return true;
+	}
+	if (!WalkDoc(docRef, conditions, part, static_cast<size_t>(kMaxInt32), hits, versions, capped, hadRuby))
 		return false;
 	IDataBase* const db = docRef.GetDataBase();
 	const std::vector<KFCRubyChangePlan::Piece> pieces(PlanPieces(asked));
-	if (asked.kind != kKFCRubyFindMarks && KFCRubyChangePlan::Check(pieces) == KFCRubyChangePlan::kReadingOverNoBase)
+	if (asked.kind != kKFCRubyFindMarks && asked.kind != kKFCRubyFindList && KFCRubyChangePlan::Check(pieces) == KFCRubyChangePlan::kReadingOverNoBase)
 		return true;		// no row could take it (a row's Replace says so; a run writes on)
 	// FROM THE LAST TO THE FIRST: a mark's write takes characters out, and the places before it stand (each story's places are in its order).
 	for (size_t h = hits.size(); h > 0; --h)
@@ -627,6 +709,14 @@ bool KFCRubySearch::WriteDocument(const UIDRef& docRef, const KFCRubyConditions&
 			int32 baseLength = 0;
 			bool stillThere = false;
 			if (WriteMark(story, hit.textStart, hit.textEnd - hit.textStart, baseLength, stillThere) != kSuccess)
+				return false;
+		}
+		else if (asked.kind == kKFCRubyFindList)
+		{
+			std::vector<KFCRubyChangePlan::Run> runs;
+			if (!ListPlanForRow(*conditions.listWords, story, hit.textStart, hit.textEnd, runs) || ReadsAsPlanned(story, hit.textStart, hit.textEnd, runs))
+				continue;
+			if (WritePlan(story, hit.textStart, hit.textEnd, runs) != kSuccess)
 				return false;
 		}
 		else
@@ -673,6 +763,16 @@ KFCRubyChangePlan::Result KFCRubySearch::PlanForRow(const UIDRef& story, TextInd
 	return KFCRubyChangePlan::Make(pieces, U32Of(KFCSearchEngine::ReadText(story, start, end - start)), outRuns);
 }
 
+bool KFCRubySearch::ListPlanForRow(const KFCRubyList::Words& words, const UIDRef& story, TextIndex start, TextIndex end, std::vector<KFCRubyChangePlan::Run>& outRuns)
+{
+	outRuns.clear();
+	const KFCRubyList::Entry* const entry = KFCRubyList::FindWord(words, U32Of(KFCSearchEngine::ReadText(story, start, end - start)));
+	if (entry == nullptr)
+		return false;
+	outRuns = entry->runs;
+	return true;
+}
+
 bool KFCRubySearch::ReadsAsPlanned(const UIDRef& story, TextIndex start, TextIndex end, const std::vector<KFCRubyChangePlan::Run>& runs)
 {
 	std::vector<RubyRun> on;
@@ -712,9 +812,16 @@ ErrorCode KFCRubySearch::WritePlan(const UIDRef& story, TextIndex start, TextInd
 
 KFCRowUpper KFCRubySearch::UpperOn(const UIDRef& story, TextIndex start, TextIndex end)
 {
-	KFCRowUpper upper;
 	std::vector<RubyRun> on;
 	RunsOn(story, start, end, on);
+	return UpperOver(start, on);
+}
+
+namespace
+{
+KFCRowUpper UpperOver(TextIndex start, const std::vector<RubyRun>& on)
+{
+	KFCRowUpper upper;
 	for (size_t r = 0; r < on.size(); ++r)
 	{
 		const int32 length = on[r].end - on[r].start;
@@ -741,6 +848,7 @@ KFCRowUpper KFCRubySearch::UpperOn(const UIDRef& story, TextIndex start, TextInd
 	}
 	return upper;
 }
+}	// anonymous namespace
 
 bool KFCRubySearch::HasRubyOn(const UIDRef& story, TextIndex start, TextIndex end)
 {
@@ -753,6 +861,13 @@ PMString KFCRubySearch::RowWords(const UIDRef& story, TextIndex start, TextIndex
 {
 	std::vector<RubyRun> on;
 	RunsOn(story, start, end, on);
+	return WordsOver(story, start, end, on);
+}
+
+namespace
+{
+PMString WordsOver(const UIDRef& story, TextIndex start, TextIndex end, const std::vector<RubyRun>& on)
+{
 	PMString words;
 	words.SetTranslatable(kFalse);
 	if (on.empty())
@@ -772,6 +887,7 @@ PMString KFCRubySearch::RowWords(const UIDRef& story, TextIndex start, TextIndex
 		AppendCut(words, KFCSearchEngine::ReadText(story, at, end - at), kRowWordsBase);
 	return words;
 }
+}	// anonymous namespace
 
 ErrorCode KFCRubySearch::Apply(const UIDRef& story, TextIndex start, TextIndex end, const WideString& reading)
 {

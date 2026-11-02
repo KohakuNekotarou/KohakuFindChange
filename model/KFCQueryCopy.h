@@ -30,7 +30,10 @@
 #include "UIDRef.h"				// UID
 #include "AttributeBossList.h"	// the format lists, and boost::shared_ptr with them
 
+#include <memory>				// a ruby list's words
+
 class IDataBase;
+namespace KFCRubyList { struct Words; }
 
 struct KFCQueryCopy
 {
@@ -83,6 +86,8 @@ struct KFCQueryCopy
 	int32		rubyKind;				// kKFCRubyFindWith ... (KFCModelTypes.h)
 	PMString	rubyBase;
 	PMString	rubyReading;
+	PMString	rubyListPath;			// kKFCRubyFindList: its file
+	std::shared_ptr<const KFCRubyList::Words>	rubyList;	// ...and its words as the list found them: its rows write these and its searches again look for these, whatever the file says by then
 	// A KENTEN LIST'S (CaptureKenten): the same.
 	int32		kentenKind;				// kKFCKentenFindWith ... (KFCModelTypes.h)
 	PMString	kentenBase;

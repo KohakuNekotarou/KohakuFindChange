@@ -43,6 +43,93 @@ namespace
 // name's one definition, so a rename moves it too; wide, as the reference text is (the "L" on the first piece makes the
 // whole concatenation wide).
 const wchar_t* const kHowToTitle = L"" kKFCDisplayName " - How to Use";
+// The Ruby part's own page (ShowRubyMarks).
+const wchar_t* const kRubyMarksTitle = L"" kKFCDisplayName " - ルビの書き方";
+
+const wchar_t* const kRubyMarksJA =
+	L"【ルビの書き方】\n"
+	L"Look For の Ruby Marks in Text（原稿に書かれた印）と Words in a Ruby List（ルビのリストのファイル）は、同じ書き方を読みます。\n"
+	L"\n"
+	L"　親文字《読み》\n"
+	L"\n"
+	L"読みは二重山括弧《 》で親文字の直後に書きます。親文字の範囲は次のように決まります。\n"
+	L"\n"
+	L"【｜が要らないとき】\n"
+	L"《の直前に続く漢字が親文字になります（々 〆 〇 ヶ も漢字として扱います）。\n"
+	L"　漢字《かんじ》　　　　「漢字」に1本（グループルビ）\n"
+	L"　漢《かん》字《じ》　　「漢」と「字」に別々（モノルビ）\n"
+	L"　食《た》べ物《もの》　「食」と「物」に別々（「べ」には付かない）\n"
+	L"\n"
+	L"【｜が要るとき】\n"
+	L"｜は親文字の始まりを示します。全角の｜でも半角の | でもかまいません。\n"
+	L"・親文字にかなや記号が混ざるとき\n"
+	L"　｜食べ物《たべもの》　3字全体に1本\n"
+	L"・漢字の連なりの途中から親文字にしたいとき\n"
+	L"　小｜太郎《たろう》　　「太郎」にだけ1本（「小」には付かない）\n"
+	L"\n"
+	L"【モノルビかグループルビか】\n"
+	L"親文字の字数で決まります。2字以上はグループルビ、1字はモノルビです。｜の有無とは関係ありません。\n"
+	L"\n"
+	L"【印にならないもの】\n"
+	L"・読みが空のもの　漢字《》\n"
+	L"・行をまたぐもの\n"
+	L"・親文字が無いもの　｜《よみ》\n"
+	L"・｜が無く、《の直前が漢字でないもの　かな《かな》\n"
+	L"\n"
+	L"【Ruby Marks in Text（原稿の印をルビにする）】\n"
+	L"Find in … で印を一覧にします。この時点では文書は変わりません。行の Replace で、親文字にルビを付けて印を文字から消します。一緒に置換した行は Ctrl+Z 1回で戻ります。Track Changes が入っている物語では、消した印が残るので置換しません。\n"
+	L"\n"
+	L"【Words in a Ruby List（リストのファイルから付ける）】\n"
+	L"すでにある文字に、ファイルに書いた読みをまとめて付けます。Choose List... でファイルを選びます。\n"
+	L"\n"
+	L"　太《た》郎《ろう》\n"
+	L"　太《ふと》る\n"
+	L"　琥《こ》珀《はく》\n"
+	L"　猫《ねこ》\n"
+	L"\n"
+	L"・1行に1語です。印を除いた字（太郎、太る）を本文から探し、印の付いた字にだけルビを付けます。太《ふと》る は「太る」を探して「太」にだけ付けます。「る」は探すための字です。\n"
+	L"・ファイルでは《 》の代わりに ＜＜ ＞＞、<< >>、≪ ≫ でも書けます。\n"
+	L"・長い語から先に当てます。太《ふと》 と 太《た》郎《ろう》 の両方があれば、「太郎」は「たろう」です。ファイルの順番は関係ありません。\n"
+	L"・同じ語に2つの読みは書けません。前後の字を含めて書き分けます（行《い》く、行《こ》う）。\n"
+	L"・空の行と、# で始まる行は読み飛ばします。CSV やタブ区切りは1列目だけを読みます。文字コードは UTF-8、UTF-16、Shift_JIS です。\n"
+	L"・読めない行があるとファイル全体を使わず、最初の行の番号を言います。\n"
+	L"・Find in … は、語の出現を全部一覧にし、付く読みを行の上に薄く出します。すでにルビのある箇所は一覧に出さず、数だけ言います。\n"
+	L"・行の Replace で付けます。一緒に置換した行は Ctrl+Z 1回で戻ります。行は一覧を作ったときの読みで書きます。ファイルを直したら Find in … をやり直してください。\n"
+	L"・語の一部に当たることがあります（「太郎」は「小太郎」にも当たります）。「小太郎」の行を足すか、その行を選ばずに Replace してください。\n";
+
+// The Kenten part's own page (ShowKenten).
+const wchar_t* const kKentenTitle = L"" kKFCDisplayName " - 圏点の探し方と付け方";
+
+const wchar_t* const kKentenJA =
+	L"【圏点の探し方と付け方】\n"
+	L"Find: Kenten は、圏点の付いた文字を探し、圏点の種類を変えたり外したりします。\n"
+	L"Find in … で一覧にします。この時点では文書は変わりません。行の Replace で書きます。\n"
+	L"\n"
+	L"【Look For】\n"
+	L"・Text With Kenten　圏点の付いた文字を探します。同じ種類の圏点が続く範囲が1行になります。文字スタイルや段落スタイルの圏点も探します。段落の終わりで行が分かれます。\n"
+	L"・Text Without Kenten　Base Text の文字のうち、圏点が付いていない箇所を探します。Base Text が空のときは探せません。\n"
+	L"\n"
+	L"【Base Text】\n"
+	L"Text With Kenten では、入れた文字を含む行だけを出します。空なら全部です。\n"
+	L"\n"
+	L"【Kenten】\n"
+	L"探す圏点の種類です。[Any Kenten] はどの種類でも探します。右に選んだ印の見本が出ます。Text Without Kenten では使いません。\n"
+	L"\n"
+	L"【Change Kenten To】\n"
+	L"行の Replace で付ける圏点の種類です。右に選んだ印の見本が出ます。[Leave As It Is] なら種類を変えません。\n"
+	L"種類だけを書きます。圏点の大きさ・位置・色などの設定は変えません。\n"
+	L"\n"
+	L"【Remove Kenten】\n"
+	L"入れると、行の Replace で圏点を外します。Change Kenten To より優先します。\n"
+	L"圏点に関する設定（大きさ・フォント・色なども）を全部外し、本文に残しません。文字スタイルや段落スタイルの圏点は、スタイルを変えず、その文字の上で「なし」にします。\n"
+	L"\n"
+	L"【Replace】\n"
+	L"行の右クリックメニューの Replace か、Return で書きます。書くのはその時のタブの設定です。\n"
+	L"一緒に置換した行は Ctrl+Z 1回で戻ります。\n"
+	L"Change Kenten To が [Leave As It Is] で Remove Kenten も入っていないときや、すでにその種類のときは、書かずにメッセージで言います。\n"
+	L"\n"
+	L"【一覧の見方】\n"
+	L"行は2段です。下の段が親文字、上の段が文字ごとの印です。圏点を外した行は、上の段に棒が出ます。\n";
 
 //========================================================================================
 // The reference text, one wide literal per language
@@ -81,6 +168,8 @@ const wchar_t* const kHowToEN =
 	L"- Replace on a row gives it what the tab's Change Ruby To boxes hold, as they stand then - or, with no reading in them, takes its ruby off. One Ctrl+Z takes back the rows replaced together.\n"
 	L"- Ruby and Base Text are rows of boxes, a Base Text box holding one character; + and - add and take away boxes. Change Ruby To's boxes follow them, with the Base Text shown under each. A reading goes on the base text under it. The chain between two boxes joins them, on both sides: one reading over all their base text (group ruby). A row whose text is not what the base boxes hold is left, and said; clear those boxes to give the reading to the whole row.\n"
 	L"- Ruby Marks in Text lists ruby a manuscript wrote out, as \uFF5C\u6F22\u5B57\u300A\u304B\u3093\u3058\u300B or \u6F22\u5B57\u300A\u304B\u3093\u3058\u300B (with no bar, the kanji just before it). Replace on its row puts the reading on the base and takes the marks out.\n"
+	L"- Words in a Ruby List reads a file chosen with Choose List...: a word a line, written as those marks. It lists each occurrence of a word that has no ruby, the reading it will get faint over it (the longest word at a place wins), and Replace on a row writes it.\n"
+	L"- How to Use..., left of Done on the tab, says how the marks are written (in Japanese).\n"
 	L"\n"
 	L"[Finding and setting kenten (Find: Kenten - a Japanese InDesign)]\n"
 	L"- Find in ... lists the text with emphasis marks (Base Text: what its text contains; Kenten: the kind), or, with Text Without Kenten, each occurrence of Base Text that has none.\n"
@@ -156,10 +245,13 @@ const wchar_t* const kHowToJA =
 	L"・行の Replace で、その箇所にタブの Change Ruby To の欄のルビを付けます。読みの欄が全部空ならルビを外します（どちらもその時の設定）。一緒に置換した行は Ctrl+Z 1回で戻ります。\n"
 	L"・Ruby と Base Text は欄の並びで（Base Text の欄は1字ずつ）、＋と−で欄を増減できます（探すときは欄をつないだ字で比べます）。Change Ruby To の欄はこれに連動し、その下に Base Text の字が出ます。読みは、その下の親文字に付きます。欄の間の鎖を押すと両方の欄がつながり、1つの読みを下の親文字全部に付けます（グループルビ）。行の文字が親文字の欄と違う行は書かずにメッセージで言います（親文字の欄を空にすると、行の文字全部に読みを付けます）。\n"
 	L"・Ruby Marks in Text は、原稿に書かれたルビの印（｜漢字《かんじ》、｜が無ければ《の直前の漢字）を一覧にします。行の Replace で、親文字にそのルビを付けて印を消します。\n"
+	L"・Words in a Ruby List は、Choose List... で選んだファイル（1行1語・同じ印の書き方）の語を探します。ルビのない出現を全部一覧にし、付く読みを行の上に薄く出します（長い語が優先）。行の Replace で付けます。\n"
+	L"・タブの完了ボタンの左の How to Use... に印の書き方があります。\n"
 	L"\n"
 	L"【圏点で探す・圏点を付ける（Find: Kenten）】\n"
 	L"・Find in … で、圏点の付いた文字を一覧にします（Base Text は含まれる文字、Kenten は圏点の種類）。Text Without Kenten にすると、Base Text のうち圏点の付いていない箇所を一覧にします。\n"
 	L"・行の Replace で、その箇所にタブの Change Kenten To の圏点を付けます。Remove Kenten なら圏点を外します（どちらもその時の設定）。一緒に置換した行は Ctrl+Z 1回で戻ります。\n"
+	L"・タブの完了ボタンの左の How to Use... に欄の説明があります。\n"
 	L"\n"
 	L"【結果の見方】\n"
 	L"・右クリックメニュー\n"
@@ -236,6 +328,8 @@ void AppendJSEscaped(std::string& out, const wchar_t* text)
 
 } // anonymous namespace
 
+namespace { void ShowPage(const wchar_t* title, const wchar_t* text); }
+
 //========================================================================================
 // KFCHowTo::Show
 //========================================================================================
@@ -246,8 +340,23 @@ void KFCHowTo::Show()
 	// the UI language (the string tables are English in every UI language - model/KFC.fr's LocaleIndex note). What is
 	// asked is the UI LANGUAGE, not the featureset (PMLocaleId keeps them as separate axes - PMLocaleId.h:39-43): a
 	// Roman-engine install running a Japanese UI gets the Japanese page.
-	const wchar_t* const text = (LocaleSetting::GetLocale().GetUserInterfaceId() == k_jaJP) ? kHowToJA : kHowToEN;
+	ShowPage(kHowToTitle, (LocaleSetting::GetLocale().GetUserInterfaceId() == k_jaJP) ? kHowToJA : kHowToEN);
+}
 
+void KFCHowTo::ShowRubyMarks()
+{
+	ShowPage(kRubyMarksTitle, kRubyMarksJA);
+}
+
+void KFCHowTo::ShowKenten()
+{
+	ShowPage(kKentenTitle, kKentenJA);
+}
+
+namespace
+{
+void ShowPage(const wchar_t* title, const wchar_t* text)
+{
 	Utils<IExtendScriptUtils> esUtils;
 	if (esUtils.Exists())
 	{
@@ -258,7 +367,7 @@ void KFCHowTo::Show()
 		js.reserve(16384);
 		js += "(function () {\n"
 			  "  var w = new Window(\"dialog\", \"";
-		AppendJSEscaped(js, kHowToTitle);
+		AppendJSEscaped(js, title);
 		js += "\");\n"
 			  "  var t = w.add(\"edittext\", undefined, \"";
 		AppendJSEscaped(js, text);
@@ -292,10 +401,11 @@ void KFCHowTo::Show()
 	// wants (the plug-in is Windows-only).
 	PMString fallback;
 	fallback.SetTranslatable(kFalse);
-	fallback.AppendW(reinterpret_cast<const UTF16TextChar*>(kHowToTitle));
+	fallback.AppendW(reinterpret_cast<const UTF16TextChar*>(title));
 	fallback.Append("\n\n");
 	fallback.AppendW(reinterpret_cast<const UTF16TextChar*>(text));
 	CAlert::InformationAlert(fallback);
 }
+}	// anonymous namespace
 
 // End, KFCHowTo.cpp.

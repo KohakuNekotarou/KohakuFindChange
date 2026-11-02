@@ -41,6 +41,7 @@
 #include "KFCSearchEngine.h"
 #include "KFCTableSearch.h"			// IsTabCurrent - the Table tab, and what it asks
 #include "KFCRubySearch.h"			// IsTabCurrent - the Ruby tab, and what it asks
+#include "KFCRubyListFile.h"		// Load - what the Ruby part says of a ruby list
 #include "KFCKentenSearch.h"		// ...and the Kenten kind
 #include "KFCKohakuQuery.h"			// a saved query of the Kohaku+ tab
 #include "KFCTierStore.h"
@@ -204,6 +205,11 @@ public:
 	virtual bool TableNext(const KFCTableLook& look, KFCTableFound& out) { return KFCTableSearch::Next(look, out); }
 	virtual bool TableChangeFound(const KFCTableFound& found, PMString& outWords) { return KFCTableSearch::ChangeFound(found, outWords); }
 	virtual bool TableChangeAll(const KFCTableLook& look, int32& outChanged, int32& outMatched, PMString& outWords) { return KFCTableSearch::ChangeAll(look, outChanged, outMatched, outWords); }
+	virtual bool RubyListCheck(const PMString& path, int32& outWords, PMString& outWhy)
+	{
+		std::shared_ptr<const KFCRubyList::Words> words;
+		return KFCRubyListFile::Load(path, words, outWords, outWhy);
+	}
 };
 
 CREATE_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)

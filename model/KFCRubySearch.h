@@ -8,7 +8,8 @@
 //  beside the story (IRubyAttrStrand) and InDesign's Find/Change has no condition for it, nor a change format for its reading. While KFC's own tab in
 //  Edit > Find/Change - "Ruby" - is the tab Find/Change is on (IsTabCurrent), the panel's Find lists the text with ruby (its base and its reading each "contains"), or
 //  the occurrences of a text without ruby, or - Ruby Marks in Text - ruby a manuscript wrote out: a bar, a base, and its reading in book title marks, as Aozora Bunko writes it (the bar
-//  full-width or ASCII; with none, the kanji just before the reading). A row is a TEXT row on the ruby's run (on the mark); what it draws there is the base and the reading
+//  full-width or ASCII; with none, the kanji just before the reading - KFCRubyMarkText.h), or - Words in a Ruby List - the words of a file, each with the readings its line gives it (KFCRubyList.h).
+//  A row is a TEXT row on the ruby's run (on the mark); what it draws there is the base and the reading
 //  (Hit::runChain - "base<reading>"; a mark's row draws its text - Hit::upper the reading above it).
 //  Its Replace gives the row what the tab's Change boxes say (KFCRubyChangePlan.h - WritePlan), and takes its ruby off when they read nothing (Remove below - KFCReplaceEngine's own-tab rows). A reading a
 //  person cannot see is no ruby: a footnote's marker inherits one. Text a condition hides is not searched. No setting of Find/Change's is read or touched. The main thread only.
@@ -44,6 +45,9 @@ namespace KFCRubySearch
 
 	/** What the boxes write over [start, end) of the story: the plan's answer, runs by code point from start. */
 	KFCRubyChangePlan::Result PlanForRow(const UIDRef& story, TextIndex start, TextIndex end, const std::vector<KFCRubyChangePlan::Piece>& pieces, std::vector<KFCRubyChangePlan::Run>& outRuns);
+
+	/** WHAT A RUBY LIST WRITES OVER [start, end) of the story: its word's runs, or false - the text there is no word of the list's (a row edited since). */
+	bool ListPlanForRow(const KFCRubyList::Words& words, const UIDRef& story, TextIndex start, TextIndex end, std::vector<KFCRubyChangePlan::Run>& outRuns);
 
 	/** Does [start, end) of the story read as the runs say - each its reading, nothing between them? Asked before a write: a row that does is not written. */
 	bool ReadsAsPlanned(const UIDRef& story, TextIndex start, TextIndex end, const std::vector<KFCRubyChangePlan::Run>& runs);

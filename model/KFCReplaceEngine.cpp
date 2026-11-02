@@ -72,6 +72,7 @@
 #include "KFCCopyStore.h"		// the copies a row's Replace takes and its Restore from Copy puts back
 #include "KFCTableSearch.h"		// a table row's Replace - the Table tab's Change side
 #include "KFCRubySearch.h"		// a ruby row's Replace - the Ruby tab's
+#include "KFCRubyList.h"		// ...and a ruby list's
 #include "KFCKentenSearch.h"	// a kenten row's Replace - the Kenten kind's
 #include "IKentenStyle.h"		// Kenten_None - Remove Kenten
 #include "KFCQueryCopy.h"		// rubyKind - a list of ruby marks
@@ -4022,6 +4023,7 @@ enum OwnTabRefusal
 	kOwnTabNoStyle,		// its document has no table style of the Change side's name
 	kOwnTabAsAsked,		// it already reads as the Change side asks: counted, not written
 	kOwnTabBaseDiffers,	// its text is not what the Ruby part's base boxes hold
+	kOwnTabCountDiffers,	// no base boxes, and the Change side's readings are neither one nor one a character of it
 	kOwnTabRefusalCount
 };
 
@@ -4038,6 +4040,7 @@ const char* OwnTabRefusalWords(OwnTabRefusal why)
 		case kOwnTabNoStyle:		return "no such table style";
 		case kOwnTabAsAsked:		return "already as asked";
 		case kOwnTabBaseDiffers:	return "base text differs";
+		case kOwnTabCountDiffers:	return "readings do not fit";
 		default:					return "";
 	}
 }
@@ -4056,6 +4059,7 @@ const char* OwnTabRefusalSentence(OwnTabRefusal why)
 		case kOwnTabNoStyle:		return "this document has no table style of that name.";
 		case kOwnTabAsAsked:		return "this row already reads as its tab asks.";
 		case kOwnTabBaseDiffers:	return "this row's text is not what the Base Text boxes hold - clear those boxes to give the reading to the whole row.";
+		case kOwnTabCountDiffers:	return "the Change Ruby To boxes hold neither one reading nor one for each character of this row.";
 		default:					return "this row cannot be replaced.";
 	}
 }
@@ -4181,6 +4185,8 @@ public:
 				return KFCRubySearch::HasRubyOn(storyRef, row.start, row.end) ? kOwnTabOk : kOwnTabAsAsked;
 			case KFCRubyChangePlan::kWrite:
 				return KFCRubySearch::ReadsAsPlanned(storyRef, row.start, row.end, runs) ? kOwnTabAsAsked : kOwnTabOk;
+			case KFCRubyChangePlan::kCountDiffers:
+				return kOwnTabCountDiffers;
 			default:
 				return kOwnTabBaseDiffers;
 		}
@@ -4207,6 +4213,42 @@ public:
 private:
 	KFCRubyConditions						fAsked;
 	std::vector<KFCRubyChangePlan::Piece>	fPieces;
+};
+
+// A RUBY LIST'S (KFCRubyList.h): what the line of the row's word says, whatever the Change side does - and the words the list was found with, not the file as it stands now: what a row draws over it is what it gets.
+class RubyListWrite : public OwnTabWrite
+{
+public:
+	explicit RubyListWrite(const std::shared_ptr<const KFCRubyList::Words>& words) : fWords(words) {}
+	virtual const char* NothingToChange() const { return nil; }
+	virtual void EnterDocument(IDataBase* /*db*/) {}
+	virtual OwnTabRefusal RowDoor(const UIDRef& storyRef, OwnTabRow& row)
+	{
+		std::vector<KFCRubyChangePlan::Run> runs;
+		if (fWords == nullptr || !KFCRubySearch::ListPlanForRow(*fWords, storyRef, row.start, row.end, runs))
+			return kOwnTabEdited;
+		return KFCRubySearch::ReadsAsPlanned(storyRef, row.start, row.end, runs) ? kOwnTabAsAsked : kOwnTabOk;
+	}
+	virtual ErrorCode WriteRow(const UIDRef& storyRef, const OwnTabRow& row, PMString& outWords, KFCRowUpper& outUpper)
+	{
+		std::vector<KFCRubyChangePlan::Run> runs;
+		if (fWords == nullptr || !KFCRubySearch::ListPlanForRow(*fWords, storyRef, row.start, row.end, runs))
+			return kFailure;
+		const ErrorCode wrote = KFCRubySearch::WritePlan(storyRef, row.start, row.end, runs);
+		if (wrote == kSuccess)
+		{
+			outWords = KFCRubySearch::RowWords(storyRef, row.start, row.end);
+			outUpper = KFCRubySearch::UpperOn(storyRef, row.start, row.end);
+		}
+		return wrote;
+	}
+	virtual int32 RowMark() const { return kKFCSpecialRubyChange; }
+	virtual const char* StepKey() const { return kKFCRubyChangeStepKey; }
+	virtual const char* StepName() const { return "Change Ruby"; }
+	virtual const char* Verb() const { return "Changed ruby on"; }
+	virtual const char* Noun() const { return "rows"; }
+private:
+	std::shared_ptr<const KFCRubyList::Words>	fWords;
 };
 
 // THE KENTEN KIND'S: the kind of mark on a row's text, the look of the marks left as it stands - or, Remove Kenten, the marks taken off whole (KFCKentenSearch::Remove).
@@ -4572,6 +4614,11 @@ static bool ReplaceOwnTabRows(const KFCRowsByChapter& rowsByChapter, PMString& o
 		{
 			MarksWrite marks;
 			return WriteOwnTabRows(marks, rowsByChapter, outStatus);
+		}
+		if (asked != nil && asked->rubyKind == kKFCRubyFindList)
+		{
+			RubyListWrite list(asked->rubyList);
+			return WriteOwnTabRows(list, rowsByChapter, outStatus);
 		}
 		RubyWrite ruby;
 		return WriteOwnTabRows(ruby, rowsByChapter, outStatus);

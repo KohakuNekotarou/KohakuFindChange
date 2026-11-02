@@ -11,6 +11,12 @@
 - **KENTEN-01** 日本語で起動しているときだけ Find: に出る（KOHAKU-03）。部品＝**Look For:**（Text With Kenten／Text Without Kenten）・**Base Text:**・**Kenten:**（`[Any Kenten]`＋11種・Without のとき灰色）・**Change Kenten To:**（`[Leave As It Is]`＋10種）・**Remove Kenten**・案内の2行。値は KFC が覚える（起動している間だけ）。回帰 `kt-face-*`
   - 訂正:
 
+- **KENTEN-02** ★`Kenten:` と `Change Kenten To:` の右に**選んだ種類の印の見本**（作者 11-02）＝`ui/KFCKentenSample.cpp`・行の上の段と同じ図形（KENTEN-21）。Custom は `✱`。出さない＝`[Any Kenten]`・`[Leave As It Is]`・Text Without Kenten の `Kenten:`・Remove Kenten が入っているときの Change 側。変わるのは選んだ時。回帰 `kt-sample`
+  - 訂正:
+
+- **KENTEN-03** ★完了ボタンの左に **How to Use...**（作者 11-02「圏点のほうにもHowToを」・RUBY-03 と同じボタン）＝欄の説明の窓（`KFCHowTo::ShowKenten`）。日本語だけ。回帰 `kt-howto`
+  - 訂正:
+
 ## 2. 探す
 
 - **KENTEN-10** ★**Text With Kenten**＝同じ種類の圏点の連なりが1行（文字スタイルの圏点も）。段落の終わり・本体の制御文字で切る。Base Text は含むか（そのまま比べる）・Kenten: は種類。（K20）回帰 `kt-any`・`kt-mark`・`kt-base`・`kt-both`・`kt-style`・`kt-two-paragraphs`

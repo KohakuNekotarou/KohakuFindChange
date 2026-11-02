@@ -39,6 +39,7 @@
 #include "KFCObjectSearch.h"	// HasChangeObjectFormat, the shared walker aimed back at the front
 #include "KFCProgressBar.h"		// the run's one bar - the UI half's, asked for through IKFCUIServices
 #include "KFCResultModel.h"
+#include "KFCRubyListFile.h"	// a ruby list's query: its file, read once for the run
 #include "KFCRunGuard.h"
 #include "KFCRunList.h"			// the list the run leaves - what each query's Change All wrote, placed
 #include "KFCSavedQueries.h"	// LoadIntoFindChange - each query in turn; Describe - a file's name as the dialog shows it
@@ -354,6 +355,17 @@ int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 			{
 				skip(kSkipNoChangeTo);
 				continue;
+			}
+			// A RUBY LIST'S QUERY: its file read once, here, for every document of the run - and one that cannot be read, or has a wrong line, skipped and said, as a query file of InDesign's that cannot be read is.
+			if (ownQuery && own.mode == kKFCRubySearchMode && own.ruby.kind == kKFCRubyFindList)
+			{
+				int32 listCount = 0;
+				PMString listWhy;
+				if (!KFCRubyListFile::Load(own.ruby.listPath, own.ruby.listWords, listCount, listWhy))
+				{
+					skip(kSkipUnread);
+					continue;
+				}
 			}
 			const bool loaded = ownQuery || KFCSavedQueries::LoadIntoFindChange(query.file);
 			// The tab the query turned Find/Change to: InDesign's own mode - not the QR Code tab the dialog may be showing

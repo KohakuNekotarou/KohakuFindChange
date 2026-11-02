@@ -501,7 +501,8 @@ void KFCColorTextView::DV_Draw(dvaui::drawbot::Drawbot* drawbotP) const
 		shown.SetTranslatable(kFalse);
 		if (readingX + readingW > rightEdge)
 			shown = KFCEllipsize(rightEdge - readingX, run.reading, fontInfo, kEllipsizeEnd);
-		StringUtils::PMDrawStringRGB(drawbotP, PMRect(readingX, upperBox.Top(), rightEdge, upperBox.Bottom()), kAlignLeft, shown, fontInfo, kFullColor,
+		// (A reading its Replace will give it, not one it has - a ruby list's row: faint, as the context.)
+		StringUtils::PMDrawStringRGB(drawbotP, PMRect(readingX, upperBox.Top(), rightEdge, upperBox.Bottom()), kAlignLeft, shown, fontInfo, upper.planned ? kContextColor : kFullColor,
 			kKFCDontConvertAmpersand, kTrue /*centerVertically*/, kKFCNoUnderline, kKFCTextSmoothing);
 		nextFree = readingX + KFCDrawnWidth(shown, fontInfo) + PMReal(2.0);
 	}

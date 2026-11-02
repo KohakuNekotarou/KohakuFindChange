@@ -133,7 +133,9 @@ namespace KFCSearchEngine
 		int32					objects;
 		int32					noText;
 		int32					gone;
-		CollectTally() : total(0), chaptersWithHits(0), truncated(false), cancelled(false), objects(0), noText(0), gone(0) {}
+		// A RUBY LIST'S WALK: its words a ruby stood on already - not rows, and said (a list gives readings to text with none).
+		int32					hadRuby;
+		CollectTally() : total(0), chaptersWithHits(0), truncated(false), cancelled(false), objects(0), noText(0), gone(0), hadRuby(0) {}
 	};
 
 	/** ONE TARGET'S ROWS INTO THE MODEL AS A CHAPTER, AND INTO THE TALLY - the one way a walk's rows are filed (both
