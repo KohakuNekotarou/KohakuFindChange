@@ -14,7 +14,7 @@
 - **KOHAKU-02** ★面は**2列**（作者 11-02 夕「他のタブと同じように」＝本体の面と同じ＝486×356・余白15）。**左の列（幅330）**＝Find:・Search:（どちらも語の下に一覧＝KOHAKU-20）・その下の行（Table は `Find Table Style:` の語、Ruby・Kenten はアイコン）・選んだ種類の部品。**右の列（左から355・幅116・どれも116×26）**＝上から Find Next・Change・Change All・Change/Find（15／46／77／108＝TBL-60）、10空けて **Find in KFC**（144＝KOHAKU-36）、さらに10空けてその種類のもの＝Ruby は Choose List...・Save List...・How to Use...（180／211／242＝RUBY-03）、Kenten は How to Use...（180＝KENTEN-03）。QR Code は Find Next と Find in KFC だけ（変えるものが無い）。どの種類も両方の列の下に共通の2行（KOHAKU-37）。（窓を別の種類で開いてから変えても押せる）（K2・L1〜L7）回帰 `kh-part-shown`・`kh-findnext-after-another-kind`・`tb-btn-after-another-kind`・`rb-face-columns`・`kt-face-columns`・`kh-face-qr`
   - 訂正: 11-01＝Table にもボタン（作者の試用）。11-02＝Ruby と Kenten にも同じボタン（作者「FindNextなどのぼたん Ruby、圏点の方にもつけれるかな？」）・本体の枠の行（完了の隣）に差し込んでいたボタンを右の列へ（作者「今完了ボタンのところにあるボタンを Choose Save Howto の並びで縦に並べる。他のタブと同じように」）。
 
-- **KOHAKU-03** ★**Ruby と Kenten は日本語で起動しているときだけ** Find: に出る（他の言語では QR Code・Table の2つ）。（K11）回帰 `kh-japanese`・`kh-not-japanese`・`kh-not-japanese-on-ruby`
+- **KOHAKU-03** ★**Ruby・Kenten・Warichu は日本語で起動しているときだけ** Find: に出る（他の言語では QR Code・Table の2つ・Warichu は 2026-11-02＝WARI-01）。（K11）回帰 `kh-japanese`・`kh-not-japanese`・`kh-not-japanese-on-ruby`
   - 訂正:
 
 - **KOHAKU-04** Find: の値に応じて、パネルのタイトル（`Kohaku Find/Change - Table - Document`）と Find の名前、Find in … の動きが**その場で**変わる。本体のタブへ移れば本体のタブに戻り、戻れば前の種類のまま。閉じても開き直しても同じ。（K3・K4）回帰 `kh-kinds-title`・`kh-kinds-find`・`kh-closed-kind`・`kh-leave-back`
@@ -28,7 +28,7 @@
 
 ## 2. Search:
 
-- **KOHAKU-10** ★**Search: は種類で共通の1つ**。Table・Ruby・Kenten は `All Documents／Document／Story／To End of Story／Selection`、QR Code は `All Documents／Document`。本体のタブの Search: とは別の値。（K5）回帰 `kh-scope-entries`・`kh-scope-shared`・`kh-scope-native-unmoved`
+- **KOHAKU-10** ★**Search: は種類で共通の1つ**。Table・Ruby・Kenten・Warichu は `All Documents／Document／Story／To End of Story／Selection`、QR Code は `All Documents／Document`。本体のタブの Search: とは別の値。（K5）回帰 `kh-scope-entries`・`kh-scope-shared`・`kh-scope-native-unmoved`
   - 訂正:
 
 - **KOHAKU-11** Story などを選んだまま QR Code にすると `Document` と見せて探す。種類を戻すと元の値。（K5）回帰 `kh-scope-story-qr`
@@ -40,7 +40,7 @@
 - **KOHAKU-13** ★範囲の中身は**本体の範囲そのもの**。表＝文字（錨）が区間の中、または区間がその表のセルの中。Story＝その物語の全部の表。To End of Story＝カーソルより後ろの表（カーソルがセルの中なら、その表とその後ろの表＝本体もセルから物語の終わりまで歩く＝本体の「すべてを置換」で測った）。Selection＝選択の中の表（セルを選んでいればその表）。（K7）回帰 `tb-part-story`・`tb-part-toend`・`tb-part-selection`・`tb-part-selection-two`・`tb-part-selection-none`・`tb-part-frame`・`tb-part-cell-story`・`tb-part-cell-toend`・`tb-part-cell-text`・`tb-part-cells`
   - 訂正:
 
-- **KOHAKU-14** ルビ・圏点の連なりは範囲に触れていれば行になる。Text Without…・ルビの印は範囲に丸ごと入っていれば行になる。（K7）回帰 `rb-part-*`・`kt-part-*`
+- **KOHAKU-14** ルビ・圏点・割注の連なりは範囲に触れていれば行になる。Text Without…・ルビの印は範囲に丸ごと入っていれば行になる。（K7）回帰 `rb-part-*`・`kt-part-*`
   - 訂正:
 
 - **KOHAKU-15** 範囲の一覧の Search These Results Again は断る（`the search was over part of the document (Search: Story) - search again.`）。Search This Document Again は灰色。行の Replace は効く。Book Scope ON のとき Document 以外は断る（Text と同じ文）。（K8）回帰 `tb-part-again`・`tb-part-doc-again`・`tb-part-replace`・`tb-part-book`・`rb-part-again`・`kt-part-again`

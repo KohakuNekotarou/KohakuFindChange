@@ -270,6 +270,14 @@
   回帰＝`nor-cases.tsv` の `overrides-clear-*`（★本体と双子で並べる＝`overrides-clear-twin`＝双子の段落に DOM の `clearOverrides(OverrideType.ALL)` を当てて、属性を1つずつ比べる・`overrides-clear-twin-mixed`＝本物の上書き〈倍率〉と、上書きでないもの〈条件・ルビ・文字スタイル〉が同じ一致に付いた形・`overrides-clear-in-cell`＝表のセルの一致〈段落の範囲はセルの終わりまで・隣のセルは触らない〉・`overrides-clear-para-neighbour`）。脚注の中の一致は試験していない（セルと同じ読み方＝段落の範囲はそのスレッドの中）。（作り＝`model/KFCTextOverrides.cpp`・`KFCReplaceEngine::ClearOverridesHits`。）
   - 訂正:
 
+- **REP-41** ★**文字の行の Special Operations ▸ Tate-chu-yoko**（ヒットの行の右クリック・2026-11-02 作者「テキスト検索の後のspオペレーションにたてなかよこにするのが欲しい」＝設計書 `docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md` B1〜B6＝作者「設計書はあなたのおすすめで」の私の判断）――
+  **本体の文字パネルの「縦中横」を、その一致を選んで入れたのと同じ**＝一致の文字に縦中横の文字の属性を当てる。書く口＝`ITextModelCmds::ApplyCmd` に縦中横の属性（公式 `SnpPerformTextAttrTateChuYoko.cpp` の形）。書いた後に読み直し、当たっていなければ書けなかったと言う（字形の保護などで黙って飛ばされる口があるため）。
+  ★**日本語で起動しているときだけメニューに出る**（KOHAKU-03 と同じ判定＝メニューを出す直前に足し引きする＝本体の `AEMUIStartupShutdown.cpp` の形）。**ルビ・圏点・割注の行にも出る**（どれも本文の一致）。表の一覧の行は断る（物の行のメニューには無い＝ROW-32）。**段落の終わりをまたぐ一致も書く**（本体と同じ＝11-02 に実測）。**すでに縦中横の一致は書かずに数える**（`already tate-chu-yoko`）。
+  まとめて選んだ行の1つなら選んだ行すべて・文書をまたいでも1つの取り消しの段（Edit メニューの名前 `Tate-chu-yoko`）。1行ずつの扉は Clear Overrides と同じ（REP-40）。**灰色**＝押せる行が1つも無いとき（SET-11）。
+  文＝`Set tate-chu-yoko on ID:262 #3.`／1行の断り `Tate-chu-yoko: <理由>`（例 `Tate-chu-yoko: the match is already tate-chu-yoko - left as it is.`）。
+  回帰＝`tcy-cases.tsv`（14件）・`wr-tcy`。（作り＝`KFCReplaceEngine::TcyHits`＝Clear Overrides と1つの芯 `TextRowOp`。）
+  - 訂正:
+
 ---
 
 ## ⬜ この章で未確認
