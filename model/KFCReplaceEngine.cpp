@@ -25,7 +25,9 @@
 #include "IAttrReport.h"			// IsParagraphAttribute - a Change side that sets paragraph formatting (TakeRowCopy)
 #include "IAttributeStrand.h"		// a paragraph's style and own overrides, kept and put back (TakeRowCopy, PutParagraphBack)
 #include "IStyleInfo.h"				// a kept paragraph style still one of the document's (ParagraphStyleStands)
-#include "IComposeScanner.h"		// FindSurroundingParagraph - the paragraph of a copy (ParagraphOf)
+#include "IComposeScanner.h"		// FindSurroundingParagraph - the paragraph of a copy (ParagraphOf); QueryAttributeAt - a match's tate-chu-yoko (AllTcy)
+#include "ITextAttrBoolean.h"		// kTATatechuyokoAttrBoss's value - Tate-chu-yoko (SetTcy)
+#include "CJKID.h"					// kTATatechuyokoAttrBoss
 #include "ICreateOutlinesUtils.h"		// CreateCOTextCmd - a text row's Create Outlines (OutlineHits)
 #include "ITextModelCmds.h"			// ApplyStyleCmd / ApplyCmd - a paragraph's formatting put back (PutParagraphBack)
 #include "IHyperlinkUtils.h"		// hyperlink sources a copy would cut or carry (TakeRowCopy) - source/open/interfaces/layout
@@ -3687,34 +3689,117 @@ const char* ClearSentence(ClearRefusal why)
 	}
 }
 
-// A CLEAR OVERRIDES THAT CLEARED NOTHING: one row's reason in full (ClearSentence), several rows' counted by reason.
-void SayNoneCleared(PMString& out, size_t total, ClearRefusal oneWhy, const int32 (&counts)[kClearRefusalCount])
+// TATE-CHU-YOKO'S (docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md B5, B6): Clear Overrides' words, but for what has nothing to write.
+const char* TcyWords(ClearRefusal why)
 {
-	out = "Clear Overrides: ";
+	return (why == kClearNone) ? "already tate-chu-yoko" : ClearWords(why);
+}
+
+const char* TcySentence(ClearRefusal why)
+{
+	switch (why)
+	{
+		case kClearOutlined:	return "this row's match is outlines now - there is no text to set.";
+		case kClearEmpty:		return "this row's match has no characters to set.";
+		case kClearNone:		return "the match is already tate-chu-yoko - left as it is.";
+		default:				return ClearSentence(why);
+	}
+}
+
+// IS ALL OF [start, end) TATE-CHU-YOKO - as the composer reads it, a character style's too (KFCKentenSearch's MarkAt's way).
+bool AllTcy(IComposeScanner* scanner, TextIndex start, TextIndex end)
+{
+	TextIndex at = start;
+	while (at < end)
+	{
+		int32 len = 0;
+		InterfacePtr<const IAttrReport> attr(scanner->QueryAttributeAt(at, end, kTATatechuyokoAttrBoss, &len));
+		InterfacePtr<const ITextAttrBoolean> on(attr, UseDefaultIID());
+		if (on == nil || !on->GetFlag() || len <= 0)
+			return false;
+		at += len;
+	}
+	return true;
+}
+
+// TATE-CHU-YOKO ON [start, end) (the warichu-tcy spec's B2): the attribute alone, as the Character panel's menu sets it - its offsets left (the SDK's SnpPerformTextAttrTateChuYoko.cpp: ApplyCmd on
+// the character strand). Nothing written where all of it is already (outWrote false). Read back after: a write InDesign took and did not do (a command that answers kSuccess and leaves the text -
+// KIDMCP's session measured one, 11-02: a text attribute refused for a glyph protection) is a failure, not a write.
+ErrorCode SetTcy(const UIDRef& story, TextIndex start, TextIndex end, bool& outWrote)
+{
+	outWrote = false;
+	InterfacePtr<IComposeScanner> scanner(story, UseDefaultIID());
+	InterfacePtr<ITextModelCmds> cmds(story, UseDefaultIID());
+	if (scanner == nil || cmds == nil)
+		return kFailure;
+	if (AllTcy(scanner, start, end))
+		return kSuccess;
+	boost::shared_ptr<AttributeBossList> attrs(new AttributeBossList);
+	InterfacePtr<ITextAttrBoolean> tcy(::CreateObject2<ITextAttrBoolean>(kTATatechuyokoAttrBoss));
+	if (attrs.get() == nil || tcy == nil)
+		return kFailure;
+	tcy->SetFlag(kTrue);
+	InterfacePtr<IAttrReport> report(tcy, UseDefaultIID());
+	attrs->ApplyAttribute(report);
+	InterfacePtr<ICommand> apply(cmds->ApplyCmd(RangeData(start, end), attrs, kCharAttrStrandBoss));
+	if (apply == nil || CmdUtils::ProcessCommand(apply) != kSuccess || !AllTcy(scanner, start, end))
+		return kFailure;
+	outWrote = true;
+	return kSuccess;
+}
+
+// WHAT IS A TEXT ROW'S SPECIAL OPERATION'S OWN - Clear Overrides (the next-overrides-restore spec's B2 - B7) and Tate-chu-yoko (the warichu-tcy spec's B2 - B7). The rest is one: the doors row by row,
+// the chapters reached, one undoable step across documents, the rows marked, the message (WriteTextRows).
+struct TextRowOp
+{
+	const char*		name;							// its menu item's: the refusals' head ("Clear Overrides: ...") and the step Undo is followed by
+	const char*		done;							// the message's verb: "Cleared overrides on"
+	const char*		canBe;							// "none of the N selected rows can be <canBe>"
+	const char*		cannot;							// what InDesign would not do: "clear a match's overrides"
+	const char*		(*words)(ClearRefusal);			// a reason in a few words, counted
+	const char*		(*sentence)(ClearRefusal);		// one row's reason in full
+	const char*		stepKey;						// the Edit menu's name of its step
+	const char*		stepName;						// ...before its key is translated
+	int32			mark;							// a written row's (MarkHitSpecial)
+	bool			kohakuText;						// the text rows of a Kohaku+ list take it - Ruby's, Kenten's; no table's. False: no row of a Kohaku+ list with a Change side (Clear Overrides)
+	ErrorCode		(*write)(const UIDRef& story, TextIndex start, TextIndex end, bool& outWrote);		// outWrote false = nothing to write there (kClearNone, counted)
+};
+
+const TextRowOp kClearOverridesOp = { "Clear Overrides", "Cleared overrides on", "cleared", "clear a match's overrides", ClearWords, ClearSentence,
+	kKFCClearOverridesStepKey, "KFC Clear Overrides", kKFCSpecialClearTextOverrides, false, KFCTextOverrides::ClearOverrides };
+const TextRowOp kTcyOp = { "Tate-chu-yoko", "Set tate-chu-yoko on", "set tate-chu-yoko", "make a match tate-chu-yoko", TcyWords, TcySentence,
+	kKFCTcyStepKey, "KFC Tate-chu-yoko", kKFCSpecialTextTcy, true, SetTcy };
+
+// A WRITE THAT WROTE NOTHING: one row's reason in full, several rows' counted by reason.
+void SayNoneWritten(const TextRowOp& op, PMString& out, size_t total, ClearRefusal oneWhy, const int32 (&counts)[kClearRefusalCount])
+{
+	out = op.name;
+	out.Append(": ");
 	if (total == 1)
-		out.Append(ClearSentence(oneWhy));
+		out.Append(op.sentence(oneWhy));
 	else
 	{
 		out.Append("none of the ");
 		out.AppendNumber(static_cast<int32>(total));
-		out.Append(" selected rows can be cleared - ");
-		AppendCountsByWhy(out, counts, ClearWords);
+		out.Append(" selected rows can be ");
+		out.Append(op.canBe);
+		out.Append(" - ");
+		AppendCountsByWhy(out, counts, op.words);
 		out.Append(".");
 	}
 	out.SetTranslatable(kFalse);
 }
 
-// CAN THE ROW BE CLEARED, BY THE ROW ALONE - asked in one place: the menu greys Clear Overrides by it
-// (CanClearOverridesHit), and ClearOverridesHits' first door counts a row by it. A text row not outlined, not locked, not
-// of zero width - one reason a row, in that order. (Overset text is cleared: nothing has to be composed - the spec's B3.)
-ClearRefusal ClearRowRefusal(int32 chapterIdx, int32 hitIdx)
+// CAN THE ROW BE WRITTEN, BY THE ROW ALONE - asked in one place: the menu greys the item by it (CanWriteTextRow), and WriteTextRows' first door counts a row by it. A text row not outlined, not
+// locked, not of zero width - one reason a row, in that order. (Overset text is written: nothing has to be composed - the spec's B3.) A table's row is no text row (a Kohaku+ list's Table).
+ClearRefusal TextRowRefusal(const TextRowOp& op, int32 chapterIdx, int32 hitIdx)
 {
 	KFCResultModel::RowDisplay look;
 	bool replaced = false, locked = false;
 	UID story = kInvalidUID;
 	TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
 	uint64 hash = 0;
-	if (KFCResultModel::GetHitItem(chapterIdx, hitIdx) != kInvalidUID)
+	if (KFCResultModel::GetHitItem(chapterIdx, hitIdx) != kInvalidUID || (op.kohakuText && KFCResultModel::ListIsTables()))
 		return kClearNotText;
 	if (!KFCResultModel::GetHitRow(chapterIdx, hitIdx, look) || look.outlined)
 		return kClearOutlined;
@@ -3749,11 +3834,10 @@ struct ClearChapter
 	ClearChapter() : chapterIdx(-1), cleared(0) {}
 };
 
-// THE OVERRIDES OF ONE DOCUMENT, inside the write's step: each row checked again just before its command - its characters
-// where the doors read them (nothing this write does moves text) - then cleared (KFCTextOverrides::ClearOverrides, which
-// writes nothing where InDesign calls the text not overridden: kClearNone, counted). The cleared rows marked
-// (MarkHitSpecial - "Cleared"). False = InDesign would not clear a match: the caller takes the step back.
-bool ClearInChapter(ClearChapter& chapter, int32 (&counts)[kClearRefusalCount])
+// ONE DOCUMENT'S ROWS, inside the write's step: each row checked again just before its command - its characters where the doors read them (nothing these writes do moves text) - then written
+// (op.write, which writes nothing where there is nothing to: kClearNone, counted - no overrides, already tate-chu-yoko). The written rows marked (MarkHitSpecial - "Cleared", "Tate-chu-yoko").
+// False = InDesign would not write a match: the caller takes the step back.
+bool WriteInChapter(const TextRowOp& op, ClearChapter& chapter, int32 (&counts)[kClearRefusalCount])
 {
 	IDataBase* const db = chapter.docRef.GetDataBase();
 	if (db == nil)
@@ -3767,12 +3851,12 @@ bool ClearInChapter(ClearChapter& chapter, int32 (&counts)[kClearRefusalCount])
 			row.why = kClearEdited;
 			continue;
 		}
-		bool hadAny = false;
-		if (KFCTextOverrides::ClearOverrides(storyRef, row.start, row.end, hadAny) != kSuccess)
+		bool wrote = false;
+		if (op.write(storyRef, row.start, row.end, wrote) != kSuccess)
 			return false;
-		KFC_DIAG_LOG("CLEAROVERRIDES chapter=%d row=%d story=%u at=%d..%d hadAny=%d", chapter.chapterIdx, row.hit,
-			row.story.Get(), (int)row.start, (int)row.end, hadAny ? 1 : 0);
-		if (!hadAny)
+		KFC_DIAG_LOG("TEXTROWOP %s chapter=%d row=%d story=%u at=%d..%d wrote=%d", op.name, chapter.chapterIdx, row.hit,
+			row.story.Get(), (int)row.start, (int)row.end, wrote ? 1 : 0);
+		if (!wrote)
 		{
 			row.why = kClearNone;
 			continue;
@@ -3786,25 +3870,53 @@ bool ClearInChapter(ClearChapter& chapter, int32 (&counts)[kClearRefusalCount])
 			++counts[chapter.rows[k].why != kClearOk ? chapter.rows[k].why : kClearEdited];
 	for (size_t k = 0; k < chapter.rows.size(); ++k)
 		if (chapter.rows[k].done)
-			KFCResultModel::MarkHitSpecial(chapter.chapterIdx, chapter.rows[k].hit, kKFCSpecialClearTextOverrides);
+			KFCResultModel::MarkHitSpecial(chapter.chapterIdx, chapter.rows[k].hit, op.mark);
 	return true;
 }
+
+// CAN THE OPERATION BE OFFERED ON THE ROW - the menu's grey (each op's B6).
+bool CanWriteTextRow(const TextRowOp& op, int32 chapterIdx, int32 hitIdx)
+{
+	if (KFCResultModel::ListIsRunList() || (KFCResultModel::ListHasOwnChangeTab() && !op.kohakuText))
+		return false;		// (RefuseRunListRow's and RefuseOwnTabRow's notes)
+	return TextRowRefusal(op, chapterIdx, hitIdx) == kClearOk;
+}
+
+bool WriteTextRows(const TextRowOp& op, const KFCRowsByChapter& rowsByChapter, PMString& outStatus);
 
 }	// anonymous namespace
 
 bool KFCReplaceEngine::CanClearOverridesHit(int32 chapterIdx, int32 hitIdx)
 {
-	if (KFCResultModel::ListIsRunList() || KFCResultModel::ListHasOwnChangeTab())
-		return false;		// (RefuseRunListRow's and RefuseOwnTabRow's notes)
-	return ClearRowRefusal(chapterIdx, hitIdx) == kClearOk;
+	return CanWriteTextRow(kClearOverridesOp, chapterIdx, hitIdx);
 }
 
 bool KFCReplaceEngine::ClearOverridesHits(const KFCRowsByChapter& rowsByChapter, PMString& outStatus)
 {
-	KFC_DIAG_WRITTEN_DOCS_CHECK("clear-overrides-rows");	// (test builds: after DocsAfterWrite, below - KFCDiagWrittenDocs.h)
+	KFC_DIAG_WRITTEN_DOCS_CHECK("clear-overrides-rows");	// (test builds: after DocsAfterWrite, inside - KFCDiagWrittenDocs.h)
+	return WriteTextRows(kClearOverridesOp, rowsByChapter, outStatus);
+}
+
+bool KFCReplaceEngine::CanTcyHit(int32 chapterIdx, int32 hitIdx)
+{
+	return CanWriteTextRow(kTcyOp, chapterIdx, hitIdx);
+}
+
+bool KFCReplaceEngine::TcyHits(const KFCRowsByChapter& rowsByChapter, PMString& outStatus)
+{
+	KFC_DIAG_WRITTEN_DOCS_CHECK("tate-chu-yoko-rows");
+	return WriteTextRows(kTcyOp, rowsByChapter, outStatus);
+}
+
+namespace
+{
+
+// A TEXT ROW'S SPECIAL OPERATION WRITTEN WHERE THE MATCHES STAND (Clear Overrides, Tate-chu-yoko): Create Outlines' doors and step (OutlineHits, above). Only attributes change: no row moves.
+bool WriteTextRows(const TextRowOp& op, const KFCRowsByChapter& rowsByChapter, PMString& outStatus)
+{
 	outStatus.Clear();
 	outStatus.SetTranslatable(kFalse);
-	if (RefuseRunListRow("Clear Overrides", outStatus) || RefuseOwnTabRow("Clear Overrides", outStatus))
+	if (RefuseRunListRow(op.name, outStatus) || (!op.kohakuText && RefuseOwnTabRow(op.name, outStatus)))
 		return false;
 	if (KFCRunGuard::IsAnyRunning())
 	{
@@ -3834,7 +3946,7 @@ bool KFCReplaceEngine::ClearOverridesHits(const KFCRowsByChapter& rowsByChapter,
 		{
 			ClearRow row;
 			row.hit = hits[k];
-			const ClearRefusal why = ClearRowRefusal(chapter.chapterIdx, row.hit);		// the menu's question
+			const ClearRefusal why = TextRowRefusal(op, chapter.chapterIdx, row.hit);		// the menu's question
 			if (why != kClearOk)
 			{
 				++counts[why];
@@ -3912,7 +4024,7 @@ bool KFCReplaceEngine::ClearOverridesHits(const KFCRowsByChapter& rowsByChapter,
 	}
 	if (toWrite == 0)
 	{
-		SayNoneCleared(outStatus, total, lastWhy, counts);
+		SayNoneWritten(op, outStatus, total, lastWhy, counts);
 		return false;
 	}
 	// EVERY DOCUMENT TO WRITE STILL OPEN once the last is reached (a Replace's rule).
@@ -3921,7 +4033,8 @@ bool KFCReplaceEngine::ClearOverridesHits(const KFCRowsByChapter& rowsByChapter,
 	{
 		if (!KFCBookScope::IsDocStillOpen(chapters[c].docRef))
 		{
-			outStatus = "Clear Overrides: a document of the selected rows has been closed - nothing was changed.";
+			outStatus = op.name;
+			outStatus.Append(": a document of the selected rows has been closed - nothing was changed.");
 			outStatus.SetTranslatable(kFalse);
 			return false;
 		}
@@ -3932,22 +4045,23 @@ bool KFCReplaceEngine::ClearOverridesHits(const KFCRowsByChapter& rowsByChapter,
 	for (size_t c = 0; c < chapters.size(); ++c)
 		chapterIdxs.push_back(chapters[c].chapterIdx);
 	KFCUndoFollow::StepRecorder recorder(chapterIdxs);
-	recorder.SetName("Clear Overrides");
+	recorder.SetName(op.name);
 	bool ok = false;
 	bool failed = false;
 	int32 clearedRows = 0;
 	{
 		KFCReplaceEngine::WriteStep step;
-		if (!KFCReplaceEngine::BeginWriteStep(acrossDocuments, step, kKFCClearOverridesStepKey, "KFC Clear Overrides"))
+		if (!KFCReplaceEngine::BeginWriteStep(acrossDocuments, step, op.stepKey, op.stepName))
 		{
-			outStatus = acrossDocuments ? "Clear Overrides: InDesign would not start an undoable step - nothing was changed."
-				: "Clear Overrides: InDesign would not start a command sequence - nothing was changed.";
+			outStatus = op.name;
+			outStatus.Append(acrossDocuments ? ": InDesign would not start an undoable step - nothing was changed."
+				: ": InDesign would not start a command sequence - nothing was changed.");
 			outStatus.SetTranslatable(kFalse);
 			return false;
 		}
 		for (size_t c = 0; c < chapters.size() && !failed; ++c)
 		{
-			if (!ClearInChapter(chapters[c], counts))
+			if (!WriteInChapter(op, chapters[c], counts))
 				failed = true;
 			clearedRows += chapters[c].cleared;
 		}
@@ -3972,17 +4086,20 @@ bool KFCReplaceEngine::ClearOverridesHits(const KFCRowsByChapter& rowsByChapter,
 				KFCRowFoci::ReanchorStory(chapters[c].chapterIdx, *s);
 		if (failed)
 		{
-			outStatus = "Clear Overrides: InDesign would not clear a match's overrides - nothing was changed.";
+			outStatus = op.name;
+			outStatus.Append(": InDesign would not ");
+			outStatus.Append(op.cannot);
+			outStatus.Append(" - nothing was changed.");
 			outStatus.SetTranslatable(kFalse);
 			return false;
 		}
-		// No row was cleared - each one's reason from the step (several are counted): "had no overrides", edited since.
+		// No row was written - each one's reason from the step (several are counted): "had no overrides", "already tate-chu-yoko", edited since.
 		ClearRefusal why = kClearNone;
 		for (size_t c = 0; c < chapters.size(); ++c)
 			for (size_t k = 0; k < chapters[c].rows.size(); ++k)
 				if (chapters[c].rows[k].why != kClearOk)
 					why = chapters[c].rows[k].why;
-		SayNoneCleared(outStatus, total, why, counts);
+		SayNoneWritten(op, outStatus, total, why, counts);
 		return false;
 	}
 	for (size_t c = 0; c < chapters.size(); ++c)
@@ -3999,10 +4116,12 @@ bool KFCReplaceEngine::ClearOverridesHits(const KFCRowsByChapter& rowsByChapter,
 	// WHAT IT DID (the spec's B7 - SayRowsWritten): "Cleared overrides on ID:262 #3." /
 	// "Cleared overrides on 2 of 3 matches: ID:262 #1, ID:262 #3. Left as they were: 1 had no overrides."
 	PMString leftWords;
-	AppendCountsByWhy(leftWords, counts, ClearWords);
-	SayRowsWritten(outStatus, "Cleared overrides on", "matches", RowsDone(chapters), total, leftWords);
+	AppendCountsByWhy(leftWords, counts, op.words);
+	SayRowsWritten(outStatus, op.done, "matches", RowsDone(chapters), total, leftWords);
 	return true;
 }
+
+}	// anonymous namespace
 
 // ======================================================================================================
 // A ROW OF A TAB OF KFC'S WITH A CHANGE SIDE, REPLACED - the Table tab's (docs/superpowers/specs/2026-10-31-kfc-table-tab-design.md T8 - T10) and the Ruby tab's

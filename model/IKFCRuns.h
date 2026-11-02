@@ -215,6 +215,11 @@ public:
 	virtual bool FaceTextChangeFound(int32 mode, const KFCTableFound& found, PMString& outWords) = 0;
 	/** = KFCFaceText::ChangeAll (appended) - its Change All. */
 	virtual bool FaceTextChangeAll(int32 mode, const KFCTableLook& look, int32& outChanged, int32& outMatched, PMString& outWords) = 0;
+	/** = KFCReplaceEngine::TcyHits (appended - docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md B2) - a text row's Special Operations > Tate-chu-yoko: the rows' matches made
+	    tate-chu-yoko in one undoable step. True = something written; outStatus says what. */
+	virtual bool TcyRows(const KFCRowsByChapter& rows, PMString& outStatus) = 0;
+	/** = KFCReplaceEngine::CanTcyHit (appended) - can Tate-chu-yoko be offered on the row (the menu's grey - B7). */
+	virtual bool CanTcyHit(int32 chapterIdx, int32 hitIdx) = 0;
 };
 
 #endif // __IKFCRuns_h__

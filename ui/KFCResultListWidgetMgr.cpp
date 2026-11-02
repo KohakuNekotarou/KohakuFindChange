@@ -1328,6 +1328,17 @@ bool KFCResultTree::CanClearOverridesAny(const KFCRowsByChapter& rows)
 	return AnyRowCan(rows, [](int32 chapter, int32 hit) { return KFCRuns()->CanClearOverridesHit(chapter, hit); });
 }
 
+bool KFCResultTree::TcyRows(const KFCRowsByChapter& rows)
+{
+	// (Clear Overrides' way: each written row reads Tate-chu-yoko - SpecialRowWord.)
+	return WriteRowsInPlace(rows, [&](PMString& status) { return KFCRuns()->TcyRows(rows, status); });
+}
+
+bool KFCResultTree::CanTcyAny(const KFCRowsByChapter& rows)
+{
+	return AnyRowCan(rows, [](int32 chapter, int32 hit) { return KFCRuns()->CanTcyHit(chapter, hit); });
+}
+
 bool KFCResultTree::SpecialRows(int32 op, const KFCRowsByChapter& rows, const KFCSpecialParams& params)
 {
 	// Drawn again after it (WriteRowsInPlace): each written row reads the operation's word, its place read again,
@@ -1375,6 +1386,7 @@ const char* KFCResultTree::SpecialRowWord(int32 op)
 		case kKFCSpecialTableStyle:				return "Styled";	// a table row's Replace (the table tab spec's T9)
 		case kKFCSpecialRubyChange:				return "Changed";	// a ruby row's Replace (the ruby tab spec's R8)
 		case kKFCSpecialKentenChange:			return "Changed";	// a kenten row's Replace
+		case kKFCSpecialTextTcy:				return "Tate-chu-yoko";	// a text row's Special Operations > Tate-chu-yoko (the warichu-tcy spec's B4)
 		case kKFCSpecialDelete:					return "Deleted";
 		default:								return "";
 	}

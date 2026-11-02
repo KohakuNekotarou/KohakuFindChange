@@ -42,6 +42,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCTableStyleStepKey,			"Apply Table Style",
                 kKFCRubyChangeStepKey,			"Change Ruby",
                 kKFCKentenChangeStepKey,		"Change Kenten",
+                kKFCTcyStepKey,					"Tate-chu-yoko",
                 // An object row's other Special Operations (KFCObjectSpecial) - InDesign's own English command names.
                 kKFCFillFramePropStepKey,			"Fill Frame Proportionally",
                 kKFCFitContentPropStepKey,			"Fit Content Proportionally",

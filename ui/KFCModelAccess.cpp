@@ -207,6 +207,8 @@ namespace
 			SayWhy(outWords);
 			return false;
 		}
+		virtual bool TcyRows(const KFCRowsByChapter&, PMString& outStatus) { SayWhy(outStatus); return false; }
+		virtual bool CanTcyHit(int32, int32) { return false; }
 	};
 
 	class KFCChaptersStandInImpl : public IKFCChapters

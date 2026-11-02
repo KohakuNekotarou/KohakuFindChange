@@ -1407,6 +1407,11 @@ void FillKept(IPMUnknown* face)
 
 }	// anonymous namespace
 
+bool KFCKohakuTab::IsJapaneseUI()
+{
+	return JapaneseKinds();
+}
+
 bool KFCKohakuTab::IsQRCodeCurrent(int32& outScope)
 {
 	outScope = (ScopeAsked() == IWalkerScopeFactoryUtils::kAllDocumentScope) ? static_cast<int32>(IWalkerScopeFactoryUtils::kAllDocumentScope)

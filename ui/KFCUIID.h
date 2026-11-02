@@ -494,6 +494,9 @@ DECLARE_PMID(kActionIDSpace, kKFCNarrowWithOverridesActionID, kKFCUIPrefix + 110
 // SPECIAL OPERATIONS > CLEAR OVERRIDES (the spec's B2): a TEXT row's - the overrides of its match taken off, as the paragraph
 // styles panel's Clear Overrides takes them off a selection (KFCReplaceEngine::ClearOverridesHits). + 111.
 DECLARE_PMID(kActionIDSpace, kKFCClearTextOverridesActionID, kKFCUIPrefix + 111)
+// SPECIAL OPERATIONS > TATE-CHU-YOKO (docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md B1): a TEXT row's - its match made tate-chu-yoko (KFCReplaceEngine::TcyHits). Put on the
+// text row's Special Operations in a Japanese InDesign alone, as its menu pops (KFCResultNodeEH's PopRowMenu): no MenuDef. + 113.
+DECLARE_PMID(kActionIDSpace, kKFCTcyTextActionID, kKFCUIPrefix + 113)
 // A tier's heading's Search Text in These Tables (the author, 10-31: list the tables, then search the text in them - KFCResultHistory::SearchTextInObjects). + 112.
 DECLARE_PMID(kActionIDSpace, kKFCSearchTextInTablesActionID, kKFCUIPrefix + 112)
 
@@ -760,6 +763,7 @@ DECLARE_PMID(kWidgetIDSpace, kKFCKentenButtonsWidgetID, kKFCPrefix + 85)
 // ...With Overrides, and a text row's Special Operations > Clear Overrides (measured against every other key - key_collisions.py).
 #define kKFCNarrowWithOverridesMenuKey	kKFCStringPrefix "kKFCNarrowWithOverridesMenuKey"	// "With Overrides"
 #define kKFCClearTextOverridesMenuKey	kKFCStringPrefix "kKFCClearTextOverridesMenuKey"	// "Clear Overrides"
+#define kKFCTcyTextMenuKey				kKFCStringPrefix "kKFCTcyTextMenuKey"				// "Tate-chu-yoko" (a text row's Special Operations - key_collisions.py)
 // ...and Copy Results: the panel menu's, a row's Copy Rows, a tier heading's Copy These Results (measured against every
 // other key - key_collisions.py).
 #define kKFCCopyResultsMenuKey			kKFCStringPrefix "kKFCCopyResultsMenuKey"
@@ -1090,7 +1094,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCKentenButtonsWidgetID, kKFCPrefix + 85)
 #define kKFCNarrowOnPasteboardMenuItemPosition	6.0		// On Pasteboard
 #define kKFCNarrowPagesMenuItemPosition			7.0		// Pages...
 #define kKFCNarrowWithOverridesMenuItemPosition	8.0		// With Overrides
-// Special Operations, in abc order (an object row's whole; a text row's holds Clear Overrides and Create Outlines).
+// Special Operations, in abc order (an object row's whole; a text row's holds Clear Overrides, Create Outlines and - in a Japanese InDesign - Tate-chu-yoko).
+#define kKFCTcyTextMenuItemPosition				9.0		// Tate-chu-yoko (a text row's menu - its own path; after Create Outlines' 3.0)
 #define kKFCArrangeSubmenuPosition				1.0		// Arrange >
 #define kKFCClearStyleOverridesMenuItemPosition	2.0		// Clear Object Style Overrides
 #define kKFCClearTextOverridesMenuItemPosition	2.0		// Clear Overrides (a text row's menu - its own path, so no clash with the 2.0 above)

@@ -164,6 +164,14 @@ namespace KFCReplaceEngine
 	    alone (nothing opened, no override read): the menu greys the item by it (the spec's B6). */
 	bool CanClearOverridesHit(int32 chapterIdx, int32 hitIdx);
 
+	/** SPECIAL OPERATIONS > TATE-CHU-YOKO (docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md B2 - B7): the rows' matches made tate-chu-yoko where they stand - the attribute alone, as
+	    the Character panel's menu sets it. Clear Overrides' doors, step and marks (one undo step "Tate-chu-yoko", rows marked "Tate-chu-yoko"); a match all tate-chu-yoko already is counted, not
+	    written. A Kohaku+ list's text rows take it (Ruby, Kenten) - a table's row is no text row. True = something written; outStatus says what. */
+	bool TcyHits(const KFCRowsByChapter& rows, PMString& outStatus);
+
+	/** Can Tate-chu-yoko be offered on a row (CanClearOverridesHit's rule, a Kohaku+ list's text rows let in) - the menu's grey (B7). */
+	bool CanTcyHit(int32 chapterIdx, int32 hitIdx);
+
 	/** ONE UNDO STEP FOR A WRITE FROM THE LIST, the one rule for every such write - its callers are the list (a row's
 	    Replace of text or object rows, Restore from Copy, Create Outlines, the Special Operations), each naming its
 	    step by stepKey ("Replace" - kKFCReplaceStepKey - by default):

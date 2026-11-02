@@ -276,6 +276,13 @@ namespace KFCResultTree
 	    read only)? The question the text row menu greys it by (the spec's B6). */
 	bool CanClearOverridesAny(const KFCRowsByChapter& rows);
 
+	/** A TEXT ROW'S SPECIAL OPERATIONS > TATE-CHU-YOKO (docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md B2): the rows' matches made tate-chu-yoko where they stand, by the model
+	    (KFCRuns()->TcyRows), Clear Overrides' way - each one written reads "Tate-chu-yoko". True = written. */
+	bool TcyRows(const KFCRowsByChapter& rows);
+
+	/** Can Tate-chu-yoko be offered on these rows (KFCRuns()->CanTcyHit - read only)? The menu's grey (B7). */
+	bool CanTcyAny(const KFCRowsByChapter& rows);
+
 	/** AN OBJECT ROW'S OTHER SPECIAL OPERATIONS (docs/superpowers/specs/2026-10-17-kfc-object-special-operations-design.md):
 	    the rows' objects written where they stand - across spreads and documents - by InDesign's own Object menu commands
 	    (op, a KFCSpecialOp, with params - Move to Active Layer's layer name), by the model (KFCRuns()->SpecialRows,

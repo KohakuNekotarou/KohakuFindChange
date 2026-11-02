@@ -81,6 +81,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCNarrowOnLayerMenuKey,		"On Active Layer",
                 kKFCNarrowWithOverridesMenuKey,	"With Overrides",
                 kKFCClearTextOverridesMenuKey,	"Clear Overrides",
+                kKFCTcyTextMenuKey,				"Tate-chu-yoko",
                 // An object row's other Special Operations - InDesign's own English command names.
                 kKFCFillFramePropMenuKey,			"Fill Frame Proportionally",
                 kKFCContentProportionalMenuKey,		"Fit Content Proportionally",

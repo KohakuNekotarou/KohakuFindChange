@@ -24,6 +24,7 @@
 #include "FileUtils.h"
 #include "TextWalkerServiceProviderID.h"	// kClearFindChangeOptionsCmdBoss
 
+#include <memory>
 #include <set>
 #include <string>
 #include <vector>
@@ -40,7 +41,9 @@
 #include "KFCObjectSearch.h"	// HasChangeObjectFormat, the shared walker aimed back at the front
 #include "KFCProgressBar.h"		// the run's one bar - the UI half's, asked for through IKFCUIServices
 #include "KFCResultModel.h"
+#include "KFCRubyList.h"		// Readings - an Inconsistent Ruby query's readings, counted over every document of the run
 #include "KFCRubyListFile.h"	// a ruby list's query: its file, read once for the run
+#include "KFCRubySearch.h"		// CountReadings
 #include "KFCRunGuard.h"
 #include "KFCRunList.h"			// the list the run leaves - what each query's Change All wrote, placed
 #include "KFCSavedQueries.h"	// LoadIntoFindChange - each query in turn; Describe - a file's name as the dialog shows it
@@ -429,6 +432,17 @@ int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 					why.Append(query.name);
 					break;
 				}
+			}
+			// INCONSISTENT RUBY OVER SEVERAL DOCUMENTS (docs/superpowers/specs/2026-11-02-kfc-kohaku-face-buttons-design.md P3-4): every document's readings counted first, as its Find counts them
+			// (KFCRubySearch::CollectTargets) - a word read one way in one document and another way in the next is read two ways. Each document written alone would count its own (the re-check of 11-02:
+			// a book's Run wrote nothing its Find listed). Every target is open and held here (below), so nothing is opened for it.
+			if (ownQuery && own.mode == kKFCRubySearchMode && own.ruby.kind == kKFCRubyFindVaries && targets.size() > 1)
+			{
+				std::shared_ptr<KFCRubyList::Readings> counted(new KFCRubyList::Readings);
+				for (size_t d = 0; d < targets.size(); ++d)
+					if (KFCBookScope::IsDocStillOpen(targets[d].docRef))
+						KFCRubySearch::CountReadings(targets[d].docRef, own.ruby.switches, nil, *counted);
+				own.ruby.varies = counted;
 			}
 			// (A ruby list's First in Book over a book's chapters: the words of the documents written before, the query's own. Elsewhere each document is its own.)
 			std::set<size_t> bookSeen;

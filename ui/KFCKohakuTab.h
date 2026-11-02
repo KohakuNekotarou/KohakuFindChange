@@ -75,6 +75,10 @@ namespace KFCKohakuTab
 	/** WHAT A KENTEN SAMPLE DRAWS (KFCKentenSample.cpp - a sample's widget): an IKentenStyle::KentenKind, or 0 for nothing - what its list asks, while that list counts. */
 	int32 KentenSampleKind(const WidgetID& sample);
 
+	/** IS THIS A JAPANESE INDESIGN - what puts Ruby and Kenten on Find: (KOHAKU-03), asked of the one place: a text row's Special Operations > Tate-chu-yoko too (docs/superpowers/specs/
+	    2026-11-02-kfc-warichu-tcy-design.md B1). A test build's fault switch not-japanese says no. */
+	bool IsJapaneseUI();
+
 	/** Application shutdown: what the face keeps holds PMStrings - released while the session stands (the plug-in's other statics' rule). */
 	void ShutdownCleanup();
 }

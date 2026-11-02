@@ -1954,6 +1954,17 @@ resource ActionDef (kSDKDefActionResourceID)
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
 
+		// Tate-chu-yoko - a text row's Special Operations in a Japanese InDesign (docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md B1): no MenuDef - the item is put on
+		// the menu as it pops, in Japanese alone (KFCResultNodeEH's PopRowMenu). kCustomEnabling: grey when none of the rows can take it (CanTcyAny).
+		kKFCActionComponentBoss,
+		kKFCTcyTextActionID,
+		kKFCTcyTextMenuKey,				// "Tate-chu-yoko"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
 		// Restore from Copy - a text row's right-click menu, under Replace (the copy-restore spec).
 		// kCustomEnabling: a text row a Replace wrote (CanRestoreAny); why a copy cannot go back it says on the status line.
 		kKFCActionComponentBoss,

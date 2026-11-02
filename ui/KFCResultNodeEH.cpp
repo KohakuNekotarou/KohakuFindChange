@@ -65,6 +65,9 @@
 #include "KFCDiagHiddenDocs.h"	// the hidden-document check after a click - test builds only
 #include "KFCResultTree.h"		// TakeKeyboard - the hand-off after a click; DiagKeyFocus - who holds the keyboard, for that trace
 #include "KFCResultHistory.h"	// SwitchToKeptRowLater - a grey row's click
+#include "KFCKohakuTab.h"		// IsJapaneseUI - a text row's Tate-chu-yoko, a Japanese InDesign's alone
+
+#include <cstring>				// strcmp - which menu pops
 
 namespace
 {
@@ -87,8 +90,19 @@ void PopRowMenu(const char* menuName, IEvent* e, IPMUnknown* widget)
 	if (KFC_DIAG_FAULT("menu-drop-grey"))
 		removeDisabledItems = kTrue;
 #endif
-	if (menuMgr != nil)
-		menuMgr->HandlePopupMenu(menuName, e->GlobalWhere(), e->GlobalWhere(), removeDisabledItems, widget);
+	if (menuMgr == nil)
+		return;
+	// TATE-CHU-YOKO, A JAPANESE INDESIGN'S ALONE (docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md B1): on a text row's Special Operations as its menu pops, or taken off - asked
+	// each time, so a test build's fault switch not-japanese answers too. Taken off first, then put once (the SDK's AEMUIStartupShutdown.cpp's way: never twice on the menu).
+	if (std::strcmp(menuName, kKFCResultHitMenuName) == 0)
+	{
+		PMString path(kKFCHitSpecialOpsSubmenuPath);
+		path.SetTranslatable(kFalse);
+		menuMgr->RemoveMenuItem(path, kKFCTcyTextActionID);
+		if (KFCKohakuTab::IsJapaneseUI())
+			menuMgr->AddMenuItem(kKFCTcyTextActionID, path, kKFCTcyTextMenuItemPosition, kFalse);
+	}
+	menuMgr->HandlePopupMenu(menuName, e->GlobalWhere(), e->GlobalWhere(), removeDisabledItems, widget);
 }
 
 }

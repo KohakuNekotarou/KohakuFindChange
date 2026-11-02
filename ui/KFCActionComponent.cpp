@@ -760,6 +760,16 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			break;
 		}
 
+		case kKFCTcyTextActionID:
+		{
+			// A TEXT row's Special Operations > Tate-chu-yoko (docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md B2, B3): Clear Overrides' way - the row it was popped over, or the
+			// rows selected together when it is one of them - their matches made tate-chu-yoko (KFCResultTree::TcyRows). No hit row: nothing.
+			int32 chapter = -1, hit = -1;
+			if (RightClickedHit(widget, chapter, hit))
+				(void)KFCResultTree::TcyRows(KFCResultTree::RowsOfRightClick(chapter, hit));
+			break;
+		}
+
 		case kKFCRestoreOriginalActionID:
 		{
 			// A TEXT row's Restore from Copy (docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md): the
@@ -1171,6 +1181,15 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 				int32 chapter = -1, hit = -1;
 				const bool enable = RightClickedHit(widget, chapter, hit)
 					&& KFCResultTree::CanClearOverridesAny(KFCResultTree::RowsOfRightClick(chapter, hit));
+				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
+				break;
+			}
+			case kKFCTcyTextActionID:
+			{
+				// A text row's menu: Tate-chu-yoko while the row - or one selected together with it - can take it (CanTcyAny, read only - B7). A match already tate-chu-yoko is counted when pressed.
+				int32 chapter = -1, hit = -1;
+				const bool enable = RightClickedHit(widget, chapter, hit)
+					&& KFCResultTree::CanTcyAny(KFCResultTree::RowsOfRightClick(chapter, hit));
 				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 				break;
 			}

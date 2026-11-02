@@ -207,6 +207,9 @@ enum KFCSpecialOp
 	kKFCSpecialRubyChange,
 	// A kenten row's Replace (the Kenten kind - KFCKentenSearch): the same.
 	kKFCSpecialKentenChange,
+	// A TEXT row's Special Operations > Tate-chu-yoko (docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md B4): its mark alone - the row reads
+	// "Tate-chu-yoko". Written by KFCReplaceEngine::TcyHits, never by SpecialRows.
+	kKFCSpecialTextTcy,
 	kKFCSpecialOpCount
 };
 

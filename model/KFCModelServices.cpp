@@ -215,6 +215,8 @@ public:
 	virtual bool FaceTextNext(int32 mode, const KFCTableLook& look, KFCTableFound& out) { return KFCFaceText::Next(mode, look, out); }
 	virtual bool FaceTextChangeFound(int32 mode, const KFCTableFound& found, PMString& outWords) { return KFCFaceText::ChangeFound(mode, found, outWords); }
 	virtual bool FaceTextChangeAll(int32 mode, const KFCTableLook& look, int32& outChanged, int32& outMatched, PMString& outWords) { return KFCFaceText::ChangeAll(mode, look, outChanged, outMatched, outWords); }
+	virtual bool TcyRows(const KFCRowsByChapter& rows, PMString& outStatus) { return KFCReplaceEngine::TcyHits(rows, outStatus); }
+	virtual bool CanTcyHit(int32 chapterIdx, int32 hitIdx) { return KFCReplaceEngine::CanTcyHit(chapterIdx, hitIdx); }
 };
 
 CREATE_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)
