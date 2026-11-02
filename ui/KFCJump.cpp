@@ -931,7 +931,7 @@ void ArmScopeKeep()
 	// ON KFC'S QR CODE TAB the Search: a click can move is InDesign's own tab's - the one shown before it, which the open
 	// dialog re-picks as it does under its own tabs: kept as a QR code Find Next's landing keeps it (ArmNativeScopeKeep).
 	// The QR Code tab's own Search: is KFC's (KFCKohakuTab), and no selection moves it.
-	if (mode == kKFCQRCodeSearchMode || mode == kKFCTableSearchMode || mode == kKFCRubySearchMode || mode == kKFCKentenSearchMode)		// (the Table, Ruby and Kenten kinds' too: they keep their own)
+	if (KFCIsKohakuQueryMode(mode))		// (the Table, Ruby, Kenten and Warichu kinds' too: they keep their own)
 	{
 		ArmNativeScopeKeep();
 		return;

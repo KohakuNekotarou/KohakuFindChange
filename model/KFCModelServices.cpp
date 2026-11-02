@@ -101,6 +101,7 @@ public:
 	virtual bool ListHasOwnChangeTab() { return KFCResultModel::ListHasOwnChangeTab(); }
 	virtual bool ListIsTables() { return KFCResultModel::ListIsTables(); }
 	virtual bool ListDrawsTwoLines() { return KFCResultModel::ListDrawsTwoLines(); }
+	virtual bool ListIsOwnKind() { return KFCResultModel::ListIsOwnKind(); }
 };
 
 CREATE_PMINTERFACE(KFCResultsSession, kKFCResultsImpl)

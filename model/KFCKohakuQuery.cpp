@@ -221,7 +221,7 @@ bool KFCKohakuQuery::Read(const IDFile& file, KFCKohakuQueryData& out)
 		const int32 number = std::atoi(value.c_str());
 		if (key == "kind")
 		{
-			const int32 modes[] = { kKFCQRCodeSearchMode, kKFCTableSearchMode, kKFCRubySearchMode, kKFCKentenSearchMode };
+			const int32 modes[] = { kKFCQRCodeSearchMode, kKFCTableSearchMode, kKFCRubySearchMode, kKFCKentenSearchMode, kKFCWarichuSearchMode };
 			for (size_t m = 0; m < sizeof(modes) / sizeof(modes[0]); ++m)
 				if (value == KFCSavedQueries::KindName(modes[m]))
 					out.mode = modes[m];
@@ -247,6 +247,7 @@ bool KFCKohakuQuery::Read(const IDFile& file, KFCKohakuQueryData& out)
 			// (Each kind's own, and a file holds one kind. What the file has no word of, as the tab starts: the file of a version before the icons.)
 			out.ruby.switches.SetBits(number);
 			out.kenten.switches.SetBits(number);
+			out.warichu.switches.SetBits(number);
 		}
 		else if (key == "rubyBase")
 			out.ruby.base = Words(value);
@@ -338,6 +339,8 @@ std::string KFCKohakuQuery::FileText(const KFCKohakuQueryData& query)
 		Attribute(element, "kentenChange", query.kenten.changeTo);
 		Attribute(element, "kentenRemove", query.kenten.removeKenten ? 1 : 0);
 	}
+	else if (query.mode == kKFCWarichuSearchMode)
+		Attribute(element, "switches", query.warichu.switches.Bits());		// (its icons alone - docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md A6)
 	element.append(">\n</KohakuFindChange>\n");
 	// A QUERY OF THE COLOR TAB ASKING NOTHING, as InDesign writes one (measured - app.saveFindChangeQuery), for InDesign to load where KFC is not there.
 	std::string text("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<Query>\n<Header>\n<Version major=\"5\" minor=\"1\">\n</Version>\n"

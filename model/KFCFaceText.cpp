@@ -29,6 +29,7 @@
 #include "KFCRubyListFile.h"			// a ruby list's words, read for every press
 #include "KFCRubySearch.h"
 #include "KFCSearchEngine.h"			// the part of Search:, ReadText, the frame's lock
+#include "KFCWarichuSearch.h"
 #include "KFCTextCut.h"					// KFCSafeCut
 
 namespace
@@ -36,20 +37,29 @@ namespace
 // What a row's words hold of its text when it draws no ruby of its own, at most (a QR code row's line's length).
 const int32 kFaceWordsMost = 40;
 
+// The Warichu kind lists and changes nothing (docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md A2).
+const char* const kWarichuChangesNothing = "Find: Warichu lists the warichu and changes nothing.";
+
 // WHAT THE BUTTONS ASK NOW: the kind's conditions - the face's - with what its search reads first: a ruby list's words. False = refused, outWhy says why (the panel's Find's doors, in the face's words).
 struct Asked
 {
 	int32					mode;
 	KFCRubyConditions		ruby;
 	KFCKentenConditions		kenten;
+	KFCWarichuConditions	warichu;
 
 	Asked() : mode(kKFCRubySearchMode) {}
-	int32 Scope() const { return (mode == kKFCKentenSearchMode) ? kenten.scope : ruby.scope; }
+	int32 Scope() const { return (mode == kKFCKentenSearchMode) ? kenten.scope : (mode == kKFCWarichuSearchMode) ? warichu.scope : ruby.scope; }
 };
 
 bool ReadAsked(int32 mode, Asked& out, PMString& outWhy)
 {
 	out.mode = mode;
+	if (mode == kKFCWarichuSearchMode)		// (the Warichu kind asks nothing a Find Next could refuse - docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md A5)
+	{
+		(void)KFCWarichuSearch::IsTabCurrent(&out.warichu);
+		return true;
+	}
 	if (mode == kKFCKentenSearchMode)
 	{
 		(void)KFCKentenSearch::IsTabCurrent(&out.kenten);
@@ -156,6 +166,7 @@ bool WalkRange(const KFCTableLook& look, Asked& asked, std::vector<KFCBookScope:
 	{
 		std::vector<KFCResultModel::Hit> hits;
 		const bool walked = (asked.mode == kKFCKentenSearchMode) ? KFCKentenSearch::WalkForFace(outDocs[d].docRef, asked.kenten, part, hits)
+			: (asked.mode == kKFCWarichuSearchMode) ? KFCWarichuSearch::WalkForFace(outDocs[d].docRef, asked.warichu, part, hits)
 			: KFCRubySearch::WalkForFace(outDocs[d].docRef, asked.ruby, part, hits);
 		if (!walked)
 			continue;
@@ -292,6 +303,11 @@ bool KFCFaceText::ChangeFound(int32 mode, const KFCTableFound& found, PMString& 
 {
 	outWords.Clear();
 	outWords.SetTranslatable(kFalse);
+	if (mode == kKFCWarichuSearchMode)		// (the face shows no Change for it; a caller that never went through the face)
+	{
+		outWords.Append(kWarichuChangesNothing);
+		return false;
+	}
 	Asked asked;
 	if (!ReadAsked(mode, asked, outWords))
 		return false;
@@ -341,6 +357,11 @@ bool KFCFaceText::ChangeAll(int32 mode, const KFCTableLook& look, int32& outChan
 	outMatched = 0;
 	outWords.Clear();
 	outWords.SetTranslatable(kFalse);
+	if (mode == kKFCWarichuSearchMode)		// (ChangeFound's door)
+	{
+		outWords.Append(kWarichuChangesNothing);
+		return false;
+	}
 	Asked asked;
 	if (!ReadAsked(mode, asked, outWords))
 		return false;

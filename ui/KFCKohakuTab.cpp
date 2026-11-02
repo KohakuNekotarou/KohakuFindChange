@@ -82,6 +82,7 @@ const int32 kKindQRCode = 0;
 const int32 kKindTable = 1;
 const int32 kKindRuby = 2;
 const int32 kKindKenten = 3;
+const int32 kKindWarichu = 4;		// (docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md A1 - a Japanese InDesign's, as Ruby and Kenten)
 
 // Search:'s entries: the .fr's two for every kind, the three after them for what stands in a story's text (ShowScopeEntries).
 const IWalkerScopeFactoryUtils::WalkScopeType kScopeOfEntry[] =
@@ -104,12 +105,13 @@ IPMUnknown* gShownFace = nil;	// the face, while shown - from its AutoAttach to 
 int32 gKind = kKindQRCode;	// its Find: - QR Code at launch, the tab InDesign's dialog first had
 // WHAT EACH KIND LAST SAID ON THE FACE'S TWO LINES (docs/superpowers/specs/2026-11-02-kfc-kohaku-face-buttons-design.md L4 - the author, 11-02: "the same place as the other messages"): the first line, what a button or the list
 // said; the second, why what was found could not be selected. One pair of lines for every kind - shown again as its kind is.
-const int32 kKindCount = 4;
+const int32 kKindCount = 5;
 PMString gSaid[kKindCount][2];
 int32 gScope = IWalkerScopeFactoryUtils::kDocumentScope;	// its Search: - Document at launch
 KFCTableConditions gTable;	// what the Table part asks, kept from its widgets (its scope is gScope)
 KFCRubyConditions gRuby;	// what the Ruby part asks
 KFCKentenConditions gKenten;	// what the Kenten part asks
+KFCWarichuConditions gWarichu;	// what the Warichu kind asks: its icons alone
 
 // THE RUBY PART'S BOXES (docs/superpowers/specs/2026-11-01-kfc-kohaku-trial-fixes-design.md F14 - F16): what each holds, as gRuby holds it (KeepFromBoxes). The widgets' own text is the same - the face can be hidden and written (a saved query) with
 // none to read. Find's Ruby: and Base Text: a column each, the Change side's reading over the same columns; its base text is Find's.
@@ -160,6 +162,7 @@ void TakeTestReset()
 		gTable = KFCTableConditions();
 		gRuby = KFCRubyConditions();
 		gKenten = KFCKentenConditions();
+		gWarichu = KFCWarichuConditions();
 		BoxesFromKept();
 		for (int32 k = 0; k < kKindCount; ++k)
 		{
@@ -285,7 +288,7 @@ bool SelectionAsLeft()
 // The model's mode for the text kinds' buttons (IKFCRuns::FaceTextNext and the rest).
 int32 TextModeOfKind()
 {
-	return (gKind == kKindKenten) ? static_cast<int32>(kKFCKentenSearchMode) : static_cast<int32>(kKFCRubySearchMode);
+	return (gKind == kKindKenten) ? static_cast<int32>(kKFCKentenSearchMode) : (gKind == kKindWarichu) ? static_cast<int32>(kKFCWarichuSearchMode) : static_cast<int32>(kKFCRubySearchMode);
 }
 
 // DOES THE KIND'S CHANGE SIDE ASK ANYTHING (B5)? Table: a style, or Clear Overrides. Ruby: with Text Without Ruby a reading in a Change Ruby To box; with the rest always - no reading takes the ruby off (the author,
@@ -313,7 +316,7 @@ bool ChangeSideAsks()
 // Change and Change/Find are for what Find Next found, while it is selected and has not been written; all of them want something on the Change side. Grey otherwise, as the Text tab's after the selection moves or a Change.
 void ShowFaceButtons(IPanelControlData* panel)
 {
-	if (panel == nil || gKind == kKindQRCode)
+	if (panel == nil || gKind == kKindQRCode || gKind == kKindWarichu)		// (no Change buttons on them: they change nothing)
 		return;
 	const bool asks = ChangeSideAsks();
 	const bool onFound = asks && gFoundTable.doc != UIDRef::gNull && gFoundSelected && !gFoundWritten && SelectionAsLeft();
@@ -1202,7 +1205,7 @@ bool JapaneseKinds()
 	return !asAnother && LocaleSetting::GetLocale().GetUserInterfaceId() == k_jaJP;
 }
 
-// FIND:'S ENTRIES: the .fr's two for every language, Ruby and Kenten after them in a Japanese InDesign - and the kind selected. Not heard (notifyOfChange kFalse).
+// FIND:'S ENTRIES: the .fr's two for every language, Ruby, Kenten and Warichu after them in a Japanese InDesign - and the kind selected. Not heard (notifyOfChange kFalse).
 void ShowKindEntries(IPMUnknown* face)
 {
 	InterfacePtr<IPanelControlData> panel(face, UseDefaultIID());
@@ -1218,6 +1221,8 @@ void ShowKindEntries(IPMUnknown* face)
 			strings->AddString(PMString(kKFCKohakuTabRubyKey, PMString::kTranslateDuringCall), IStringListControlData::kEnd, kFalse, kFalse);
 			strings->AddString(PMString(kKFCKohakuTabKentenKey, PMString::kTranslateDuringCall), IStringListControlData::kEnd, kFalse, kFalse);
 		}
+		if (strings->Length() <= kKindWarichu)
+			strings->AddString(PMString(kKFCKohakuTabWarichuKindKey, PMString::kTranslateDuringCall), IStringListControlData::kEnd, kFalse, kFalse);
 	}
 	else
 	{
@@ -1232,7 +1237,7 @@ void ShowKindEntries(IPMUnknown* face)
 // A test build's trace names the kind (run.ps1's cases read them).
 const char* KindWord()
 {
-	return (gKind == kKindTable) ? "TBLTAB" : (gKind == kKindRuby) ? "RUBYTAB" : (gKind == kKindKenten) ? "KENTAB" : "QRTAB";
+	return (gKind == kKindTable) ? "TBLTAB" : (gKind == kKindRuby) ? "RUBYTAB" : (gKind == kKindKenten) ? "KENTAB" : (gKind == kKindWarichu) ? "WARITAB" : "QRTAB";
 }
 
 // WHAT SEARCH: IS FOR THE KIND NOW: a QR code's frame stands in no story's text, so a part of a story picked for the others reads as Document on QR Code - and is there again when they come back
@@ -1340,24 +1345,34 @@ bool IsSwitchIcon(const WidgetID& widget)
 	return false;
 }
 
-// The icons of the kind now: shown for Ruby and Kenten, each as that kind holds it. Not heard (notifyOfChange kFalse).
+// The kind's own icons (Ruby's, Kenten's, Warichu's) - the one place each is kept.
+KFCOwnSwitches& SwitchesOfKind()
+{
+	return (gKind == kKindKenten) ? gKenten.switches : (gKind == kKindWarichu) ? gWarichu.switches : gRuby.switches;
+}
+
+// The icons of the kind now: shown for Ruby, Kenten and Warichu, each as that kind holds it - Warichu's without Kana and Width Sensitive (no text is compared - the warichu-tcy spec's A2). Not heard
+// (notifyOfChange kFalse).
 void ShowSwitches(IPanelControlData* panel)
 {
-	const bool shown = (gKind == kKindRuby || gKind == kKindKenten);
-	const KFCOwnSwitches& kept = (gKind == kKindKenten) ? gKenten.switches : gRuby.switches;
+	const bool shown = (gKind == kKindRuby || gKind == kKindKenten || gKind == kKindWarichu);
+	const KFCOwnSwitches& kept = SwitchesOfKind();
 	for (int32 k = 0; k < kSwitchIconCount; ++k)
 	{
-		ShowPart(panel, kSwitchIcons[k].widget, shown);
-		if (shown)
+		const bool comparesText = (kSwitchIcons[k].widget == kKFCSwitchKanaWidgetID || kSwitchIcons[k].widget == kKFCSwitchWidthWidgetID);
+		const bool shownHere = shown && !(comparesText && gKind == kKindWarichu);
+		ShowPart(panel, kSwitchIcons[k].widget, shownHere);
+		if (shownHere)
 			SetBox(panel, kSwitchIcons[k].widget, kept.*(kSwitchIcons[k].value));
 	}
 }
 
-// THE CHOSEN KIND'S PART, the others away, its buttons, its lines, and Search: for it. Every kind has Find Next and Find in KFC; Table, Ruby and Kenten Change, Change All and Change/Find (QR Code writes nothing).
+// THE CHOSEN KIND'S PART, the others away, its buttons, its lines, and Search: for it. Every kind has Find Next and Find in KFC; Table, Ruby and Kenten Change, Change All and Change/Find (QR Code and
+// Warichu write nothing).
 void ShowKind(IPMUnknown* face)
 {
 	InterfacePtr<IPanelControlData> panel(face, UseDefaultIID());
-	const bool writes = (gKind != kKindQRCode);
+	const bool writes = (gKind != kKindQRCode && gKind != kKindWarichu);
 	ShowPart(panel, kKFCQRTabFindNextWidgetID, true);
 	ShowPart(panel, kKFCTableTabChangeWidgetID, writes);
 	ShowPart(panel, kKFCTableTabChangeAllWidgetID, writes);
@@ -1449,6 +1464,13 @@ bool KFCKohakuTab::IsKentenCurrent(KFCKentenConditions& outConditions)
 	return FaceIsCurrent() && gKind == kKindKenten;
 }
 
+bool KFCKohakuTab::IsWarichuCurrent(KFCWarichuConditions& outConditions)
+{
+	outConditions = gWarichu;
+	outConditions.scope = ScopeAsked();
+	return FaceIsCurrent() && gKind == kKindWarichu;
+}
+
 void KFCKohakuTab::YieldToSavedQuery()
 {
 	gYield = true;
@@ -1457,7 +1479,7 @@ void KFCKohakuTab::YieldToSavedQuery()
 
 bool KFCKohakuTab::OffersQuery(const KFCKohakuQueryData& query)
 {
-	return (query.mode != kKFCRubySearchMode && query.mode != kKFCKentenSearchMode) || JapaneseKinds();
+	return (query.mode != kKFCRubySearchMode && query.mode != kKFCKentenSearchMode && query.mode != kKFCWarichuSearchMode) || JapaneseKinds();
 }
 
 void KFCKohakuTab::StateQuery(const KFCKohakuQueryData& query, bool forItsFind, int32 scope)
@@ -1478,6 +1500,11 @@ void KFCKohakuTab::StateQuery(const KFCKohakuQueryData& query, bool forItsFind, 
 	{
 		gKind = kKindKenten;
 		gKenten = query.kenten;
+	}
+	else if (query.mode == kKFCWarichuSearchMode)
+	{
+		gKind = kKindWarichu;
+		gWarichu = query.warichu;
 	}
 	else
 		gKind = kKindQRCode;
@@ -1507,10 +1534,11 @@ void KFCKohakuTab::QueryOfFace(KFCKohakuQueryData& out)
 {
 	out = KFCKohakuQueryData();
 	out.mode = (gKind == kKindTable) ? static_cast<int32>(kKFCTableSearchMode) : (gKind == kKindRuby) ? static_cast<int32>(kKFCRubySearchMode)
-		: (gKind == kKindKenten) ? static_cast<int32>(kKFCKentenSearchMode) : static_cast<int32>(kKFCQRCodeSearchMode);
+		: (gKind == kKindKenten) ? static_cast<int32>(kKFCKentenSearchMode) : (gKind == kKindWarichu) ? static_cast<int32>(kKFCWarichuSearchMode) : static_cast<int32>(kKFCQRCodeSearchMode);
 	out.table = gTable;
 	out.ruby = gRuby;
 	out.kenten = gKenten;
+	out.warichu = gWarichu;
 }
 
 void KFCKohakuTab::ShutdownCleanup()
@@ -1527,6 +1555,7 @@ void KFCKohakuTab::ShutdownCleanup()
 	gTable = KFCTableConditions();
 	gRuby = KFCRubyConditions();
 	gKenten = KFCKentenConditions();
+	gWarichu = KFCWarichuConditions();
 	gFindPaths = std::vector<PMString>();
 	gChangePaths = std::vector<PMString>();
 	gFoundTable = KFCTableFound();
@@ -1731,7 +1760,7 @@ public:
 			// FIND: CHANGED - another part, and KFC's Find looks for it, whatever a saved query had stated: said in the panel's title and the Application Bar's field, as a switch of tab is.
 			InterfacePtr<IDropDownListController> list(view, UseDefaultIID());
 			const int32 entry = (list != nil) ? list->GetSelected() : -1;
-			if (entry >= kKindQRCode && entry <= kKindKenten)
+			if (entry >= kKindQRCode && entry <= kKindWarichu)
 				gKind = entry;
 			gYield = false;
 			ForgetFound();		// (Find Next starts from the first again)
@@ -1841,7 +1870,7 @@ public:
 		else if (protocol == IID_ITRISTATECONTROLDATA && (theChange == kTrueStateMessage || theChange == kFalseStateMessage) && IsSwitchIcon(widget))
 		{
 			// AN ICON, THE KIND'S OWN: InDesign's toggling icon button (the Text tab's own - kADBEIconToggleButtonWidgetBoss, in its class list): a press leaves it as it says.
-			KFCOwnSwitches& kept = (gKind == kKindKenten) ? gKenten.switches : gRuby.switches;
+			KFCOwnSwitches& kept = SwitchesOfKind();
 			for (int32 k = 0; k < kSwitchIconCount; ++k)
 				if (widget == kSwitchIcons[k].widget)
 					kept.*(kSwitchIcons[k].value) = (theChange == kTrueStateMessage);

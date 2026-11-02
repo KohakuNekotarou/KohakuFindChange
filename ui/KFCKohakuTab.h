@@ -55,6 +55,10 @@ namespace KFCKohakuTab
 	/** The same for Kenten (IKFCUIServices::KentenTabConditions). */
 	bool IsKentenCurrent(KFCKentenConditions& outConditions);
 
+	/** IS THE WARICHU KIND FIND/CHANGE'S NOW (docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md A1 - asked by the model through IKFCUIServices::WarichuTabConditions), and what it asks:
+	    its icons and Search:. */
+	bool IsWarichuCurrent(KFCWarichuConditions& outConditions);
+
 	/** A SAVED QUERY STATES ITS OWN TAB (the query dialog's Find - KFCQueryDialog, once the query is loaded): the Kohaku tab steps aside until the person shows its face again or picks in its Find:, so
 	    the Find searches what the query says. */
 	void YieldToSavedQuery();

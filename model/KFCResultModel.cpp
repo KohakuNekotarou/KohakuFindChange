@@ -419,7 +419,7 @@ bool KFCResultModel::ListIsFrames()
 
 int32 KFCResultModel::ListLimit()
 {
-	return ListLimitFor(ListHoldsObjects() || ListHasOwnChangeTab());		// (a table or ruby list's are text rows, one a thing: the object lists' number)
+	return ListLimitFor(ListHoldsObjects() || ListIsOwnKind());		// (a table, ruby, kenten or warichu list's are text rows, one a thing: the object lists' number)
 }
 
 int32 KFCResultModel::ListLimitFor(bool objectRows)
@@ -459,9 +459,19 @@ bool KFCResultModel::ListIsRuby()
 	return gHeader.searchMode == static_cast<int32>(kKFCRubySearchMode);
 }
 
+bool KFCResultModel::ListIsWarichu()
+{
+	return gHeader.searchMode == static_cast<int32>(kKFCWarichuSearchMode);
+}
+
 bool KFCResultModel::ListHasOwnChangeTab()
 {
 	return ListIsTables() || ListIsRuby() || ListIsKenten();
+}
+
+bool KFCResultModel::ListIsOwnKind()
+{
+	return ListHasOwnChangeTab() || ListIsWarichu();
 }
 
 bool KFCResultModel::ListDrawsTwoLines()

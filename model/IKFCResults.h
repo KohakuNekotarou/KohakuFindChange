@@ -147,6 +147,9 @@ public:
 	virtual bool ListIsTables() = 0;
 	/** = KFCResultModel::ListDrawsTwoLines (appended) - the live list's hit rows stand on two lines (ruby, kenten): how tall a row is, and whether the tree may be promised one height. */
 	virtual bool ListDrawsTwoLines() = 0;
+	/** = KFCResultModel::ListIsOwnKind (appended - docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md) - the live list is a Kohaku+ kind's, with a Change side or not (Table, Ruby, Kenten,
+	    Warichu): its conditions are its tab's - not searched again by story, not narrowed (the heading's menu and the story rows' grey by it, kept per tier). */
+	virtual bool ListIsOwnKind() = 0;
 };
 
 #endif // __IKFCResults_h__

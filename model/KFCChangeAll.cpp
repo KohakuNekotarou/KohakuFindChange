@@ -323,6 +323,11 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 		outSummary.Append("Change All: the Find/Change dialog is on Table on the Kohaku+ tab. List the tables and Replace their rows.");
 		return 0;
 	}
+	if (KFCSearchEngine::CurrentSearchMode() == kKFCWarichuSearchMode)	// (the Warichu kind: it changes nothing, as QR Code's)
+	{
+		outSummary.Append("Change All: the Find/Change dialog is on Warichu on the Kohaku+ tab. This panel lists the warichu there - nothing to change.");
+		return 0;
+	}
 	if (KFCSearchEngine::CurrentSearchMode() == kKFCKentenSearchMode)	// (the Kenten kind's the same)
 	{
 		outSummary.Append("Change All: the Find/Change dialog is on Kenten on the Kohaku+ tab. List the text and Replace its rows.");

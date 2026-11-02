@@ -920,6 +920,7 @@ DECLARE_PMID(kWidgetIDSpace, kKFCKentenButtonsWidgetID, kKFCPrefix + 85)
 #define kKFCTableTabChangeAllKey		kKFCStringPrefix "kKFCTableTabChangeAllKey"
 #define kKFCTableTabChangeFindKey		kKFCStringPrefix "kKFCTableTabChangeFindKey"
 #define kKFCKohakuTabKentenKey			kKFCStringPrefix "kKFCKohakuTabKentenKey"
+#define kKFCKohakuTabWarichuKindKey		kKFCStringPrefix "kKFCKohakuTabWarichuKindKey"	// Find:'s fifth, a Japanese InDesign's (key_collisions.py: "kKFCKohakuTabWarichuKey" had kKFCRubyListSaveFileKey's length and sum)
 #define kKFCKentenTabWithKey			kKFCStringPrefix "kKFCKentenTabWithKey"
 #define kKFCKentenTabWithoutKey			kKFCStringPrefix "kKFCKentenTabWithoutKey"
 #define kKFCKentenTabMarkKey			kKFCStringPrefix "kKFCKentenTabMarkKey"

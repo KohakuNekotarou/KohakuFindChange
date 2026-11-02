@@ -61,6 +61,7 @@ namespace
 		{ "Table",			kKFCTableSearchMode },
 		{ "Ruby",			kKFCRubySearchMode },
 		{ "Kenten",			kKFCKentenSearchMode },
+		{ "Warichu",		kKFCWarichuSearchMode },
 	};
 	const int32 kKindCount = static_cast<int32>(sizeof(kKinds) / sizeof(kKinds[0]));
 	const int32 kFolderKinds = 5;	// the first five: the kinds with a folder
@@ -127,7 +128,7 @@ namespace
 		}
 	}
 
-	/** THE KOHAKU+ TAB'S QUERIES, of the files in the queries' folder itself: Ruby and Kenten in a Japanese InDesign alone, as the tab offers them (KFCKohakuTab.cpp's JapaneseKinds, and its test switch). */
+	/** THE KOHAKU+ TAB'S QUERIES, of the files in the queries' folder itself: Ruby, Kenten and Warichu in a Japanese InDesign alone, as the tab offers them (KFCKohakuTab.cpp's JapaneseKinds, and its test switch). */
 	void CollectKohakuQueries(std::vector<KFCSavedQuery>& out)
 	{
 		IDFile folder;
@@ -138,7 +139,7 @@ namespace
 		const bool japanese = !KFC_DIAG_FAULT("not-japanese") && LocaleSetting::GetLocale().GetUserInterfaceId() == k_jaJP;
 		for (size_t k = 0; k < found.size(); ++k)
 			if (found[k].mode == kKFCQRCodeSearchMode || found[k].mode == kKFCTableSearchMode
-				|| (japanese && (found[k].mode == kKFCRubySearchMode || found[k].mode == kKFCKentenSearchMode)))
+				|| (japanese && (found[k].mode == kKFCRubySearchMode || found[k].mode == kKFCKentenSearchMode || found[k].mode == kKFCWarichuSearchMode)))
 				out.push_back(found[k]);
 	}
 

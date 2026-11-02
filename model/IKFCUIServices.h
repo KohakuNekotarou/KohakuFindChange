@@ -176,6 +176,8 @@ public:
 	virtual bool				RubyTabConditions(KFCRubyConditions& outConditions) = 0;
 	/** IS THE KOHAKU+ TAB'S KENTEN KIND FIND/CHANGE'S NOW (appended; KFCKentenSearch::IsTabCurrent asks it) - the same for its conditions. */
 	virtual bool				KentenTabConditions(KFCKentenConditions& outConditions) = 0;
+	/** IS THE KOHAKU+ TAB'S WARICHU KIND FIND/CHANGE'S NOW (appended - docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md; KFCWarichuSearch::IsTabCurrent asks it) - the same for its conditions. */
+	virtual bool				WarichuTabConditions(KFCWarichuConditions& outConditions) = 0;
 };
 
 /** HOW THE MODEL HALF ASKS FOR IKFCUIServices - the only way. IKFCUIServices has no kDefaultIID, so a Query of its

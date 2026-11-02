@@ -1167,7 +1167,7 @@ QueryCompared CompareQueryWithSearch()
 	// whatever tab the dialog is on, and its rows are never replaced (CanReplaceHit). A query run's list has none either: no
 	// search made it, and its rows are not written again (RefuseRunListRow). Nor a table list: what it asks is the Table tab's, and
 	// its Replace reads that tab as it stands (WriteOwnTabRows).
-	if (KFCResultModel::ListIsQRCodes() || KFCResultModel::ListIsRunList() || KFCResultModel::ListHasOwnChangeTab())
+	if (KFCResultModel::ListIsQRCodes() || KFCResultModel::ListIsRunList() || KFCResultModel::ListIsOwnKind())
 		return kQueryUnchanged;
 
 	// ----- (1) the TAB the results were searched with -----
@@ -1319,6 +1319,17 @@ static bool RefuseRunListRow(const char* what, PMString& outStatus)
 	return true;
 }
 
+// A WARICHU LIST'S ROWS ARE NOT REPLACED (docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md A4 - the Warichu kind changes nothing, as QR Code's): CanReplaceHit greys them; this door is for
+// a press that never went through the menu.
+static bool RefuseWarichuRow(PMString& outStatus)
+{
+	if (!KFCResultModel::ListIsWarichu())
+		return false;
+	outStatus = "Replace: Find: Warichu lists the warichu and changes nothing - a row is not replaced.";
+	outStatus.SetTranslatable(kFalse);
+	return true;
+}
+
 // A LIST OF A TAB OF KFC'S WITH A CHANGE SIDE IS WRITTEN BY ITS REPLACE ALONE (the table tab spec's T11, the ruby tab spec's R9): no other write of a text row is what its tab asks. The
 // menu greys them; these doors are for a press that never went through it.
 static bool RefuseOwnTabRow(const char* what, PMString& outStatus)
@@ -1339,8 +1350,9 @@ bool KFCReplaceEngine::CanReplaceHit(int32 chapterIdx, int32 hitIdx)
 	// Nothing greys it (WhyGreyed - the one place the reasons are asked: the menu's grey state and the rows a Replace of
 	// rows selected together leaves are the same question).
 	// A QR CODE LIST'S ROWS ARE NEVER REPLACED (QR-18 - the author: "no replace"): greyed whatever the row says
-	// - the doors that turn a press away name it (ReplaceHit, ReplaceHits, KFCObjectReplace). Nor a query run's (RefuseRunListRow).
-	if (KFCResultModel::ListIsQRCodes() || KFCResultModel::ListIsRunList())
+	// - the doors that turn a press away name it (ReplaceHit, ReplaceHits, KFCObjectReplace). Nor a query run's (RefuseRunListRow). Nor a warichu list's: the Warichu kind changes nothing
+	// (docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md A4 - as QR Code's).
+	if (KFCResultModel::ListIsQRCodes() || KFCResultModel::ListIsRunList() || KFCResultModel::ListIsWarichu())
 		return false;
 	return WhyGreyed(chapterIdx, hitIdx) == kGreyedNot;
 }
@@ -2230,7 +2242,7 @@ bool KFCReplaceEngine::ReplaceHit(int32 chapterIdx, int32 hitIdx, PMString& outS
 		outStatus.SetTranslatable(kFalse);
 		return false;
 	}
-	if (RefuseRunListRow("Replace", outStatus))
+	if (RefuseWarichuRow(outStatus) || RefuseRunListRow("Replace", outStatus))
 		return false;
 	if (KFCResultModel::ListHasOwnChangeTab())
 	{
@@ -2273,7 +2285,7 @@ bool KFCReplaceEngine::ReplaceHits(const KFCRowsByChapter& rowsByChapter, PMStri
 		outStatus.SetTranslatable(kFalse);
 		return false;
 	}
-	if (RefuseRunListRow("Replace", outStatus))
+	if (RefuseWarichuRow(outStatus) || RefuseRunListRow("Replace", outStatus))
 		return false;
 	if (KFCResultModel::ListHasOwnChangeTab())
 		return ReplaceOwnTabRows(rowsByChapter, outStatus);

@@ -109,6 +109,7 @@ namespace
 		virtual bool ListHasOwnChangeTab() { return false; }
 		virtual bool ListIsTables() { return false; }
 		virtual bool ListDrawsTwoLines() { return false; }
+		virtual bool ListIsOwnKind() { return false; }
 	};
 
 	class KFCRunsStandInImpl : public IKFCRuns

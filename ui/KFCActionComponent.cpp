@@ -1091,7 +1091,7 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 				// rather than greying the item, so the user learns why (KFCSearchEngine::SearchStoryAgain).
 				// (Grey over a query run's list: no search made it - the run list spec's R12.)
 				int32 chapter = -1, group = -1;
-				const bool enable = RightClickedStory(widget, chapter, group) && !KFCResults()->ListIsRunList() && !KFCResults()->ListHasOwnChangeTab();
+				const bool enable = RightClickedStory(widget, chapter, group) && !KFCResults()->ListIsRunList() && !KFCResults()->ListIsOwnKind();
 				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 				break;
 			}

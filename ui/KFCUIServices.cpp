@@ -598,6 +598,11 @@ public:
 	{
 		return KFCKohakuTab::IsKentenCurrent(outConditions);
 	}
+
+	virtual bool WarichuTabConditions(KFCWarichuConditions& outConditions)
+	{
+		return KFCKohakuTab::IsWarichuCurrent(outConditions);
+	}
 };
 
 CREATE_PMINTERFACE(KFCUIServices, kKFCUIServicesImpl)

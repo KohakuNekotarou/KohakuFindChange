@@ -125,6 +125,9 @@ namespace KFCQueryCopier
 	/** A KENTEN LIST'S (KFCKentenSearch): the mode, kKFCKentenSearchMode, and its find side - the same. */
 	void CaptureKenten(KFCQueryCopy& out, int32 kind, const PMString& base, int32 mark);
 
+	/** A WARICHU LIST'S (KFCWarichuSearch - docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md): the mode, kKFCWarichuSearchMode - it asks nothing but its icons (ownSwitches, set by the caller). */
+	void CaptureWarichu(KFCQueryCopy& out);
+
 	/** State `copy` back into Find/Change: the tab, then every field that differs from what the dialog holds now, with the
 	    dialog's own commands (KFCFindChangeCmds; the formats with kClearFindFormatCmdBoss / kClearChangeFormatCmdBoss and
 	    kFindChangeFormatCmdBoss). False = a command failed - outWhat names the field; the ones before it went through

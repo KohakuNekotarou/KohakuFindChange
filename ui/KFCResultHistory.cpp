@@ -226,7 +226,7 @@ namespace
 			? (treeMgr->IsNodeExpanded(KFCResultNodeID::CreateLiveTier()) != kFalse) : true;
 		out.holdsObjects = KFCResults()->ListHoldsObjects();
 		out.holdsQRCodes = KFCResults()->ListIsQRCodes();
-		out.holdsOwnChangeTab = KFCResults()->ListHasOwnChangeTab();
+		out.holdsOwnChangeTab = KFCResults()->ListIsOwnKind();		// (a warichu list's too: its conditions are its tab's)
 		out.holdsTables = KFCResults()->ListIsTables();
 		out.holdsRunList = KFCResults()->ListIsRunList();
 		CopyRows(treeMgr, KFCResultNodeID::CreateLiveTier(), -1, out);
@@ -568,7 +568,7 @@ bool KFCResultHistory::TierHoldsTables(int32 tier)
 bool KFCResultHistory::TierHoldsOwnChangeTab(int32 tier)
 {
 	if (tier < 0)
-		return KFCResults()->ListHasOwnChangeTab();
+		return KFCResults()->ListIsOwnKind();
 	return tier < static_cast<int32>(gKept.size()) && gKept[static_cast<size_t>(tier)].holdsOwnChangeTab;
 }
 
@@ -665,6 +665,12 @@ namespace
 			if (asked.overridesOnly)
 				label.Append(" +");
 			label.Append("\"");
+			return label;
+		}
+		// THE WARICHU KIND ASKS NOTHING BUT ITS ICONS (docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md A3): Find:"[Warichu]".
+		if (mode == kKFCWarichuSearchMode)
+		{
+			label.Append(" Find:\"[Warichu]\"");
 			return label;
 		}
 		// THE KENTEN KIND'S THE SAME: Find:"base<mark>" as its rows draw it; Find:"base" (no kenten) for Text Without Kenten; [Any Kenten] with nothing asked.

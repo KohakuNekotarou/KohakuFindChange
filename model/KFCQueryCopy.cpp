@@ -297,6 +297,13 @@ void KFCQueryCopier::CaptureKenten(KFCQueryCopy& out, int32 kind, const PMString
 	out.valid = true;
 }
 
+void KFCQueryCopier::CaptureWarichu(KFCQueryCopy& out)
+{
+	out = KFCQueryCopy();
+	out.mode = static_cast<int32>(kKFCWarichuSearchMode);
+	out.valid = true;
+}
+
 void KFCQueryCopier::CaptureRuby(KFCQueryCopy& out, int32 kind, const PMString& base, const PMString& reading)
 {
 	out = KFCQueryCopy();
@@ -324,8 +331,8 @@ bool KFCQueryCopier::Apply(const KFCQueryCopy& copy, PMString& outWhat)
 		return Failed(outWhat, "there is no query to put back");
 	// A QR CODE LIST'S COPY STATES NOTHING: InDesign has no such mode to state (KFCModelTypes.h - never handed to a command),
 	// and no setting of Find/Change's steers its walk (KFCQRSearch). Nor a query run's list's: it has no query (KFCRunList). Nor a
-	// table list's: what it asks is the Table tab's (KFCTableSearch). Nor a ruby or kenten list's.
-	if (copy.mode == kKFCQRCodeSearchMode || copy.mode == kKFCRunListSearchMode || copy.mode == kKFCTableSearchMode || copy.mode == kKFCRubySearchMode || copy.mode == kKFCKentenSearchMode)
+	// table list's: what it asks is the Table tab's (KFCTableSearch). Nor a ruby, kenten or warichu list's.
+	if (copy.mode == kKFCRunListSearchMode || KFCIsKohakuQueryMode(copy.mode))
 		return true;
 	using namespace KFCFindChangeCmds;
 	const int32 mode = copy.mode;
@@ -456,8 +463,8 @@ bool KFCQueryCopier::Matches(const KFCQueryCopy& copy, PMString& outWhat)
 	outWhat.SetTranslatable(kFalse);
 	if (!copy.valid)
 		return Failed(outWhat, "there is no query to compare");
-	if (copy.mode == kKFCQRCodeSearchMode || copy.mode == kKFCRunListSearchMode || copy.mode == kKFCTableSearchMode || copy.mode == kKFCRubySearchMode || copy.mode == kKFCKentenSearchMode)
-		return true;		// a QR code list's copy, a query run's list's, a table, ruby or kenten list's: no field of Find/Change's is its (Apply's note)
+	if (copy.mode == kKFCRunListSearchMode || KFCIsKohakuQueryMode(copy.mode))
+		return true;		// a QR code list's copy, a query run's list's, a table, ruby, kenten or warichu list's: no field of Find/Change's is its (Apply's note)
 	KFCQueryCopy now;
 	Capture(now);
 	const char* const differs = FirstDifference(copy, now);

@@ -343,6 +343,18 @@ struct KFCKentenConditions
 	KFCKentenConditions() : kind(kKFCKentenFindWith), mark(0), changeTo(0), removeKenten(false), scope(0) {}
 };
 
+/** THE WARICHU KIND'S "SEARCH MODE" (the author, 11-02 - docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md A1; KFCWarichuSearch.h): the Kenten kind's for its own. KFC'S ALONE. */
+enum { kKFCWarichuSearchMode = 105 };
+
+/** WHAT THE WARICHU KIND ASKS (the face's - KFCKohakuTab, read by IKFCUIServices::WarichuTabConditions): its icons and its Search: - nothing else; it changes nothing (A2). */
+struct KFCWarichuConditions
+{
+	KFCOwnSwitches	switches;	// the icons (no Kana or Width Sensitive: no text is compared)
+	int32			scope;		// its Search: - as KFCRubyConditions::scope
+
+	KFCWarichuConditions() : scope(0) {}
+};
+
 /** A KIND OF KENTEN AS THE PAGE'S OWN MARKS READ (IKentenStyle::KentenKind's numbers: U+FE45 the sesame dot and the rest) - what a kenten row and a kenten list's name draw. Custom, a glyph of the person's
     which they do not read: an asterisk. */
 inline UTF32TextChar KFCKentenMarkCharacter(int32 mark)
@@ -402,7 +414,7 @@ struct KFCTableConditions
 /** IS THIS MODE ONE A SAVED QUERY OF THE KOHAKU+ TAB IS OF (KFCKohakuQuery.h)? */
 inline bool KFCIsKohakuQueryMode(int32 mode)
 {
-	return mode == kKFCQRCodeSearchMode || mode == kKFCTableSearchMode || mode == kKFCRubySearchMode || mode == kKFCKentenSearchMode;
+	return mode == kKFCQRCodeSearchMode || mode == kKFCTableSearchMode || mode == kKFCRubySearchMode || mode == kKFCKentenSearchMode || mode == kKFCWarichuSearchMode;
 }
 
 /** WHAT A SAVED QUERY OF THE KOHAKU+ TAB HOLDS: its kind (kKFCTableSearchMode ...) and what that kind asks. A query's scope is no part of it: it runs on what Search: says when it runs. */
@@ -412,6 +424,7 @@ struct KFCKohakuQueryData
 	KFCTableConditions	table;
 	KFCRubyConditions	ruby;
 	KFCKentenConditions	kenten;
+	KFCWarichuConditions	warichu;
 
 	KFCKohakuQueryData() : mode(-1) {}
 };
