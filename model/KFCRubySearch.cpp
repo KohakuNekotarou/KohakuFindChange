@@ -16,6 +16,7 @@
 #include "ICommand.h"
 #include "IComposeScanner.h"			// QueryAttributeAt - a run's reading
 #include "IDataBase.h"
+#include "IDocument.h"					// Save List...: the front document
 #include "IRubyStrand.h"				// IRubyAttrStrand - the file is IRubyStrand.h, the class is not
 #include "IStoryList.h"
 #include "ITextAttrBoolean.h"			// kTARubyAttrBoss, kTAMojiRubyBoss
@@ -610,6 +611,63 @@ bool WalkDoc(const UIDRef& docRef, const KFCRubyConditions& asked, const std::ve
 	return true;
 }
 
+// THE WORDS OF ONE STORY FOR SAVE LIST...: the rubies a search of it would take (the icons, the part of the document), those that touch one another one word - characters given their readings one by one are a word's, as Text With Ruby's Ruby: reads them.
+void CollectWords(const UIDRef& storyRef, ITextModel* model, KFCOwnScope& taken, const std::vector<KFCSearchEngine::ListedPlace>* part, KFCRubyList::ListMaker& ioMaker)
+{
+	InterfacePtr<IRubyAttrStrand> strand(static_cast<IRubyAttrStrand*>(model->QueryStrand(kRubyAttrStrandBoss, IRubyAttrStrand::kDefaultIID)));
+	InterfacePtr<IComposeScanner> scanner(model, UseDefaultIID());
+	if (strand == nil || scanner == nil)
+		return;
+	std::vector<RubyRun> all;
+	RunsIn(strand, scanner, 0, model->TotalLength(), all);
+	const auto takes = [&](const RubyRun& run)
+	{
+		return !StandsInSetAsideText(model, run.start) && (part == nil || KFCSearchEngine::StretchesTouch(*part, storyRef.GetUID(), run.start, run.end)) && taken.Takes(storyRef, model, run.start);
+	};
+	size_t r = 0;
+	while (r < all.size())
+	{
+		if (!takes(all[r]))
+		{
+			++r;
+			continue;
+		}
+		size_t end = r + 1;
+		while (end < all.size() && all[end].start == all[end - 1].end && takes(all[end]))
+			++end;
+		KFCRubyList::Entry word;
+		word.word = U32Of(KFCSearchEngine::ReadText(storyRef, all[r].start, all[end - 1].end - all[r].start));
+		for (size_t g = r; g < end; ++g)
+		{
+			KFCRubyChangePlan::Run run = { static_cast<size_t>(all[g].start - all[r].start), static_cast<size_t>(all[g].end - all[g].start), U32Of(Plain(all[g].reading)) };
+			word.runs.push_back(run);
+		}
+		ioMaker.Add(word);
+		r = end;
+	}
+}
+
+// ...OF ONE DOCUMENT. A function of its own: everything it holds of the document is let go when it returns - a book's chapter is closed straight after, and one reference held across the close is released into a database that has gone (it brought InDesign down - rb-save-book, 11-02).
+void CollectDocumentWords(const UIDRef& docRef, const KFCOwnSwitches& switches, const std::vector<KFCSearchEngine::ListedPlace>* part, KFCRubyList::ListMaker& ioMaker)
+{
+	IDataBase* const db = docRef.GetDataBase();
+	InterfacePtr<IStoryList> stories(db, (db != nil) ? db->GetRootUID() : kInvalidUID, UseDefaultIID());
+	if (stories == nil)
+		return;
+	// Composing to read a place's frame dirties nothing the person made (a search's walk's rule).
+	IDataBase::SaveRestoreModifiedState dirtyGuard(db);
+	KFCOwnScope taken(switches);
+	const int32 count = stories->GetAllTextModelCount();
+	for (int32 s = 0; s < count; ++s)
+	{
+		const UIDRef storyRef(stories->GetNthTextModelUID(s));
+		InterfacePtr<ITextModel> model(storyRef, UseDefaultIID());
+		if (model == nil || (part != nil && !KFCSearchEngine::StretchesTouch(*part, storyRef.GetUID(), 0, kMaxInt32)) || !taken.TakesStory(storyRef))
+			continue;
+		CollectWords(storyRef, model, taken, part, ioMaker);
+	}
+}
+
 ErrorCode CreateStrandIfNeeded(ITextModel* model)
 {
 	InterfacePtr<IRubyAttrStrand> existing(static_cast<IRubyAttrStrand*>(model->QueryStrand(kRubyAttrStrandBoss, IRubyAttrStrand::kDefaultIID)));
@@ -769,6 +827,124 @@ void KFCRubySearch::CollectTargets(std::vector<KFCBookScope::ChapterDoc>& target
 	if (!out.cancelled && bar.WasCancelled(kFalse))
 		out.cancelled = true;
 	bar.SetPosition(barEnd);
+}
+
+bool KFCRubySearch::SaveListText(PMString& outText, PMString& outName, PMString& outSaid)
+{
+	outText.Clear();
+	outText.SetTranslatable(kFalse);
+	outName.Clear();
+	outName.SetTranslatable(kFalse);
+	outSaid.Clear();
+	outSaid.SetTranslatable(kFalse);
+	KFCRubyConditions asked;
+	(void)IsTabCurrent(&asked);
+	KFCSearchEngine::RunScope scope;
+	if (!KFCSearchEngine::ResolveRunScope(scope, outSaid))
+		return false;
+	// THE SAME TARGETS AS THE TAB'S FIND (KFCSearchEngine's run): the book's chapters, opened when their turn comes and handed straight back; every open document; or the front one, whole or the part Search: holds.
+	std::vector<KFCBookScope::ChapterDoc> targets;
+	PMString bookName;
+	std::vector<KFCBookScope::SkippedChapter> unopenable;
+	std::vector<KFCSearchEngine::ListedPlace> stretches;
+	const IWalkerScopeFactoryUtils::WalkScopeType part = static_cast<IWalkerScopeFactoryUtils::WalkScopeType>(scope.selectionScope);
+	const bool overPart = (part != IWalkerScopeFactoryUtils::kDocumentScope);
+	KFCForwardSearchScope forward(overPart);		// (To End of Story, backwards, is the text before the caret: the run's rule)
+	if (scope.fromBook)
+	{
+		if (!KFCBookScope::ListBookChapters(targets, bookName) || targets.empty())
+		{
+			outSaid.Append(KFCSearchEngine::kBookHasNoChapters);
+			return false;
+		}
+		outName = bookName;
+	}
+	else if (scope.allDocuments)
+	{
+		KFCBookScope::ListOpenDocuments(targets);
+		outName.Append("All Documents");
+	}
+	else
+	{
+		IDocument* const doc = KFCBookScope::ActiveDocument();
+		if (doc != nil)
+		{
+			targets.push_back(KFCBookScope::DocAsChapter(doc));
+			outName = targets[0].shortName;
+		}
+		if (overPart && (doc == nil || !KFCSearchEngine::PartStretches(static_cast<int32>(part), ::GetDataBase(doc), stretches)))
+		{
+			outSaid.Append("What Search: holds in the selection could not be read - nothing was saved.");
+			return false;
+		}
+	}
+	if (targets.empty())
+	{
+		outSaid.Append("There is no document to read the ruby of.");
+		return false;
+	}
+	outName.SetTranslatable(kFalse);
+	PMString title("Reading the ruby...");
+	title.SetTranslatable(kFalse);
+	const int32 barEnd = static_cast<int32>(targets.size()) * kRubyDocSpan;
+	const std::vector<int32> shares(KFCBookScope::ProgressBases(targets, barEnd));
+	KFCProgressBar bar(title, 0, barEnd, kTrue, kTrue);
+	bar.DisableChildProgressBars(kTrue);
+	KFCRubyList::ListMaker maker;
+	std::vector<PMString> unclosed;
+	for (size_t i = 0; i < targets.size(); ++i)
+	{
+		KFCSetCountedTask(bar, scope.fromBook ? "Chapter" : "Document", i, targets.size(), targets[i].shortName);
+		bar.SetPosition(shares[i]);
+		if (bar.WasCancelled(kFalse))
+		{
+			outSaid.Append("Cancelled - nothing was saved.");
+			return false;
+		}
+		if (scope.fromBook && targets[i].docRef == UIDRef::gNull && !KFCBookScope::OpenChapterDoc(targets[i], &unopenable))
+			continue;
+		const UIDRef docRef = targets[i].docRef;
+		CollectDocumentWords(docRef, asked.switches, overPart ? &stretches : nil, maker);
+		// A book's chapter goes back now, closed on the spot (one chapter of ours at a time - the other walks' rule).
+		if (scope.fromBook && !KFCBookScope::HandBackHeldDocNow(docRef))
+			unclosed.push_back(targets[i].shortName);
+	}
+	bar.SetPosition(barEnd);
+	if (bar.WasCancelled(kFalse))
+	{
+		outSaid.Append("Cancelled - nothing was saved.");
+		return false;
+	}
+	PMString head("the ruby of ");
+	head.SetTranslatable(kFalse);
+	head.Append(outName);
+	const std::u32string text(maker.Text(U32Of(head)));
+	KFC_DIAG_LOG("RUBYTAB save words=%d split=%d unwritable=%d", static_cast<int>(maker.Written()), static_cast<int>(maker.Split()), static_cast<int>(maker.Unwritable()));
+	if (maker.Written() == 0)
+	{
+		outSaid.Append(maker.Empty() ? "There is no ruby in what Search: holds - nothing was saved." : "No ruby there can be written as a line of a list - nothing was saved.");
+		KFCBookScope::AppendUnopenableNote(outSaid, unopenable);
+		return false;
+	}
+	outText = Plain(WideOf(text));
+	outSaid.AppendNumber(static_cast<int32>(maker.Written()));
+	outSaid.Append((maker.Written() == 1) ? " word." : " words.");
+	if (maker.Split() > 0)
+	{
+		outSaid.Append(" ");
+		outSaid.AppendNumber(static_cast<int32>(maker.Split()));
+		outSaid.Append((maker.Split() == 1) ? " is read two ways or more: its line is the way read most, and the others stand under it as # lines." : " are read two ways or more: each line is the way read most, and the others stand under it as # lines.");
+	}
+	if (maker.Unwritable() > 0)
+	{
+		outSaid.Append(" ");
+		outSaid.AppendNumber(static_cast<int32>(maker.Unwritable()));
+		outSaid.Append(" could not be written as a line: see the # lines.");
+	}
+	KFCBookScope::AppendUnopenableNote(outSaid, unopenable);
+	KFCBookScope::AppendUnclosedNote(outSaid, unclosed);
+	outSaid.SetTranslatable(kFalse);
+	return true;
 }
 
 bool KFCRubySearch::WalkOneDocument(const UIDRef& docRef, const PMString& name, size_t limit, const KFCRubyConditions& asked,

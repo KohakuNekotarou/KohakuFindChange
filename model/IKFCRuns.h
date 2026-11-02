@@ -207,6 +207,8 @@ public:
 	virtual bool TableChangeAll(const KFCTableLook& look, int32& outChanged, int32& outMatched, PMString& outWords) = 0;
 	/** = KFCRubyListFile::Load (appended - docs/superpowers/specs/2026-11-02-kfc-ruby-list-design.md L10) - what the Ruby part says of a ruby list: its words, or why not (outWhy). The words are not kept: a search reads the file again. */
 	virtual bool RubyListCheck(const PMString& path, int32& outWords, PMString& outWhy) = 0;
+	/** = KFCRubySearch::SaveListText (appended) - Save List...: the text of a ruby list of what the tab's Search: holds. */
+	virtual bool RubyListText(PMString& outText, PMString& outName, PMString& outSaid) = 0;
 };
 
 #endif // __IKFCRuns_h__

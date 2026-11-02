@@ -3925,6 +3925,17 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 									kKFCQRTabFindNextKey,		// "Find Next"
 									kEVENoSpaceAfter,
 								),
+								// The Ruby part's own, in the same place (the author, 11-02: the document's ruby as a list). KFCKohakuTab.cpp shows one or the other.
+								EVEButtonWidget
+								(
+									kKFCRubyListSaveWidgetID,	// WidgetId
+									kSysButtonPMRsrcId,			// RsrcId
+									kBindNone,					// Frame binding
+									Frame(0, 0, 116, 26)		// Frame
+									kTrue, kTrue,				// Visible, Enabled
+									kKFCRubyListSaveFileKey,	// "Save List..."
+									kEVENoSpaceAfter,
+								),
 							}
 						),
 						EVEGenericPanelWidget
@@ -4321,9 +4332,9 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 									kTrue, kTrue,
 									{{
 										kKFCRubyListEveryKey,
-										kKFCRubyListInStoryKey,
-										kKFCRubyListInDocumentKey,
-										kKFCRubyListInBookKey,
+										kKFCRubyListFirstOfStoryKey,
+										kKFCRubyListFirstOfDocumentKey,
+										kKFCRubyListFirstOfTheBookKey,
 									}}
 									kEVENoSpaceAfter,
 								),

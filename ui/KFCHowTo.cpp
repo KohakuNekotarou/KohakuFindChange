@@ -95,7 +95,17 @@ const wchar_t* const kRubyMarksJA =
 	L"・読めない行があるとファイル全体を使わず、最初の行の番号を言います。\n"
 	L"・Find in … は、語の出現を全部一覧にし、付く読みを行の上に薄く出します。すでにルビのある箇所は一覧に出さず、数だけ言います。\n"
 	L"・行の Replace で付けます。一緒に置換した行は Ctrl+Z 1回で戻ります。行は一覧を作ったときの読みで書きます。ファイルを直したら Find in … をやり直してください。\n"
-	L"・語の一部に当たることがあります（「太郎」は「小太郎」にも当たります）。「小太郎」の行を足すか、その行を選ばずに Replace してください。\n";
+	L"・語の一部に当たることがあります（「太郎」は「小太郎」にも当たります）。「小太郎」の行を足すか、その行を選ばずに Replace してください。\n"
+	L"・Occurrences で、語ごとに最初の1か所だけを一覧にできます（First in Story、First in Document、First in Book）。最初とは一覧に並ぶ順の最初です（ページ順）。最初の1か所にすでにルビがあれば、その語は一覧に出しません。Book Scope が切のときの First in Book は First in Document と同じです。\n"
+	L"\n"
+	L"【Save List...（文書のルビをリストに書き出す）】\n"
+	L"Search の範囲（Book Scope が入っていればブック）のルビを、このリストの書き方でファイルに書き出します。文書は変わりません。\n"
+	L"・同じ語は1行です。接したルビは1語にまとめます。\n"
+	L"・同じ語に別の読みがあれば、多い方を行にし、ほかは # の行に箇所の数と一緒に残します（# の行は読むときに飛ばされます）。読みの揺れの点検にも使えます。\n"
+	L"・タブのアイコン（ロック・非表示・親ページ・脚注）の設定に従います。\n"
+	L"\n"
+	L"【タブのアイコン】\n"
+	L"Search の下のアイコンは、本体のテキストタブと同じ働きです。ロックされたレイヤーとオブジェクト（検索のみ）、ロックされたストーリー（検索のみ）、非表示のレイヤーとオブジェクト、親ページ、脚注を探す範囲に入れるかと、カナの区別、全角・半角の区別です。Ruby と Kenten で別々に覚えます。カナや全角・半角を区別しないときは、Base Text、Ruby、リストの語を本体と同じ規則で同じ字として比べます。\n";
 
 // The Kenten part's own page (ShowKenten).
 const wchar_t* const kKentenTitle = L"" kKFCDisplayName " - 圏点の探し方と付け方";
@@ -108,6 +118,9 @@ const wchar_t* const kKentenJA =
 	L"【Look For】\n"
 	L"・Text With Kenten　圏点の付いた文字を探します。同じ種類の圏点が続く範囲が1行になります。文字スタイルや段落スタイルの圏点も探します。段落の終わりで行が分かれます。\n"
 	L"・Text Without Kenten　Base Text の文字のうち、圏点が付いていない箇所を探します。Base Text が空のときは探せません。\n"
+	L"\n"
+	L"【Search の下のアイコン】\n"
+	L"本体のテキストタブと同じ働きです。ロックされたレイヤーとオブジェクト（検索のみ）、ロックされたストーリー（検索のみ）、非表示のレイヤーとオブジェクト、親ページ、脚注を探す範囲に入れるかと、カナの区別、全角・半角の区別です。Ruby とは別に覚えます。\n"
 	L"\n"
 	L"【Base Text】\n"
 	L"Text With Kenten では、入れた文字を含む行だけを出します。空なら全部です。\n"
@@ -169,6 +182,9 @@ const wchar_t* const kHowToEN =
 	L"- Ruby and Base Text are rows of boxes, a Base Text box holding one character; + and - add and take away boxes. Change Ruby To's boxes follow them, with the Base Text shown under each. A reading goes on the base text under it. The chain between two boxes joins them, on both sides: one reading over all their base text (group ruby). A row whose text is not what the base boxes hold is left, and said; clear those boxes to give the reading to the whole row.\n"
 	L"- Ruby Marks in Text lists ruby a manuscript wrote out, as \uFF5C\u6F22\u5B57\u300A\u304B\u3093\u3058\u300B or \u6F22\u5B57\u300A\u304B\u3093\u3058\u300B (with no bar, the kanji just before it). Replace on its row puts the reading on the base and takes the marks out.\n"
 	L"- Words in a Ruby List reads a file chosen with Choose List...: a word a line, written as those marks. It lists each occurrence of a word that has no ruby, the reading it will get faint over it (the longest word at a place wins), and Replace on a row writes it.\n"
+	L"- Words in a Ruby List's Occurrences: can take each word's first alone: First in Story, First in Document, First in Book. A word whose first has ruby has no row.\n"
+	L"- Save List... writes the ruby of what Search: holds (the book, with Book Scope on) as such a file: each word once. A word read two ways is a line the way most of it reads, and # lines under it.\n"
+	L"- The icons under Search: do what they do on InDesign's Text tab: locked layers and objects, locked stories (both Search Only), hidden layers and objects, parent pages, footnotes, and Kana and Width Sensitive. Ruby and Kenten each hold their own.\n"
 	L"- How to Use..., left of Done on the tab, says how the marks are written (in Japanese).\n"
 	L"\n"
 	L"[Finding and setting kenten (Find: Kenten - a Japanese InDesign)]\n"
@@ -246,6 +262,9 @@ const wchar_t* const kHowToJA =
 	L"・Ruby と Base Text は欄の並びで（Base Text の欄は1字ずつ）、＋と−で欄を増減できます（探すときは欄をつないだ字で比べます）。Change Ruby To の欄はこれに連動し、その下に Base Text の字が出ます。読みは、その下の親文字に付きます。欄の間の鎖を押すと両方の欄がつながり、1つの読みを下の親文字全部に付けます（グループルビ）。行の文字が親文字の欄と違う行は書かずにメッセージで言います（親文字の欄を空にすると、行の文字全部に読みを付けます）。\n"
 	L"・Ruby Marks in Text は、原稿に書かれたルビの印（｜漢字《かんじ》、｜が無ければ《の直前の漢字）を一覧にします。行の Replace で、親文字にそのルビを付けて印を消します。\n"
 	L"・Words in a Ruby List は、Choose List... で選んだファイル（1行1語・同じ印の書き方）の語を探します。ルビのない出現を全部一覧にし、付く読みを行の上に薄く出します（長い語が優先）。行の Replace で付けます。\n"
+	L"・Words in a Ruby List の Occurrences で、語ごとに最初の1か所だけを一覧にできます（First in Story、First in Document、First in Book）。\n"
+	L"・Save List... で、Search の範囲（Book Scope が入っていればブック）のルビをこのリストの形でファイルに書き出します。同じ語は1行、別の読みは # の行に残します。\n"
+	L"・Search の下のアイコンは本体のテキストタブと同じ働きです。Ruby と Kenten で別々に覚えます。\n"
 	L"・タブの完了ボタンの左の How to Use... に印の書き方があります。\n"
 	L"\n"
 	L"【圏点で探す・圏点を付ける（Find: Kenten）】\n"

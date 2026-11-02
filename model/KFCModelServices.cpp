@@ -210,6 +210,7 @@ public:
 		std::shared_ptr<const KFCRubyList::Words> words;
 		return KFCRubyListFile::Load(path, words, outWords, outWhy);
 	}
+	virtual bool RubyListText(PMString& outText, PMString& outName, PMString& outSaid) { return KFCRubySearch::SaveListText(outText, outName, outSaid); }
 };
 
 CREATE_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)

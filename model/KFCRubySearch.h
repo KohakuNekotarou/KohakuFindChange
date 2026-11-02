@@ -64,6 +64,10 @@ namespace KFCRubySearch
 	void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBook, std::vector<KFCBookScope::SkippedChapter>& unopenable,
 		KFCSearchEngine::CollectTally& out, int32 reserved, const KFCRubyConditions& asked, const std::vector<KFCSearchEngine::ListedPlace>* part = nil);
 
+	/** SAVE LIST... (the author, 11-02): the ruby of what the tab's Search: holds (the book with Book Scope on), the same icons taken in as its Find, as a ruby list's file reads it (KFCRubyList::ListMaker). outName = what it is of - the book's, the document's name, All Documents. outSaid = what it
+	    came to, for the person. False = nothing to save: outSaid says why. Reads; writes nothing to a document. */
+	bool SaveListText(PMString& outText, PMString& outName, PMString& outSaid);
+
 	/** One document's rows again (Search This Document Again). False = cancelled or nothing to walk with. */
 	bool WalkOneDocument(const UIDRef& docRef, const PMString& name, size_t limit, const KFCRubyConditions& asked,
 		std::vector<KFCResultModel::Hit>& outHits, std::map<UID, uint32>& outVersions, bool& outCapped, bool& outCancelled);

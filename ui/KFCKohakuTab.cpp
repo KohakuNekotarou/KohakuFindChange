@@ -16,6 +16,7 @@
 #include "IControlView.h"
 #include "IDropDownListController.h"	// the face's lists' entries
 #include "IEventHandler.h"				// ...the focus's handler
+#include "ISaveFileDialog.h"			// (and DocumentID.h - kSaveFileDialogBoss) Save List...'s file
 #include "IKeyBoard.h"
 #include "IObserver.h"					// the selection observer, attached with the face
 #include "IPanelControlData.h"
@@ -57,6 +58,7 @@
 #include "KFCUIID.h"
 #include "KFCDiag.h"					// KFC_DIAG_LOG - the face's calls, in a test build's trace (QRTAB / TBLTAB / RUBYTAB lines)
 #include "KFCHowTo.h"					// ShowRubyMarks, ShowKenten - the tab's How to Use...
+#include "KFCPanelState.h"				// KFCWriteFileSafely - Save List...'s file
 #include "KFCPanelTitle.h"				// Update - the panel's title names the kind and its Search:
 #include "KFCAppBarSearchEnter.h"		// KFCMirrorAppBarFieldNow - the Application Bar's field shows the tab's nothing
 #include "KFCJump.h"					// LandOnQRCode, LandOnTable - Find Next lands as a row's click does
@@ -821,6 +823,79 @@ bool ChooseRubyList(IPanelControlData* panel)
 	return true;
 }
 
+// SAVE LIST... (the author, 11-02): the ruby of what Search: holds, read first - there may be nothing to save, and the book's or the document's name is the file's - then its file, asked of Windows' Save dialog: what Choose List... reads, in UTF-8 with its BOM (Notepad and Excel take it as UTF-8) -
+// and what it came to said. Through the Save dialog of KFCChooseOrderFileToSave, whose reasons hold: the name always ends in .txt. TEST BUILDS - the fault switch ruby-list-save's first line is the file.
+void SaveRubyList()
+{
+	PMString text, name, said;
+	if (!KFCRuns()->RubyListText(text, name, said))
+	{
+		KFC_DIAG_LOG("RUBYTAB save refused: %s", said.GetUTF8String().c_str());
+		CAlert::InformationAlert(said);
+		return;
+	}
+	IDFile file;
+	bool chosen = false;
+#ifdef KFC_DIAG
+	std::string testPath;
+	if (KFCDiagFaultText("ruby-list-save", testPath))
+	{
+		PMString path;
+		path.SetUTF8String(testPath);
+		file = FileUtils::PMStringToSysFile(path);
+		chosen = true;
+	}
+#endif
+	if (!chosen)
+	{
+		InterfacePtr<ISaveFileDialog> dialog(::CreateObject2<ISaveFileDialog>(kSaveFileDialogBoss, IID_ISAVEFILEDIALOG));
+		if (dialog == nil)
+			return;
+		PMString shownType(kKFCRubyListFileTypeKey);		// "Ruby List"
+		shownType.Translate();
+		dialog->AddFileTypeInfo(shownType, PMString("txt"));
+		dialog->SetAdditionalFOSFlags(FOS_OVERWRITEPROMPT | FOS_NOREADONLYRETURN | FOS_STRICTFILETYPES);
+		// (Its name with no extension of its own: a document's .indd, a book's .indb. A name with no folder: the dialog starts where Windows last saved.)
+		PMString fileName(name);
+		fileName.SetTranslatable(kFalse);
+		const int32 dot = fileName.LastIndexOfWChar(UTF32TextChar('.'));
+		if (dot > 0)
+			fileName.Remove(dot, fileName.CharCount() - dot);
+		fileName.Append(" Ruby List.txt");
+		const IDFile defaultFile(FileUtils::PMStringToSysFile(fileName));
+		PMString title(kKFCRubyListSaveTitleKey);		// "Save Ruby List"
+		title.Translate();
+		int32 selectedIndex = 0;
+		if (dialog->DoDialog(&defaultFile, &file, &selectedIndex, kTrue /*the last used folder*/, kTrue /*the type menu*/, &title) == kFalse)
+			return;
+	}
+	std::string bytes("\xEF\xBB\xBF");
+	bytes.append(text.GetUTF8String());
+	const char* const failure = KFCWriteFileSafely(file, bytes);
+	PMString shownName;
+	FileUtils::GetFileName(file, shownName);
+	shownName.SetTranslatable(kFalse);
+	PMString words;
+	words.SetTranslatable(kFalse);
+	if (failure != nil)
+	{
+		words.Append(shownName);
+		words.Append(" could not be written (");
+		words.Append(failure);
+		words.Append(").");
+	}
+	else
+	{
+		words.Append("Saved to ");
+		words.Append(shownName);
+		words.Append(": ");
+		words.Append(said);
+	}
+	words.SetTranslatable(kFalse);
+	KFC_DIAG_LOG("RUBYTAB saved=%d name=%s said=%s", (failure == nil) ? 1 : 0, shownName.GetUTF8String().c_str(), words.GetUTF8String().c_str());
+	CAlert::InformationAlert(words);
+}
+
 // EVERY BOX AND ITS WORDS WRITTEN FROM WHAT IS KEPT. Not heard (notifyOfChange kFalse).
 void WriteBoxes(IPanelControlData* panel)
 {
@@ -1119,6 +1194,7 @@ void ShowKind(IPMUnknown* face)
 	InterfacePtr<IPanelControlData> panel(face, UseDefaultIID());
 	ShowPart(panel, kKFCKohakuQRSectionWidgetID, gKind == kKindQRCode);
 	ShowPart(panel, kKFCQRTabFindNextWidgetID, gKind == kKindQRCode || gKind == kKindTable);
+	ShowPart(panel, kKFCRubyListSaveWidgetID, gKind == kKindRuby);
 	ShowHowTo();
 	ShowPart(panel, kKFCTableTabChangeWidgetID, gKind == kKindTable);
 	ShowPart(panel, kKFCTableTabChangeAllWidgetID, gKind == kKindTable);
@@ -1352,6 +1428,7 @@ public:
 			AttachToWidget(kKFCKohakuTabScopeWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
 			AttachToWidget(kKFCQRTabFindNextWidgetID, IID_IBOOLEANCONTROLDATA, panel);
 			AttachToWidget(kKFCRubyListChooseWidgetID, IID_IBOOLEANCONTROLDATA, panel);
+			AttachToWidget(kKFCRubyListSaveWidgetID, IID_IBOOLEANCONTROLDATA, panel);
 			AttachToWidget(kKFCRubyListFirstWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
 			for (int32 k = 0; k < kSwitchIconCount; ++k)
 				AttachToWidget(kSwitchIcons[k].widget, IID_ITRISTATECONTROLDATA, panel);
@@ -1443,6 +1520,7 @@ public:
 		DetachFromWidget(kKFCKohakuTabScopeWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
 		DetachFromWidget(kKFCQRTabFindNextWidgetID, IID_IBOOLEANCONTROLDATA, panel);
 		DetachFromWidget(kKFCRubyListChooseWidgetID, IID_IBOOLEANCONTROLDATA, panel);
+		DetachFromWidget(kKFCRubyListSaveWidgetID, IID_IBOOLEANCONTROLDATA, panel);
 		DetachFromWidget(kKFCRubyListFirstWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
 		for (int32 k = 0; k < kSwitchIconCount; ++k)
 			DetachFromWidget(kSwitchIcons[k].widget, IID_ITRISTATECONTROLDATA, panel);
@@ -1521,6 +1599,8 @@ public:
 			else
 				KFCHowTo::ShowRubyMarks();
 		}
+		else if (widget == kKFCRubyListSaveWidgetID && theChange == kTrueStateMessage)
+			SaveRubyList();
 		else if (widget == kKFCRubyListChooseWidgetID && theChange == kTrueStateMessage)
 		{
 			InterfacePtr<IPanelControlData> panel(this, UseDefaultIID());
@@ -1726,7 +1806,7 @@ public:
 		// WHAT A QUERY HOLDS WAS CHANGED BY HAND: Find/Change's Query menu says [Custom], as a change on InDesign's own tabs does. (Search: is no part of a query, as InDesign's own Search: is none of its menu's; Find Next changes nothing, nor do the
 		// Table part's other buttons - what they write is the document - nor a + - a box more holds nothing.)
 		if (widget != kKFCKohakuTabScopeWidgetID && widget != kKFCQRTabFindNextWidgetID && widget != kKFCTableTabChangeWidgetID && widget != kKFCTableTabChangeAllWidgetID
-			&& widget != kKFCTableTabChangeFindWidgetID && widget != kKFCRubyGridPlusWidgetID && widget != kKFCKohakuHowToWidgetID && widget != kKFCRubyListChooseWidgetID
+			&& widget != kKFCTableTabChangeFindWidgetID && widget != kKFCRubyGridPlusWidgetID && widget != kKFCKohakuHowToWidgetID && widget != kKFCRubyListChooseWidgetID && widget != kKFCRubyListSaveWidgetID
 			&& (protocol != IID_ITRISTATECONTROLDATA || theChange == kTrueStateMessage || theChange == kFalseStateMessage))
 			KFCKohakuQueryMenu::FaceChanged();
 	}

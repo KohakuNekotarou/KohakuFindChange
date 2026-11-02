@@ -703,6 +703,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCSwitchMasterWidgetID, kKFCPrefix + 76)
 DECLARE_PMID(kWidgetIDSpace, kKFCSwitchFootnotesWidgetID, kKFCPrefix + 77)
 DECLARE_PMID(kWidgetIDSpace, kKFCSwitchKanaWidgetID, kKFCPrefix + 78)
 DECLARE_PMID(kWidgetIDSpace, kKFCSwitchWidthWidgetID, kKFCPrefix + 79)
+// Save List... (the author, 11-02), the first of the head's column on Ruby.
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyListSaveWidgetID, kKFCPrefix + 80)
 
 
 // "About Plug-ins" sub-menu:
@@ -911,11 +913,13 @@ DECLARE_PMID(kWidgetIDSpace, kKFCSwitchWidthWidgetID, kKFCPrefix + 79)
 #define kKFCRubyTabFileListKey			kKFCStringPrefix "kKFCRubyTabFileListKey"
 #define kKFCRubyListWordKey				kKFCStringPrefix "kKFCRubyListWordKey"
 #define kKFCRubyListChooseFileKey		kKFCStringPrefix "kKFCRubyListChooseFileKey"
+#define kKFCRubyListSaveFileKey			kKFCStringPrefix "kKFCRubyListSaveFileKey"
+#define kKFCRubyListSaveTitleKey		kKFCStringPrefix "kKFCRubyListSaveTitleKey"
 #define kKFCRubyListWhichKey			kKFCStringPrefix "kKFCRubyListWhichKey"
 #define kKFCRubyListEveryKey			kKFCStringPrefix "kKFCRubyListEveryKey"
-#define kKFCRubyListInStoryKey			kKFCStringPrefix "kKFCRubyListInStoryKey"
-#define kKFCRubyListInDocumentKey		kKFCStringPrefix "kKFCRubyListInDocumentKey"
-#define kKFCRubyListInBookKey			kKFCStringPrefix "kKFCRubyListInBookKey"
+#define kKFCRubyListFirstOfStoryKey			kKFCStringPrefix "kKFCRubyListFirstOfStoryKey"
+#define kKFCRubyListFirstOfDocumentKey		kKFCStringPrefix "kKFCRubyListFirstOfDocumentKey"
+#define kKFCRubyListFirstOfTheBookKey			kKFCStringPrefix "kKFCRubyListFirstOfTheBookKey"
 #define kKFCRubyListDialogTitleKey		kKFCStringPrefix "kKFCRubyListDialogTitleKey"
 #define kKFCRubyListFileTypeKey			kKFCStringPrefix "kKFCRubyListFileTypeKey"
 #define kKFCRubyTabBaseKey				kKFCStringPrefix "kKFCRubyTabBaseKey"

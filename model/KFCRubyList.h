@@ -353,6 +353,171 @@ namespace KFCRubyList
 		return true;
 	}
 
+	/** A WORD AS A LINE OF A LIST - what ParseCell reads back (Save List...): each ruby's base and its reading, a bar where the base is more than kanji; a line the first-cell rule would cut, quoted. */
+	inline std::u32string LineOf(const Entry& entry)
+	{
+		std::u32string line;
+		size_t at = 0;
+		for (size_t r = 0; r < entry.runs.size(); ++r)
+		{
+			const KFCRubyChangePlan::Run& run = entry.runs[r];
+			line.append(entry.word, at, run.start - at);
+			bool kanji = (run.start == at);		// (a character standing before a base could be taken for its base)
+			for (size_t k = run.start; kanji && k < run.start + run.length; ++k)
+				kanji = KFCRubyMarkText::IsKanji(entry.word[k]);
+			if (!kanji)
+				line.push_back(0xFF5C);
+			line.append(entry.word, run.start, run.length);
+			line.push_back(KFCRubyMarkText::kMarkOpen);
+			line.append(run.reading);
+			line.push_back(KFCRubyMarkText::kMarkClose);
+			at = run.start + run.length;
+		}
+		line.append(entry.word, at, std::u32string::npos);
+		if (line.find(char32_t(0x2C)) == std::u32string::npos && line.find(char32_t(0x09)) == std::u32string::npos && line.find(char32_t(0x22)) == std::u32string::npos)
+			return line;
+		std::u32string quoted(1, char32_t(0x22));
+		for (size_t k = 0; k < line.size(); ++k)
+		{
+			if (line[k] == 0x22)
+				quoted.push_back(line[k]);
+			quoted.push_back(line[k]);
+		}
+		quoted.push_back(0x22);
+		return quoted;
+	}
+
+	/** Does the line read back as the word, when the file is read? (A base or a reading that holds a mark of its own does not: `LineOf` has no way of writing it.) */
+	inline bool LineReadsBack(const std::u32string& line, const Entry& entry)
+	{
+		if (line.find(char32_t(0x0D)) != std::u32string::npos || line.find(char32_t(0x0A)) != std::u32string::npos)
+			return false;
+		const std::u32string cell(FirstCell(line));
+		Entry back;
+		Why why = kOk;
+		return !cell.empty() && cell[0] != 0x23 && cell[0] != 0xFF03 && ParseCell(cell, back, why) && back.word == entry.word;
+	}
+
+	/** WHAT A DOCUMENT'S RUBY COMES TO AS A LIST (Save List... - the author, 11-02: "the same word once"): each word once, as the rubies touching one another read. A word read two ways is one line, the way most of its places read it - a list holds one reading for a word, so the rest stand under it as comments with how many places read so: what the person is to look at. Ties: the way met first. */
+	class ListMaker
+	{
+	public:
+		ListMaker() : fWritten(0), fSplit(0), fUnwritable(0) {}
+
+		void Add(const Entry& found)
+		{
+			const std::map<std::u32string, size_t>::const_iterator known = fIndex.find(found.word);
+			const size_t w = (known != fIndex.end()) ? known->second : fWords.size();
+			if (known == fIndex.end())
+			{
+				fIndex[found.word] = w;
+				fWords.emplace_back();
+				fWords.back().word = found.word;
+			}
+			const std::u32string line(LineOf(found));
+			if (!LineReadsBack(line, found))
+			{
+				++fWords[w].unwritable;
+				return;
+			}
+			for (size_t v = 0; v < fWords[w].ways.size(); ++v)
+				if (fWords[w].ways[v].line == line)
+				{
+					++fWords[w].ways[v].count;
+					return;
+				}
+			Way way;
+			way.line = line;
+			way.count = 1;
+			fWords[w].ways.push_back(way);
+		}
+
+		/** The file's text, its lines ended as Windows ends them, under a head of a comment. */
+		std::u32string Text(const std::u32string& headWords)
+		{
+			static const std::u32string kEol(U"\r\n");
+			fSplit = 0;
+			fUnwritable = 0;
+			size_t written = 0;
+			std::u32string body;
+			for (size_t w = 0; w < fWords.size(); ++w)
+			{
+				SavedWord& word = fWords[w];
+				std::stable_sort(word.ways.begin(), word.ways.end(), [](const Way& a, const Way& b) { return a.count > b.count; });
+				if (!word.ways.empty())
+				{
+					++written;
+					body += word.ways[0].line + kEol;
+					if (word.ways.size() > 1)
+						++fSplit;
+				}
+				for (size_t v = 1; v < word.ways.size(); ++v)
+					body += U"# another reading, " + Number(word.ways[v].count) + U" of " + Number(Places(word)) + U" places: " + word.ways[v].line + kEol;
+				if (word.unwritable > 0)
+				{
+					++fUnwritable;
+					body += U"# no line can hold this, " + Number(word.unwritable) + U" places: " + Plain(word.word) + kEol;
+				}
+			}
+			fWritten = written;
+			return U"# " + Plain(headWords) + U": " + Number(written) + U" words" + kEol + body;
+		}
+
+		size_t Written() const { return fWritten; }
+		size_t Split() const { return fSplit; }
+		size_t Unwritable() const { return fUnwritable; }
+		bool Empty() const { return fWords.empty(); }
+
+	private:
+		struct Way
+		{
+			std::u32string	line;
+			size_t			count;
+		};
+		struct SavedWord
+		{
+			std::u32string		word;
+			std::vector<Way>	ways;
+			size_t				unwritable;
+			SavedWord() : unwritable(0) {}
+		};
+
+		static size_t Places(const SavedWord& word)
+		{
+			size_t places = 0;
+			for (size_t v = 0; v < word.ways.size(); ++v)
+				places += word.ways[v].count;
+			return places;
+		}
+
+		static std::u32string Number(size_t n)
+		{
+			std::u32string digits;
+			do
+			{
+				digits.insert(digits.begin(), static_cast<char32_t>(0x30 + (n % 10)));
+				n /= 10;
+			} while (n > 0);
+			return digits;
+		}
+
+		// A comment's words on one line.
+		static std::u32string Plain(const std::u32string& words)
+		{
+			std::u32string out(words);
+			for (size_t k = 0; k < out.size(); ++k)
+				if (KFCRubyMarkText::StopsMark(out[k]))
+					out[k] = 0x20;
+			return out;
+		}
+
+		std::vector<SavedWord>				fWords;
+		std::map<std::u32string, size_t>	fIndex;
+		size_t								fWritten;
+		size_t								fSplit;
+		size_t								fUnwritable;
+	};
+
 	/** A FILE'S BYTES AS UNICODE, when they say so: a UTF-16 BOM, or whole UTF-8 (RFC 3629's table - with its BOM or not). False = neither: the caller's next guess is what a Japanese Windows writes, CP932. */
 	inline bool DecodeUnicode(const std::string& bytes, std::u32string& out)
 	{
