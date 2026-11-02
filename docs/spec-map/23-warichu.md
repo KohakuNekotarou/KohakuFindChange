@@ -42,7 +42,7 @@
 - **WARI-21** ★行の **Replace は効かない**＝灰色。Return も何もしない（灰色と同じ問い＝`KFCResultTree::ReplaceRows` の `CanReplaceAny`）。メニューと Return 以外の道で来ても、モデルの扉が書かずに言う（`Replace: Find: Warichu lists the warichu and changes nothing - a row is not replaced.`＝`RefuseWarichuRow`）。パネルの Change All in Book は灰色（Kohaku+ の種類には走らせるクエリが無い＝KENTEN-40 と同じ）。扉でも書かずに言う（`Change All: the Find/Change dialog is on Warichu on the Kohaku+ tab. This panel lists the warichu there - nothing to change.`）。回帰 `wr-replace-grey`
   - 訂正:
 
-- **WARI-22** ★行の **Special Operations ▸ Tate-chu-yoko** は効く（本文の一致＝REP-41）。回帰 `wr-tcy`
+- **WARI-22** ★行の **Special Operations ▸ Tate-chu-yoko** は効く（本文の一致＝REP-41）。**Clear Overrides と Create Outlines も、Text タブの行と同じく効く**（灰色にするのは Change 側を持つ一覧＝Table・Ruby・Kenten＝TBL-40・RUBY-40＝「その一覧の Replace だけが書く」決まり。割注の一覧には Change 側が無いので当たらない）。⚠手で付けた割注は文字の上書きなので、Clear Overrides で割注も外れる見込み（本体の「オーバーライドを消去」と同じ・未実測）。Restore from Copy は写しが無いので灰色。回帰 `wr-tcy`
   - 訂正:
 
 ## 4. クエリ
@@ -64,5 +64,6 @@
 
 - 本体の割注設定（行数・行間・大きさの比率など）は見ない＝割注が付いているかどうか（`kTAWarichuAttrBoss` の真偽）だけで探す。設定ごとに分けて探す口は作っていない。
 - Change All in Book の灰色と扉の文、Return で何もしないこと、モデルの扉の文（WARI-21）は、コードで読んだだけで試験が無い（灰色の Replace は `wr-replace-grey`）。
+- 割注の行の Clear Overrides・Create Outlines（WARI-22）は試験していない。手で付けた割注が Clear Overrides で外れるかも測っていない。
 - Search: の Story／To End of Story／Selection は割注では試験していない（作りは圏点と同じ＝範囲に触れていれば行＝KOHAKU-14・`KFCSearchEngine::StretchesTouch`）。
 - 縦組みの文書の割注の行を、実機の絵では見ていない。

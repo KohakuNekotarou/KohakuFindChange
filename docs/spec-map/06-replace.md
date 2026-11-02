@@ -272,7 +272,7 @@
 
 - **REP-41** ★**文字の行の Special Operations ▸ Tate-chu-yoko**（ヒットの行の右クリック・2026-11-02 作者「テキスト検索の後のspオペレーションにたてなかよこにするのが欲しい」＝設計書 `docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md` B1〜B6＝作者「設計書はあなたのおすすめで」の私の判断）――
   **本体の文字パネルの「縦中横」を、その一致を選んで入れたのと同じ**＝一致の文字に縦中横の文字の属性を当てる。書く口＝`ITextModelCmds::ApplyCmd` に縦中横の属性（公式 `SnpPerformTextAttrTateChuYoko.cpp` の形）。書いた後に読み直し、当たっていなければ書けなかったと言う（字形の保護などで黙って飛ばされる口があるため）。
-  ★**日本語で起動しているときだけメニューに出る**（KOHAKU-03 と同じ判定＝メニューを出す直前に足し引きする＝本体の `AEMUIStartupShutdown.cpp` の形）。**ルビ・圏点・割注の行にも出る**（どれも本文の一致）。表の一覧の行は断る（物の行のメニューには無い＝ROW-32）。**段落の終わりをまたぐ一致も書く**（本体と同じ＝11-02 に実測）。**すでに縦中横の一致は書かずに数える**（`already tate-chu-yoko`）。
+  ★**日本語で起動しているときだけメニューに出る**（KOHAKU-03 と同じ判定＝メニューを出す直前に足し引きする＝本体の `AEMUIStartupShutdown.cpp` の形）。**ルビ・圏点・割注の行にも出る**（どれも本文の一致）。★ルビ・圏点の行では Clear Overrides と Create Outlines は灰色のまま（RUBY-40・KENTEN-40＝その一覧の Replace だけが書く）で、縦中横だけが出る＝縦中横はルビも圏点も消さない書き込みなので、その一覧の Replace とぶつからない（設計書の問い2の「Clear Overrides と同じく」は誤った前提だった＝11-02 夜の見直し）。表の一覧の行は断る（物の行のメニューには無い＝ROW-32）。**段落の終わりをまたぐ一致も書く**（本体と同じ＝11-02 に実測）。**すでに縦中横の一致は書かずに数える**（`already tate-chu-yoko`）。
   まとめて選んだ行の1つなら選んだ行すべて・文書をまたいでも1つの取り消しの段（Edit メニューの名前 `Tate-chu-yoko`）。1行ずつの扉は Clear Overrides と同じ（REP-40）。**灰色**＝押せる行が1つも無いとき（SET-11）。
   文＝`Set tate-chu-yoko on ID:262 #3.`／1行の断り `Tate-chu-yoko: <理由>`（例 `Tate-chu-yoko: the match is already tate-chu-yoko - left as it is.`）。
   回帰＝`tcy-cases.tsv`（14件）・`wr-tcy`。（作り＝`KFCReplaceEngine::TcyHits`＝Clear Overrides と1つの芯 `TextRowOp`。）
