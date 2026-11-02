@@ -49,6 +49,7 @@
 #include "KFCKentenMark.h"		// a kenten row's marks - and KFCMarkPassView, this cell's base
 #include "KFCPanelTextDraw.h"	// the context's fade, the '&' flags and the bar - shared with the message area
 #include "KFCModelAccess.h"		// the model half, through its session interfaces
+#include "KFCTierWords.h"		// what of a tier's name fades (KFCBranchLabelView)
 
 // How far up the widget chain to look for the hilite (see KFCViewOrParentIsHilited). One step is
 // all this panel needs (cell -> row); the extra steps only keep it working if the row ever gains
@@ -505,6 +506,73 @@ void KFCColorTextView::DV_Draw(dvaui::drawbot::Drawbot* drawbotP) const
 		StringUtils::PMDrawStringRGB(drawbotP, PMRect(readingX, upperBox.Top(), rightEdge, upperBox.Bottom()), kAlignLeft, shown, fontInfo, upper.planned ? kContextColor : kFullColor,
 			kKFCDontConvertAmpersand, kTrue /*centerVertically*/, kKFCNoUnderline, kKFCTextSmoothing);
 		nextFree = readingX + KFCDrawnWidth(shown, fontInfo) + PMReal(2.0);
+	}
+}
+
+//----------------------------------------------------------------------------------------
+// KFCBranchLabelView - a branch row's label
+//----------------------------------------------------------------------------------------
+
+/** Implements IControlView: a book's, a document's, a story's or a tier's row's words, by the hit row's cell's rules - its font, its colours, selected and kept, its '&' as it stands, cut at the end when it overflows - with what of a tier's name says what it asked faded as a hit row's context is (the author, 11-02: KFCTierWords.h). Its words are the generic panel's ITextControlData's, where a reader that walks the widgets looks for them. */
+class KFCBranchLabelView : public DVControlView
+{
+	typedef DVControlView inherited;
+public:
+	KFCBranchLabelView(IPMUnknown* boss) : inherited(boss) {}
+	virtual ~KFCBranchLabelView() {}
+
+	virtual void DV_Draw(dvaui::drawbot::Drawbot* drawbotP) const;
+};
+
+CREATE_PERSIST_PMINTERFACE(KFCBranchLabelView, kKFCBranchLabelViewImpl)
+
+void KFCBranchLabelView::DV_Draw(dvaui::drawbot::Drawbot* drawbotP) const
+{
+	if (drawbotP == nil)
+		return;
+	InterfacePtr<const ITextControlData> words(this, UseDefaultIID());
+	InterfacePtr<IInterfaceFonts> fonts(GetExecutionContextSession(), UseDefaultIID());
+	if (words == nil || fonts == nil)
+		return;
+	const InterfaceFontInfo& fontInfo = fonts->GetFont(kPaletteWindowSystemScriptFontId);
+	const bool16 isHilited = KFCViewOrParentIsHilited(this, kKFCHiliteParentSteps);
+	RealAGMColor bg(0.5, 0.5, 0.5), fg(0.0, 0.0, 0.0);	// sane fallbacks if the query fails
+	InterfacePtr<IInterfaceColors> colors(GetExecutionContextSession(), UseDefaultIID());
+	if (colors != nil)
+	{
+		colors->GetRealAGMColor(isHilited ? kInterfaceHighLight : kInterfacePaletteFill, bg);
+		colors->GetRealAGMColor(isHilited ? kInterfaceHighLightText : kInterfaceTextColor, fg);
+	}
+	// A KEPT ROW (the widget manager disables the cell): one step fainter, as a kept hit row's (KFCColorTextView::DV_Draw's note).
+	if (!this->GetEnableState())
+		fg = KFCBlendColor(bg, fg, PMReal(kKFCContextTextWeight));
+	const RealAGMColor kFadedColor = KFCBlendColor(bg, fg, PMReal(kKFCContextTextWeight));
+	const WideString wide(words->GetString());
+	std::u32string name;
+	for (WideString::const_iterator c = wide.begin(); c != wide.end(); ++c)
+		name.push_back(static_cast<char32_t>(static_cast<uint32>(*c)));
+	const std::vector<KFCTierWords::Run> runs(KFCTierWords::RunsOf(name));
+	const PMRect frame = this->GetInnerContentFrame();
+	PMString upTo;
+	upTo.SetTranslatable(kFalse);
+	for (size_t r = 0; r < runs.size(); ++r)
+	{
+		PMString piece;
+		piece.SetTranslatable(kFalse);
+		for (size_t k = 0; k < runs[r].length; ++k)
+			piece.AppendW(UTF32TextChar(static_cast<uint32>(name[runs[r].start + k])));
+		upTo.Append(piece);
+		// WHERE IT STARTS: the name up to here less this run, not the runs' widths added up. Drover's measure of a string is a little over what it draws, once a string - added up, that stood between the runs as gaps (photographed, 11-02: "Find:" [Ruby Marks] " and the count cut off).
+		const PMReal x = frame.Left() + KFCDrawnWidth(upTo, fontInfo) - KFCDrawnWidth(piece, fontInfo);
+		if (x >= frame.Right())
+			break;
+		const PMReal room = frame.Right() - x;
+		const bool cut = KFCDrawnWidth(piece, fontInfo) > room;
+		const PMString shown(cut ? KFCEllipsize(room, piece, fontInfo, kEllipsizeEnd) : piece);
+		StringUtils::PMDrawStringRGB(drawbotP, PMRect(x, frame.Top(), frame.Right(), frame.Bottom()), kAlignLeft, shown, fontInfo, runs[r].faded ? kFadedColor : fg,
+			kKFCDontConvertAmpersand, kTrue /*centerVertically*/, kKFCNoUnderline, kKFCTextSmoothing);
+		if (cut)
+			break;
 	}
 }
 

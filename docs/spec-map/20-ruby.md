@@ -11,10 +11,10 @@
 - **RUBY-01** ★本体の「検索と置換」の **Kohaku+ タブ**（21 章）の Find: を **Ruby** にしているとき（日本語で起動しているときだけ出る＝KOHAKU-03）、KFC の Find in … はルビの一覧を作る。閉じる時にそうなら閉じている間も同じ。（R1・K1）回帰 `rb-face-shown`・`rb-face-find`・`rb-face-closed`・`rb-face-done`・`rb-face-switch-back`
   - 訂正:
 
-- **RUBY-02** 部品＝**Look For:**（Text With Ruby／Text Without Ruby／Ruby Marks in Text／Words in a Ruby List＝RUBY-60）・**Ruby:**（Without のとき灰色）・**Base Text:**・**Change Ruby To の欄**（RUBY-33）・案内の2行。**Search:** は 5つ（KOHAKU-10）。文字欄は1打鍵ごとに控える。値は KFC が覚える（起動している間だけ）。（R2・K5）回帰 `rb-face-base`・`rb-face-reading`・`rb-face-kind`・`rb-face-change`・`rb-face-empty`・`rb-face-scope`・`rb-part-face`
+- **RUBY-02** 部品＝**Look For:**（Text With Ruby／Text Without Ruby／Ruby Marks in Text／Words in a Ruby List＝RUBY-60）・**Ruby:**（Without のとき灰色）・**Base Text:**・**Change Ruby To の欄**（RUBY-33）・案内の2行。**Search:** は 5つ（KOHAKU-10）。★ラベルは右寄せで欄に付ける（作者 11-02「LookFor：とかのあとに空白があるのをなくしたい」＝欄の位置はそのまま・Kenten も同じ列）。★Ruby Marks in Text のときは欄を隠す（RUBY-50）。文字欄は1打鍵ごとに控える。値は KFC が覚える（起動している間だけ）。（R2・K5）回帰 `rb-face-base`・`rb-face-reading`・`rb-face-kind`・`rb-face-change`・`rb-face-empty`・`rb-face-scope`・`rb-part-face`
   - 訂正: 11-01 作者の試用＝Remove Ruby は無くした・Ruby を Base Text の上に・Change は□の欄に。
 
-- **RUBY-03** ★**完了ボタンの左に How to Use...**（作者 11-02「完了ボタンの左に欲しい」）＝ルビの書き方の窓（`KFCHowTo::ShowRubyMarks`・本文を選んでコピーできる）。日本語だけ（Ruby の種類は日本語の InDesign にしか出ない）。完了は本体の枠の部品で面の外にあるので、面が出たときに本体の枠の行へ本体の普通のボタンを差し込み（`ui/KFCKohakuTab.cpp`＝`QueryHowTo`）、Ruby と Kenten の間だけ見せる。面が隠れるときは持っているボタンを隠すだけで、部品はたどらない（QR の D1）。回帰 `rb-howto`・`rb-howto-place`・`rb-howto-done`・`rb-howto-closed-elsewhere`
+- **RUBY-03** ★**完了ボタンの左に How to Use...**（作者 11-02「完了ボタンの左に欲しい」）＝ルビの書き方の窓（`KFCHowTo::ShowRubyMarks`・本文を選んでコピーできる）。日本語だけ（Ruby の種類は日本語の InDesign にしか出ない）。完了は本体の枠の部品で面の外にあるので、面が出たときに本体の枠の行へ本体の普通のボタンを差し込み（`ui/KFCKohakuTab.cpp`＝`QueryFrameButton`）、Ruby と Kenten の間だけ見せる。★**並び＝How to Use...・Choose List...・Save List...・完了**（作者 11-02「ぼたんのならびを、Howto Chose Save 完了に」）＝Ruby の3つ。Choose List... は使えないとき灰色で残す（RUBY-60）。Kenten は How to Use... が完了の隣（`ShowFrameButtons`）。面が隠れるときは持っているボタンを隠すだけで、部品はたどらない（QR の D1）。回帰 `rb-frame-buttons`・`rb-howto`・`rb-howto-place`・`rb-howto-done`・`rb-howto-closed-elsewhere`
   - 訂正:
 
 ## 2. 探す
@@ -56,7 +56,7 @@
 - **RUBY-31** 断り＝既にそのとおり（数える＝書かない）／行の字が親文字の□と違う（`base text differs`）／読みの下に親文字が無い□があるのに他の□には親文字がある（全部の行を断る）／親文字が全部空で読みの数が1でも字数でもない。ロックされた行は灰色。（R7・F20）回帰 `rb-same`・`rb-locked`・`rb-box-differs`・`rb-box-over-nothing`・`rb-box-nobase-count`
   - 訂正:
 
-- **RUBY-33** ★★**□の欄**（作者 11-01「□□□□□ のような入力欄に漢字やルビを入力／＋で増やせる／結合できる」・触った後の指示＝検索側も□・Change は連動）＝検索の段は読みの□（Ruby:）の下に親文字の□（Base Text:＝★**1字だけ**）。Change の段は読みの□（Change Ruby To）の下に親文字の字（枠なし・編集できない＝検索の親文字の□の字）。列はそろう。始めは5列・＋で増やし−で減らす（検索側だけ・最大 12・最小 1・列の幅は窓の幅を列の数で割る）。隣り合う□の間の鎖＝読みの□がつながる（グループルビ）＝検索と Change が同じ形。読みの字は左へ寄せ、解くと左に残る。親文字の□は結合しない。灰色＝Text Without Ruby のとき検索の読み／Ruby Marks in Text のとき Change の段と鎖。⚠**探すときは□の字をつないで比べる**（モノルビとグループルビを区別しない＝私の判断）。⚠`.fr` に上限の数を置いて出し入れする（`LayOutRubyGrid`＝`SetFrame`・`ShowView`・`Enable`・窓の大きさを動かさない）。（F14〜F17）回帰 `rb-box-words`・`rb-box-one-char`・`rb-box-find-together`・`rb-box-follow`・`rb-box-group`・`rb-box-join-left`・`rb-box-plus-minus`・`rb-box-marks-grey`・`rb-box-without-grey`
+- **RUBY-33** ★★**□の欄**（作者 11-01「□□□□□ のような入力欄に漢字やルビを入力／＋で増やせる／結合できる」・触った後の指示＝検索側も□・Change は連動）＝検索の段は読みの□（Ruby:）の下に親文字の□（Base Text:＝★**1字ずつ**＝2字以上を打つか貼ると次の□へ続く＝作者 11-02「複数の文字を入力したら自働的に次のマスに」・先の□の字は上書き・列は足りなければ増える・12 列を超えた分は最後の□・キーボードは書いた最後の□へ移りカーソルは字の後ろ・日本語入力の変換中は動かさない＝`TakeBaseBox`・⚠IME は未実測）。Change の段は読みの□（Change Ruby To）の下に親文字の字（枠なし・編集できない＝検索の親文字の□の字）。列はそろう。始めは5列・＋で増やし−で減らす（検索側だけ・最大 12・最小 1・列の幅は窓の幅を列の数で割る）。隣り合う□の間の鎖＝読みの□がつながる（グループルビ）＝検索と Change が同じ形。読みの字は左へ寄せ、解くと左に残る。親文字の□は結合しない。灰色＝Text Without Ruby のとき検索の読み。Ruby Marks in Text と Words in a Ruby List では□も鎖もラベルも＋−も隠れる。⚠**探すときは□の字をつないで比べる**（モノルビとグループルビを区別しない＝私の判断）。⚠`.fr` に上限の数を置いて出し入れする（`LayOutRubyGrid`＝`SetFrame`・`ShowView`・`Enable`・窓の大きさを動かさない）。（F14〜F17）回帰 `rb-box-words`・`rb-box-one-char`・`rb-box-flow-keys`・`rb-box-flow-grow`・`rb-box-find-together`・`rb-box-follow`・`rb-box-group`・`rb-box-join-left`・`rb-box-plus-minus`・`rb-box-marks-grey`・`rb-box-without-grey`
   - 訂正:
 
 - **RUBY-34** ★**付け方**（`model/KFCRubyChangePlan.h`＝std だけで単体試験 `work/note-scripts/2026-11-01-kfc-kohaku-fixes/plan_test.ps1`）＝読みの□1つ＝1本のルビ、その下の親文字（結合なら全部の列）に付く。親文字が2字以上＝グループ（`kTAMojiRubyBoss` kFalse）。別々の□＝別々のルビ。空の読みの下の字はルビなし（`太る`＝`[ふと][  ]`／`[太][る]`）＝もともと付いていた字からは消す。親文字が全部空なら行の字全部に＝読みが1つならグループ・数が字数と同じなら1字ずつ。1つの読みに空白があって塊の数が字数と同じなら1字ずつ（本体のモノルビの書き方を貼られたとき）。（F18〜F21）回帰 `rb-box-each`・`rb-box-part`・`rb-box-nobase-each`・`rb-box-spaces`
@@ -78,10 +78,10 @@
 
 ## 6. 原稿の印からルビ（Ruby Marks in Text）
 
-- **RUBY-50** ★`Find:` の3つ目。青空文庫の書き方＝`｜漢字《かんじ》`（バーは全角・半角）、バーが無ければ《の直前の漢字（々〆〇ヶを含む）。読みが空・行をまたぐ・親文字が無いものは印でない。Base Text・Ruby で絞れる。行は印の範囲（字はふつうの行のまま）。段の名前＝`[Ruby/Document] Find:"[Ruby Marks]"`。（R12）回帰 `rb-marks-list`・`rb-marks-not`・`rb-marks-base`・`rb-marks-reading`・`rb-marks-face`
+- **RUBY-50** ★`Find:` の3つ目。青空文庫の書き方＝`｜漢字《かんじ》`（バーは全角・半角）、バーが無ければ《の直前の漢字（々〆〇ヶを含む）。読みが空・行をまたぐ・親文字が無いものは印でない。★□の欄は隠れ、入っている字では絞らない（作者 11-02「入力欄は必要なのかな？いらなければ、非表示にできれば非表示に」＝読みは印にあり、省きたい印は行を Replace しなければよい）。行は印の範囲（字はふつうの行のまま）。段の名前＝`[Ruby/Document] Find:"[Ruby Marks]"`。（R12）回帰 `rb-marks-no-boxes`・`rb-marks-list`・`rb-marks-not`・`rb-marks-base`・`rb-marks-reading`・`rb-marks-face`
   - 訂正:
 
-- **RUBY-51** ★Replace＝読みを親文字に付け（グループルビ）、印を文字から消す。Change 側は見ない（欄は灰色）。文字が動くので同じ文書の他の行を運ぶ（`MarksWrite::WriteChapter`＝`OutlineInChapter` の型）。書いた行は親文字に立ち、`Changed`＋`親文字《読み》`。もう一度は「既にそのとおり」。全部で Ctrl+Z 1回＝文字も行も戻る。（R12）回帰 `rb-marks-replace-one`・`rb-marks-replace-all`・`rb-marks-undo`・`rb-marks-again`・`rb-marks-cell`・`rb-marks-book`
+- **RUBY-51** ★Replace＝読みを親文字に付け（グループルビ）、印を文字から消す。Change 側は見ない（欄は隠れる）。文字が動くので同じ文書の他の行を運ぶ（`MarksWrite::WriteChapter`＝`OutlineInChapter` の型）。書いた行は親文字に立ち、`Changed`＋`親文字《読み》`。もう一度は「既にそのとおり」。全部で Ctrl+Z 1回＝文字も行も戻る。（R12）回帰 `rb-marks-replace-one`・`rb-marks-replace-all`・`rb-marks-undo`・`rb-marks-again`・`rb-marks-cell`・`rb-marks-book`
   - 訂正:
 
 - **RUBY-52** ★Track Changes が入っている物語は断る（消した字が物語に残るので、段ごと戻して文で言う）。実測＝自分の変更履歴の挿入を消すのは記録に残らず本当に消える（その場合は書ける）。回帰 `rb-marks-track`
@@ -94,10 +94,10 @@
 - **RUBY-65** ★**Occurrences:**（作者 11-02「それずっと欲しかった」「りすとでえらぶのかな、Storyで初出とか」「documentで初出とか、ブックで初出とか」）＝All／First in Story／First in Document／First in Book。語（リストの行）ごとに最初の1か所だけ行にする。最初＝一覧に並ぶ順の最初（ページ順・同じページは歩いた順・あふれは最後）＝表のセルや脚注は本文より後ろに持っているので物語の中の順では決めない。最初の1か所にルビがあればその語の行は出さない（数を言う）。見る範囲は Search: の範囲とアイコンの範囲の中。Book Scope が切の First in Book は First in Document と同じ。`Search This Document Again` は First in Book のとき断る（前の章を読まない）。段の名前に `(First in Document)`。クエリに `rubyFirst`。実装＝`KFCRubySearch.cpp` の `WalkList`（スレッドごとの最初を候補に）→`KeepFirsts`。回帰 `rb-first-*`・`kq-pick-first`・`kq-qd-run-ruby-list-first`・`kq-qd-run-ruby-list-all`
   - 訂正:
 
-- **RUBY-66** ★**Save List...**（作者 11-02・右上の列の1段目・Ruby のとき Look For によらず出る）＝Search: の範囲（Book Scope ならブック）のルビをリストのファイルに書き出す。文書は変えない。同じ語は1行・接したルビは1語・同じ語の読みが割れたら多い方を行に（同数は先に出た方）、他は `# another reading, N of M places:` の行。行に書けない読み（印を含む等）は `# no line can hold this` で残す＝書く前に全行を読み戻して確かめる（`KFCRubyList::ListMaker`）。アイコンの範囲に従う。UTF-8（BOM つき）・CRLF・既定の名前 `<文書名> Ruby List.txt`。何も無ければファイルを作らず言う。⚠章を閉じる前に文書の参照を全部手放す＝`rb-save-book` で 11-02 に保護シャットダウン（`CloseDocCmd - document is still referenced`）を踏んだ。回帰 `rb-save-*`
+- **RUBY-66** ★**Save List...**（作者 11-02・完了の左隣・Ruby のとき Look For によらず出る）＝Search: の範囲（Book Scope ならブック）のルビをリストのファイルに書き出す。文書は変えない。同じ語は1行・接したルビは1語・★同じ語の読みが割れたら、語に次の1字を付けて1行ずつ書き分ける（作者 11-02「読みが割れた語だけ次の1字を付けて」＝`太《ふと》る`・`太《た》田`）。読みが1つの語・読みが同じで付き方だけ違う語（モノとグループ）には付けない。次の字が空白・段落の終わり・隠れた字などなら語だけの行。できた語が同じになったら（同じ次の字・既にある長い語）多い方を行に（同数は先に出た方）、他は `# another reading, N of M places:` の行。行に書けない読み（印を含む等）は `# no line can hold this` で残す＝書く前に全行を読み戻して確かめる（`KFCRubyList::ListMaker`）。アイコンの範囲に従う。UTF-8（BOM つき）・CRLF・既定の名前 `<文書名> Ruby List.txt`。何も無ければファイルを作らず言う。⚠章を閉じる前に文書の参照を全部手放す＝`rb-save-book` で 11-02 に保護シャットダウン（`CloseDocCmd - document is still referenced`）を踏んだ。回帰 `rb-save-*`
   - 訂正:
 
-- **RUBY-60** ★Look For: の4つ目。**Choose List...**（右上の列の2段目）でファイルを選ぶ＝1行1語・Ruby Marks in Text と同じ印で書く（`太《た》郎《ろう》`・`太《ふと》る`・`漢字《かんじ》`・`｜食べ物《たべもの》`）。印を除いた字を探し、印の字にだけ付ける（`太《ふと》る`＝太るを探して太にだけ＝作者 11-02）。ファイルでは `＜＜ ＞＞`・`<< >>`・`≪ ≫` も印。空行と `#` の行は飛ばす・CSV とタブ区切りは1列目・UTF-8／UTF-16／Shift_JIS。□の欄は隠れ、ファイル名と「N words.」か断りの文が出る。（L1〜L4・L7・L10）回帰 `rb-list-face`・`rb-list-cp932`
+- **RUBY-60** ★Look For: の4つ目。**Choose List...**（完了の行＝How to Use... の右・他の Look For では灰色＝作者 11-02）でファイルを選ぶ＝1行1語・Ruby Marks in Text と同じ印で書く（`太《た》郎《ろう》`・`太《ふと》る`・`漢字《かんじ》`・`｜食べ物《たべもの》`）。印を除いた字を探し、印の字にだけ付ける（`太《ふと》る`＝太るを探して太にだけ＝作者 11-02）。ファイルでは `＜＜ ＞＞`・`<< >>`・`≪ ≫` も印。空行と `#` の行は飛ばす・CSV とタブ区切りは1列目・UTF-8／UTF-16／Shift_JIS。□の欄は隠れ、ファイル名と「N words.」か断りの文が出る。（L1〜L4・L7・L10）回帰 `rb-list-face`・`rb-list-cp932`
   - 訂正:
 
 - **RUBY-61** ★読めない行が1行でもあればファイルを使わない＝最初の行の番号を言う（印が無い／読みが読めない／同じ語に違う読み＝両方の行）。ファイルを選んでいなければ断る。（L3・L5）回帰 `rb-list-nofile`・`rb-list-bad-line`・`rb-list-bad-mark`・`rb-list-other-reading`

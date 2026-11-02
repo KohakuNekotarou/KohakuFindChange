@@ -46,7 +46,6 @@
 #include "ITreeViewMgr.h"				// ClearTree / ChangeRoot / ExpandNode (the rebuild)
 
 // Interface includes (cont.):
-#include "IMenuUtils.h"					// InsertAmpersandForDisplay - a file name may contain '&'
 
 // General includes:
 #include "CTreeViewWidgetMgr.h"
@@ -130,24 +129,10 @@ namespace
 		if (cv == nil)
 			return;
 
-		// The label carries a name the user chose - a document's or a book's file name - and this
-		// cell converts ampersands (KFCUI.fr sets that flag on it, exactly as the layer panel's row
-		// resource does). A lone '&' is then taken as a keyboard accelerator: "A&B.indd" would show
-		// as "AB.indd" with the B underlined. Doubling each one up is what the built-in panels do
-		// before handing a user-entered name to a static text - see SetupLayerWidget in
-		// LayerPanelTreeViewWidgetMgr.cpp, AddWidgetsIfNeeded in LinksUIPanelTreeViewWidgetMgr.cpp,
-		// and the note on IMenuUtils::InsertAmpersandForDisplay itself ("style names, master names,
-		// layer names ... or other user-entered strings").
-		//
-		// The hit rows do NOT come through here: their cell draws itself and asks for no ampersand
-		// conversion at all (KFCColorTextView), which is right - the matched text has to appear
-		// exactly as it stands in the document.
-		PMString display(text);
-		Utils<IMenuUtils>()->InsertAmpersandForDisplay(&display);
-
+		// The label draws itself and asks for no ampersand conversion at all (KFCBranchLabelView, as the hit row's cell), so a name with a '&' in it goes in as it stands - no doubling for a static text.
 		InterfacePtr<ITextControlData> tcd(cv, UseDefaultIID());
 		if (tcd != nil)
-			tcd->SetString(display, kTrue /*invalidate*/, kFalse /*don't notify*/);
+			tcd->SetString(text, kTrue /*invalidate*/, kFalse /*don't notify*/);
 	}
 
 	// A DOCUMENT WITH NO WINDOW: the chapter's document is open and no window shows it. The one question the document

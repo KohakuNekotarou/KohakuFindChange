@@ -28,6 +28,7 @@ REGISTER_PMINTERFACE(KFCActionComponent, kKFCActionComponentImpl)
 REGISTER_PMINTERFACE(KFCResultListAdapter, kKFCResultListAdapterImpl)
 REGISTER_PMINTERFACE(KFCResultListWidgetMgr, kKFCResultListWidgetMgrImpl)
 REGISTER_PMINTERFACE(KFCColorTextView, kKFCColorTextViewImpl)
+REGISTER_PMINTERFACE(KFCBranchLabelView, kKFCBranchLabelViewImpl)
 REGISTER_PMINTERFACE(KFCRowData, kKFCRowDataImpl)
 // The jump marker's countdown and the hit row's click (the jump).
 REGISTER_PMINTERFACE(KFCMarkerExpiryTask, kKFCMarkerExpiryIdleTaskImpl)

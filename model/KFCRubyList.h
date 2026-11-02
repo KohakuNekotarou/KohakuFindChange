@@ -21,6 +21,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "KFCFold.h"				// what a word and the text take for the same
@@ -398,13 +399,14 @@ namespace KFCRubyList
 		return !cell.empty() && cell[0] != 0x23 && cell[0] != 0xFF03 && ParseCell(cell, back, why) && back.word == entry.word;
 	}
 
-	/** WHAT A DOCUMENT'S RUBY COMES TO AS A LIST (Save List... - the author, 11-02: "the same word once"): each word once, as the rubies touching one another read. A word read two ways is one line, the way most of its places read it - a list holds one reading for a word, so the rest stand under it as comments with how many places read so: what the person is to look at. Ties: the way met first. */
+	/** WHAT A DOCUMENT'S RUBY COMES TO AS A LIST (Save List... - the author, 11-02: "the same word once"): each word once, as the rubies touching one another read. A WORD READ TWO WAYS gets a line for each way with the character after it (the author: "the next character, for the words whose reading splits" - futo-ru and ta-da, each read back as itself): the rest of a list reads as it is, the characters a word is followed by being many, and few of them saying anything. A place with no such character is the word's bare line. Two ways over the same characters (the word and the character after it the same, or one word given its readings as a group and as a character each - that is no other reading) are one line, the way most of its places read it - a list holds one reading for a word, so the rest stand under it as comments with how many places read so: what the person is to look at. Ties: the way met first. */
 	class ListMaker
 	{
 	public:
-		ListMaker() : fWritten(0), fSplit(0), fUnwritable(0) {}
+		ListMaker() : fWritten(0), fSplit(0), fApart(0), fUnwritable(0) {}
 
-		void Add(const Entry& found)
+		/** One place: the word its rubies make, and the character after it in the text (0 = none a line could use: the caller's to say what stands there is text). */
+		void Add(const Entry& found, char32_t after = 0)
 		{
 			const std::map<std::u32string, size_t>::const_iterator known = fIndex.find(found.word);
 			const size_t w = (known != fIndex.end()) ? known->second : fWords.size();
@@ -414,22 +416,32 @@ namespace KFCRubyList
 				fWords.emplace_back();
 				fWords.back().word = found.word;
 			}
+			SeenWord& word = fWords[w];
 			const std::u32string line(LineOf(found));
 			if (!LineReadsBack(line, found))
 			{
-				++fWords[w].unwritable;
+				++word.unwritable;
 				return;
 			}
-			for (size_t v = 0; v < fWords[w].ways.size(); ++v)
-				if (fWords[w].ways[v].line == line)
-				{
-					++fWords[w].ways[v].count;
-					return;
-				}
-			Way way;
-			way.line = line;
-			way.count = 1;
-			fWords[w].ways.push_back(way);
+			size_t v = 0;
+			while (v < word.ways.size() && word.ways[v].line != line)
+				++v;
+			if (v == word.ways.size())
+			{
+				SeenWay way;
+				way.entry = found;
+				way.line = line;
+				way.count = 0;
+				word.ways.push_back(way);
+			}
+			SeenWay& way = word.ways[v];
+			++way.count;
+			size_t a = 0;
+			while (a < way.after.size() && way.after[a].first != after)
+				++a;
+			if (a == way.after.size())
+				way.after.push_back(std::make_pair(after, size_t(0)));
+			++way.after[a].second;
 		}
 
 		/** The file's text, its lines ended as Windows ends them, under a head of a comment. */
@@ -437,12 +449,76 @@ namespace KFCRubyList
 		{
 			static const std::u32string kEol(U"\r\n");
 			fSplit = 0;
+			fApart = 0;
 			fUnwritable = 0;
-			size_t written = 0;
-			std::u32string body;
+			// THE WORDS THE LINES WILL HOLD, in the order they came: one word of a line may be reached twice - a word read two ways, with its next character, and a longer word of its own that reads those same characters. A file holds one line for a word.
+			std::vector<SavedWord> saved;
+			std::map<std::u32string, size_t> savedAt;
+			const auto savedWord = [&](const std::u32string& word) -> SavedWord&
+			{
+				const std::map<std::u32string, size_t>::const_iterator known = savedAt.find(word);
+				if (known != savedAt.end())
+					return saved[known->second];
+				savedAt[word] = saved.size();
+				saved.emplace_back();
+				saved.back().word = word;
+				return saved.back();
+			};
+			const auto put = [&](const std::u32string& word, const std::u32string& line, size_t count)
+			{
+				SavedWord& into = savedWord(word);
+				for (size_t v = 0; v < into.ways.size(); ++v)
+					if (into.ways[v].line == line)
+					{
+						into.ways[v].count += count;
+						return;
+					}
+				Way way;
+				way.line = line;
+				way.count = count;
+				into.ways.push_back(way);
+			};
 			for (size_t w = 0; w < fWords.size(); ++w)
 			{
-				SavedWord& word = fWords[w];
+				SeenWord& seen = fWords[w];
+				std::stable_sort(seen.ways.begin(), seen.ways.end(), [](const SeenWay& a, const SeenWay& b) { return a.count > b.count; });
+				const bool split = ReadingsDiffer(seen);
+				bool apart = false;
+				for (size_t v = 0; v < seen.ways.size(); ++v)
+				{
+					SeenWay& way = seen.ways[v];
+					if (!split)
+					{
+						put(seen.word, way.line, way.count);
+						continue;
+					}
+					std::stable_sort(way.after.begin(), way.after.end(), [](const std::pair<char32_t, size_t>& a, const std::pair<char32_t, size_t>& b) { return a.second > b.second; });
+					for (size_t a = 0; a < way.after.size(); ++a)
+					{
+						Entry longer(way.entry);
+						if (way.after[a].first != 0)
+							longer.word.push_back(way.after[a].first);
+						const std::u32string line(LineOf(longer));
+						// (A character no line can hold after the word - a mark's own, say: the word's bare line.)
+						if (way.after[a].first != 0 && LineReadsBack(line, longer))
+						{
+							put(longer.word, line, way.after[a].second);
+							apart = true;
+						}
+						else
+							put(seen.word, way.line, way.after[a].second);
+					}
+				}
+				if (apart)
+					++fApart;
+				if (seen.unwritable > 0)
+					savedWord(seen.word).unwritable += seen.unwritable;
+			}
+			size_t written = 0;
+			std::u32string body;
+			for (size_t w = 0; w < saved.size(); ++w)
+			{
+				SavedWord& word = saved[w];
 				std::stable_sort(word.ways.begin(), word.ways.end(), [](const Way& a, const Way& b) { return a.count > b.count; });
 				if (!word.ways.empty())
 				{
@@ -464,11 +540,31 @@ namespace KFCRubyList
 		}
 
 		size_t Written() const { return fWritten; }
+		/** Words of the file left with # lines of other readings. */
 		size_t Split() const { return fSplit; }
+		/** Words read two ways that the character after them told apart. */
+		size_t Apart() const { return fApart; }
 		size_t Unwritable() const { return fUnwritable; }
 		bool Empty() const { return fWords.empty(); }
 
 	private:
+		// What the document held: each word, each way it was read, how many places, and what stood after them.
+		struct SeenWay
+		{
+			Entry			entry;
+			std::u32string	line;
+			size_t			count;
+			std::vector<std::pair<char32_t, size_t> >	after;
+			SeenWay() : count(0) {}
+		};
+		struct SeenWord
+		{
+			std::u32string			word;
+			std::vector<SeenWay>	ways;
+			size_t					unwritable;
+			SeenWord() : unwritable(0) {}
+		};
+		// What the file holds.
 		struct Way
 		{
 			std::u32string	line;
@@ -481,6 +577,23 @@ namespace KFCRubyList
 			size_t				unwritable;
 			SavedWord() : unwritable(0) {}
 		};
+
+		// Is the word read two ways - in what it says, not in how the rubies stand over it?
+		static bool ReadingsDiffer(const SeenWord& word)
+		{
+			std::u32string first;
+			for (size_t v = 0; v < word.ways.size(); ++v)
+			{
+				std::u32string reading;
+				for (size_t r = 0; r < word.ways[v].entry.runs.size(); ++r)
+					reading += word.ways[v].entry.runs[r].reading;
+				if (v == 0)
+					first = reading;
+				else if (reading != first)
+					return true;
+			}
+			return false;
+		}
 
 		static size_t Places(const SavedWord& word)
 		{
@@ -511,10 +624,11 @@ namespace KFCRubyList
 			return out;
 		}
 
-		std::vector<SavedWord>				fWords;
+		std::vector<SeenWord>				fWords;
 		std::map<std::u32string, size_t>	fIndex;
 		size_t								fWritten;
 		size_t								fSplit;
+		size_t								fApart;
 		size_t								fUnwritable;
 	};
 

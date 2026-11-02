@@ -121,6 +121,8 @@ DECLARE_PMID(kClassIDSpace, kKFCKohakuSaveFilterBoss, kKFCUIPrefix + 35)
 DECLARE_PMID(kClassIDSpace, kKFCKentenSampleWidgetBoss, kKFCUIPrefix + 36)
 // The Ruby and Kenten parts' icons, InDesign's Text tab's own (KFCSwitchIcon.cpp): a toggling icon button, with their tips.
 DECLARE_PMID(kClassIDSpace, kKFCSwitchIconWidgetBoss, kKFCUIPrefix + 37)
+// A branch row's label, drawn by hand (KFCColorTextView.cpp): a tier's name fades the words around what it asked.
+DECLARE_PMID(kClassIDSpace, kKFCBranchLabelWidgetBoss, kKFCUIPrefix + 38)
 
 
 // InterfaceIDs:
@@ -254,6 +256,7 @@ DECLARE_PMID(kImplementationIDSpace, kKFCKohakuSaveFilterEHImpl, kKFCUIPrefix + 
 DECLARE_PMID(kImplementationIDSpace, kKFCKohakuTabSelectionObserverImpl, kKFCUIPrefix + 66)
 DECLARE_PMID(kImplementationIDSpace, kKFCKentenSampleViewImpl, kKFCUIPrefix + 67)
 DECLARE_PMID(kImplementationIDSpace, kKFCSwitchIconTipImpl, kKFCUIPrefix + 68)
+DECLARE_PMID(kImplementationIDSpace, kKFCBranchLabelViewImpl, kKFCUIPrefix + 69)
 
 
 // ActionIDs:
@@ -1169,6 +1172,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCRubyListSaveWidgetID, kKFCPrefix + 80)
 #define kKFCKohakuTabRsrcID					(kSDKDefPanelResourceID + 30)
 #define kKFCKohakuTabIDListRsrcID			(kSDKDefPanelResourceID + 32)
 #define kKFCKohakuHowToRsrcID				(kSDKDefPanelResourceID + 36)	// the tab's How to Use..., built into the row of the dialog frame's Done
+#define kKFCRubyListSaveRsrcID				(kSDKDefPanelResourceID + 38)	// ...and Save List...
+#define kKFCRubyListChooseRsrcID			(kSDKDefPanelResourceID + 40)	// ...and Choose List...
 #define kKFCValueFieldWidth					84
 // One row of the query dialog's lists: KCM's book comparison dialog's row height (kKCMBookRowHeight), the one other
 // list the Kohaku plug-ins draw in a dialog's font. Read by the row resource, the lists' scroll increments

@@ -15,6 +15,7 @@
 #include "IApplication.h"				// the keyboard - a box that goes takes its focus with it
 #include "IControlView.h"
 #include "IDropDownListController.h"	// the face's lists' entries
+#include "IEditBoxAttributes.h"			// SelectRange - a base box's caret, when what was typed goes on into it
 #include "IEventHandler.h"				// ...the focus's handler
 #include "ISaveFileDialog.h"			// (and DocumentID.h - kSaveFileDialogBoss) Save List...'s file
 #include "IKeyBoard.h"
@@ -52,6 +53,10 @@
 
 #include <string>		// (test builds: the fault switch ruby-list-file's line)
 #include <vector>
+
+// (windows.h is in already: the precompiled header brings it - KFCPanelAlpha.cpp says how.)
+#include <imm.h>		// InputMethodComposing - a base box leaves what an input method is still composing alone
+#pragma comment(lib, "imm32.lib")
 
 // Project includes:
 #include "KFCKohakuTab.h"
@@ -95,7 +100,10 @@ bool gYield = false;		// a saved query loaded since states its own tab (YieldToS
 bool gStated = false;		// a saved query of this tab's Find is under way (StateQuery) - until EndStatedFind
 int32 gStatedScope = IWalkerScopeFactoryUtils::kDocumentScope;	// ...over this Search:
 IPMUnknown* gShownFace = nil;	// the face, while shown - from its AutoAttach to its AutoDetach (not AddRef'd): a query stated with it shown writes its widgets
-IControlView* gHowTo = nil;		// How to Use... in the row of the frame's Done, while the face is shown (the face's observer holds the reference: QueryHowTo's note)
+// THE BUTTONS IN THE ROW OF THE FRAME'S DONE, while the face is shown (the face's observer holds the references: QueryFrameButton's note): How to Use..., Choose List..., Save List....
+IControlView* gHowTo = nil;
+IControlView* gChooseList = nil;
+IControlView* gSaveList = nil;
 int32 gKind = kKindQRCode;	// its Find: - QR Code at launch, the tab InDesign's dialog first had
 int32 gScope = IWalkerScopeFactoryUtils::kDocumentScope;	// its Search: - Document at launch
 KFCTableConditions gTable;	// what the Table part asks, kept from its widgets (its scope is gScope)
@@ -685,6 +693,8 @@ void BoxesFromKept()
 		gCols = col;
 }
 
+void ShowFrameButtons();	// (below, with the buttons)
+
 // WHERE A COLUMN STANDS IN THE GRID (KFCUI.fr): the labels to 110, the + and - from 428, the columns sharing what is between.
 const int32 kGridColumnsLeft = 115;
 const int32 kGridColumnsRight = 422;
@@ -708,16 +718,15 @@ void PlaceGridWidget(IPanelControlData* panel, const WidgetID& widget, bool show
 }
 
 // THE GRID AS THE COLUMNS AND THE JOINS NOW SAY (the frames set here, no EVE layout: the window keeps its size - InDesign's LinkInfoPanelObserver places its widgets the same way). Each column's base box and its words on the Change side are its own; a reading box - Find's, and
-// Change's, which follow it (the author, 11-01) - runs over the columns joined to it, and the boxes it runs over are away. GREY: Find's Ruby: with Text Without Ruby, whose search has no reading; the Change side and the chains with Ruby Marks in Text - the reading is in the mark -
-// and all of it with the part hidden.
+// Change's, which follow it (the author, 11-01) - runs over the columns joined to it, and the boxes it runs over are away. GREY: Find's Ruby: with Text Without Ruby, whose search has no reading; and all of it with the part hidden.
 void LayOutRubyGrid(IPanelControlData* panel)
 {
 	const bool part = (gKind == kKindRuby);
 	// WORDS IN A RUBY LIST ASKS NOTHING OF THE BOXES: they go, and what it says of its file stands in their place.
 	const bool listing = part && gRuby.kind == kKFCRubyFindList;
-	const bool boxes = !listing;
+	// NOR DOES RUBY MARKS IN TEXT (the author, 11-02: "not needed? then hide them"): the reading is in the mark, and every mark is a row - a row's own Replace is how one is left out. They go, and what they hold asks nothing of it (KFCRubySearch.cpp's WalkMarks).
+	const bool boxes = !listing && !(part && gRuby.kind == kKFCRubyFindMarks);
 	const bool findReads = part && gRuby.kind != kKFCRubyFindWithout;
-	const bool changes = part && gRuby.kind != kKFCRubyFindMarks;
 	PlaceGridWidget(panel, kKFCRubyGridLabelReadingWidgetID, boxes, part, 0, 0, 110, 21);
 	PlaceGridWidget(panel, kKFCRubyGridLabelBaseWidgetID, boxes, part, 0, 41, 110, 62);
 	PlaceGridWidget(panel, kKFCRubyGridLabelChangeWidgetID, boxes, part, 0, 72, 110, 93);
@@ -727,13 +736,7 @@ void LayOutRubyGrid(IPanelControlData* panel)
 	PlaceGridWidget(panel, kKFCRubyListStatusWidgetID, listing, listing, 0, 26, 456, 47);
 	PlaceGridWidget(panel, kKFCRubyListFirstLabelWidgetID, listing, listing, 0, 52, 110, 73);
 	PlaceGridWidget(panel, kKFCRubyListFirstWidgetID, listing, listing, 115, 52, 285, 73);
-	// (Choose List... stands in the head's column.)
-	IControlView* const choose = (panel != nil) ? panel->FindWidget(kKFCRubyListChooseWidgetID) : nil;
-	if (choose != nil)
-	{
-		choose->Enable(listing ? kTrue : kFalse);
-		choose->ShowView(listing ? kTrue : kFalse);
-	}
+	ShowFrameButtons();		// (Choose List..., in the row of the frame's Done, is usable with Words in a Ruby List alone)
 	for (int32 k = 0; k < kKFCRubyBoxColumnsMost; ++k)
 	{
 		const bool stands = boxes && (k < gCols);
@@ -746,13 +749,13 @@ void LayOutRubyGrid(IPanelControlData* panel)
 		const int32 columnRight = stands ? GridColumnLeft(k + 1) - kGridBoxGap : 0;
 		PlaceGridWidget(panel, ReadingBoxID(k), stands && !overLeft, findReads, left, 0, readingRight, 21);
 		PlaceGridWidget(panel, BaseBoxID(k), stands, part, left, 41, columnRight, 62);
-		PlaceGridWidget(panel, ChangeBoxID(k), stands && !overLeft, changes, left, 72, readingRight, 93);
-		PlaceGridWidget(panel, ChangeBaseID(k), stands, changes, left, 96, columnRight, 116);
+		PlaceGridWidget(panel, ChangeBoxID(k), stands && !overLeft, part, left, 72, readingRight, 93);
+		PlaceGridWidget(panel, ChangeBaseID(k), stands, part, left, 96, columnRight, 116);
 		if (k + 1 < kKFCRubyBoxColumnsMost)
 		{
 			const bool between = boxes && (k + 1 < gCols);
 			const int32 middle = between ? GridColumnLeft(k + 1) - (kGridBoxGap / 2) : 0;
-			PlaceGridWidget(panel, JoinID(k), between, changes, middle - 10, 21, middle + 10, 41);
+			PlaceGridWidget(panel, JoinID(k), between, part, middle - 10, 21, middle + 10, 41);
 		}
 	}
 	IControlView* const plus = (panel != nil) ? panel->FindWidget(kKFCRubyGridPlusWidgetID) : nil;
@@ -943,7 +946,7 @@ WidgetID LetGoOfGoingBox()
 	return boxOf(to);
 }
 
-// THE BOXES ARE GOING, ALL OF THEM (Words in a Ruby List): one holding the keyboard lets go - the keys would go on into a box no one sees (LetGoOfGoingBox's rule, below; it answers for the columns that stay).
+// THE BOXES ARE GOING, ALL OF THEM (Ruby Marks in Text, Words in a Ruby List): one holding the keyboard lets go - the keys would go on into a box no one sees (LetGoOfGoingBox's rule, below; it answers for the columns that stay).
 void LetGoOfAnyBox()
 {
 	ISession* const session = GetExecutionContextSession();
@@ -955,6 +958,79 @@ void LetGoOfAnyBox()
 	const WidgetID held = focus->GetWidgetID();
 	if (ColumnOf(held, ReadingBoxID(0), kKFCRubyBoxColumnsMost) >= 0 || ColumnOf(held, BaseBoxID(0), kKFCRubyBoxColumnsMost) >= 0 || ColumnOf(held, ChangeBoxID(0), kKFCRubyBoxColumnsMost) >= 0)
 		keyboard->RelinquishKeyFocus();
+}
+
+// IS AN INPUT METHOD STILL COMPOSING IN THE WINDOW WITH THE KEYBOARD? What a box holds then is not yet what the person typed, and moving it would break the composition. (IMM's own answer; an input method on the newer text services answers it through the same call - not measured here on one: only the author's hands can.)
+bool InputMethodComposing()
+{
+	const HWND focus = ::GetFocus();
+	const HIMC context = (focus != nullptr) ? ::ImmGetContext(focus) : nullptr;
+	if (context == nullptr)
+		return false;
+	const LONG bytes = ::ImmGetCompositionStringW(context, GCS_COMPSTR, nullptr, 0);
+	::ImmReleaseContext(focus, context);
+	return bytes > 0;
+}
+
+// WHAT A BASE BOX WAS GIVEN (the author, 11-02: "more than one character typed goes on into the next box"): one character stays; more - typed, pasted, an input method's confirming - one a box from this one on, over what those hold, the columns grown as far as they go and past the
+// last box all the rest in it (FillBaseFromKept's rule). A space is no character of it (CharsOf). THE KEYBOARD GOES WITH THEM if this box still has it - to the last box written, its caret after its character, so the next key goes on from there (a box hears a change when it loses the
+// keyboard too: then it stays where the person put it).
+void TakeBaseBox(IPanelControlData* panel, int32 k, const PMString& typed)
+{
+	gCellBase[k] = typed;
+	if (panel == nil)
+		return;
+	if (InputMethodComposing())
+	{
+		KFC_DIAG_LOG("RUBYTAB base box %d composing", static_cast<int>(k));
+		return;
+	}
+	const std::vector<PMString> chars(CharsOf(typed));
+	if (chars.size() <= 1)
+	{
+		PMString one;
+		one.SetTranslatable(kFalse);
+		if (!chars.empty())
+			one = chars[0];
+		if (one != typed)
+			SetField(panel, BaseBoxID(k), one);
+		gCellBase[k] = one;
+		SetField(panel, ChangeBaseID(k), one);
+		return;
+	}
+	int32 last = k;
+	for (size_t c = 0; c < chars.size(); ++c)
+	{
+		const int32 place = k + static_cast<int32>(c);
+		if (place < kKFCRubyBoxColumnsMost)
+		{
+			last = place;
+			gCellBase[place] = chars[c];
+		}
+		else
+			gCellBase[kKFCRubyBoxColumnsMost - 1].Append(chars[c]);
+	}
+	for (int32 place = k; place <= last; ++place)
+	{
+		gCellBase[place].SetTranslatable(kFalse);
+		SetField(panel, BaseBoxID(place), gCellBase[place]);
+		SetField(panel, ChangeBaseID(place), gCellBase[place]);
+	}
+	if (last + 1 > gCols)
+	{
+		gCols = last + 1;
+		LayOutRubyGrid(panel);
+	}
+	ISession* const session = GetExecutionContextSession();
+	InterfacePtr<IApplication> application((session != nil) ? session->QueryApplication() : nil);
+	InterfacePtr<IKeyBoard> keyboard(application, UseDefaultIID());
+	InterfacePtr<IControlView> focus((keyboard != nil) ? keyboard->GetKeyFocus() : nil, UseDefaultIID());
+	if (focus == nil || focus->GetWidgetID() != BaseBoxID(k))
+		return;
+	panel->SetKeyboardFocus(BaseBoxID(last));
+	InterfacePtr<IEditBoxAttributes> box(panel->FindWidget(BaseBoxID(last)), UseDefaultIID());
+	if (box != nil)
+		box->SelectRange(gCellBase[last].CharCount(), gCellBase[last].CharCount());
 }
 
 // (What each Look For: greys and takes away - LayOutRubyGrid - and what a list says of itself.)
@@ -1085,14 +1161,14 @@ void ShowPart(IPanelControlData* panel, const WidgetID& widget, bool shown)
 	view->ShowView(shown ? kTrue : kFalse);
 }
 
-// ----- How to Use... (the author, 11-02: "left of the Done button", on Ruby and on Kenten)
+// ----- The buttons left of the frame's Done (the author, 11-02: How to Use... on Ruby and on Kenten; Choose List... and Save List... on Ruby - left to right How to Use..., Choose List..., Save List..., Done)
 //
-// DONE IS THE DIALOG FRAME'S, in a row of the frame under the faces' tabs (measured: the row's first widget is on no face), so a child of the face cannot stand beside it. The button is built into that row - the recipe of Adobe's linksui
-// (LinkInfoPanelObserver: ::CreateObject with a RsrcSpec, AddWidget, SetFrame), memory widget-injection-builtin-ui - and it is a plain button of InDesign's (KFCUI.fr). Found and built as the face is shown. HIDING WALKS NOTHING: the face's
-// AutoDetach comes with the dialog's close too, and a face that walked the dialog's widgets there left Find/Change closed and yet standing, for good (the QR spec's D1, measured): the face holds the button for as long as it is shown.
+// DONE IS THE DIALOG FRAME'S, in a row of the frame under the faces' tabs (measured: the row's first widget is on no face), so a child of the face cannot stand beside it. The buttons are built into that row - the recipe of Adobe's linksui
+// (LinkInfoPanelObserver: ::CreateObject with a RsrcSpec, AddWidget, SetFrame), memory widget-injection-builtin-ui - and each is a plain button of InDesign's (KFCUI.fr). Found and built as the face is shown. HIDING WALKS NOTHING: the face's
+// AutoDetach comes with the dialog's close too, and a face that walked the dialog's widgets there left Find/Change closed and yet standing, for good (the QR spec's D1, measured): the face holds the buttons for as long as it is shown.
 
-// How far left of Done: the Object tab's Find Next and Change stand 5 apart in a column, and InDesign's dialogs part two buttons in a row by 10 (kEVELargeSpaceAfter).
-const int32 kHowToGapToDone = 10;
+// How far apart, and from Done: the Object tab's Find Next and Change stand 5 apart in a column, and InDesign's dialogs part two buttons in a row by 10 (kEVELargeSpaceAfter).
+const int32 kFrameButtonGap = 10;
 
 // The first panel up from the face that holds the frame's Done: the dialog's own, for the frame is no face's. Nil with no such dialog. (The face is shown: see above.)
 IControlView* FindFrameDone(IPMUnknown* face)
@@ -1111,39 +1187,55 @@ IControlView* FindFrameDone(IPMUnknown* face)
 	return nil;
 }
 
-// The button in Done's row (AddRef'd): the one built at an earlier show if the dialog has kept it, or built now, Done's height and binding, its own width left of Done. Nil where the dialog is not as measured: then there is simply no How to Use....
-IControlView* QueryHowTo(IPMUnknown* face)
+// A button in Done's row (AddRef'd): the one built at an earlier show if the dialog has kept it, or built now, Done's height and binding, `place` buttons of its width further left than the first left of Done. Nil where the dialog is not as measured: then there is simply no such button.
+IControlView* QueryFrameButton(IPMUnknown* face, const WidgetID& widget, RsrcID rsrc, int32 place)
 {
 	IControlView* const done = FindFrameDone(face);
 	InterfacePtr<IWidgetParent> doneParent(done, UseDefaultIID());
 	InterfacePtr<IPanelControlData> row((doneParent != nil) ? doneParent->GetParent() : nil, UseDefaultIID());
 	if (row == nil)
 		return nil;
-	IControlView* const kept = row->FindWidget(kKFCKohakuHowToWidgetID);
+	IControlView* const kept = row->FindWidget(widget);
 	if (kept != nil)
 	{
 		kept->AddRef();
 		return kept;
 	}
-	InterfacePtr<IControlView> button(::CreateObject2<IControlView>(::GetDataBase(row), RsrcSpec(LocaleSetting::GetLocale(), kKFCUIPluginID, kViewRsrcType, kKFCKohakuHowToRsrcID)));
+	InterfacePtr<IControlView> button(::CreateObject2<IControlView>(::GetDataBase(row), RsrcSpec(LocaleSetting::GetLocale(), kKFCUIPluginID, kViewRsrcType, rsrc)));
 	if (button == nil)
 		return nil;
 	row->AddWidget(button);
 	const PMRect doneFrame = done->GetFrame();
-	const PMReal right = doneFrame.Left() - PMReal(kHowToGapToDone);
-	button->SetFrame(PMRect(right - button->GetFrame().Width(), doneFrame.Top(), right, doneFrame.Bottom()));
+	const PMReal width = button->GetFrame().Width();
+	const PMReal right = doneFrame.Left() - PMReal(kFrameButtonGap) - PMReal(place) * (width + PMReal(kFrameButtonGap));
+	button->SetFrame(PMRect(right - width, doneFrame.Top(), right, doneFrame.Bottom()));
 	button->SetFrameBinding(done->GetFrameBinding());
 	return button.forget();
 }
 
-// THE BUTTON FOR THE KIND NOW: Ruby's and Kenten's own, each with its page; a hidden one takes no click. Nothing while the face is hidden (gHowTo).
-void ShowHowTo()
+// A button of the row, as the kind says; a hidden one takes no click. Nothing while the face is hidden (no button then).
+void ShowFrameButton(IControlView* button, bool shown, bool enabled)
 {
-	if (gHowTo == nil)
+	if (button == nil)
 		return;
-	const bool shown = (gKind == kKindRuby || gKind == kKindKenten);
-	gHowTo->Enable(shown ? kTrue : kFalse);
-	gHowTo->ShowView(shown ? kTrue : kFalse);
+	button->Enable(enabled ? kTrue : kFalse);
+	button->ShowView(shown ? kTrue : kFalse);
+}
+
+// THE BUTTONS FOR THE KIND NOW (the author, 11-02: "How to Use..., Choose List..., Save List..., Done", "Choose List... grey when it cannot be used"). On Ruby all three: Save List... with any Look For, Choose List... usable with Words in a Ruby List alone. On Kenten How to Use... alone, each with its page - beside Done, where Save List... stands on Ruby: no gap between it and Done.
+void ShowFrameButtons()
+{
+	const bool ruby = (gKind == kKindRuby);
+	const bool howTo = ruby || gKind == kKindKenten;
+	ShowFrameButton(gSaveList, ruby, ruby);
+	ShowFrameButton(gChooseList, ruby, ruby && gRuby.kind == kKFCRubyFindList);
+	if (howTo && gHowTo != nil && gSaveList != nil && gChooseList != nil)
+	{
+		const PMRect next = ruby ? gChooseList->GetFrame() : gSaveList->GetFrame();
+		const PMReal right = ruby ? next.Left() - PMReal(kFrameButtonGap) : next.Right();
+		gHowTo->SetFrame(PMRect(right - gHowTo->GetFrame().Width(), next.Top(), right, next.Bottom()));
+	}
+	ShowFrameButton(gHowTo, howTo, howTo);
 }
 
 // ----- The icons under Search: (the author, 11-02), each kind's own: nothing a kind asks has to do with what the other asks.
@@ -1194,8 +1286,7 @@ void ShowKind(IPMUnknown* face)
 	InterfacePtr<IPanelControlData> panel(face, UseDefaultIID());
 	ShowPart(panel, kKFCKohakuQRSectionWidgetID, gKind == kKindQRCode);
 	ShowPart(panel, kKFCQRTabFindNextWidgetID, gKind == kKindQRCode || gKind == kKindTable);
-	ShowPart(panel, kKFCRubyListSaveWidgetID, gKind == kKindRuby);
-	ShowHowTo();
+	ShowFrameButtons();
 	ShowPart(panel, kKFCTableTabChangeWidgetID, gKind == kKindTable);
 	ShowPart(panel, kKFCTableTabChangeAllWidgetID, gKind == kKindTable);
 	ShowPart(panel, kKFCTableTabChangeFindWidgetID, gKind == kKindTable);
@@ -1407,7 +1498,7 @@ CREATE_PMINTERFACE(KFCKohakuTabController, kKFCKohakuTabControllerImpl)
 class KFCKohakuTabObserver : public AbstractDialogObserver
 {
 public:
-	KFCKohakuTabObserver(IPMUnknown* boss) : AbstractDialogObserver(boss), fHowTo(nil), fIconTurnedOn(false) {}
+	KFCKohakuTabObserver(IPMUnknown* boss) : AbstractDialogObserver(boss), fHowTo(nil), fSaveList(nil), fChooseList(nil) {}
 	virtual ~KFCKohakuTabObserver() {}
 
 	virtual void AutoAttach()
@@ -1427,8 +1518,6 @@ public:
 			AttachToWidget(kKFCKohakuTabKindWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
 			AttachToWidget(kKFCKohakuTabScopeWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
 			AttachToWidget(kKFCQRTabFindNextWidgetID, IID_IBOOLEANCONTROLDATA, panel);
-			AttachToWidget(kKFCRubyListChooseWidgetID, IID_IBOOLEANCONTROLDATA, panel);
-			AttachToWidget(kKFCRubyListSaveWidgetID, IID_IBOOLEANCONTROLDATA, panel);
 			AttachToWidget(kKFCRubyListFirstWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
 			for (int32 k = 0; k < kSwitchIconCount; ++k)
 				AttachToWidget(kSwitchIcons[k].widget, IID_ITRISTATECONTROLDATA, panel);
@@ -1464,12 +1553,10 @@ public:
 			contextSubject->AttachObserver(ISubject::kRegularAttachment, this, IID_IACTIVECONTEXT, IID_IOBSERVER);
 		fWorkspace = UIDRef::gNull;
 		FollowWorkspace(context);
-		// HOW TO USE..., held and heard while shown, and shown by FillKept for the kind. (Heard as the face's own buttons are; AttachToWidget would want the row's panel.)
-		fHowTo.reset(QueryHowTo(this));
-		gHowTo = fHowTo;
-		InterfacePtr<ISubject> howToSubject(fHowTo, UseDefaultIID());
-		if (howToSubject != nil && !howToSubject->IsAttached(ISubject::kRegularAttachment, this, IID_IBOOLEANCONTROLDATA, IID_IOBSERVER))
-			howToSubject->AttachObserver(ISubject::kRegularAttachment, this, IID_IBOOLEANCONTROLDATA, IID_IOBSERVER);
+		// THE BUTTONS LEFT OF DONE, held and heard while shown, and shown by FillKept for the kind.
+		HoldFrameButton(fSaveList, gSaveList, kKFCRubyListSaveWidgetID, kKFCRubyListSaveRsrcID, 0);
+		HoldFrameButton(fChooseList, gChooseList, kKFCRubyListChooseWidgetID, kKFCRubyListChooseRsrcID, 1);
+		HoldFrameButton(fHowTo, gHowTo, kKFCKohakuHowToWidgetID, kKFCKohakuHowToRsrcID, 2);		// (where it stands: ShowFrameButtons, for the kind)
 		FillKept(this);
 		// THE SELECTION, FOLLOWED WHILE SHOWN: Change greys as it leaves what Find Next found.
 		InterfacePtr<IObserver> selectionObserver(this, IID_IKFCKOHAKUSELECTIONOBSERVER);
@@ -1496,17 +1583,10 @@ public:
 		KFC_DIAG_LOG("%s hidden", KindWord());
 		KFCKohakuQueryMenu::FaceHidden();
 		StopHearingWorkspace();
-		// HOW TO USE... GOES WITH THE FACE - the button the face holds; no walk to it (the note above QueryHowTo).
-		if (fHowTo != nil)
-		{
-			InterfacePtr<ISubject> howToSubject(fHowTo, UseDefaultIID());
-			if (howToSubject != nil && howToSubject->IsAttached(ISubject::kRegularAttachment, this, IID_IBOOLEANCONTROLDATA, IID_IOBSERVER))
-				howToSubject->DetachObserver(ISubject::kRegularAttachment, this, IID_IBOOLEANCONTROLDATA, IID_IOBSERVER);
-			fHowTo->Disable();
-			fHowTo->HideView();
-		}
-		gHowTo = nil;
-		fHowTo.reset();
+		// THE BUTTONS LEFT OF DONE GO WITH THE FACE - those the face holds; no walk to them (the note above QueryFrameButton).
+		LetGoOfFrameButton(fHowTo, gHowTo);
+		LetGoOfFrameButton(fSaveList, gSaveList);
+		LetGoOfFrameButton(fChooseList, gChooseList);
 		// (The dialog can go with the application: no session, no context - nothing is attached to a context that has gone.)
 		ISession* const session = GetExecutionContextSession();
 		IActiveContext* const context = (session != nil) ? session->GetActiveContext() : nil;
@@ -1519,8 +1599,6 @@ public:
 		DetachFromWidget(kKFCKohakuTabKindWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
 		DetachFromWidget(kKFCKohakuTabScopeWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
 		DetachFromWidget(kKFCQRTabFindNextWidgetID, IID_IBOOLEANCONTROLDATA, panel);
-		DetachFromWidget(kKFCRubyListChooseWidgetID, IID_IBOOLEANCONTROLDATA, panel);
-		DetachFromWidget(kKFCRubyListSaveWidgetID, IID_IBOOLEANCONTROLDATA, panel);
 		DetachFromWidget(kKFCRubyListFirstWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
 		for (int32 k = 0; k < kSwitchIconCount; ++k)
 			DetachFromWidget(kSwitchIcons[k].widget, IID_ITRISTATECONTROLDATA, panel);
@@ -1645,7 +1723,7 @@ public:
 			const int32 entry = (list != nil) ? list->GetSelected() : -1;
 			if (entry >= kKFCRubyFindWith && entry <= kKFCRubyFindList)
 				gRuby.kind = entry;
-			if (gRuby.kind == kKFCRubyFindList)
+			if (gRuby.kind == kKFCRubyFindList || gRuby.kind == kKFCRubyFindMarks)
 				LetGoOfAnyBox();
 			InterfacePtr<IPanelControlData> panel(this, UseDefaultIID());
 			ShowRubyKind(panel);
@@ -1661,20 +1739,12 @@ public:
 		}
 		else if (protocol == IID_ITRISTATECONTROLDATA && (theChange == kTrueStateMessage || theChange == kFalseStateMessage) && IsSwitchIcon(widget))
 		{
-			// AN ICON, THE KIND'S OWN: a push button that ends every press off (memory tool-activation-and-selection-sync 4; measured here: one that is off says on, then off - one that is on, off alone). So the press's end says what it comes to, and it is written back on the icon then.
+			// AN ICON, THE KIND'S OWN: InDesign's toggling icon button (the Text tab's own - kADBEIconToggleButtonWidgetBoss, in its class list): a press leaves it as it says.
 			KFCOwnSwitches& kept = (gKind == kKindKenten) ? gKenten.switches : gRuby.switches;
-			if (theChange == kTrueStateMessage)
-				fIconTurnedOn = true;
-			else
-			{
-				for (int32 k = 0; k < kSwitchIconCount; ++k)
-					if (widget == kSwitchIcons[k].widget)
-						kept.*(kSwitchIcons[k].value) = fIconTurnedOn;
-				fIconTurnedOn = false;
-				InterfacePtr<IPanelControlData> panel(this, UseDefaultIID());
-				ShowSwitches(panel);
-				KFC_DIAG_LOG("%s switches=%d", KindWord(), static_cast<int>(kept.Bits()));
-			}
+			for (int32 k = 0; k < kSwitchIconCount; ++k)
+				if (widget == kSwitchIcons[k].widget)
+					kept.*(kSwitchIcons[k].value) = (theChange == kTrueStateMessage);
+			KFC_DIAG_LOG("%s switches=%d", KindWord(), static_cast<int>(kept.Bits()));
 		}
 		else if (ColumnOf(widget, ReadingBoxID(0), kKFCRubyBoxColumnsMost) >= 0)
 		{
@@ -1688,10 +1758,9 @@ public:
 		{
 			// A BOX OF FIND'S BASE TEXT: - and the Change side's words under its column, which are this box's.
 			const int32 k = ColumnOf(widget, BaseBoxID(0), kKFCRubyBoxColumnsMost);
-			gCellBase[k] = WordsOf(view);
-			KeepFromBoxes();
 			InterfacePtr<IPanelControlData> panel(this, UseDefaultIID());
-			SetField(panel, ChangeBaseID(k), gCellBase[k]);
+			TakeBaseBox(panel, k, WordsOf(view));
+			KeepFromBoxes();
 			KFC_DIAG_LOG("RUBYTAB base=%s", gRuby.base.GetUTF8String().c_str());
 		}
 		else if (ColumnOf(widget, ChangeBoxID(0), kKFCRubyBoxColumnsMost) >= 0)
@@ -1819,6 +1888,30 @@ public:
 	}
 
 private:
+	// A button left of Done, held and heard while the face is shown. (Heard as the face's own buttons are; AttachToWidget would want the row's panel.)
+	void HoldFrameButton(InterfacePtr<IControlView>& held, IControlView*& shown, const WidgetID& widget, RsrcID rsrc, int32 place)
+	{
+		held.reset(QueryFrameButton(this, widget, rsrc, place));
+		shown = held;
+		InterfacePtr<ISubject> subject(held, UseDefaultIID());
+		if (subject != nil && !subject->IsAttached(ISubject::kRegularAttachment, this, IID_IBOOLEANCONTROLDATA, IID_IOBSERVER))
+			subject->AttachObserver(ISubject::kRegularAttachment, this, IID_IBOOLEANCONTROLDATA, IID_IOBSERVER);
+	}
+
+	void LetGoOfFrameButton(InterfacePtr<IControlView>& held, IControlView*& shown)
+	{
+		if (held != nil)
+		{
+			InterfacePtr<ISubject> subject(held, UseDefaultIID());
+			if (subject != nil && subject->IsAttached(ISubject::kRegularAttachment, this, IID_IBOOLEANCONTROLDATA, IID_IOBSERVER))
+				subject->DetachObserver(ISubject::kRegularAttachment, this, IID_IBOOLEANCONTROLDATA, IID_IOBSERVER);
+			held->Disable();
+			held->HideView();
+		}
+		shown = nil;
+		held.reset();
+	}
+
 	// The workspace the lists are from, and heard for its table styles (IDHAObserver's protocol, in the SDK's hostadapter sample).
 	void FollowWorkspace(IActiveContext* context)
 	{
@@ -1845,8 +1938,10 @@ private:
 	}
 
 	UIDRef fWorkspace;
-	InterfacePtr<IControlView> fHowTo;	// How to Use..., while the face is shown (gHowTo)
-	bool fIconTurnedOn;					// an icon's press has said on, and has not ended
+	// The buttons left of Done, while the face is shown (gHowTo, gSaveList, gChooseList).
+	InterfacePtr<IControlView> fHowTo;
+	InterfacePtr<IControlView> fSaveList;
+	InterfacePtr<IControlView> fChooseList;
 };
 CREATE_PMINTERFACE(KFCKohakuTabObserver, kKFCKohakuTabObserverImpl)
 

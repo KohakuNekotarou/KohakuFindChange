@@ -198,23 +198,17 @@ size_t FoldedPlaceOf(const KFCFold::Folded& folded, size_t textPlace)
 	return static_cast<size_t>(std::lower_bound(folded.from.begin(), folded.from.end(), textPlace) - folded.from.begin());
 }
 
-// THE MARKS OF ONE STORY, by the conditions.
-void WalkMarks(const UIDRef& storyRef, ITextModel* model, const KFCRubyConditions& asked, KFCOwnScope& taken, const std::vector<KFCSearchEngine::ListedPlace>* part, size_t limit,
+// THE MARKS OF ONE STORY: every mark Search: and the icons take in. The boxes ask nothing of them: the face hides those with this Look For (the author, 11-02), and what is hidden must not narrow a list unseen.
+void WalkMarks(const UIDRef& storyRef, ITextModel* model, KFCOwnScope& taken, const std::vector<KFCSearchEngine::ListedPlace>* part, size_t limit,
 	std::vector<KFCSearchEngine::ListedPlace>& ioPlaces, bool& outCapped)
 {
 	const std::u32string text(U32Of(KFCSearchEngine::ReadText(storyRef, 0, model->TotalLength())));
 	if (static_cast<int32>(text.size()) != model->TotalLength())
 		return;		// (a reading of another length has not told each position's character)
-	const KFCFold::Flags flags(KFCFoldFlagsOf(asked.switches));
-	const std::u32string wantedBase(KFCFold::TextOf(U32Of(asked.base), flags)), wantedReading(KFCFold::TextOf(U32Of(asked.reading), flags));
 	for (size_t open = text.find(kMarkOpen); open != std::u32string::npos; open = text.find(kMarkOpen, open + 1))
 	{
 		MarkPlace mark;
 		if (!MarkAtOpen(text, open, mark) || StandsInSetAsideText(model, static_cast<TextIndex>(open)))
-			continue;
-		const std::u32string base(KFCFold::TextOf(std::u32string(text, mark.baseStart, mark.open - mark.baseStart), flags));
-		const std::u32string reading(KFCFold::TextOf(std::u32string(text, mark.open + 1, mark.close - mark.open - 1), flags));
-		if (base.find(wantedBase) == std::u32string::npos || reading.find(wantedReading) == std::u32string::npos)
 			continue;
 		if (part != nil && !KFCSearchEngine::StretchesHold(*part, storyRef.GetUID(), static_cast<TextIndex>(mark.first), static_cast<TextIndex>(mark.close + 1)))
 			continue;
@@ -577,7 +571,7 @@ bool WalkDoc(const UIDRef& docRef, const KFCRubyConditions& asked, const std::ve
 		if (asked.kind == kKFCRubyFindWithout)
 			WalkWithoutRuby(storyRef, model, asked, taken, part, limit, places, outCapped);
 		else if (asked.kind == kKFCRubyFindMarks)
-			WalkMarks(storyRef, model, asked, taken, part, limit, places, outCapped);
+			WalkMarks(storyRef, model, taken, part, limit, places, outCapped);
 		else if (asked.kind == kKFCRubyFindList)
 			WalkList(storyRef, model, asked, taken, part, limit, places, outCapped, ioHadRuby, firsts ? &found : nil);
 		else
@@ -611,6 +605,17 @@ bool WalkDoc(const UIDRef& docRef, const KFCRubyConditions& asked, const std::ve
 	return true;
 }
 
+// THE CHARACTER AFTER A WORD, for the line that tells its readings apart (KFCRubyList::ListMaker): 0 where there is none a line could use - the page does not set it, it is InDesign's own or a space (a line's are trimmed), or it belongs to the word's last character.
+char32_t CharAfterWord(const UIDRef& storyRef, ITextModel* model, TextIndex at)
+{
+	if (at >= model->TotalLength() || StandsInSetAsideText(model, at))
+		return 0;
+	const std::u32string one(U32Of(KFCSearchEngine::ReadText(storyRef, at, 1)));
+	if (one.size() != 1 || KFCRubyMarkText::StopsMark(one[0]) || KFCRubyChangePlan::IsSpace(one[0]) || KFCIsAttachedMark(UTF32TextChar(static_cast<uint32>(one[0]))))
+		return 0;
+	return one[0];
+}
+
 // THE WORDS OF ONE STORY FOR SAVE LIST...: the rubies a search of it would take (the icons, the part of the document), those that touch one another one word - characters given their readings one by one are a word's, as Text With Ruby's Ruby: reads them.
 void CollectWords(const UIDRef& storyRef, ITextModel* model, KFCOwnScope& taken, const std::vector<KFCSearchEngine::ListedPlace>* part, KFCRubyList::ListMaker& ioMaker)
 {
@@ -642,7 +647,7 @@ void CollectWords(const UIDRef& storyRef, ITextModel* model, KFCOwnScope& taken,
 			KFCRubyChangePlan::Run run = { static_cast<size_t>(all[g].start - all[r].start), static_cast<size_t>(all[g].end - all[g].start), U32Of(Plain(all[g].reading)) };
 			word.runs.push_back(run);
 		}
-		ioMaker.Add(word);
+		ioMaker.Add(word, CharAfterWord(storyRef, model, all[end - 1].end));
 		r = end;
 	}
 }
@@ -919,7 +924,7 @@ bool KFCRubySearch::SaveListText(PMString& outText, PMString& outName, PMString&
 	head.SetTranslatable(kFalse);
 	head.Append(outName);
 	const std::u32string text(maker.Text(U32Of(head)));
-	KFC_DIAG_LOG("RUBYTAB save words=%d split=%d unwritable=%d", static_cast<int>(maker.Written()), static_cast<int>(maker.Split()), static_cast<int>(maker.Unwritable()));
+	KFC_DIAG_LOG("RUBYTAB save words=%d apart=%d split=%d unwritable=%d", static_cast<int>(maker.Written()), static_cast<int>(maker.Apart()), static_cast<int>(maker.Split()), static_cast<int>(maker.Unwritable()));
 	if (maker.Written() == 0)
 	{
 		outSaid.Append(maker.Empty() ? "There is no ruby in what Search: holds - nothing was saved." : "No ruby there can be written as a line of a list - nothing was saved.");
@@ -929,6 +934,12 @@ bool KFCRubySearch::SaveListText(PMString& outText, PMString& outName, PMString&
 	outText = Plain(WideOf(text));
 	outSaid.AppendNumber(static_cast<int32>(maker.Written()));
 	outSaid.Append((maker.Written() == 1) ? " word." : " words.");
+	if (maker.Apart() > 0)
+	{
+		outSaid.Append(" ");
+		outSaid.AppendNumber(static_cast<int32>(maker.Apart()));
+		outSaid.Append((maker.Apart() == 1) ? " word read two ways or more has a line for each, with the character after it." : " words read two ways or more have a line for each, with the character after them.");
+	}
 	if (maker.Split() > 0)
 	{
 		outSaid.Append(" ");

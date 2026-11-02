@@ -715,8 +715,10 @@ namespace
 				if (asked.listFirst != kKFCRubyListAll)
 					label.Append((asked.listFirst == kKFCRubyListFirstInStory) ? " (First in Story)" : (asked.listFirst == kKFCRubyListFirstInDocument) ? " (First in Document)" : " (First in Book)");
 			}
+			else if (asked.kind == kKFCRubyFindMarks)
+				label.Append("[Ruby Marks]");		// (every mark: the boxes ask nothing of it - KFCRubySearch.cpp's WalkMarks)
 			else if (asked.base.IsEmpty() && asked.reading.IsEmpty())
-				label.Append((asked.kind == kKFCRubyFindMarks) ? "[Ruby Marks]" : "[Any Ruby]");
+				label.Append("[Any Ruby]");
 			else
 			{
 				label.Append(asked.base);
