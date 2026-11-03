@@ -961,7 +961,23 @@ void ShowRubyList(IPanelControlData* panel)
 	KFC_DIAG_LOG("RUBYTAB list name=%s said=%s", name.GetUTF8String().c_str(), said.GetUTF8String().c_str());
 }
 
-// CHOOSE LIST...: its file. Text files, and any file - a list may be called anything. (The SDK's own chooser, as Load Order... - KFCQueryOrderFile.cpp. TEST BUILDS - the fault switch ruby-list-file's first line is the file: Windows' dialogs cannot be pressed by a test.)
+// A RUBY LIST IS A TEXT FILE: .txt, or .csv (its first column) - by its name's end, as Windows' dialog filters it (2026-11-04 - the author: "Choose List: text files alone").
+bool IsRubyListTextFile(const PMString& path)
+{
+	PMString name;
+	FileUtils::GetFileName(FileUtils::PMStringToSysFile(path), name);
+	const int32 dot = name.LastIndexOfWChar(UTF32TextChar('.'));
+	if (dot < 0)
+		return false;
+	PMString extension(name);
+	extension.Remove(0, dot + 1);
+	extension.ToLower();
+	return extension == PMString("txt") || extension == PMString("csv");
+}
+
+// CHOOSE LIST...: its file - a text file alone (2026-11-04 - the author: "Choose List: text files alone"; 11-02 to 11-03 any file could be chosen): text files (*.txt) and CSV files (*.csv), named in
+// Japanese as the face is, and a name typed into the dialog that ends otherwise is refused on the face's line - the list as it was. (The SDK's own chooser, as Load Order... - KFCQueryOrderFile.cpp.
+// TEST BUILDS - the fault switch ruby-list-file's first line is the file: Windows' dialogs cannot be pressed by a test.)
 // False = none was chosen: nothing the face asks has changed.
 bool ChooseRubyList(IPanelControlData* panel)
 {
@@ -979,12 +995,31 @@ bool ChooseRubyList(IPanelControlData* panel)
 	{
 		SDKFileOpenChooser chooser;
 		chooser.SetTitle(PMString(kKFCRubyListDialogTitleKey));		// "Choose Ruby List"
-		chooser.AddFilter('TEXT', PMString("txt"), PMString(kKFCRubyListFileTypeKey));		// "Ruby List"
-		chooser.AddFilter('TEXT', PMString("csv"), PMString(kKFCRubyListFileTypeKey));
-		chooser.AddAllFiles();
+		PMString csvFiles("CSV ");
+		csvFiles.Append(KFCJa::FileWord());
+		csvFiles.SetTranslatable(kFalse);
+		chooser.AddFilter('TEXT', PMString("txt"), KFCJa::TextFile());		// tekisuto fairu (*.txt) - an untranslatable name: the chooser's Translate leaves it
+		chooser.AddFilter('TEXT', PMString("csv"), csvFiles);				// CSV fairu (*.csv)
 		chooser.ShowDialog();
 		if (!chooser.IsChosen())
 			return false;
+		if (!IsRubyListTextFile(chooser.GetPath()))
+		{
+			// tekisuto fairu (.txt / .csv) wo erande kudasai.
+			PMString kinds(".txt");
+			kinds.Append(KFCJa::Nakaguro());
+			kinds.Append(".csv");
+			kinds.SetTranslatable(kFalse);
+			PMString refused(KFCJa::TextFile());
+			refused.Append(KFCJa::Parenthesized(kinds));
+			refused.Append(KFCJa::ChoosePlease());
+			refused.SetTranslatable(kFalse);
+			PMString none;
+			none.SetTranslatable(kFalse);
+			SayFor(kKindRuby, refused, none);
+			KFC_DIAG_LOG("RUBYTAB list refused: not a text file");
+			return false;
+		}
 		gRuby.listPath = chooser.GetPath();
 	}
 	gRuby.listPath.SetTranslatable(kFalse);
@@ -1020,9 +1055,8 @@ void SaveRubyList()
 		InterfacePtr<ISaveFileDialog> dialog(::CreateObject2<ISaveFileDialog>(kSaveFileDialogBoss, IID_ISAVEFILEDIALOG));
 		if (dialog == nil)
 			return;
-		PMString shownType(kKFCRubyListFileTypeKey);		// "Ruby List"
-		shownType.Translate();
-		dialog->AddFileTypeInfo(shownType, PMString("txt"));
+		// (A text file alone - .txt, its one type, strict: the author asked it of Choose List..., 11-04, and this was so already. Its type named in Japanese as the face is.)
+		dialog->AddFileTypeInfo(KFCJa::TextFile(), PMString("txt"));
 		dialog->SetAdditionalFOSFlags(FOS_OVERWRITEPROMPT | FOS_NOREADONLYRETURN | FOS_STRICTFILETYPES);
 		// (Its name with no extension of its own: a document's .indd, a book's .indb. A name with no folder: the dialog starts where Windows last saved.)
 		PMString fileName(name);
@@ -1352,25 +1386,31 @@ void NoteKentenBox(uint32 bit)
 }
 
 // (What each Look For: greys and takes away - LayOutRubyGrid - and what a list says of itself.)
-// WHAT RUBY MARKS IN TEXT DOES (2026-11-04 - the author: "a comment for Ruby Marks too"), on the face's two lines while nothing else is said there: a button's words stand till Look For changes (the
-// change empties the lines first - the Look For handler's SayFor).
-void ShowRubyMarksNote()
+// WHAT RUBY MARKS IN TEXT AND INCONSISTENT RUBY DO (2026-11-04 - the author: "a comment for Ruby Marks too", with examples - "ko<<ko>>haku<<haku>>neko<<neko>> or |samidare<<samidare>>";
+// "Inconsistent Ruby too?"), on the face's two lines while nothing else is said there: a button's words stand till Look For changes (the change empties the lines first - the Look For handler's
+// SayFor).
+void ShowRubyKindNote()
 {
-	if (gKind != kKindRuby || gRuby.kind != kKFCRubyFindMarks || !gSaid[kKindRuby][0].IsEmpty() || !gSaid[kKindRuby][1].IsEmpty())
+	if (gKind != kKindRuby || !gSaid[kKindRuby][0].IsEmpty() || !gSaid[kKindRuby][1].IsEmpty())
 		return;
-	PMString second("Replace ");
-	second.Append(KFCJa::Ya());
-	second.Append(" Change ");
-	second.Append(KFCJa::MarksNoteTail());		// Replace ya Change de, oyamoji ni ruby wo tsukete shirushi wo keshimasu.
-	second.SetTranslatable(kFalse);
-	SayFor(kKindRuby, KFCJa::MarksNote(), second);		// honbun no |kanji<<kanji>> no you na shirushi wo sagashimasu.
+	if (gRuby.kind == kKFCRubyFindMarks)
+	{
+		PMString second("Replace ");
+		second.Append(KFCJa::Ya());
+		second.Append(" Change ");
+		second.Append(KFCJa::MarksNoteTail());		// Replace ya Change de, oyamoji ni ruby wo tsukete shirushi wo keshimasu.
+		second.SetTranslatable(kFalse);
+		SayFor(kKindRuby, KFCJa::MarksNote(), second);		// ko<<ko>>haku<<haku>>neko<<neko>> ya |samidare<<samidare>> no you na shirushi wo sagashi,
+	}
+	else if (gRuby.kind == kKFCRubyFindVaries)
+		SayFor(kKindRuby, KFCJa::VariesNote(), KFCJa::VariesNoteHow());		// tarou<<tarou>> to tarou<<taro>> no you na yure wo ... / midashi ka gyou wo migi kurikku shi ...
 }
 
 void ShowRubyKind(IPanelControlData* panel)
 {
 	LayOutRubyGrid(panel);
 	ShowRubyList(panel);
-	ShowRubyMarksNote();
+	ShowRubyKindNote();
 }
 
 // ----- the Kenten part's lists and boxes (2026-11-03 - docs/superpowers/specs/2026-11-03-kfc-kenten-face-japanese-design.md)
