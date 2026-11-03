@@ -117,8 +117,7 @@ DECLARE_PMID(kClassIDSpace, kKFCKohakuTabPanelBoss, kKFCUIPrefix + 33)
 // The Kohaku+ tab's queries in Find/Change's own Query menu: the watch on the command processor, and the filter on Save Query's press (KFCKohakuQueryMenu).
 DECLARE_PMID(kClassIDSpace, kKFCKohakuQueryWatchBoss, kKFCUIPrefix + 34)
 DECLARE_PMID(kClassIDSpace, kKFCKohakuSaveFilterBoss, kKFCUIPrefix + 35)
-// The Kenten part's sample: the mark its list says (KFCKentenSample.cpp).
-DECLARE_PMID(kClassIDSpace, kKFCKentenSampleWidgetBoss, kKFCUIPrefix + 36)
+// (+ 36 was the Kenten part's sample, the mark its list said - KFCKentenSample.cpp, gone 2026-11-03 with the samples: the author, "stop the sample beside it". Retired - not given to anything else.)
 // The Ruby and Kenten parts' icons, InDesign's Text tab's own (KFCSwitchIcon.cpp): a toggling icon button, with their tips.
 DECLARE_PMID(kClassIDSpace, kKFCSwitchIconWidgetBoss, kKFCUIPrefix + 37)
 // A branch row's label, drawn by hand (KFCColorTextView.cpp): a tier's name fades the words around what it asked.
@@ -254,7 +253,7 @@ DECLARE_PMID(kImplementationIDSpace, kKFCKohakuTabControllerImpl, kKFCUIPrefix +
 DECLARE_PMID(kImplementationIDSpace, kKFCKohakuQueryWatchImpl, kKFCUIPrefix + 64)
 DECLARE_PMID(kImplementationIDSpace, kKFCKohakuSaveFilterEHImpl, kKFCUIPrefix + 65)
 DECLARE_PMID(kImplementationIDSpace, kKFCKohakuTabSelectionObserverImpl, kKFCUIPrefix + 66)
-DECLARE_PMID(kImplementationIDSpace, kKFCKentenSampleViewImpl, kKFCUIPrefix + 67)
+// (+ 67 was the Kenten part's sample's view - retired 2026-11-03 with it.)
 DECLARE_PMID(kImplementationIDSpace, kKFCSwitchIconTipImpl, kKFCUIPrefix + 68)
 DECLARE_PMID(kImplementationIDSpace, kKFCBranchLabelViewImpl, kKFCUIPrefix + 69)
 
@@ -497,6 +496,16 @@ DECLARE_PMID(kActionIDSpace, kKFCClearTextOverridesActionID, kKFCUIPrefix + 111)
 // SPECIAL OPERATIONS > TATE-CHU-YOKO (docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md B1): a TEXT row's - its match made tate-chu-yoko (KFCReplaceEngine::TcyHits). Put on the
 // text row's Special Operations in a Japanese InDesign alone, as its menu pops (KFCResultNodeEH's PopRowMenu): no MenuDef. + 113.
 DECLARE_PMID(kActionIDSpace, kKFCTcyTextActionID, kKFCUIPrefix + 113)
+// UNIFY TO A READING (2026-11-03 - the author: on an Inconsistent Ruby list a heading's and a row's right-click give the rows another reading of their word): one item a reading, in a row - put on the
+// menu as it pops, as many as the word has other readings (KFCResultNodeEH's PopRowMenu - no MenuDef), named as it is drawn (UpdateActionStates). Consecutive: an item's place is its ActionID less
+// the first's.
+DECLARE_PMID(kActionIDSpace, kKFCUnifyReading0ActionID, kKFCUIPrefix + 114)
+DECLARE_PMID(kActionIDSpace, kKFCUnifyReading1ActionID, kKFCUIPrefix + 115)
+DECLARE_PMID(kActionIDSpace, kKFCUnifyReading2ActionID, kKFCUIPrefix + 116)
+DECLARE_PMID(kActionIDSpace, kKFCUnifyReading3ActionID, kKFCUIPrefix + 117)
+DECLARE_PMID(kActionIDSpace, kKFCUnifyReading4ActionID, kKFCUIPrefix + 118)
+DECLARE_PMID(kActionIDSpace, kKFCUnifyReading5ActionID, kKFCUIPrefix + 119)
+#define kKFCUnifyReadingItems	6		// (the items above: a word read seven ways or more offers its six most read)
 // A tier's heading's Search Text in These Tables (the author, 10-31: list the tables, then search the text in them - KFCResultHistory::SearchTextInObjects). + 112.
 DECLARE_PMID(kActionIDSpace, kKFCSearchTextInTablesActionID, kKFCUIPrefix + 112)
 
@@ -607,11 +616,10 @@ DECLARE_PMID(kWidgetIDSpace, kKFCRubyTabKindWidgetID, kKFCUIPrefix + 71)
 DECLARE_PMID(kWidgetIDSpace, kKFCTableTabFindLabelWidgetID, kKFCUIPrefix + 72)
 DECLARE_PMID(kWidgetIDSpace, kKFCKohakuHowToWidgetID, kKFCUIPrefix + 73)
 DECLARE_PMID(kWidgetIDSpace, kKFCKohakuKentenSectionWidgetID, kKFCUIPrefix + 76)
-DECLARE_PMID(kWidgetIDSpace, kKFCKentenTabKindWidgetID, kKFCUIPrefix + 77)
+// (+ 77 was the Kenten part's Look For: and + 81 its Remove Kenten box - their none is in Kenten:'s and Change Kenten To:'s lists since 2026-11-03. Retired - not given to anything else.)
 DECLARE_PMID(kWidgetIDSpace, kKFCKentenTabBaseWidgetID, kKFCUIPrefix + 78)
 DECLARE_PMID(kWidgetIDSpace, kKFCKentenTabMarkWidgetID, kKFCUIPrefix + 79)
 DECLARE_PMID(kWidgetIDSpace, kKFCKentenTabChangeWidgetID, kKFCUIPrefix + 80)
-DECLARE_PMID(kWidgetIDSpace, kKFCKentenTabRemoveWidgetID, kKFCUIPrefix + 81)
 // Save Query's name (the value dialog's view for it)
 DECLARE_PMID(kWidgetIDSpace, kKFCValueQueryNameWidgetID, kKFCUIPrefix + 82)
 // A hit row on two lines (a ruby or kenten list's - KFCResultListWidgetMgr)
@@ -646,9 +654,7 @@ DECLARE_PMID(kWidgetIDSpace, kKFCRubyJoin3WidgetID, kKFCUIPrefix + 117)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyJoin4WidgetID, kKFCUIPrefix + 118)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyJoin5WidgetID, kKFCUIPrefix + 119)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyJoin6WidgetID, kKFCUIPrefix + 120)
-// The Kenten part's samples, beside its two lists (KFCKentenSample.cpp), and the Ruby part's Choose List... - the second of the head's column.
-DECLARE_PMID(kWidgetIDSpace, kKFCKentenMarkSampleWidgetID, kKFCUIPrefix + 125)
-DECLARE_PMID(kWidgetIDSpace, kKFCKentenChangeSampleWidgetID, kKFCUIPrefix + 126)
+// (+ 125 and + 126 were the Kenten part's samples beside its two lists - retired 2026-11-03: the boxes of a custom mark's character stand there now, kKFCPrefix + 86 and + 87.) The Ruby part's Choose List....
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyListChooseWidgetID, kKFCUIPrefix + 127)
 // (This prefix's widget ids run out at + 127. The model half's prefix, the 128 numbers below this one, has no widget of its own: its WidgetID + 0 ... + 30 are spent - KFCID.h says so - and those after them are free. + 128 ON IS THIS PREFIX: kKFCUIPrefix is kKFCPrefix + 128.)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBox0WidgetID, kKFCPrefix + 40)
@@ -694,6 +700,12 @@ DECLARE_PMID(kWidgetIDSpace, kKFCKentenHowToWidgetID, kKFCPrefix + 82)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyListOtherRubyWidgetID, kKFCPrefix + 83)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyButtonsWidgetID, kKFCPrefix + 84)
 DECLARE_PMID(kWidgetIDSpace, kKFCKentenButtonsWidgetID, kKFCPrefix + 85)
+// THE KENTEN PART'S BOXES OF A CUSTOM MARK'S CHARACTER (2026-11-03 - the author: "a box of one character for what custom holds"; docs/superpowers/specs/2026-11-03-kfc-kenten-face-japanese-design.md C1):
+// beside Kenten: and beside Change Kenten To:, each taking a character while its list says custom.
+DECLARE_PMID(kWidgetIDSpace, kKFCKentenMarkCharWidgetID, kKFCPrefix + 86)
+DECLARE_PMID(kWidgetIDSpace, kKFCKentenChangeCharWidgetID, kKFCPrefix + 87)
+// THE RUBY PART'S FIND ONLY (2026-11-03 - the author: "Ruby too, a search that does not replace - a check box?"): under its boxes.
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyFindOnlyWidgetID, kKFCPrefix + 88)
 
 
 // "About Plug-ins" sub-menu:
@@ -764,6 +776,7 @@ DECLARE_PMID(kWidgetIDSpace, kKFCKentenButtonsWidgetID, kKFCPrefix + 85)
 #define kKFCNarrowWithOverridesMenuKey	kKFCStringPrefix "kKFCNarrowWithOverridesMenuKey"	// "With Overrides"
 #define kKFCClearTextOverridesMenuKey	kKFCStringPrefix "kKFCClearTextOverridesMenuKey"	// "Clear Overrides"
 #define kKFCTcyTextMenuKey				kKFCStringPrefix "kKFCTcyTextMenuKey"				// "Tate-chu-yoko" (a text row's Special Operations - key_collisions.py)
+#define kKFCRubyUnifyMenuKey			kKFCStringPrefix "kKFCRubyUnifyMenuKey"			// "Unify Reading" - an item's name until it is drawn (key_collisions.py: kKFCUnifyReadingMenuKey would read as kKFCFlipVerticalMenuKey)
 // ...and Copy Results: the panel menu's, a row's Copy Rows, a tier heading's Copy These Results (measured against every
 // other key - key_collisions.py).
 #define kKFCCopyResultsMenuKey			kKFCStringPrefix "kKFCCopyResultsMenuKey"
@@ -916,28 +929,16 @@ DECLARE_PMID(kWidgetIDSpace, kKFCKentenButtonsWidgetID, kKFCPrefix + 85)
 #define kKFCRubyTabBaseKey				kKFCStringPrefix "kKFCRubyTabBaseKey"
 #define kKFCRubyTabReadingKey			kKFCStringPrefix "kKFCRubyTabReadingKey"
 #define kKFCRubyTabChangeKey			kKFCStringPrefix "kKFCRubyTabChangeKey"
+#define kKFCRubyTabFindOnlyKey			kKFCStringPrefix "kKFCRubyTabFindOnlyKey"	// (key_collisions.py: no other key of its length and sum - 11-03)
 #define kKFCTableTabChangeKey			kKFCStringPrefix "kKFCTableTabChangeKey"
 #define kKFCTableTabChangeAllKey		kKFCStringPrefix "kKFCTableTabChangeAllKey"
 #define kKFCTableTabChangeFindKey		kKFCStringPrefix "kKFCTableTabChangeFindKey"
 #define kKFCKohakuTabKentenKey			kKFCStringPrefix "kKFCKohakuTabKentenKey"
 #define kKFCKohakuTabWarichuKindKey		kKFCStringPrefix "kKFCKohakuTabWarichuKindKey"	// Find:'s fifth, a Japanese InDesign's (key_collisions.py: "kKFCKohakuTabWarichuKey" had kKFCRubyListSaveFileKey's length and sum)
-#define kKFCKentenTabWithKey			kKFCStringPrefix "kKFCKentenTabWithKey"
-#define kKFCKentenTabWithoutKey			kKFCStringPrefix "kKFCKentenTabWithoutKey"
 #define kKFCKentenTabMarkKey			kKFCStringPrefix "kKFCKentenTabMarkKey"
 #define kKFCKentenTabAnyMarkKey			kKFCStringPrefix "kKFCKentenTabAnyMarkKey"
 #define kKFCKentenTabChangeKey			kKFCStringPrefix "kKFCKentenTabChangeKey"
-#define kKFCKentenTabRemoveWordKey		kKFCStringPrefix "kKFCKentenTabRemoveWordKey"
-#define kKFCKentenSesameKey				kKFCStringPrefix "kKFCKentenSesameKey"
-#define kKFCKentenWhiteSesameKey		kKFCStringPrefix "kKFCKentenWhiteSesameKey"
-#define kKFCKentenFisheyeKey			kKFCStringPrefix "kKFCKentenFisheyeKey"
-#define kKFCKentenBlackCircleKey		kKFCStringPrefix "kKFCKentenBlackCircleKey"
-#define kKFCKentenSmallBlackKey			kKFCStringPrefix "kKFCKentenSmallBlackKey"
-#define kKFCKentenBullseyeKey			kKFCStringPrefix "kKFCKentenBullseyeKey"
-#define kKFCKentenTriBlackKey		kKFCStringPrefix "kKFCKentenTriBlackKey"
-#define kKFCKentenTriOpenKey		kKFCStringPrefix "kKFCKentenTriOpenKey"
-#define kKFCKentenWhiteCircleKey		kKFCStringPrefix "kKFCKentenWhiteCircleKey"
-#define kKFCKentenSmallWhiteKey			kKFCStringPrefix "kKFCKentenSmallWhiteKey"
-#define kKFCKentenCustomKey				kKFCStringPrefix "kKFCKentenCustomKey"
+// (The kinds' own keys went 2026-11-03: Kenten: and Change Kenten To: list InDesign's own keys for them - "None", "Black sesame" ... "Custom", its kenten dialog's words - KFCUI.fr.)
 
 // Other StringKeys:
 #define kKFCAboutBoxStringKey	kKFCStringPrefix "kKFCAboutBoxStringKey"
@@ -1069,6 +1070,7 @@ DECLARE_PMID(kWidgetIDSpace, kKFCKentenButtonsWidgetID, kKFCPrefix + 85)
 // the very top): first in a hit row's menu and in an object row's, ahead of the abc order, which the rest keeps. Still
 // one number for both, and still no rule under it.
 #define kKFCReplaceHitMenuItemPosition			0.5		// Replace (a hit row's) - first, ahead of the abc order (2.1.1)
+#define kKFCUnifyReadingMenuItemPosition		0.6		// Unify to a reading (an Inconsistent Ruby row's and heading's) - under Replace, one a 0.01 (11-03)
 #define kKFCObjectReplaceMenuItemPosition		0.5		// Replace (an object row's - the same action) - first as well
 #define kKFCClearFromResultsMenuItemPosition	1.0		// Clear from Results
 #define kKFCClearTheseResultsMenuItemPosition	2.0		// Clear These Results

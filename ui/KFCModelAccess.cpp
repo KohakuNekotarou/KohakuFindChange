@@ -110,6 +110,7 @@ namespace
 		virtual bool ListIsTables() { return false; }
 		virtual bool ListDrawsTwoLines() { return false; }
 		virtual bool ListIsOwnKind() { return false; }
+		virtual bool GetUnifyFacts(int32, int32, int32, PMString& outWord, PMString& outReadings) { outWord.Clear(); outReadings.Clear(); return false; }
 	};
 
 	class KFCRunsStandInImpl : public IKFCRuns
@@ -210,6 +211,7 @@ namespace
 		}
 		virtual bool TcyRows(const KFCRowsByChapter&, PMString& outStatus) { SayWhy(outStatus); return false; }
 		virtual bool CanTcyHit(int32, int32) { return false; }
+		virtual bool UnifyRubyRows(const KFCRowsByChapter&, const PMString&, PMString& outStatus) { SayWhy(outStatus); return false; }
 	};
 
 	class KFCChaptersStandInImpl : public IKFCChapters

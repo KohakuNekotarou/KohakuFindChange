@@ -36,7 +36,7 @@ KFCQueryCopy::KFCQueryCopy()
 	  replaceGlyph(kInvalidGlyphID), objectType(0), findParaStyle(kInvalidUID), findCharStyle(kInvalidUID),
 	  changeParaStyle(kInvalidUID), changeCharStyle(kInvalidUID), objectFindStyle(kInvalidUID),
 	  objectChangeStyle(kInvalidUID), attrDB(nil), changeConditionsMode(0), useFindROS(kFalse), useReplaceROS(kFalse),
-	  valid(false), tableOverridesOnly(false), rubyKind(0), rubyListFirst(0), rubyListOtherRuby(false), kentenKind(0), kentenMark(0)
+	  valid(false), tableOverridesOnly(false), rubyKind(0), rubyListFirst(0), rubyListOtherRuby(false), kentenKind(0), kentenMark(0), kentenMarkChar(0)
 {
 }
 
@@ -286,7 +286,7 @@ void KFCQueryCopier::CaptureTables(KFCQueryCopy& out, const PMString& findStyle,
 	out.valid = true;
 }
 
-void KFCQueryCopier::CaptureKenten(KFCQueryCopy& out, int32 kind, const PMString& base, int32 mark)
+void KFCQueryCopier::CaptureKenten(KFCQueryCopy& out, int32 kind, const PMString& base, int32 mark, int32 markChar)
 {
 	out = KFCQueryCopy();
 	out.mode = static_cast<int32>(kKFCKentenSearchMode);
@@ -294,6 +294,7 @@ void KFCQueryCopier::CaptureKenten(KFCQueryCopy& out, int32 kind, const PMString
 	out.kentenBase = base;
 	out.kentenBase.SetTranslatable(kFalse);
 	out.kentenMark = mark;
+	out.kentenMarkChar = markChar;
 	out.valid = true;
 }
 

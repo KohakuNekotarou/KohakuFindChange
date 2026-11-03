@@ -137,6 +137,22 @@ void Attribute(std::string& io, const char* key, int32 value)
 	io.append("\"");
 }
 
+// A CUSTOM MARK'S CHARACTER IN A FILE (2026-11-03 - C7): the character itself, empty for none - and read back as its first code point (0 for none).
+PMString CharacterWords(int32 customChar)
+{
+	PMString words;
+	words.SetTranslatable(kFalse);
+	if (KFCIsCustomKentenCharacter(static_cast<uint32>(customChar)))
+		words.AppendW(UTF32TextChar(static_cast<uint32>(customChar)));
+	return words;
+}
+
+int32 FirstCodePoint(const std::string& utf8)
+{
+	const WideString wide(Words(utf8));
+	return (wide.begin() != wide.end()) ? static_cast<int32>(static_cast<uint32>(*wide.begin())) : 0;
+}
+
 // THE RUBY PART'S BOXES IN A FILE: the Change side's readings, the bases and Find's readings, a box each, by tabs (no box can hold one). A file from before the boxes has one reading and no bases - over the row's whole text - or rubyRemove="1"; one from before Find's boxes has no rubyFind, and
 // its Ruby: comes back whole, in the first box (KFCKohakuTab's BoxesFromKept).
 std::vector<std::string> SplitAtTabs(const std::string& words)
@@ -242,6 +258,8 @@ bool KFCKohakuQuery::Read(const IDFile& file, KFCKohakuQueryData& out)
 			out.ruby.listFirst = number;
 		else if (key == "rubyOther")
 			out.ruby.listOtherRuby = (number != 0);		// (11-02 - the author's proposal 2: a file from before it has none, and lists none)
+		else if (key == "rubyFindOnly")
+			out.ruby.findOnly = (number != 0);			// (11-03 - Find Only: a file from before it has none, and writes as it did)
 		else if (key == "switches")
 		{
 			// (Each kind's own, and a file holds one kind. What the file has no word of, as the tab starts: the file of a version before the icons.)
@@ -267,8 +285,12 @@ bool KFCKohakuQuery::Read(const IDFile& file, KFCKohakuQueryData& out)
 			out.kenten.base = Words(value);
 		else if (key == "kentenMark")
 			out.kenten.mark = number;
+		else if (key == "kentenMarkChar")
+			out.kenten.markChar = FirstCodePoint(value);		// (2026-11-03 - C7: a file from before has none)
 		else if (key == "kentenChange")
 			out.kenten.changeTo = number;
+		else if (key == "kentenChangeChar")
+			out.kenten.changeChar = FirstCodePoint(value);
 		else if (key == "kentenRemove")
 			out.kenten.removeKenten = (number != 0);
 		at = close + 1;
@@ -289,7 +311,8 @@ bool KFCKohakuQuery::Read(const IDFile& file, KFCKohakuQueryData& out)
 			out.ruby.change.push_back(piece);
 		}
 	}
-	// A FILE IS WHAT ANYONE MADE OF IT, AND THE FACE SELECTS BY THESE: a number its list has no entry for reads as the list's first (the lists - KFCUI.fr: Kenten: is Any and every kind, Change Kenten To: has no Custom).
+	// A FILE IS WHAT ANYONE MADE OF IT, AND THE FACE SELECTS BY THESE: a number its list has no entry for reads as the list's first (the lists - KFCUI.fr: both are [Any] or [Leave], none, every kind and
+	// custom since 2026-11-03), a character no custom mark can be as none.
 	if (out.ruby.kind < kKFCRubyFindWith || out.ruby.kind > kKFCRubyFindVaries)
 		out.ruby.kind = kKFCRubyFindWith;
 	if (out.ruby.listFirst < kKFCRubyListAll || out.ruby.listFirst > kKFCRubyListFirstInBook)
@@ -298,8 +321,12 @@ bool KFCKohakuQuery::Read(const IDFile& file, KFCKohakuQueryData& out)
 		out.kenten.kind = kKFCKentenFindWith;
 	if (out.kenten.mark < 0 || out.kenten.mark > IKentenStyle::Kenten_Custom)
 		out.kenten.mark = 0;
-	if (out.kenten.changeTo < 0 || out.kenten.changeTo >= IKentenStyle::Kenten_Custom)
+	if (out.kenten.changeTo < 0 || out.kenten.changeTo > IKentenStyle::Kenten_Custom)
 		out.kenten.changeTo = 0;
+	if (!KFCIsCustomKentenCharacter(static_cast<uint32>(out.kenten.markChar)))
+		out.kenten.markChar = 0;
+	if (!KFCIsCustomKentenCharacter(static_cast<uint32>(out.kenten.changeChar)))
+		out.kenten.changeChar = 0;
 	return KFCIsKohakuQueryMode(out.mode);
 }
 
@@ -323,6 +350,7 @@ std::string KFCKohakuQuery::FileText(const KFCKohakuQueryData& query)
 		Attribute(element, "rubyList", query.ruby.listPath);
 		Attribute(element, "rubyFirst", query.ruby.listFirst);
 		Attribute(element, "rubyOther", query.ruby.listOtherRuby ? 1 : 0);
+		Attribute(element, "rubyFindOnly", query.ruby.findOnly ? 1 : 0);
 		Attribute(element, "switches", query.ruby.switches.Bits());
 		Attribute(element, "rubyBase", query.ruby.base);
 		Attribute(element, "ruby", query.ruby.reading);
@@ -336,7 +364,9 @@ std::string KFCKohakuQuery::FileText(const KFCKohakuQueryData& query)
 		Attribute(element, "switches", query.kenten.switches.Bits());
 		Attribute(element, "kentenBase", query.kenten.base);
 		Attribute(element, "kentenMark", query.kenten.mark);
+		Attribute(element, "kentenMarkChar", CharacterWords(query.kenten.markChar));
 		Attribute(element, "kentenChange", query.kenten.changeTo);
+		Attribute(element, "kentenChangeChar", CharacterWords(query.kenten.changeChar));
 		Attribute(element, "kentenRemove", query.kenten.removeKenten ? 1 : 0);
 	}
 	else if (query.mode == kKFCWarichuSearchMode)
@@ -391,9 +421,9 @@ bool KFCKohakuQuery::HasChangeSide(const KFCKohakuQueryData& query)
 	if (query.mode == kKFCTableSearchMode)
 		return !query.table.changeStyle.IsEmpty() || query.table.clearOverrides;
 	if (query.mode == kKFCRubySearchMode)
-		return true;		// (ruby from marks: the reading is in the mark; any other: boxes reading nothing take the ruby off - the author, as an empty Change To deletes)
+		return !query.ruby.findOnly;		// (Find Only writes nothing - 11-03; else ruby from marks: the reading is in the mark; any other: boxes reading nothing take the ruby off - the author, as an empty Change To deletes)
 	if (query.mode == kKFCKentenSearchMode)
-		return query.kenten.changeTo != 0 || query.kenten.removeKenten;
+		return query.kenten.ChangeSideAsks();		// (custom with no character asks nothing - C5)
 	return false;		// (a QR code's list writes nothing)
 }
 

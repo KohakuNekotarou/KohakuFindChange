@@ -102,6 +102,7 @@ public:
 	virtual bool ListIsTables() { return KFCResultModel::ListIsTables(); }
 	virtual bool ListDrawsTwoLines() { return KFCResultModel::ListDrawsTwoLines(); }
 	virtual bool ListIsOwnKind() { return KFCResultModel::ListIsOwnKind(); }
+	virtual bool GetUnifyFacts(int32 chapterIdx, int32 groupIdx, int32 hitIdx, PMString& outWord, PMString& outReadings) { return KFCResultModel::GetUnifyFacts(chapterIdx, groupIdx, hitIdx, outWord, outReadings); }
 };
 
 CREATE_PMINTERFACE(KFCResultsSession, kKFCResultsImpl)
@@ -218,6 +219,8 @@ public:
 	virtual bool FaceTextChangeAll(int32 mode, const KFCTableLook& look, int32& outChanged, int32& outMatched, PMString& outWords) { return KFCFaceText::ChangeAll(mode, look, outChanged, outMatched, outWords); }
 	virtual bool TcyRows(const KFCRowsByChapter& rows, PMString& outStatus) { return KFCReplaceEngine::TcyHits(rows, outStatus); }
 	virtual bool CanTcyHit(int32 chapterIdx, int32 hitIdx) { return KFCReplaceEngine::CanTcyHit(chapterIdx, hitIdx); }
+	// (Under the list's query, as ReplaceRows: the same rows' doors and the same writer.)
+	virtual bool UnifyRubyRows(const KFCRowsByChapter& rows, const PMString& reading, PMString& outStatus) { return KFCUnderListQuery(outStatus, true /*writes*/, [&]() { return KFCReplaceEngine::UnifyRubyHits(rows, reading, outStatus); }); }
 };
 
 CREATE_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)

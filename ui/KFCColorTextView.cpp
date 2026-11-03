@@ -390,13 +390,51 @@ void KFCColorTextView::DV_Draw(dvaui::drawbot::Drawbot* drawbotP) const
 	const PMReal matchW = KFCDrawnWidth(wantCaret ? KFCCaretPlaceholder() : match, fontInfo);
 	const PMReal postW  = KFCDrawnWidth(post, fontInfo);
 
+	// THE UPPER LINE'S REACH (2026-11-03 - the author: "the ruby is cut, fix it"): how far right of the match's start its readings stand, placed as they are drawn below (each centred on its
+	// characters, a long one pushing the next) over the whole match. A reading wider than its characters stands past them - 'rou' over one kanji - and the lower line, cut to keep the match
+	// whole at the cell's right, cut no room for it: the reading went past the cell's edge. The match's room on the line is the wider of the two; what follows the match is on the lower
+	// line alone, and goes under a reading as it did.
+	PMReal upperReach = PMReal(0.0);
+	if (twoLines && !wantCaret && !upper.gone)
+	{
+		auto widthOfHead = [&](int32 n) -> PMReal
+		{
+			if (n <= 0)
+				return PMReal(0.0);
+			PMString head(match);
+			head.SetTranslatable(kFalse);
+			if (n < head.CharCount())
+				head.Remove(n, head.CharCount() - n);
+			return KFCDrawnWidth(head, fontInfo);
+		};
+		const int32 chars = match.CharCount();
+		bool placed = false;
+		PMReal nextFree = PMReal(0.0);
+		for (size_t r = 0; r < upper.runs.size(); ++r)
+		{
+			const KFCRowUpperRun& run = upper.runs[r];
+			if (run.reading.IsEmpty() || run.offset >= chars)
+				continue;
+			const int32 runEnd = (run.offset + run.length < chars) ? run.offset + run.length : chars;
+			const PMReal readingW = KFCDrawnWidth(run.reading, fontInfo);
+			PMReal readingX = (widthOfHead(run.offset) + widthOfHead(runEnd) - readingW) / PMReal(2.0);
+			if (placed && readingX < nextFree)
+				readingX = nextFree;
+			placed = true;
+			nextFree = readingX + readingW + PMReal(2.0);
+			if (readingX + readingW > upperReach)
+				upperReach = readingX + readingW;
+		}
+	}
+	const PMReal matchRoom = (upperReach > matchW) ? upperReach : matchW;
+
 	// THE THREE RUNS AS THEY WILL BE DRAWN.
 	PMString preRun, matchRun(match), postRun;
 	preRun.SetTranslatable(kFalse);
 	postRun.SetTranslatable(kFalse);
-	if (preW + matchW + postW <= availWidth)
+	if (preW + matchW + postW <= availWidth && preW + matchRoom <= availWidth)
 	{
-		// The whole line fits: the three runs unchanged.
+		// The whole line fits, the readings over the match with it: the three runs unchanged.
 		preRun = pre;
 		postRun = post;
 	}
@@ -418,9 +456,11 @@ void KFCColorTextView::DV_Draw(dvaui::drawbot::Drawbot* drawbotP) const
 		// match is preferred over what follows it.
 		// (Both widths are what a subtraction leaves - the kind KFCEllipsize keeps from the SDK's call when it
 		// lands where that call never comes back.)
-		const PMReal rem = availWidth - matchW;
-		preRun = KFCEllipsize(rem, pre, fontInfo, kEllipsizeBeginning);
-		const PMReal postBudget = rem - KFCDrawnWidth(preRun, fontInfo);
+		// The leading context gives the match its room - the readings' reach with it (matchRoom, above: 11-03) -; none left, it goes, and the match stands at the line's start.
+		const PMReal preBudget = availWidth - matchRoom;
+		if (!pre.IsEmpty() && preBudget > PMReal(0.0))
+			preRun = KFCEllipsize(preBudget, pre, fontInfo, kEllipsizeBeginning);
+		const PMReal postBudget = availWidth - matchW - KFCDrawnWidth(preRun, fontInfo);
 		if (!post.IsEmpty() && postBudget > PMReal(0.0))
 			postRun = KFCEllipsize(postBudget, post, fontInfo, kEllipsizeEnd);
 	}
@@ -449,8 +489,7 @@ void KFCColorTextView::DV_Draw(dvaui::drawbot::Drawbot* drawbotP) const
 	// THE MARKS, PAINTED FIRST: KFCMarkPassView's pass blits over the whole cell, so anything drawn before it could be painted over. A row whose mark has gone draws a bar instead (below).
 	KFCKentenMark::Marks marks;
 	if (twoLines && !upper.gone && upper.mark != 0 && matchChars > 0)
-		KFCKentenMark::PlanOverRun(fontInfo, upper.mark, matchX, widthToChar(matchChars), matchChars, upperLineHeight,
-			frame.Top() + (upperLineHeight / PMReal(2.0)), rightEdge, kFullColor, marks);
+		KFCKentenMark::PlanOverRun(fontInfo, upper.mark, upper.markChar, matchX, widthToChar(matchChars), matchChars, frame.Top(), lineTop, rightEdge, kFullColor, marks);
 	this->PaintMarks(drawbotP, marks);
 
 	// The lower line: the locator, its flag, the line.
@@ -481,7 +520,7 @@ void KFCColorTextView::DV_Draw(dvaui::drawbot::Drawbot* drawbotP) const
 		KFCDrawCaret(drawbotP, kFullColor, matchX, barW, frame.Top() + PMReal(1.0), upperLineHeight - PMReal(2.0));
 		return;
 	}
-	KFCKentenMark::WriteGlyphs(drawbotP, fontInfo, marks, upperBox.Top(), upperBox.Bottom());
+	KFCKentenMark::WriteGlyphs(drawbotP, fontInfo, marks);
 	// THE READINGS: each over its own characters, centred on them, starting no further left than the cell or the reading before it (spec F12: a long one pushes the next rather than stands on it).
 	PMReal nextFree = frame.Left();
 	for (size_t r = 0; r < upper.runs.size(); ++r)

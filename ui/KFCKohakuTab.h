@@ -22,7 +22,8 @@
 //             follow them, column for column and join for join, the column's base text under each as words. A search reads the boxes' words run together. No Change reading at all takes the ruby off (KFCRubyChangePlan.h). The fields are kept at every key stroke: the panel's
 //             Find may be pressed with one still focused; a base box's characters are spread over the boxes at the next idle (SettleBaseBoxes). WORDS IN A RUBY LIST (KFCRubyList.h): the boxes away, the file's name, which occurrences, and Include Text With Other Ruby in their place.
 //             Its buttons Choose List..., Save List..., How to Use... (a page in a Japanese InDesign's one language - the author, 11-02).
-//    Kenten   Look For: (Text With Kenten / Text Without Kenten), Base Text:, Kenten: ([Any Kenten] and the kinds), Change Kenten To: ([Leave As It Is] and the kinds), Remove Kenten; a sample of the mark beside each list (KFCKentenSample.cpp). Its button How to Use....
+//    Kenten   Base Text:, Kenten: ([Any] / none / the kinds / custom - InDesign's kenten dialog's words), Change Kenten To: ([Leave] / none / the kinds / custom), a box of one character beside each list, a
+//             custom mark's (2026-11-03 - docs/superpowers/specs/2026-11-03-kfc-kenten-face-japanese-design.md: Look For and Remove Kenten went into the lists' none; the samples went). Its button How to Use....
 //  TABLE, RUBY AND KENTEN'S FIND NEXT, CHANGE, CHANGE ALL, CHANGE/FIND (2026-11-01-kfc-kohaku-trial-fixes-design.md F1 - F9; 2026-11-02-kfc-kohaku-face-buttons-design.md B1 - B5): the model's (KFCTableSearch, KFCFaceText), landed on as a
 //  row's click lands (KFCJump::LandOnPlace); Change and Change/Find grey until Find Next has found something, and once the selection leaves it or it is written, as the Text tab's.
 //  While the face is the dialog's tab - or was when the dialog closed, the face it opens on again - KFC's Find looks for what its Find: says (KFCQRSearch, KFCTableSearch, KFCRubySearch in the model
@@ -75,9 +76,6 @@ namespace KFCKohakuTab
 
 	/** What the face asks now, as a query (Save Query - KFCKohakuQueryMenu). */
 	void QueryOfFace(KFCKohakuQueryData& out);
-
-	/** WHAT A KENTEN SAMPLE DRAWS (KFCKentenSample.cpp - a sample's widget): an IKentenStyle::KentenKind, or 0 for nothing - what its list asks, while that list counts. */
-	int32 KentenSampleKind(const WidgetID& sample);
 
 	/** IS THIS A JAPANESE INDESIGN - what puts Ruby and Kenten on Find: (KOHAKU-03), asked of the one place: a text row's Special Operations > Tate-chu-yoko too (docs/superpowers/specs/
 	    2026-11-02-kfc-warichu-tcy-design.md B1). A test build's fault switch not-japanese says no. */

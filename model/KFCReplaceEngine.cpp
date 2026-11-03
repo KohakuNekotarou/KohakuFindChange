@@ -4294,6 +4294,16 @@ private:
 	IDataBase*			fDB;
 };
 
+// FIND ONLY ON THE RUBY PART (2026-11-03 - the author: "Ruby too, a search that does not replace"): no ruby writer writes while it is on - the tab as it stands, as every Change side is read.
+const char* const kRubyFindOnlyRefusal = "Replace: Find Only is on for Ruby on the Kohaku+ tab - turn it off to change, in Edit > Find/Change.";
+
+bool RubyFindOnlyNow()
+{
+	KFCRubyConditions asked;
+	(void)KFCRubySearch::IsTabCurrent(&asked);
+	return asked.findOnly;
+}
+
 // THE RUBY TAB'S: what the Change boxes say over the row's text (KFCRubyChangePlan.h) - their readings, or the ruby off when they read nothing (the author, 11-01).
 class RubyWrite : public OwnTabWrite
 {
@@ -4305,8 +4315,22 @@ public:
 		// (The Change side is the tab's as it stands; the base boxes are compared with a row's text as its list's search compared them - with no list, as the tab compares now: the face's buttons.)
 		fSwitches = (list != nil) ? list->ownSwitches : fAsked.switches;
 	}
+	// AN INCONSISTENT RUBY ROW GIVEN ONE OF ITS WORD'S READINGS (2026-11-03 - a heading's or a row's "unify" item - KFCReplaceEngine::UnifyRubyHits): that reading over the row's whole text, as one
+	// Change Ruby To box with no Base Text writes it, whatever the boxes hold. Find Only stands as the tab says (NothingToChange).
+	RubyWrite(const KFCQueryCopy* list, const PMString& unifyTo)
+	{
+		(void)KFCRubySearch::IsTabCurrent(&fAsked);
+		KFCRubyConditions one;
+		KFCRubyChangePiece piece;
+		piece.reading = unifyTo;
+		one.change.push_back(piece);
+		fPieces = KFCRubySearch::PlanPieces(one);
+		fSwitches = (list != nil) ? list->ownSwitches : fAsked.switches;
+	}
 	virtual const char* NothingToChange() const
 	{
+		if (fAsked.findOnly)
+			return kRubyFindOnlyRefusal;
 		return (KFCRubyChangePlan::Check(fPieces) == KFCRubyChangePlan::kReadingOverNoBase)
 			? "Replace: a Change Ruby To box on the Kohaku+ tab stands over no Base Text - type it in that column's Base Text box, or join the column to the one beside it, in Edit > Find/Change." : nil;
 	}
@@ -4352,11 +4376,12 @@ private:
 };
 
 // A RUBY LIST'S (KFCRubyList.h): what the line of the row's word says, whatever the Change side does - and the words the list was found with, not the file as it stands now: what a row draws over it is what it gets.
+// Find Only on the tab as it stands writes nothing (2026-11-03).
 class RubyListWrite : public OwnTabWrite
 {
 public:
-	RubyListWrite(const std::shared_ptr<const KFCRubyList::Words>& words, const KFCOwnSwitches& switches) : fWords(words), fSwitches(switches) {}
-	virtual const char* NothingToChange() const { return nil; }
+	RubyListWrite(const std::shared_ptr<const KFCRubyList::Words>& words, const KFCOwnSwitches& switches) : fWords(words), fSwitches(switches), fFindOnly(RubyFindOnlyNow()) {}
+	virtual const char* NothingToChange() const { return fFindOnly ? kRubyFindOnlyRefusal : nil; }
 	virtual void EnterDocument(IDataBase* /*db*/) {}
 	virtual OwnTabRefusal RowDoor(const UIDRef& storyRef, OwnTabRow& row)
 	{
@@ -4386,30 +4411,38 @@ public:
 private:
 	std::shared_ptr<const KFCRubyList::Words>	fWords;
 	KFCOwnSwitches								fSwitches;
+	bool										fFindOnly;
 };
 
-// THE KENTEN KIND'S: the kind of mark on a row's text, the look of the marks left as it stands - or, Remove Kenten, the marks taken off whole (KFCKentenSearch::Remove).
+// THE KENTEN KIND'S: the kind of mark on a row's text - custom with the face's character (2026-11-03 - C5) - the look of the marks left as it stands; or, Change Kenten To:'s none (Remove Kenten until 11-03),
+// the marks taken off whole (KFCKentenSearch::Remove).
 class KentenWrite : public OwnTabWrite
 {
 public:
 	KentenWrite() { (void)KFCKentenSearch::IsTabCurrent(&fAsked); }
 	virtual const char* NothingToChange() const
 	{
-		return (fAsked.changeTo == 0 && !fAsked.removeKenten)
-			? "Replace: nothing to change on the Kohaku+ tab - choose Change Kenten To or Remove Kenten in Edit > Find/Change." : nil;
+		if (fAsked.changeTo == 0 && !fAsked.removeKenten)
+			return "Replace: nothing to change on the Kohaku+ tab - choose a kind in Change Kenten To in Edit > Find/Change.";
+		if (!fAsked.ChangeSideAsks())
+			return "Replace: Change Kenten To asks for a custom mark with no character - type one in the box beside it in Edit > Find/Change.";
+		return nil;
 	}
 	virtual void EnterDocument(IDataBase* /*db*/) {}
 	virtual OwnTabRefusal RowDoor(const UIDRef& storyRef, OwnTabRow& row)
 	{
-		return (KFCKentenSearch::MarkOn(storyRef, row.start, row.end) == Wanted()) ? kOwnTabAsAsked : kOwnTabOk;
+		return (KFCKentenSearch::MarkOn(storyRef, row.start, row.end) == Wanted()
+			&& (Wanted() != IKentenStyle::Kenten_Custom || KFCKentenSearch::CustomCharOn(storyRef, row.start, row.end) == fAsked.changeChar)) ? kOwnTabAsAsked : kOwnTabOk;
 	}
 	virtual ErrorCode WriteRow(const UIDRef& storyRef, const OwnTabRow& row, PMString& outWords, KFCRowUpper& outUpper)
 	{
-		const ErrorCode wrote = fAsked.removeKenten ? KFCKentenSearch::Remove(storyRef, row.start, row.end) : KFCKentenSearch::Write(storyRef, row.start, row.end, Wanted());
+		const ErrorCode wrote = fAsked.removeKenten ? KFCKentenSearch::Remove(storyRef, row.start, row.end)
+			: KFCKentenSearch::Write(storyRef, row.start, row.end, Wanted(), (Wanted() == IKentenStyle::Kenten_Custom) ? fAsked.changeChar : 0);
 		if (wrote == kSuccess)
 		{
 			outWords = KFCKentenSearch::RowWords(storyRef, row.start, row.end, Wanted());
 			outUpper.mark = Wanted();
+			outUpper.markChar = (Wanted() == IKentenStyle::Kenten_Custom) ? fAsked.changeChar : 0;
 			outUpper.gone = (Wanted() == IKentenStyle::Kenten_None);
 		}
 		return wrote;
@@ -4453,8 +4486,8 @@ bool OwnTabWrite::WriteChapter(OwnTabChapter& chapter)
 class MarksWrite : public OwnTabWrite
 {
 public:
-	MarksWrite() : fStillThere(false) {}
-	virtual const char* NothingToChange() const { return nil; }
+	MarksWrite() : fStillThere(false), fFindOnly(RubyFindOnlyNow()) {}
+	virtual const char* NothingToChange() const { return fFindOnly ? kRubyFindOnlyRefusal : nil; }
 	virtual void EnterDocument(IDataBase* /*db*/) {}
 	virtual OwnTabRefusal RowDoor(const UIDRef& storyRef, OwnTabRow& row)
 	{
@@ -4546,6 +4579,7 @@ public:
 	virtual const char* Noun() const { return "rows"; }
 private:
 	bool	fStillThere;
+	bool	fFindOnly;
 };
 
 bool WriteOwnTabRows(OwnTabWrite& how, const KFCRowsByChapter& rowsByChapter, PMString& outStatus)
@@ -4764,6 +4798,24 @@ static bool ReplaceOwnTabRows(const KFCRowsByChapter& rowsByChapter, PMString& o
 	return WriteOwnTabRows(table, rowsByChapter, outStatus);
 }
 
+bool KFCReplaceEngine::UnifyRubyHits(const KFCRowsByChapter& rowsByChapter, const PMString& reading, PMString& outStatus)
+{
+	const WriteUnderWay replacing;		// (IsReplacing - ReplaceHits')
+	outStatus.Clear();
+	outStatus.SetTranslatable(kFalse);
+	if (KFCRowCount(rowsByChapter) == 0)
+		return false;
+	// AN INCONSISTENT RUBY LIST'S ROWS ALONE: a reading of their word is what each was found among. (The menu offers it on no other row - KFCActionComponent.)
+	const std::shared_ptr<const KFCQueryCopy> asked(KFCResultModel::GetQueryCopy());
+	if (!KFCResultModel::ListIsRuby() || asked == nil || asked->rubyKind != kKFCRubyFindVaries || reading.IsEmpty())
+	{
+		outStatus.Append("Unify: only the rows of an Inconsistent Ruby list take a reading of their word.");
+		return false;
+	}
+	RubyWrite unify(asked.get(), reading);
+	return WriteOwnTabRows(unify, rowsByChapter, outStatus);
+}
+
 bool KFCReplaceEngine::WriteFaceTables(const std::vector<FaceTable>& tables, bool clearOverrides, PMString& outWhy)
 {
 	KFC_DIAG_WRITTEN_DOCS_CHECK("table-buttons");	// (test builds: after DocsAfterWrite, below - KFCDiagWrittenDocs.h)
@@ -4895,6 +4947,12 @@ bool KFCReplaceEngine::WriteFacePlaces(int32 mode, const KFCRubyConditions& ruby
 	if (places.empty())
 		return false;
 	const WriteUnderWay writing;
+	// FIND ONLY writes nothing, whatever the kind (the face greys its buttons too).
+	if (mode == kKFCRubySearchMode && ruby.findOnly)
+	{
+		out.why.Append(kRubyFindOnlyRefusal);
+		return false;
+	}
 	// THE WRITER: a row's Replace's, for the kind and its Look For (ReplaceOwnTabRows' choice). A mark's write moves text and has none: its own write, the later places first.
 	const bool marks = (mode == kKFCRubySearchMode && ruby.kind == kKFCRubyFindMarks);
 	std::unique_ptr<OwnTabWrite> how;

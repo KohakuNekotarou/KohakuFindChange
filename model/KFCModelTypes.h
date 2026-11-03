@@ -48,10 +48,11 @@ struct KFCRowUpper
 {
 	std::vector<KFCRowUpperRun>	runs;
 	int32						mark;	// an IKentenStyle::KentenKind over the whole match; 0 = none
+	int32						markChar;	// ...a custom mark's character (Kenten_Custom - 2026-11-03), a code point up to U+FFFF; 0 = not known: the asterisk
 	bool						gone;	// its Replace took the ruby or the marks off: a bar
 	bool						planned;	// the readings are what its Replace will give it, not what it has (a ruby list's row - KFCRubyList.h): drawn faint, as the row's context
 
-	KFCRowUpper() : mark(0), gone(false), planned(false) {}
+	KFCRowUpper() : mark(0), markChar(0), gone(false), planned(false) {}
 };
 
 namespace KFCResultModel
@@ -318,30 +319,50 @@ struct KFCRubyConditions
 	PMString	base;			// its base contains this; empty = any (Text Without Ruby: what it looks for - refused empty)
 	PMString	reading;		// its reading contains this; empty = any (not Text Without Ruby)
 	std::vector<KFCRubyChangePiece>	change;	// what a row's Replace gives it: the boxes in order. No box reading anything = its Replace takes the ruby off (the author, 11-01)
+	bool		findOnly;		// FIND ONLY (the author, 11-03: "Ruby too, a search that does not replace - a check box?"): nothing is written, whatever Look For and the boxes say - a row's Replace, the face's Change
+							// buttons and a query's Run all pass it by (Kenten's [Leave As It Is], Ruby's own way: an empty Change Ruby To takes the ruby off)
 	int32		scope;			// its Search: - IWalkerScopeFactoryUtils::kDocumentScope (at launch), kAllDocumentScope, or over part of the front document kStoryScope, kToEndOfStoryScope, kSelectionScope
 
-	KFCRubyConditions() : kind(kKFCRubyFindWith), listFirst(kKFCRubyListAll), listOtherRuby(false), scope(0) {}
+	KFCRubyConditions() : kind(kKFCRubyFindWith), listFirst(kKFCRubyListAll), listOtherRuby(false), findOnly(false), scope(0) {}
 };
 
 /** THE KENTEN KIND'S "SEARCH MODE" (the author, 10-31 - KFCKentenSearch.h): the Ruby kind's for its own (KFCKentenSearch::IsTabCurrent). KFC'S ALONE. */
 enum { kKFCKentenSearchMode = 104 };
 
-/** The Kenten part's Look For: - its entries' order (KFCUI.fr). */
+/** What the Kenten kind looks for: text with marks, or the occurrences of Base Text with none. The face says it in Kenten:'s list - none is Without (2026-11-03 - the author: Look For went, its none in the kinds'
+    list as InDesign's kenten dialog has it - docs/superpowers/specs/2026-11-03-kfc-kenten-face-japanese-design.md N1); a saved query, the fault switch and a list's copy say it as before. */
 enum { kKFCKentenFindWith = 0, kKFCKentenFindWithout = 1 };
 
 /** WHAT THE KENTEN KIND ASKS (the face's - KFCKohakuTab, read by IKFCUIServices::KentenTabConditions; a kenten list keeps its find side in its query copy). */
 struct KFCKentenConditions
 {
-	int32		kind;			// Look For: - kKFCKentenFindWith, kKFCKentenFindWithout (the occurrences of base with none on them)
+	int32		kind;			// kKFCKentenFindWith, kKFCKentenFindWithout (the occurrences of base with none on them - Kenten:'s none)
 	PMString	base;			// its text contains this; empty = any (Text Without Kenten: what it looks for - refused empty)
 	int32		mark;			// Kenten: - 0 = any, or an IKentenStyle::KentenKind (not Text Without Kenten)
+	int32		markChar;		// ...Kenten_Custom: the custom marks of this character alone (a code point up to U+FFFF); 0 = every custom mark (C4)
 	int32		changeTo;		// Change Kenten To: - the IKentenStyle::KentenKind a row's Replace gives it; 0 = none given
-	bool		removeKenten;	// ...or its Replace takes the marks off - over changeTo
+	int32		changeChar;		// ...Kenten_Custom: the character it gives (C5); 0 = none - that Replace is refused
+	bool		removeKenten;	// ...or its Replace takes the marks off - over changeTo (Change Kenten To:'s none - N2)
 	KFCOwnSwitches	switches;	// the icons
 	int32		scope;			// its Search: - as KFCRubyConditions::scope
 
-	KFCKentenConditions() : kind(kKFCKentenFindWith), mark(0), changeTo(0), removeKenten(false), scope(0) {}
+	KFCKentenConditions() : kind(kKFCKentenFindWith), mark(0), markChar(0), changeTo(0), changeChar(0), removeKenten(false), scope(0) {}
+
+	/** DOES ITS CHANGE SIDE ASK ANYTHING IT CAN WRITE - a kind, or the marks off; custom with no character asks nothing (C5). */
+	bool ChangeSideAsks() const
+	{
+		if (removeKenten)
+			return true;
+		return changeTo != 0 && !(changeTo == 11 /* IKentenStyle::Kenten_Custom */ && changeChar == 0);
+	}
 };
+
+/** CAN THIS CHARACTER BE A CUSTOM MARK? InDesign keeps one 16-bit character (kTAKentenCharacterBoss, ITextAttrInt16 - SnpPerformTextAttrKenten.cpp: "limited to a 16-bit signed integer"): up to U+FFFF,
+    not half of a surrogate pair, not a space or a control (C3). */
+inline bool KFCIsCustomKentenCharacter(uint32 c)
+{
+	return c > 0x20 && c <= 0xFFFF && !(c >= 0xD800 && c <= 0xDFFF) && c != 0x3000 && c != 0x7F && c != 0xA0 && c != 0xFEFF;
+}
 
 /** THE WARICHU KIND'S "SEARCH MODE" (the author, 11-02 - docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md A1; KFCWarichuSearch.h): the Kenten kind's for its own. KFC'S ALONE. */
 enum { kKFCWarichuSearchMode = 105 };
@@ -355,10 +376,12 @@ struct KFCWarichuConditions
 	KFCWarichuConditions() : scope(0) {}
 };
 
-/** A KIND OF KENTEN AS THE PAGE'S OWN MARKS READ (IKentenStyle::KentenKind's numbers: U+FE45 the sesame dot and the rest) - what a kenten row and a kenten list's name draw. Custom, a glyph of the person's
-    which they do not read: an asterisk. */
-inline UTF32TextChar KFCKentenMarkCharacter(int32 mark)
+/** A KIND OF KENTEN AS THE PAGE'S OWN MARKS READ (IKentenStyle::KentenKind's numbers: U+FE45 the sesame dot and the rest) - what a kenten row and a kenten list's name draw. Custom, its own character
+    when it is known (2026-11-03 - C6), an asterisk when it is not. */
+inline UTF32TextChar KFCKentenMarkCharacter(int32 mark, int32 customChar = 0)
 {
+	if (mark == 11 /* IKentenStyle::Kenten_Custom */ && customChar > 0)
+		return UTF32TextChar(static_cast<uint32>(customChar));
 	switch (mark)
 	{
 		case 1:		return UTF32TextChar(0xFE45);		// Kenten_BlackSesameDot

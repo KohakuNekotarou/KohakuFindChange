@@ -3706,7 +3706,7 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 		(void)KFCKentenSearch::IsTabCurrent(&asking);
 		if (asking.kind == kKFCKentenFindWithout && asking.base.IsEmpty())
 		{
-			outSummary.Append("Text Without Kenten looks for a text: type it in Base Text on the Kohaku+ tab in Edit > Find/Change.");
+			outSummary.Append("Kenten: none looks for a text with no marks - type it in Base Text on the Kohaku+ tab in Edit > Find/Change.");
 			return 0;
 		}
 	}
@@ -3978,6 +3978,7 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 			kentenAsked.kind = againCopy->kentenKind;
 			kentenAsked.base = againCopy->kentenBase;
 			kentenAsked.mark = againCopy->kentenMark;
+			kentenAsked.markChar = againCopy->kentenMarkChar;
 			kentenAsked.switches = againCopy->ownSwitches;
 		}
 		else
@@ -4009,7 +4010,7 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 		}
 		else if (kentenTab)
 		{
-			KFCQueryCopier::CaptureKenten(copy, kentenAsked.kind, kentenAsked.base, kentenAsked.mark);
+			KFCQueryCopier::CaptureKenten(copy, kentenAsked.kind, kentenAsked.base, kentenAsked.mark, kentenAsked.markChar);
 			copy.ownSwitches = kentenAsked.switches;
 		}
 		else if (warichuTab)
@@ -5725,6 +5726,7 @@ bool KFCSearchEngine::SearchDocumentAgain(int32 chapterIdx, PMString& outStatus)
 				listAsked.kind = asked->kentenKind;
 				listAsked.base = asked->kentenBase;
 				listAsked.mark = asked->kentenMark;
+				listAsked.markChar = asked->kentenMarkChar;
 				listAsked.switches = asked->ownSwitches;
 			}
 			walked = KFCKentenSearch::WalkOneDocument(docRef, name, limit, listAsked, hits, storyVersions, capped, cancelled);

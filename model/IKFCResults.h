@@ -150,6 +150,9 @@ public:
 	/** = KFCResultModel::ListIsOwnKind (appended - docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md) - the live list is a Kohaku+ kind's, with a Change side or not (Table, Ruby, Kenten,
 	    Warichu): its conditions are its tab's - not searched again by story, not narrowed (the heading's menu and the story rows' grey by it, kept per tier). */
 	virtual bool ListIsOwnKind() = 0;
+	/** = KFCResultModel::GetUnifyFacts (appended - 2026-11-03, Inconsistent Ruby's headings) - a row's (hitIdx >= 0) or a heading's word, as its rows are put together (rows of one word answer one),
+	    and the word's other readings, tab-separated, the most read first: what the row's and the heading's menus offer to unify it to. False = none. */
+	virtual bool GetUnifyFacts(int32 chapterIdx, int32 groupIdx, int32 hitIdx, PMString& outWord, PMString& outReadings) = 0;
 };
 
 #endif // __IKFCResults_h__

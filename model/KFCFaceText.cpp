@@ -65,7 +65,7 @@ bool ReadAsked(int32 mode, Asked& out, PMString& outWhy)
 		(void)KFCKentenSearch::IsTabCurrent(&out.kenten);
 		if (out.kenten.kind == kKFCKentenFindWithout && out.kenten.base.IsEmpty())
 		{
-			outWhy.Append("Text Without Kenten looks for a text: type it in Base Text.");
+			outWhy.Append("Kenten: none looks for a text with no marks - type it in Base Text.");
 			return false;
 		}
 		return true;

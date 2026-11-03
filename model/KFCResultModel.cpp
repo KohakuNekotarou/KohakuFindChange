@@ -238,6 +238,78 @@ namespace
 		}
 	}
 
+	// AN INCONSISTENT RUBY LIST'S HEADINGS (2026-11-03 - the author: "a heading per reading, the places found with it under it"): its rows put together by their word and reading (Hit::groupKey) - the
+	// key's word part before U+001F -, each heading its first row's words; a word's headings together, in the order their words first stand, its most read reading first (the same count: the
+	// first to stand). The rows of a heading in the chapter's own order, as a story's. A row taken off the list is in no group, as BuildFontGroups has it.
+	void BuildReadingGroups(KFCResultModel::Chapter& chapter)
+	{
+		chapter.fontGroups.clear();
+		std::map<std::string, int32> groupOf;
+		std::vector<KFCResultModel::FontGroup> made;
+		for (size_t i = 0; i < chapter.hits.size(); ++i)
+		{
+			KFCResultModel::Hit& hit = chapter.hits[i];
+			hit.fontGroup = -1;
+			hit.fontGroupPos = -1;
+			if (hit.cleared)
+				continue;
+			const std::string key(hit.groupKey.GetUTF8String());
+			std::map<std::string, int32>::const_iterator known = groupOf.find(key);
+			if (known == groupOf.end())
+			{
+				KFCResultModel::FontGroup group;
+				group.story = hit.storyUID;
+				group.label = hit.groupLabel;
+				group.otherReadings = hit.otherReadings;
+				const std::string::size_type cut = key.find('\x1F');
+				group.word.SetUTF8String(key.substr(0, cut));
+				made.push_back(group);
+				known = groupOf.insert(std::make_pair(key, static_cast<int32>(made.size()) - 1)).first;
+			}
+			made[known->second].hitIndices.push_back(static_cast<int32>(i));
+		}
+		// THE ORDER: each word where it first stands, its headings the most read first.
+		std::vector<int32> order;
+		std::vector<bool> placed(made.size(), false);
+		for (size_t g = 0; g < made.size(); ++g)
+		{
+			if (placed[g])
+				continue;
+			std::vector<int32> ofWord;
+			for (size_t o = g; o < made.size(); ++o)
+				if (!placed[o] && made[o].word == made[g].word)
+				{
+					ofWord.push_back(static_cast<int32>(o));
+					placed[o] = true;
+				}
+			std::stable_sort(ofWord.begin(), ofWord.end(), [&made](int32 a, int32 b) { return made[a].hitIndices.size() > made[b].hitIndices.size(); });
+			order.insert(order.end(), ofWord.begin(), ofWord.end());
+		}
+		for (size_t n = 0; n < order.size(); ++n)
+		{
+			KFCResultModel::FontGroup& group = made[static_cast<size_t>(order[n])];
+			for (size_t k = 0; k < group.hitIndices.size(); ++k)
+			{
+				KFCResultModel::Hit& hit = chapter.hits[static_cast<size_t>(group.hitIndices[k])];
+				hit.fontGroup = static_cast<int32>(n);
+				hit.fontGroupPos = static_cast<int32>(k);
+			}
+			chapter.fontGroups.push_back(group);
+		}
+	}
+
+	// Its groups: by reading on an Inconsistent Ruby list (its rows hold a key - every row the walk made does), else by story.
+	void GroupHits(KFCResultModel::Chapter& chapter)
+	{
+		for (size_t i = 0; i < chapter.hits.size(); ++i)
+			if (!chapter.hits[i].cleared && !chapter.hits[i].groupKey.IsEmpty())
+			{
+				BuildReadingGroups(chapter);
+				return;
+			}
+		BuildFontGroups(chapter);
+	}
+
 	// Each story's hits numbered in the order their text stands (the text-focus spec's T14 - its path is at
 	// Hit::storyOrdinal in the header): a group's hits sorted by where they started when the search found them. Not
 	// the hits' own order - that is page order, and the walk's order inside a table is reading order (memory
@@ -266,7 +338,7 @@ namespace
 	// (AppendChapter, RowsLaidOutAgain), so no road builds the one and leaves the other naming rows that have moved.
 	void IndexRows(KFCResultModel::Chapter& chapter)
 	{
-		BuildFontGroups(chapter);
+		GroupHits(chapter);		// (by story - or, an Inconsistent Ruby list's, by word and reading: 11-03)
 		NumberHitsWithinStories(chapter);
 	}
 
@@ -709,9 +781,9 @@ int32 KFCResultModel::ClearRows(const KFCRowsByChapter& rows)
 		if (!touched)
 			continue;
 		// The groups and the object rows' places again, around the rows taken off - NOT the stories' order (Hit::storyOrdinal
-		// is the search's order, which finds a row among look-alikes): BuildFontGroups alone, no new layout generation (no
-		// row moves), so the writes kept for an Undo still name their rows.
-		BuildFontGroups(*c);
+		// is the search's order, which finds a row among look-alikes): the groups alone (GroupHits - by story or by reading), no new
+		// layout generation (no row moves), so the writes kept for an Undo still name their rows.
+		GroupHits(*c);
 		// A document searched again with nothing found was shown at (0/0) to be searched again; its rows taken off by
 		// hand, its row goes as any other document's (the clear-from-results spec's K5).
 		if (ShownRows(c->hits) == 0)
@@ -747,11 +819,33 @@ UID KFCResultModel::GetGroupStory(int32 chapterIdx, int32 groupIdx)
 	return (group != nil) ? group->story : kInvalidUID;
 }
 
+bool KFCResultModel::GetUnifyFacts(int32 chapterIdx, int32 groupIdx, int32 hitIdx, PMString& outWord, PMString& outReadings)
+{
+	outWord.Clear();
+	outReadings.Clear();
+	const FontGroup* group = GroupAt(chapterIdx, (hitIdx >= 0) ? GetHitFontGroup(chapterIdx, hitIdx) : groupIdx);
+	if (group == nil || group->label.IsEmpty() || group->otherReadings.IsEmpty())
+		return false;
+	outWord = group->word;
+	outWord.SetTranslatable(kFalse);
+	outReadings = group->otherReadings;
+	outReadings.SetTranslatable(kFalse);
+	return true;
+}
+
 bool KFCResultModel::GetFontDisplay(int32 chapterIdx, int32 fontIdx, PMString& outName, int32& outHitCount)
 {
 	const FontGroup* group = GroupAt(chapterIdx, fontIdx);
 	if (group == nil)
 		return false;
+	// AN INCONSISTENT RUBY LIST'S HEADING (2026-11-03): its word and reading as its first row's page had them when found - the reading the rows were put together by, whatever a Replace wrote since.
+	if (!group->label.IsEmpty())
+	{
+		outName = group->label;
+		outName.SetTranslatable(kFalse);
+		outHitCount = static_cast<int32>(group->hitIndices.size());
+		return true;
+	}
 	// THE STORY ROW'S TEXT - "ID260: first words..." - made from its rows' storyLead NOW, not kept beside them (the
 	// author's call): a Replace reads the story's first words into its rows again (SetStoryLead), and a rollback, an
 	// Undo or a Redo puts the rows back with theirs, so the row says what the story says. No space after "ID" (the

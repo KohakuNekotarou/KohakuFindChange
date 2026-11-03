@@ -201,6 +201,12 @@ namespace KFCResultModel
 								// row's words, cut for the row
 		PMString	runNames;	// ...and the queries that wrote it, in the run's order (RowDisplay::runNames)
 		KFCRowUpper	upper;		// a ruby or kenten row's upper line (RowDisplay::upper): what stands above its match as its walk or its Replace left it
+		// AN INCONSISTENT RUBY ROW'S HEADING (2026-11-03 - the author: "a heading per reading, the places found with it under it"): groupKey = its word and its reading as the search compares
+		// them, U+001F between - what its rows are put together by (BuildFontGroups; empty: by their story); groupLabel = the heading's words as the page has them ("<base><<reading>>");
+		// otherReadings = the word's other readings over what was searched, the most read first, as the page has them, tab-separated - what its menu offers to give it.
+		PMString	groupKey;
+		PMString	groupLabel;
+		PMString	otherReadings;
 		UID			matchFrame;	// a TEXT row's match's own frame (the parcel's - IParcelList::GetParcelFrameUID), kInvalidUID when
 								// it has none placed: what Frames of These Matches climbs to the frame the person selects
 		UID			pageUID;	// the page the row names (a text row's frame's - the "+" frame's for an overset match -, an object
@@ -289,6 +295,11 @@ namespace KFCResultModel
 		// A STORY GROUP (the author's call). A Find/Change result groups its hits by story, the way KCM's
 		// Story mode lists stories, and every group is one.
 		UID					story;
+		// ...BUT AN INCONSISTENT RUBY LIST'S, a reading's of a word (Hit::groupKey - 2026-11-03): its heading's words and its word's other readings, its first row's, and its word's part of
+		// the key - a word's headings stand together, and a row of it is known by it. All empty on a story's. (story: its first row's.)
+		PMString			label;
+		PMString			otherReadings;
+		PMString			word;
 		FontGroup() : story(kInvalidUID) {}
 	};
 
@@ -637,6 +648,10 @@ namespace KFCResultModel
 
 	/** The story a story group stands for (FontGroup::story); kInvalidUID for an index out of range. */
 	UID GetGroupStory(int32 chapterIdx, int32 groupIdx);
+
+	/** AN INCONSISTENT RUBY ROW'S WORD AND ITS WORD'S OTHER READINGS (2026-11-03 - what its menu offers): the hit's (hitIdx >= 0) or a heading's (hitIdx < 0: group groupIdx). outWord = its word's
+	    part of the key (FontGroup::word - rows of one word answer one), outReadings = Hit::otherReadings. False = not an Inconsistent Ruby row or heading, or its word read no other way. */
+	bool GetUnifyFacts(int32 chapterIdx, int32 groupIdx, int32 hitIdx, PMString& outWord, PMString& outReadings);
 
 	// (RowDisplay - everything a hit row needs to draw itself, see GetHitRow: KFCModelTypes.h.)
 

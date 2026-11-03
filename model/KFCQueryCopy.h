@@ -96,6 +96,7 @@ struct KFCQueryCopy
 	int32		kentenKind;				// kKFCKentenFindWith ... (KFCModelTypes.h)
 	PMString	kentenBase;
 	int32		kentenMark;
+	int32		kentenMarkChar;			// ...a custom mark's character it asked for (2026-11-03); 0 = every custom mark
 	// A RUBY OR KENTEN LIST'S: what its search took in and took for the same. (Not the five bool16s above: those are a tab of InDesign's, read and stated back; these were never any of InDesign's.)
 	KFCOwnSwitches	ownSwitches;
 
@@ -123,7 +124,7 @@ namespace KFCQueryCopier
 	void CaptureRuby(KFCQueryCopy& out, int32 kind, const PMString& base, const PMString& reading);
 
 	/** A KENTEN LIST'S (KFCKentenSearch): the mode, kKFCKentenSearchMode, and its find side - the same. */
-	void CaptureKenten(KFCQueryCopy& out, int32 kind, const PMString& base, int32 mark);
+	void CaptureKenten(KFCQueryCopy& out, int32 kind, const PMString& base, int32 mark, int32 markChar);
 
 	/** A WARICHU LIST'S (KFCWarichuSearch - docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md): the mode, kKFCWarichuSearchMode - it asks nothing but its icons (ownSwitches, set by the caller). */
 	void CaptureWarichu(KFCQueryCopy& out);

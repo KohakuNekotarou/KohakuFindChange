@@ -17,7 +17,7 @@
 #include "IDataBase.h"
 #include "IKentenStyle.h"				// the kinds
 #include "IStoryList.h"
-#include "ITextAttrInt16.h"				// kTAKentenKindBoss
+#include "ITextAttrInt16.h"				// kTAKentenKindBoss, kTAKentenCharacterBoss, kTAKentenCharacterSetBoss
 #include "ITextModel.h"
 #include "ITextModelCmds.h"				// ApplyCmd, ClearOverridesCmd
 #include "ITextStoryThread.h"
@@ -32,6 +32,7 @@
 #include "TextID.h"						// kCharAttrStrandBoss
 #include "Utils.h"
 
+#include <cstdlib>						// strtol - the fault switch's characters, in hex
 #include <string>
 
 // Project includes:
@@ -82,6 +83,15 @@ int32 MarkAt(IComposeScanner* scanner, TextIndex at, TextIndex until, int32& out
 	return (kind != nil) ? static_cast<int32>(kind->Get()) : static_cast<int32>(IKentenStyle::Kenten_None);
 }
 
+// THE CHARACTER OF THE CUSTOM MARK AT `at` AND HOW FAR IT GOES, up to `until` (MarkAt's way): kTAKentenCharacterBoss's 16 bits as a code point; 0 = none.
+int32 CustomCharAt(IComposeScanner* scanner, TextIndex at, TextIndex until, int32& outLength)
+{
+	outLength = 0;
+	InterfacePtr<const IAttrReport> attr(scanner->QueryAttributeAt(at, until, kTAKentenCharacterBoss, &outLength));
+	InterfacePtr<const ITextAttrInt16> character(attr, UseDefaultIID());
+	return (character != nil) ? static_cast<int32>(static_cast<uint16>(character->Get())) : 0;
+}
+
 // Is any mark on [from, to)?
 bool MarkAnywhereIn(IComposeScanner* scanner, TextIndex from, TextIndex to)
 {
@@ -103,7 +113,41 @@ bool Holds(const std::u32string& words, const std::u32string& part)
 	return part.empty() || words.find(part) != std::u32string::npos;
 }
 
-// THE STRETCHES OF MARKS OF ONE STORY, by the conditions: each thread's on its own (a table's cells are threads of its own, and the scanner would run on across them), cut where StopsRow stands.
+// ONE STRETCH OF ONE MARK, [at, at + len), listed: cut where StopsRow stands, each piece a row when its text holds Base Text. False = the list is full (outCapped).
+bool ListStretch(const UIDRef& storyRef, ITextModel* model, const KFCFold::Flags& flags, const std::u32string& wantedBase, KFCOwnScope& taken,
+	const std::vector<KFCSearchEngine::ListedPlace>* part, size_t limit, TextIndex at, int32 len, std::vector<KFCSearchEngine::ListedPlace>& ioPlaces, bool& outCapped)
+{
+	const std::u32string text(U32Of(KFCSearchEngine::ReadText(storyRef, at, len)));
+	size_t from = 0;
+	for (size_t k = 0; k <= text.size(); ++k)
+	{
+		if (k < text.size() && !StopsRow(text[k]))
+			continue;
+		const TextIndex start = at + static_cast<TextIndex>(from);
+		const TextIndex end = at + static_cast<TextIndex>(k);
+		if (k > from && Holds(KFCFold::TextOf(std::u32string(text, from, k - from), flags), wantedBase)
+			&& (part == nil || KFCSearchEngine::StretchesTouch(*part, storyRef.GetUID(), start, end))
+			&& taken.Takes(storyRef, model, start))
+		{
+			if (ioPlaces.size() >= limit)
+			{
+				outCapped = true;
+				return false;
+			}
+			KFCSearchEngine::ListedPlace place;
+			place.story = storyRef.GetUID();
+			place.start = start;
+			place.end = end;
+			ioPlaces.push_back(place);
+		}
+		from = k + 1;
+	}
+	return true;
+}
+
+// THE STRETCHES OF MARKS OF ONE STORY, by the conditions: each thread's on its own (a table's cells are threads of its own, and the scanner would run on across them), cut where StopsRow stands - and a custom
+// mark where its character changes (2026-11-03 - docs/superpowers/specs/2026-11-03-kfc-kenten-face-japanese-design.md C6: two characters side by side are two marks), Kenten: custom with a character in its box
+// taking the custom marks of that character alone (C4).
 void WalkWithKenten(const UIDRef& storyRef, ITextModel* model, const KFCKentenConditions& asked, KFCOwnScope& taken, const std::vector<KFCSearchEngine::ListedPlace>* part, size_t limit,
 	std::vector<KFCSearchEngine::ListedPlace>& ioPlaces, bool& outCapped)
 {
@@ -127,30 +171,22 @@ void WalkWithKenten(const UIDRef& storyRef, ITextModel* model, const KFCKentenCo
 		const TextIndex runEnd = at + len;
 		if (mark != IKentenStyle::Kenten_None && (asked.mark == 0 || asked.mark == mark) && !StandsInSetAsideText(model, at))
 		{
-			const std::u32string text(U32Of(KFCSearchEngine::ReadText(storyRef, at, len)));
-			size_t from = 0;
-			for (size_t k = 0; k <= text.size(); ++k)
+			TextIndex pieceAt = at;
+			while (pieceAt < runEnd)
 			{
-				if (k < text.size() && !StopsRow(text[k]))
-					continue;
-				const TextIndex start = at + static_cast<TextIndex>(from);
-				const TextIndex end = at + static_cast<TextIndex>(k);
-				if (k > from && Holds(KFCFold::TextOf(std::u32string(text, from, k - from), flags), wantedBase)
-					&& (part == nil || KFCSearchEngine::StretchesTouch(*part, storyRef.GetUID(), start, end))
-					&& taken.Takes(storyRef, model, start))
+				int32 pieceLen = runEnd - pieceAt;
+				int32 customChar = 0;
+				if (mark == IKentenStyle::Kenten_Custom)
 				{
-					if (ioPlaces.size() >= limit)
-					{
-						outCapped = true;
-						return;
-					}
-					KFCSearchEngine::ListedPlace place;
-					place.story = storyRef.GetUID();
-					place.start = start;
-					place.end = end;
-					ioPlaces.push_back(place);
+					int32 sameLen = 0;
+					customChar = CustomCharAt(scanner, pieceAt, runEnd, sameLen);
+					if (sameLen > 0 && sameLen < pieceLen)
+						pieceLen = sameLen;
 				}
-				from = k + 1;
+				if ((asked.mark != IKentenStyle::Kenten_Custom || asked.markChar == 0 || asked.markChar == customChar)
+					&& !ListStretch(storyRef, model, flags, wantedBase, taken, part, limit, pieceAt, pieceLen, ioPlaces, outCapped))
+					return;
+				pieceAt += pieceLen;
 			}
 		}
 		at = runEnd;
@@ -218,7 +254,7 @@ bool WalkDoc(const UIDRef& docRef, const KFCKentenConditions& asked, const std::
 			WalkWithKenten(storyRef, model, asked, taken, part, limit, places, outCapped);
 	}
 	KFCSearchEngine::BuildListedHits(docRef, places, outHits, outVersions);
-	// What the rows with marks draw there; a row without any draws its text.
+	// What the rows with marks draw there - a custom mark's own character (C6); a row without any draws its text.
 	for (size_t h = 0; asked.kind == kKFCKentenFindWith && h < outHits.size() && h < places.size(); ++h)
 	{
 		const UIDRef storyRef(db, places[h].story);
@@ -226,6 +262,11 @@ bool WalkDoc(const UIDRef& docRef, const KFCKentenConditions& asked, const std::
 		outHits[h].runChain = KFCKentenSearch::RowWords(storyRef, places[h].start, places[h].end, mark);
 		outHits[h].runChain.SetTranslatable(kFalse);
 		outHits[h].upper.mark = mark;
+		if (mark == IKentenStyle::Kenten_Custom)
+		{
+			const int32 customChar = KFCKentenSearch::CustomCharOn(storyRef, places[h].start, places[h].end);
+			outHits[h].upper.markChar = KFCIsCustomKentenCharacter(static_cast<uint32>(customChar)) ? customChar : 0;
+		}
 	}
 	return true;
 }
@@ -261,6 +302,10 @@ bool KFCKentenSearch::IsTabCurrent(KFCKentenConditions* outConditions)
 				conditions.mark = value.GetAsNumber();
 			else if (line.compare(0, 7, "change=") == 0)
 				conditions.changeTo = value.GetAsNumber();
+			else if (line.compare(0, 9, "markchar=") == 0)
+				conditions.markChar = static_cast<int32>(std::strtol(line.c_str() + 9, nullptr, 16));
+			else if (line.compare(0, 11, "changechar=") == 0)
+				conditions.changeChar = static_cast<int32>(std::strtol(line.c_str() + 11, nullptr, 16));
 			else if (line == "remove=1")
 				conditions.removeKenten = true;
 			else if (line == "scope=all")
@@ -371,16 +416,20 @@ bool KFCKentenSearch::WriteDocument(const UIDRef& docRef, const KFCKentenConditi
 	bool capped = false;
 	if (!WalkDoc(docRef, asked, part, static_cast<size_t>(kMaxInt32), hits, versions, capped))
 		return false;
+	if (!asked.ChangeSideAsks())
+		return true;		// (custom with no character writes nothing - C5; HasChangeSide keeps a run from asking it)
 	IDataBase* const db = docRef.GetDataBase();
 	const int32 wanted = asked.removeKenten ? static_cast<int32>(IKentenStyle::Kenten_None) : asked.changeTo;
+	const int32 wantedChar = (wanted == IKentenStyle::Kenten_Custom) ? asked.changeChar : 0;
 	for (size_t h = 0; h < hits.size(); ++h)
 	{
 		if (hits[h].isLocked)
 			continue;
 		const UIDRef story(db, hits[h].storyUID);
-		if (MarkOn(story, hits[h].textStart, hits[h].textEnd) == wanted)
+		if (MarkOn(story, hits[h].textStart, hits[h].textEnd) == wanted
+			&& (wanted != IKentenStyle::Kenten_Custom || CustomCharOn(story, hits[h].textStart, hits[h].textEnd) == wantedChar))
 			continue;
-		const ErrorCode wrote = asked.removeKenten ? Remove(story, hits[h].textStart, hits[h].textEnd) : Write(story, hits[h].textStart, hits[h].textEnd, wanted);
+		const ErrorCode wrote = asked.removeKenten ? Remove(story, hits[h].textStart, hits[h].textEnd) : Write(story, hits[h].textStart, hits[h].textEnd, wanted, wantedChar);
 		if (wrote != kSuccess)
 			return false;
 		++outCount;
@@ -406,6 +455,16 @@ int32 KFCKentenSearch::MarkOn(const UIDRef& story, TextIndex start, TextIndex en
 	return (len >= end - start) ? mark : -1;
 }
 
+int32 KFCKentenSearch::CustomCharOn(const UIDRef& story, TextIndex start, TextIndex end)
+{
+	InterfacePtr<IComposeScanner> scanner(story, UseDefaultIID());
+	if (scanner == nil || end <= start)
+		return 0;
+	int32 len = 0;
+	const int32 customChar = CustomCharAt(scanner, start, end, len);
+	return (len >= end - start) ? customChar : -1;
+}
+
 PMString KFCKentenSearch::RowWords(const UIDRef& story, TextIndex start, TextIndex end, int32 mark)
 {
 	if (mark == IKentenStyle::Kenten_None)
@@ -423,7 +482,9 @@ PMString KFCKentenSearch::RowWords(const UIDRef& story, TextIndex start, TextInd
 	}
 	words.Append(base);
 	words.AppendW(UTF32TextChar(0x300A));		// the book title marks: a ruby row's way of writing what goes beside the base
-	words.AppendW(KFCKentenMarkCharacter(mark));
+	// A custom mark's own character (C6) - the asterisk when it is none a row can write.
+	const int32 customChar = (mark == IKentenStyle::Kenten_Custom) ? CustomCharOn(story, start, end) : 0;
+	words.AppendW(KFCKentenMarkCharacter(mark, KFCIsCustomKentenCharacter(static_cast<uint32>(customChar)) ? customChar : 0));
 	words.AppendW(UTF32TextChar(0x300B));
 	return words;
 }
@@ -463,7 +524,7 @@ ErrorCode KFCKentenSearch::Remove(const UIDRef& story, TextIndex start, TextInde
 	return (MarkOn(story, start, end) != IKentenStyle::Kenten_None) ? Write(story, start, end, IKentenStyle::Kenten_None) : kSuccess;
 }
 
-ErrorCode KFCKentenSearch::Write(const UIDRef& story, TextIndex start, TextIndex end, int32 mark)
+ErrorCode KFCKentenSearch::Write(const UIDRef& story, TextIndex start, TextIndex end, int32 mark, int32 customChar)
 {
 	InterfacePtr<ITextModelCmds> cmds(story, UseDefaultIID());
 	if (cmds == nil)
@@ -475,6 +536,23 @@ ErrorCode KFCKentenSearch::Write(const UIDRef& story, TextIndex start, TextIndex
 	kind->Set(static_cast<int16>(mark));
 	InterfacePtr<IAttrReport> report(kind, UseDefaultIID());
 	attrs->ApplyAttribute(report);
+	// A CUSTOM MARK'S CHARACTER, with its kind (SnpPerformTextAttrKenten::ApplyKenten writes the same two ITextAttrInt16s): the character's 16 bits, and the set it was entered in - 0, what the kenten dialog's
+	// character input keeps (the DOM's CHARACTER_INPUT; the C++ enum names 0 kShiftJIS, and the snippet's own comment says the set is "not really used").
+	if (mark == IKentenStyle::Kenten_Custom)
+	{
+		if (!KFCIsCustomKentenCharacter(static_cast<uint32>(customChar)))
+			return kFailure;
+		InterfacePtr<ITextAttrInt16> character(::CreateObject2<ITextAttrInt16>(kTAKentenCharacterBoss));
+		InterfacePtr<ITextAttrInt16> characterSet(::CreateObject2<ITextAttrInt16>(kTAKentenCharacterSetBoss));
+		if (character == nil || characterSet == nil)
+			return kFailure;
+		character->Set(static_cast<int16>(static_cast<uint16>(customChar)));
+		characterSet->Set(static_cast<int16>(IKentenStyle::kShiftJIS));
+		InterfacePtr<IAttrReport> characterReport(character, UseDefaultIID());
+		InterfacePtr<IAttrReport> setReport(characterSet, UseDefaultIID());
+		attrs->ApplyAttribute(characterReport);
+		attrs->ApplyAttribute(setReport);
+	}
 	InterfacePtr<ICommand> apply(cmds->ApplyCmd(RangeData(start, end), attrs, kCharAttrStrandBoss));
 	return (apply != nil) ? CmdUtils::ProcessCommand(apply) : kFailure;
 }

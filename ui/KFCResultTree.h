@@ -152,8 +152,20 @@ namespace KFCResultTree
 	    object rows through KFCJump::ReplaceObjectRows (the document of the row selected last in front, its item left
 	    selected - LastSelectedHit), text rows through the model (IKFCRuns::ReplaceRows) - the rows repainted and the
 	    status line set. True = something written. outStatus, when given, gets the status line it set - Shift+Return adds
-	    to it when there is no row below to go on to (KFCResultTreeEH). */
-	bool ReplaceRows(const KFCRowsByChapter& rows, PMString* outStatus = nil);
+	    to it when there is no row below to go on to (KFCResultTreeEH). unifyTo (2026-11-03): an Inconsistent Ruby row's
+	    "unify" - that reading written in place of the Change side (IKFCRuns::UnifyRubyRows), through the same doors. */
+	bool ReplaceRows(const KFCRowsByChapter& rows, PMString* outStatus = nil, const PMString* unifyTo = nil);
+
+	/** UNIFY TO A READING (2026-11-03 - Inconsistent Ruby's headings and rows - the author: "<<tarou>> ni soroeru"): the readings the row's word has besides its own, the most read first - a hit
+	    row's or a heading's (a story row of such a list); false for any other row. outWord = its word: rows of one word answer one (KFCResults()->GetUnifyFacts). */
+	bool UnifyReadingsOf(const NodeID& row, PMString& outWord, std::vector<PMString>& outReadings);
+
+	/** Item `slot`'s name over the row - "<<reading>> ni soroeru" - false when the row's word has no reading `slot`. */
+	bool UnifyItemName(const NodeID& row, int32 slot, PMString& outName);
+
+	/** Item `slot`'s write: a heading's every row, or the hit row - the rows selected together when it is one of them (RowsOfRightClick) - those of the row's word, given its reading `slot`
+	    (ReplaceRows with unifyTo). True = something written. */
+	bool UnifyRows(const NodeID& row, int32 slot);
 
 	/** Can the Replace run on these rows - can any of them be replaced (KFCRuns()->CanReplaceHit)? The one question the
 	    row menu greys Replace by (KFCActionComponent) and ReplaceRows asks first. */

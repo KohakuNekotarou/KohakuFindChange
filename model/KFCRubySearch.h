@@ -45,7 +45,7 @@ namespace KFCRubySearch
 	/** IS THE RUBY TAB FIND/CHANGE'S TAB NOW, and what it asks (outConditions, when given - the tab's as it stands, whichever tab is shown: a row's Replace reads its
 	    Change side). Asked of the UI half (IKFCUIServices::RubyTabConditions - ui/KFCKohakuTab.h); no UI half = not the Ruby tab. A TEST BUILD asks its fault switch
 	    ruby-tab first: on = the Ruby tab, its file's lines kind=without, base=, ruby=, change=<a reading over the row's whole text>, piece=<base>=<reading> (a box, in order), remove=1 (no box reads
-	    anything), scope=all|story|toend|selection, first=story|document|book, on=<icon>, off=<icon> (KFCOwnScopeDiagLine) the conditions. */
+	    anything), findonly=1 (Find Only - 2026-11-03), scope=all|story|toend|selection, first=story|document|book, on=<icon>, off=<icon> (KFCOwnScopeDiagLine) the conditions. */
 	bool IsTabCurrent(KFCRubyConditions* outConditions = nil);
 
 	/** The Change boxes as KFCRubyChangePlan takes them. */

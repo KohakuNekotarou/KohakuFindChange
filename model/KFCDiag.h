@@ -233,8 +233,8 @@
 //                what it asks - find=<style>, overrides=1, change=<style>, clear=1, scope=all|story|toend|selection (the model's cases, which need no dialog -
 //                work\kbs-regress\tb-cases.tsv)
 //    table-cap  KFCTableSearch::CollectTargets lists at most 2 tables (tb-cap)
-//    ruby-tab  KFCRubySearch::IsTabCurrent the same for KFC's Ruby tab; the file's lines kind=without, base=, ruby=, change=, remove=1, scope=all|story|toend|selection (work\kbs-regress\rb-cases.tsv)
-//    kenten-tab  KFCKentenSearch::IsTabCurrent the same for the Kenten kind; the file's lines kind=without, base=, mark=<n>, change=<n>, remove=1, scope=all|story|toend|selection (work\kbs-regress\kt-cases.tsv)
+//    ruby-tab  KFCRubySearch::IsTabCurrent the same for KFC's Ruby tab; the file's lines kind=without, base=, ruby=, change=, remove=1, findonly=1, scope=all|story|toend|selection (work\kbs-regress\rb-cases.tsv)
+//    kenten-tab  KFCKentenSearch::IsTabCurrent the same for the Kenten kind; the file's lines kind=without, base=, mark=<n>, change=<n>, remove=1, markchar=<hex>, changechar=<hex>, scope=all|story|toend|selection (work\kbs-regress\kt-cases.tsv)
 //    kohaku-tab-reset  (UI half) what the Kohaku+ tab keeps as at launch, and the switch off again - one use (a case's saved query left its conditions on the tab)
 //    query-menu-pass  (UI half) KFCKohakuQueryMenu's watch lets InDesign's reader load a query of the Kohaku+ tab - what a person with no KFC gets from its file
 //    not-japanese  (UI half) the Kohaku tab's Find: as in an InDesign of another language - no Ruby (ui/KFCKohakuTab.cpp's JapaneseKinds; kh-not-japanese)

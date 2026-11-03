@@ -7,9 +7,10 @@
 //  THE KOHAKU+ TAB'S KENTEN KIND, LISTED (the author, 10-31: "add kenten too" - in a Japanese InDesign alone, as Ruby; KFCRubySearch's shape). While Find: on Find/Change's Kohaku+ tab says Kenten (the
 //  tab itself is the UI half's - IKFCUIServices::KentenTabConditions), the panel's Find lists the text with emphasis marks: a row a stretch of one kind of mark (kTAKentenKindBoss as the composer reads it
 //  - IComposeScanner::QueryAttributeAt, which joins the characters that share it: a character style's marks too), cut at a paragraph's end and at anything of InDesign's in the text, and at a story
-//  thread's end - a table's cells are threads of its own. Base Text and Kenten narrow it. Text Without Kenten lists each occurrence of Base Text with no mark on it. A row draws its base and the mark
-//  (Hit::runChain), and is a text row in everything else. Replace on rows gives them Change Kenten To, or takes the marks off with Remove Kenten (the kind Kenten_None, as InDesign's own menu does - a
-//  character style's marks go too): the look of the marks is left as it stands. All the rows in one step.
+//  thread's end - a table's cells are threads of its own; custom marks are cut where their character changes (2026-11-03). Base Text and Kenten narrow it (custom: its character too, when the face's box has
+//  one). Kenten:'s none (Text Without Kenten until 11-03) lists each occurrence of Base Text with no mark on it. A row draws its base and the mark (Hit::runChain), and is a text row in everything else.
+//  Replace on rows gives them Change Kenten To (custom: with the box's character), or, Change Kenten To:'s none (Remove Kenten until 11-03), takes the marks off whole - every kenten attribute, a
+//  character style's mark turned off on the text. The look of the marks is left as it stands. All the rows in one step.
 //
 //========================================================================================
 
@@ -27,7 +28,8 @@
 namespace KFCKentenSearch
 {
 	/** IS THE KENTEN KIND FIND/CHANGE'S NOW, and what it asks (either way). Asked of the UI half (IKFCUIServices::KentenTabConditions - ui/KFCKohakuTab.h); no UI half = not it. A TEST BUILD asks the fault
-	    switch kenten-tab first: on = the Kenten kind, its file's lines kind=without, base=, mark=<n>, change=<n>, remove=1, scope=all|story|toend|selection the conditions. */
+	    switch kenten-tab first: on = the Kenten kind, its file's lines kind=without, base=, mark=<n>, change=<n>, remove=1, markchar=<hex>, changechar=<hex>, scope=all|story|toend|selection the
+	    conditions. */
 	bool IsTabCurrent(KFCKentenConditions* outConditions = nil);
 
 	/** THE KIND'S WALK OVER A RUN'S TARGETS (KFCRubySearch::CollectTargets' shape). part (KFCSearchEngine::PartStretches): a stretch of marks they touch - a row is the stretch whole, as
@@ -45,11 +47,16 @@ namespace KFCKentenSearch
 	/** The kind of mark on [start, end) of the story, when one kind runs over the whole of it (Kenten_None = none on it); -1 when it changes inside. */
 	int32 MarkOn(const UIDRef& story, TextIndex start, TextIndex end);
 
-	/** What a row draws: its base (cut when long) and the mark, as the page's own marks read - empty for no mark (the row draws its own text). */
+	/** THE CHARACTER OF A CUSTOM MARK on [start, end) (kTAKentenCharacterBoss - the 16-bit character InDesign keeps, read as a code point: the kenten dialog's own way of entering one, a character,
+	    is kept as its Unicode - KCMTextRead.cpp measured it), when one runs over the whole of it; 0 = none; -1 when it changes inside. Only means something where the kind is Kenten_Custom. */
+	int32 CustomCharOn(const UIDRef& story, TextIndex start, TextIndex end);
+
+	/** What a row draws: its base (cut when long) and the mark, as the page's own marks read - a custom mark's own character (read from the text) - empty for no mark (the row draws its own text). */
 	PMString RowWords(const UIDRef& story, TextIndex start, TextIndex end, int32 mark);
 
-	/** Replace on a row: the kind on [start, end) (IKentenStyle::Kenten_None takes the marks off). */
-	ErrorCode Write(const UIDRef& story, TextIndex start, TextIndex end, int32 mark);
+	/** Replace on a row: the kind on [start, end) (IKentenStyle::Kenten_None takes the marks off). Kenten_Custom writes its character too (customChar, up to U+FFFF), entered as a character (the
+	    character set 0 - the kenten dialog's default, the DOM's CHARACTER_INPUT), in the same command: the kind and its character are one step. */
+	ErrorCode Write(const UIDRef& story, TextIndex start, TextIndex end, int32 mark, int32 customChar = 0);
 
 	/** A QUERY RUN'S WRITE OF ONE DOCUMENT (KFCKohakuQuery::WriteDocument): what the conditions list, given their Change side, with no rows. outCount = the places written. False = InDesign would not write one. */
 	bool WriteDocument(const UIDRef& docRef, const KFCKentenConditions& asked, const std::vector<KFCSearchEngine::ListedPlace>* part, int32& outCount);

@@ -169,6 +169,11 @@ namespace KFCReplaceEngine
 	    written. A Kohaku+ list's text rows take it (Ruby, Kenten) - a table's row is no text row. True = something written; outStatus says what. */
 	bool TcyHits(const KFCRowsByChapter& rows, PMString& outStatus);
 
+	/** AN INCONSISTENT RUBY LIST'S ROWS GIVEN ONE OF THEIR WORD'S READINGS (2026-11-03 - the author: a heading's or a row's right-click "unify to <reading>"): that reading over each row's whole
+	    text, as a row's Replace writes one Change Ruby To box with no Base Text - its doors, step (Change Ruby) and refusals (Find Only, a locked row, one that reads so already). Refused on any other
+	    list. True = something written; outStatus says what. */
+	bool UnifyRubyHits(const KFCRowsByChapter& rows, const PMString& reading, PMString& outStatus);
+
 	/** Can Tate-chu-yoko be offered on a row (CanClearOverridesHit's rule, a Kohaku+ list's text rows let in) - the menu's grey (B7). */
 	bool CanTcyHit(int32 chapterIdx, int32 hitIdx);
 

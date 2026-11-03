@@ -692,7 +692,7 @@ namespace
 				if (asked.mark != 0)
 				{
 					label.AppendW(UTF32TextChar(0x300A));
-					label.AppendW(KFCKentenMarkCharacter(asked.mark));
+					label.AppendW(KFCKentenMarkCharacter(asked.mark, asked.markChar));		// (custom: the character it asks for - 2026-11-03, C6)
 					label.AppendW(UTF32TextChar(0x300B));
 				}
 			}
@@ -725,18 +725,12 @@ namespace
 			}
 			else if (asked.kind == kKFCRubyFindVaries)
 			{
-				// INCONSISTENT RUBY (the author's proposal 3): what Base Text and Ruby: narrow it to, after the kind.
+				// INCONSISTENT RUBY (the author's proposal 3): what Base Text narrows it to, after the kind (Ruby: is not read - 11-03, KFCRubySearch.cpp's WalkVaries).
 				label.Append("[Inconsistent Ruby]");
-				if (!asked.base.IsEmpty() || !asked.reading.IsEmpty())
+				if (!asked.base.IsEmpty())
 				{
 					label.Append(" ");
 					label.Append(asked.base);
-					if (!asked.reading.IsEmpty())
-					{
-						label.AppendW(UTF32TextChar(0x300A));		// the book title marks, as a row writes a reading
-						label.Append(asked.reading);
-						label.AppendW(UTF32TextChar(0x300B));
-					}
 				}
 			}
 			else if (asked.kind == kKFCRubyFindMarks)

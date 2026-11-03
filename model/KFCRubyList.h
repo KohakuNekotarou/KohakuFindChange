@@ -73,12 +73,25 @@ namespace KFCRubyList
 	struct Readings
 	{
 		std::map<std::u32string, std::map<std::u32string, int32> >	byWord;
+		// ...and each reading as the page has it at its first place (2026-11-03 - a heading's and an "unify" item's words: the folded reading is how the search compares, not what the person wrote - spaces
+		// out, the characters as they stand).
+		std::map<std::u32string, std::map<std::u32string, std::u32string> >	shown;
 
 		/** Is the word read two ways or more? */
 		bool Varies(const std::u32string& word) const
 		{
 			const std::map<std::u32string, std::map<std::u32string, int32> >::const_iterator it = byWord.find(word);
 			return it != byWord.end() && it->second.size() >= 2;
+		}
+
+		/** A reading of the word as the page has it - the folded one itself when it was never counted. */
+		std::u32string Shown(const std::u32string& word, const std::u32string& reading) const
+		{
+			const std::map<std::u32string, std::map<std::u32string, std::u32string> >::const_iterator w = shown.find(word);
+			if (w == shown.end())
+				return reading;
+			const std::map<std::u32string, std::u32string>::const_iterator r = w->second.find(reading);
+			return (r != w->second.end()) ? r->second : reading;
 		}
 	};
 

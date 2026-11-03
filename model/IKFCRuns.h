@@ -220,6 +220,9 @@ public:
 	virtual bool TcyRows(const KFCRowsByChapter& rows, PMString& outStatus) = 0;
 	/** = KFCReplaceEngine::CanTcyHit (appended) - can Tate-chu-yoko be offered on the row (the menu's grey - B7). */
 	virtual bool CanTcyHit(int32 chapterIdx, int32 hitIdx) = 0;
+	/** = KFCReplaceEngine::UnifyRubyHits (appended, under the list's query - 2026-11-03) - an Inconsistent Ruby list's rows given one of their word's readings in one undoable step (a heading's or a
+	    row's right-click "unify"). True = something written; outStatus says what. */
+	virtual bool UnifyRubyRows(const KFCRowsByChapter& rows, const PMString& reading, PMString& outStatus) = 0;
 };
 
 #endif // __IKFCRuns_h__

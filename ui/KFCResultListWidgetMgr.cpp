@@ -1160,7 +1160,7 @@ bool KFCResultTree::CanReplaceAny(const KFCRowsByChapter& rows)
 	return AnyRowCan(rows, [](int32 chapter, int32 hit) { return KFCRuns()->CanReplaceHit(chapter, hit); });
 }
 
-bool KFCResultTree::ReplaceRows(const KFCRowsByChapter& rows, PMString* outStatus)
+bool KFCResultTree::ReplaceRows(const KFCRowsByChapter& rows, PMString* outStatus, const PMString* unifyTo)
 {
 	// NOT WHILE A LANDING IS UNDER WAY (KFCJump::IsLanding - its message loop can dispatch a Return or a menu item): a write
 	// inside the landing's dirty guard is marked clean when the landing ends, and the next Hide Previous Chapter sweep then
@@ -1190,6 +1190,7 @@ bool KFCResultTree::ReplaceRows(const KFCRowsByChapter& rows, PMString* outStatu
 	// ReplaceObjectRow, the model's ReplaceRows to ReplaceHit).
 	const bool wrote = (KFCResults()->GetHitItem(shownChapter, shownHit) != kInvalidUID)
 		? KFCJump::ReplaceObjectRows(rows, shownChapter, shownHit, status)
+		: (unifyTo != nil) ? KFCRuns()->UnifyRubyRows(rows, *unifyTo, status)		// (an Inconsistent Ruby row's "unify" - 11-03)
 		: KFCRuns()->ReplaceRows(rows, status);	// no prompt (the author's call)
 	KFC_DIAG_LOG("RETFOCUS ReplaceRows after the write focus=%s", DiagKeyFocus().c_str());
 	// A WRITE INTO A DOCUMENT THAT HAS NO WINDOW (Search: = All Documents): it goes through and nothing opens one - the
@@ -1222,6 +1223,86 @@ bool KFCResultTree::ReplaceRows(const KFCRowsByChapter& rows, PMString* outStatu
 	if (outStatus != nil)
 		*outStatus = status;
 	return wrote;
+}
+
+bool KFCResultTree::UnifyReadingsOf(const NodeID& row, PMString& outWord, std::vector<PMString>& outReadings)
+{
+	outWord.Clear();
+	outReadings.clear();
+	TreeNodePtr<KFCResultNodeID> node(row);
+	if (node == nil || !(node->IsHitRow() || node->IsFontRow()))
+		return false;
+	PMString joined;
+	if (!KFCResults()->GetUnifyFacts(node->GetChapter(), node->GetFont(), node->IsHitRow() ? node->GetHit() : -1, outWord, joined))
+		return false;
+	// Tab-separated (KFCResultModel::Hit::otherReadings): split as UTF-8 - a tab is one byte there, never part of another character's.
+	const std::string all(joined.GetUTF8String());
+	std::string::size_type from = 0;
+	while (from <= all.size())
+	{
+		const std::string::size_type tab = all.find('\t', from);
+		const std::string one(all.substr(from, (tab == std::string::npos) ? std::string::npos : tab - from));
+		if (!one.empty())
+		{
+			PMString reading;
+			reading.SetUTF8String(one);
+			reading.SetTranslatable(kFalse);
+			outReadings.push_back(reading);
+		}
+		if (tab == std::string::npos)
+			break;
+		from = tab + 1;
+	}
+	return !outReadings.empty();
+}
+
+bool KFCResultTree::UnifyItemName(const NodeID& row, int32 slot, PMString& outName)
+{
+	outName.Clear();
+	PMString word;
+	std::vector<PMString> readings;
+	if (!UnifyReadingsOf(row, word, readings) || slot < 0 || slot >= static_cast<int32>(readings.size()))
+		return false;
+	// "<<reading>> ni soroeru" (the author's words, 11-03) - from code points: this file is ASCII (memory file-edit-escape-and-newline-traps).
+	static const uint32 kNiSoroeru[] = { 0x306B, 0x305D, 0x308D, 0x3048, 0x308B };
+	outName.AppendW(UTF32TextChar(0x300A));
+	outName.Append(readings[static_cast<size_t>(slot)]);
+	outName.AppendW(UTF32TextChar(0x300B));
+	for (size_t c = 0; c < sizeof(kNiSoroeru) / sizeof(kNiSoroeru[0]); ++c)
+		outName.AppendW(UTF32TextChar(kNiSoroeru[c]));
+	outName.SetTranslatable(kFalse);
+	return true;
+}
+
+bool KFCResultTree::UnifyRows(const NodeID& row, int32 slot)
+{
+	PMString word;
+	std::vector<PMString> readings;
+	if (!UnifyReadingsOf(row, word, readings) || slot < 0 || slot >= static_cast<int32>(readings.size()))
+		return false;
+	TreeNodePtr<KFCResultNodeID> node(row);
+	KFCRowsByChapter rows;
+	if (node->IsHitRow())
+		rows = RowsOfRightClick(node->GetChapter(), node->GetHit());
+	else
+		(void)RowsUnder(row, rows);
+	// THE ROWS OF THE ROW'S WORD ALONE: a reading of Tarou is no reading of Gakkou - rows selected together across words write the right-clicked one's alone.
+	KFCRowsByChapter mine;
+	for (size_t c = 0; c < rows.size(); ++c)
+	{
+		KFCChapterRows kept(rows[c].chapter);		// (no row yet)
+		for (size_t k = 0; k < rows[c].hits.size(); ++k)
+		{
+			PMString rowWord, rowReadings;
+			if (KFCResults()->GetUnifyFacts(rows[c].chapter, -1, rows[c].hits[k], rowWord, rowReadings) && rowWord == word)
+				kept.hits.push_back(rows[c].hits[k]);
+		}
+		if (!kept.hits.empty())
+			mine.push_back(kept);
+	}
+	if (mine.empty())
+		return false;
+	return ReplaceRows(mine, nil, &readings[static_cast<size_t>(slot)]);
 }
 
 namespace

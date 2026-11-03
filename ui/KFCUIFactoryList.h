@@ -108,5 +108,3 @@ REGISTER_PMINTERFACE(KFCKohakuTabSelectionObserver, kKFCKohakuTabSelectionObserv
 // The Kohaku+ tab's queries in Find/Change's own Query menu.
 REGISTER_PMINTERFACE(KFCKohakuQueryWatch, kKFCKohakuQueryWatchImpl)
 REGISTER_PMINTERFACE(KFCKohakuSaveFilterEH, kKFCKohakuSaveFilterEHImpl)
-// The Kenten part's sample of the mark its list says (KFCKentenSample.cpp).
-REGISTER_PMINTERFACE(KFCKentenSampleView, kKFCKentenSampleViewImpl)

@@ -668,6 +668,21 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			break;
 		}
 
+		case kKFCUnifyReading0ActionID:
+		case kKFCUnifyReading1ActionID:
+		case kKFCUnifyReading2ActionID:
+		case kKFCUnifyReading3ActionID:
+		case kKFCUnifyReading4ActionID:
+		case kKFCUnifyReading5ActionID:
+		{
+			// UNIFY TO A READING (2026-11-03 - an Inconsistent Ruby list's heading's or row's menu): the reading the item was named for, read off the row again now (KFCResultTree::UnifyRows). No row - the
+			// action pressed by its ActionID: nothing.
+			const NodeID row(RightClickedRow(widget));
+			if (row.IsValid())
+				(void)KFCResultTree::UnifyRows(row, static_cast<int32>(actionID.Get() - kKFCUnifyReading0ActionID));
+			break;
+		}
+
 		case kKFCSearchStoryAgainActionID:
 		{
 			// A story row's right-click menu - the row it was popped over. No story row: do nothing.
@@ -1082,6 +1097,22 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 				const bool enable = RightClickedHit(widget, chapter, hit)
 					&& KFCResultTree::CanReplaceAny(KFCResultTree::RowsOfRightClick(chapter, hit));
 				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
+				break;
+			}
+			case kKFCUnifyReading0ActionID:
+			case kKFCUnifyReading1ActionID:
+			case kKFCUnifyReading2ActionID:
+			case kKFCUnifyReading3ActionID:
+			case kKFCUnifyReading4ActionID:
+			case kKFCUnifyReading5ActionID:
+			{
+				// UNIFY TO A READING (2026-11-03): named for the reading of the row's word it gives - "<<reading>> ni soroeru" - while the row has it (a run standing greys everything, above). What
+				// refuses a write (Find Only, a locked row) is said when pressed, as Replace's refusals are.
+				PMString name;
+				const bool named = KFCResultTree::UnifyItemName(RightClickedRow(widget), static_cast<int32>(action.Get() - kKFCUnifyReading0ActionID), name);
+				if (named)
+					listToUpdate->SetNthActionName(i, name);
+				listToUpdate->SetNthActionState(i, named ? kEnabledAction : kDisabled_Unselected);
 				break;
 			}
 			case kKFCSearchStoryAgainActionID:

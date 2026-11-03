@@ -68,6 +68,7 @@
 #include "KFCKohakuTab.h"		// IsJapaneseUI - a text row's Tate-chu-yoko, a Japanese InDesign's alone
 
 #include <cstring>				// strcmp - which menu pops
+#include <vector>				// a row's word's other readings (KFCResultTree::UnifyReadingsOf)
 
 namespace
 {
@@ -101,6 +102,23 @@ void PopRowMenu(const char* menuName, IEvent* e, IPMUnknown* widget)
 		menuMgr->RemoveMenuItem(path, kKFCTcyTextActionID);
 		if (KFCKohakuTab::IsJapaneseUI())
 			menuMgr->AddMenuItem(kKFCTcyTextActionID, path, kKFCTcyTextMenuItemPosition, kFalse);
+	}
+	// UNIFY TO A READING (2026-11-03 - the author: an Inconsistent Ruby list's heading and rows offer their word's other readings, "<<tarou>> ni soroeru"): on a hit row's and a story row's menus,
+	// under Replace, an item a reading the row's word has besides its own - taken off first, then put, as Tate-chu-yoko; named as the menu draws them (KFCActionComponent's UpdateActionStates).
+	if (std::strcmp(menuName, kKFCResultHitMenuName) == 0 || std::strcmp(menuName, kKFCResultStoryMenuName) == 0)
+	{
+		static const ActionID kUnify[kKFCUnifyReadingItems] = { kKFCUnifyReading0ActionID, kKFCUnifyReading1ActionID, kKFCUnifyReading2ActionID,
+			kKFCUnifyReading3ActionID, kKFCUnifyReading4ActionID, kKFCUnifyReading5ActionID };
+		PMString path(menuName);
+		path.SetTranslatable(kFalse);
+		for (int32 k = 0; k < kKFCUnifyReadingItems; ++k)
+			menuMgr->RemoveMenuItem(path, kUnify[k]);
+		InterfacePtr<const ITreeNodeIDData> nodeData(widget, UseDefaultIID());
+		PMString word;
+		std::vector<PMString> readings;
+		if (nodeData != nil && KFCResultTree::UnifyReadingsOf(nodeData->Get(), word, readings))
+			for (int32 k = 0; k < kKFCUnifyReadingItems && k < static_cast<int32>(readings.size()); ++k)
+				menuMgr->AddMenuItem(kUnify[k], path, PMReal(kKFCUnifyReadingMenuItemPosition + 0.01 * k), kFalse);
 	}
 	menuMgr->HandlePopupMenu(menuName, e->GlobalWhere(), e->GlobalWhere(), removeDisabledItems, widget);
 }

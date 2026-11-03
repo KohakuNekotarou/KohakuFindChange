@@ -243,18 +243,6 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	},
 
 	/*
-	 * THE KENTEN PART'S SAMPLE: a generic panel widget whose view draws the mark its list says, the shape a kenten row draws (KFCKentenSample.cpp).
-	 */
-	Class
-	{
-		kKFCKentenSampleWidgetBoss,
-		kGenericPanelWidgetBoss,
-		{
-			IID_ICONTROLVIEW, kKFCKentenSampleViewImpl,
-		}
-	},
-
-	/*
 	 * THE RUBY AND KENTEN PARTS' ICONS (KFCSwitchIcon.cpp): a toggling icon button as InDesign's Text tab's own (kIncludeHiddenLayersROButtonWidgetBoss and its fellows - their own bosses write InDesign's settings, so not those), with their tips.
 	 */
 	Class
@@ -1965,6 +1953,62 @@ resource ActionDef (kSDKDefActionResourceID)
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
 
+		// Unify to a reading - an Inconsistent Ruby list's heading's and row's right-click menus (2026-11-03 - the author: "<<tarou>> ni soroeru" on the heading and the rows): no MenuDef - an item a reading the
+		// row's word has besides its own is put on the menu as it pops (KFCResultNodeEH's PopRowMenu). kCustomEnabling: named as it is drawn, "<<reading>> ni soroeru" (UpdateActionStates).
+		kKFCActionComponentBoss,
+		kKFCUnifyReading0ActionID,
+		kKFCRubyUnifyMenuKey,			// "Unify Reading" (its name until it is drawn)
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCUnifyReading1ActionID,
+		kKFCRubyUnifyMenuKey,
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCUnifyReading2ActionID,
+		kKFCRubyUnifyMenuKey,
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCUnifyReading3ActionID,
+		kKFCRubyUnifyMenuKey,
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCUnifyReading4ActionID,
+		kKFCRubyUnifyMenuKey,
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCUnifyReading5ActionID,
+		kKFCRubyUnifyMenuKey,
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
 		// Restore from Copy - a text row's right-click menu, under Replace (the copy-restore spec).
 		// kCustomEnabling: a text row a Replace wrote (CanRestoreAny); why a copy cannot go back it says on the status line.
 		kKFCActionComponentBoss,
@@ -2141,7 +2185,6 @@ type KFCQueryListWidget(kViewRsrcType) : TreeViewWidget(ClassID = kKFCQueryListW
 type KFCQueryRowWidget(kViewRsrcType) : PrimaryResourcePanelWidget(ClassID = kKFCQueryRowWidgetBoss) { };
 type KFCQueryRowTextWidget(kViewRsrcType) : InfoStaticTextWidget(ClassID = kKFCQueryRowTextWidgetBoss) { };
 type KFCQueryFixedTextWidget(kViewRsrcType) : EVEStaticTextWidget(ClassID = kKFCQueryFixedTextWidgetBoss) { };
-type KFCKentenSampleWidget(kViewRsrcType) : EVEGenericPanelWidget(ClassID = kKFCKentenSampleWidgetBoss) { };
 type KFCSwitchIconWidget(kViewRsrcType) : EVERollOverIconButtonWidget(ClassID = kKFCSwitchIconWidgetBoss) { };
 // The value dialogs (KFCSpecialDialogs.cpp): DialogBoss with WidgetEveInfo, as the query dialog - EVE lays them out.
 type KFCValueDialogWidget(kViewRsrcType) : DialogBoss(ClassID = kKFCValueDialogBoss)
@@ -3770,9 +3813,9 @@ resource LocaleIndex (kKFCKohakuTabRsrcID)
 /*
  * THE FACE (docs/superpowers/specs/2026-11-02-kfc-kohaku-face-buttons-design.md L1 - L7): two columns, as InDesign's own faces stand (measured on its Object tab: the face 486 x 356, a margin of 15). ON THE LEFT, 330 wide, all that is set:
  * Find: over its list and Search: over its list (the author, 11-02: "back under Find: and the like"), the line under Search: - Ruby's and Kenten's icons, or Table's words - and under it the part Find: chooses, the parts stacked
- * one on another (KFCKohakuTab.cpp shows one and hides and disables the others: a hidden widget left enabled still takes a click). ON THE RIGHT, 10 further, 116 wide, every button, 116 x 26 and 5 apart: Find Next, Change,
- * Change All, Change/Find (at 15, 46, 77 and 108 from the face's top, as the Object tab's - docs/ai-notes/kfc-native-text-tab-measure-2026-11-01.md), Find in KFC 10 further (where the Object tab has its More Options), and 10
- * further the part's own (the author, 11-02: "Choose, Save, How to, as the other tabs") - Ruby's Choose List..., Save List..., How to Use..., Kenten's How to Use.... UNDER BOTH, the face's two lines, every kind's (L4): what a
+ * one on another (KFCKohakuTab.cpp shows one and hides and disables the others: a hidden widget left enabled still takes a click). ON THE RIGHT, 10 further, 116 wide, every button, 116 x 26 and 5 apart: Find in KFC at
+ * the top (15 - the author, 11-03), 10 under it Find Next, Change, Change All, Change/Find (51, 82, 113 and 144 - until 11-03 at 15, 46, 77 and 108, as the Object tab's: docs/ai-notes/kfc-native-text-tab-measure-2026-11-01.md),
+ * and 10 further the part's own (the author, 11-02: "Choose, Save, How to, as the other tabs") - Ruby's Choose List..., Save List..., How to Use..., Kenten's How to Use.... UNDER BOTH, the face's two lines, every kind's (L4): what a
  * button or the list said, and why what was found could not be selected. No Done: the dialog's frame has one on every tab (QR-24 - measured).
  */
 resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
@@ -3964,7 +4007,8 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 									kTrue, kTrue,
 									kEVEAlignLeft | kEVENoSpaceAfter | kEVEArrangeChildrenInColumn | kEVENoMargin,
 									{
-										// Look For: [Text With Ruby]
+										// Look For: [Text With Ruby] - its entries in Japanese as the face is shown (2026-11-03 - the author: "the Look For list in Japanese"; KFCKohakuTab.cpp's ShowRubyKindEntries): these are the order and a
+										// fallback.
 										EVEGenericPanelWidget
 										(
 											kInvalidWidgetID, kPMRsrcID_None,
@@ -4006,7 +4050,7 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 										(
 											kKFCRubyGridWidgetID, kPMRsrcID_None,
 											kBindNone,
-											Frame(0, 0, 330, 116)
+											Frame(0, 0, 330, 137)		// (137, not 116, since 11-03 - Find Only under the boxes: the parts at 138, Look For: 21 and 5, this - the face's two lines at 306 and 323, their end at 340, in the 356 of InDesign's faces less its margin of 15)
 											kTrue, kTrue,
 											kEVEAlignLeft | kEVENoSpaceAfter | kEVEDontArrangeChildren | kEVENoMargin,
 											{
@@ -4142,11 +4186,25 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 												KFC_RUBY_WORDS(kKFCRubyChangeBase5WidgetID),
 												KFC_RUBY_WORDS(kKFCRubyChangeBase6WidgetID),
 												KFC_RUBY_WORDS(kKFCRubyChangeBase7WidgetID),
+												// FIND ONLY (2026-11-03 - the author: "Ruby too, a search that does not replace - a check box?"; "Find Only on the left"): at the part's left, the labels' column, under what the part shows
+												// (LayOutRubyGrid - the boxes', here), whatever Look For says - on, nothing is written. Last, so Tab comes to it after the boxes.
+												EVECheckBoxWidget
+												(
+													kKFCRubyFindOnlyWidgetID, kSysCheckBoxPMRsrcId, kBindNone,
+													Frame(0, 118, 215, 137)
+													kTrue, kTrue, kAlignLeft,
+													kKFCRubyTabFindOnlyKey,		// "Find Only"
+													kEVENoSpaceAfter,
+												),
 											}
 										),
 									}
 								),
-								// KENTEN: the Ruby part's column. An entry of Kenten: and of Change Kenten To: is its IKentenStyle::KentenKind (Change Kenten To: has no Custom - a mark of the person's glyph takes more than a name).
+								// KENTEN: the Ruby part's column. Kenten: and Change Kenten To: list the kinds as InDesign's kenten dialog does (2026-11-03 - the author: "kenten is Japanese, so Japanese words";
+								// docs/superpowers/specs/2026-11-03-kfc-kenten-face-japanese-design.md J1 - J3): ITS OWN KEYS, translated by its own tables - none, the ten kinds, custom - after the first entry, [Any] or
+								// [Leave], whose Japanese the face writes in (KFCKohakuTab.cpp). An entry k + 1 is the IKentenStyle::KentenKind k; entry 1, none, is Text Without Kenten on Kenten: and the marks taken
+								// off on Change Kenten To: (N1, N2 - Look For and Remove Kenten went). Beside each list a box of one character, a custom mark's (C1). THE THREE ROWS' FIELDS STAND ONE OVER THE OTHER
+								// (the author, 11-03 - A2): every label 115 wide (Change Kenten To: is 115 in the dialog's font - measured; at 110 EVE widened its own and pushed its list 5 right), every field 170.
 								EVEGenericPanelWidget
 								(
 									kKFCKohakuKentenSectionWidgetID, kPMRsrcID_None,
@@ -4155,7 +4213,7 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 									kTrue, kTrue,
 									kEVEAlignLeft | kEVENoSpaceAfter | kEVEArrangeChildrenInColumn | kEVENoMargin,
 									{
-										// Look For: [Text With Kenten]
+										// Base Text: [ ] - as wide as the lists under it.
 										EVEGenericPanelWidget
 										(
 											kInvalidWidgetID, kPMRsrcID_None,
@@ -4167,39 +4225,7 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 												EVEStaticTextWidget
 												(
 													kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone,
-													Frame(0, 0, 110, 21)
-													kTrue, kTrue, kAlignRight,
-													kDontEllipsize, kTrue,
-													kKFCRubyTabLookForKey,
-													0,
-													kEVERegularSpaceAfter,
-												),
-												EVEDropDownListWidget
-												(
-													kKFCKentenTabKindWidgetID, kSysDropDownPMRsrcId, kBindNone,
-													Frame(0, 0, 170, 21)
-													kTrue, kTrue,
-													{{
-														kKFCKentenTabWithKey,
-														kKFCKentenTabWithoutKey,
-													}}
-													kEVENoSpaceAfter,
-												),
-											}
-										),
-										// Base Text: [ ] - as wide as the left column lets it (the buttons' column stands beside it).
-										EVEGenericPanelWidget
-										(
-											kInvalidWidgetID, kPMRsrcID_None,
-											kBindNone,
-											Frame(0, 0, 330, 21)
-											kTrue, kTrue,
-											kEVEAlignLeft | kEVERegularSpaceAfter | kEVEArrangeChildrenInRow | kEVENoMargin,
-											{
-												EVEStaticTextWidget
-												(
-													kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone,
-													Frame(0, 0, 110, 21)
+													Frame(0, 0, 115, 21)
 													kTrue, kTrue, kAlignRight,
 													kDontEllipsize, kTrue,
 													kKFCRubyTabBaseKey,
@@ -4209,7 +4235,7 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 												EVETextEditBoxWidget
 												(
 													kKFCKentenTabBaseWidgetID, kSysEditBoxPMRsrcId, kBindNone,
-													Frame(0, 0, 215, 0)
+													Frame(0, 0, 170, 0)
 													kTrue, kTrue,
 													kInvalidWidgetID,
 													1.0, 10.0,
@@ -4224,7 +4250,7 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 												),
 											}
 										),
-										// Kenten: [Any Kenten]
+										// Kenten: [[Any]] [ ]
 										EVEGenericPanelWidget
 										(
 											kInvalidWidgetID, kPMRsrcID_None,
@@ -4236,7 +4262,7 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 												EVEStaticTextWidget
 												(
 													kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone,
-													Frame(0, 0, 110, 21)
+													Frame(0, 0, 115, 21)
 													kTrue, kTrue, kAlignRight,
 													kDontEllipsize, kTrue,
 													kKFCKentenTabMarkKey,
@@ -4250,46 +4276,54 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 													kTrue, kTrue,
 													{{
 														kKFCKentenTabAnyMarkKey,
-														kKFCKentenSesameKey,
-														kKFCKentenWhiteSesameKey,
-														kKFCKentenFisheyeKey,
-														kKFCKentenBlackCircleKey,
-														kKFCKentenSmallBlackKey,
-														kKFCKentenBullseyeKey,
-														kKFCKentenTriBlackKey,
-														kKFCKentenTriOpenKey,
-														kKFCKentenWhiteCircleKey,
-														kKFCKentenSmallWhiteKey,
-														kKFCKentenCustomKey,
+														"None",
+														"Black sesame",
+														"White sesame",
+														"Fisheye",
+														"Black circle",
+														"Small black circle",
+														"Bullseye",
+														"Black triangle",
+														"White triangle",
+														"White circle",
+														"Small white circle",
+														"Custom",
 													}}
 													kEVERegularSpaceAfter,
 												),
-												// The mark the list says (the author, 11-02): a name alone does not say what a Fisheye looks like.
-												KFCKentenSampleWidget
+												// The custom mark's character it asks for (C1 - C4). Its box takes more than one character: the face keeps the newer (KFCKohakuTab.cpp's SettleKentenBoxes), a limit would drop
+												// what an input method confirms before the face hears of it (the Ruby part's base boxes' reason).
+												EVETextEditBoxWidget
 												(
-													kKFCKentenMarkSampleWidgetID, kPMRsrcID_None,
-													kBindNone,
-													Frame(0, 0, 30, 21)
+													kKFCKentenMarkCharWidgetID, kSysEditBoxPMRsrcId, kBindNone,
+													Frame(0, 0, 30, 0)
 													kTrue, kTrue,
-													kEVEAlignLeft | kEVENoSpaceAfter | kEVEDontArrangeChildren | kEVENoMargin,
-													{
-													}
+													kInvalidWidgetID,
+													1.0, 10.0,
+													0,
+													kFalse,
+													kTrue,
+													kFalse,
+													kTrue,
+													0, 0,
+													"",
+													kEVENoSpaceAfter,
 												),
 											}
 										),
-										// Change Kenten To: [Leave As It Is]
+										// Change Kenten To: [[Leave]] [ ]
 										EVEGenericPanelWidget
 										(
 											kInvalidWidgetID, kPMRsrcID_None,
 											kBindNone,
 											Frame(0, 0, 330, 21)
 											kTrue, kTrue,
-											kEVEAlignLeft | kEVERegularSpaceAfter | kEVEArrangeChildrenInRow | kEVENoMargin,
+											kEVEAlignLeft | kEVENoSpaceAfter | kEVEArrangeChildrenInRow | kEVENoMargin,
 											{
 												EVEStaticTextWidget
 												(
 													kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone,
-													Frame(0, 0, 110, 21)
+													Frame(0, 0, 115, 21)
 													kTrue, kTrue, kAlignRight,
 													kDontEllipsize, kTrue,
 													kKFCKentenTabChangeKey,
@@ -4303,38 +4337,39 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 													kTrue, kTrue,
 													{{
 														kKFCTableTabLeaveStyleKey,
-														kKFCKentenSesameKey,
-														kKFCKentenWhiteSesameKey,
-														kKFCKentenFisheyeKey,
-														kKFCKentenBlackCircleKey,
-														kKFCKentenSmallBlackKey,
-														kKFCKentenBullseyeKey,
-														kKFCKentenTriBlackKey,
-														kKFCKentenTriOpenKey,
-														kKFCKentenWhiteCircleKey,
-														kKFCKentenSmallWhiteKey,
+														"None",
+														"Black sesame",
+														"White sesame",
+														"Fisheye",
+														"Black circle",
+														"Small black circle",
+														"Bullseye",
+														"Black triangle",
+														"White triangle",
+														"White circle",
+														"Small white circle",
+														"Custom",
 													}}
 													kEVERegularSpaceAfter,
 												),
-												KFCKentenSampleWidget
+												// The character Change Kenten To: custom gives (C1 - C3, C5).
+												EVETextEditBoxWidget
 												(
-													kKFCKentenChangeSampleWidgetID, kPMRsrcID_None,
-													kBindNone,
-													Frame(0, 0, 30, 21)
+													kKFCKentenChangeCharWidgetID, kSysEditBoxPMRsrcId, kBindNone,
+													Frame(0, 0, 30, 0)
 													kTrue, kTrue,
-													kEVEAlignLeft | kEVENoSpaceAfter | kEVEDontArrangeChildren | kEVENoMargin,
-													{
-													}
+													kInvalidWidgetID,
+													1.0, 10.0,
+													0,
+													kFalse,
+													kTrue,
+													kFalse,
+													kTrue,
+													0, 0,
+													"",
+													kEVENoSpaceAfter,
 												),
 											}
-										),
-										EVECheckBoxWidget
-										(
-											kKFCKentenTabRemoveWidgetID, kSysCheckBoxPMRsrcId, kBindNone,
-											Frame(0, 0, 200, 19)
-											kTrue, kTrue, kAlignLeft,
-											kKFCKentenTabRemoveWordKey,
-											kEVENoSpaceAfter,
 										),
 									}
 								),
@@ -4352,6 +4387,29 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 					kTrue, kTrue,
 					kEVEAlignLeft | kEVENoSpaceAfter | kEVEArrangeChildrenInColumn | kEVENoMargin,
 					{
+						// FIND IN KFC (the author, 11-02: "Find For KFC" - the panel's Find, the panel opened first when it is closed), every kind's - AT THE TOP (the author, 11-03: "Find in KFC at the very top"; the
+						// tab is for the panel's list first), 10 over the four.
+						EVEGenericPanelWidget
+						(
+							kInvalidWidgetID, kPMRsrcID_None,
+							kBindNone,
+							Frame(0, 0, 116, 26)
+							kTrue, kTrue,
+							kEVEAlignLeft | kEVELargeSpaceAfter | kEVEArrangeChildrenStacked | kEVENoMargin,
+							{
+								KFCQueryFixedTextWidget(kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone, Frame(0, 0, 116, 26) kTrue, kTrue, kAlignLeft, kEllipsizeEnd, kFalse, "", kInvalidWidgetID kEVENoSpaceAfter,),
+								EVEButtonWidget
+								(
+									kKFCKohakuFindInKFCWidgetID,	// WidgetId
+									kSysButtonPMRsrcId,
+									kBindNone,
+									Frame(0, 0, 116, 26)
+									kTrue, kTrue,
+									kKFCKohakuFindInKFCKey,			// "Find in KFC"
+									kEVENoSpaceAfter,
+								),
+							}
+						),
 						EVEGenericPanelWidget
 						(
 							kInvalidWidgetID, kPMRsrcID_None,
@@ -4432,28 +4490,6 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 									Frame(0, 0, 116, 26)
 									kTrue, kTrue,
 									kKFCTableTabChangeFindKey,		// "Change/Find"
-									kEVENoSpaceAfter,
-								),
-							}
-						),
-						// FIND IN KFC (the author, 11-02: "Find For KFC" - the panel's Find, the panel opened first when it is closed), every kind's, 10 under the four - where InDesign's tabs have their More Options.
-						EVEGenericPanelWidget
-						(
-							kInvalidWidgetID, kPMRsrcID_None,
-							kBindNone,
-							Frame(0, 0, 116, 26)
-							kTrue, kTrue,
-							kEVEAlignLeft | kEVELargeSpaceAfter | kEVEArrangeChildrenStacked | kEVENoMargin,
-							{
-								KFCQueryFixedTextWidget(kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone, Frame(0, 0, 116, 26) kTrue, kTrue, kAlignLeft, kEllipsizeEnd, kFalse, "", kInvalidWidgetID kEVENoSpaceAfter,),
-								EVEButtonWidget
-								(
-									kKFCKohakuFindInKFCWidgetID,	// WidgetId
-									kSysButtonPMRsrcId,
-									kBindNone,
-									Frame(0, 0, 116, 26)
-									kTrue, kTrue,
-									kKFCKohakuFindInKFCKey,			// "Find in KFC"
 									kEVENoSpaceAfter,
 								),
 							}

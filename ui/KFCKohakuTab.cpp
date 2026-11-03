@@ -19,6 +19,7 @@
 #include "IEditBoxAttributes.h"			// SelectRange - a base box's caret, when what was typed goes on into it
 #include "IEventHandler.h"				// ...the focus's handler
 #include "ISaveFileDialog.h"			// (and DocumentID.h - kSaveFileDialogBoss) Save List...'s file
+#include "IKentenStyle.h"				// Kenten_Custom - the Kenten part's boxes take a character while its lists say it
 #include "IKeyBoard.h"
 #include "IObserver.h"					// the selection observer, attached with the face
 #include "IPanelMgr.h"					// Find in KFC: the panel shown first when it is closed
@@ -291,8 +292,8 @@ int32 TextModeOfKind()
 	return (gKind == kKindKenten) ? static_cast<int32>(kKFCKentenSearchMode) : (gKind == kKindWarichu) ? static_cast<int32>(kKFCWarichuSearchMode) : static_cast<int32>(kKFCRubySearchMode);
 }
 
-// DOES THE KIND'S CHANGE SIDE ASK ANYTHING (B5)? Table: a style, or Clear Overrides. Ruby: with Text Without Ruby a reading in a Change Ruby To box; with the rest always - no reading takes the ruby off (the author,
-// 11-01), a mark is made ruby, a list's word gets its reading. Kenten: Change Kenten To or Remove Kenten.
+// DOES THE KIND'S CHANGE SIDE ASK ANYTHING (B5)? Table: a style, or Clear Overrides. Ruby: nothing with Find Only (11-03); with Text Without Ruby a reading in a Change Ruby To box; with the rest always - no reading
+// takes the ruby off (the author, 11-01), a mark is made ruby, a list's word gets its reading. Kenten: a kind in Change Kenten To, or its none - custom with a character in its box (11-03 - C5).
 bool ChangeSideAsks()
 {
 	switch (gKind)
@@ -300,6 +301,8 @@ bool ChangeSideAsks()
 		case kKindTable:
 			return !gTable.changeStyle.IsEmpty() || gTable.clearOverrides;
 		case kKindRuby:
+			if (gRuby.findOnly)
+				return false;
 			if (gRuby.kind != kKFCRubyFindWithout)
 				return true;
 			for (size_t p = 0; p < gRuby.change.size(); ++p)
@@ -307,7 +310,7 @@ bool ChangeSideAsks()
 					return true;
 			return false;
 		case kKindKenten:
-			return gKenten.changeTo != 0 || gKenten.removeKenten;
+			return gKenten.ChangeSideAsks();
 		default:
 			return false;
 	}
@@ -789,7 +792,8 @@ void PlaceGridWidget(IPanelControlData* panel, const WidgetID& widget, bool show
 }
 
 // THE GRID AS THE COLUMNS AND THE JOINS NOW SAY (the frames set here, no EVE layout: the window keeps its size - InDesign's LinkInfoPanelObserver places its widgets the same way). Each column's base box and its words on the Change side are its own; a reading box - Find's, and
-// Change's, which follow it (the author, 11-01) - runs over the columns joined to it, and the boxes it runs over are away. GREY: Find's Ruby: with Text Without Ruby, whose search has no reading; and all of it with the part hidden.
+// Change's, which follow it (the author, 11-01) - runs over the columns joined to it, and the boxes it runs over are away. GREY: Find's Ruby:, its label too, with Text Without Ruby, whose search has no reading, and with
+// Inconsistent Ruby, whose search reads none (11-03 - the author: "not needed - grey, no typing in it"; KFCRubySearch.cpp's WalkVaries); and all of it with the part hidden.
 void LayOutRubyGrid(IPanelControlData* panel)
 {
 	const bool part = (gKind == kKindRuby);
@@ -797,16 +801,21 @@ void LayOutRubyGrid(IPanelControlData* panel)
 	const bool listing = part && gRuby.kind == kKFCRubyFindList;
 	// NOR DOES RUBY MARKS IN TEXT (the author, 11-02: "not needed? then hide them"): the reading is in the mark, and every mark is a row - a row's own Replace is how one is left out. They go, and what they hold asks nothing of it (KFCRubySearch.cpp's WalkMarks).
 	const bool boxes = !listing && !(part && gRuby.kind == kKFCRubyFindMarks);
-	const bool findReads = part && gRuby.kind != kKFCRubyFindWithout;
-	PlaceGridWidget(panel, kKFCRubyGridLabelReadingWidgetID, boxes, part, 0, 0, 110, 21);
+	const bool findReads = part && gRuby.kind != kKFCRubyFindWithout && gRuby.kind != kKFCRubyFindVaries;
+	// FIND ONLY (2026-11-03) greys the Change side - its label, its boxes and the base text under them - and stands at the part's left (the author: "on the left"), under what the part shows: the boxes, a
+	// list's three lines, or, with the marks, nothing.
+	const bool changes = part && !gRuby.findOnly;
+	const int32 findOnlyTop = boxes ? 118 : listing ? 76 : 0;
+	PlaceGridWidget(panel, kKFCRubyGridLabelReadingWidgetID, boxes, findReads, 0, 0, 110, 21);
 	PlaceGridWidget(panel, kKFCRubyGridLabelBaseWidgetID, boxes, part, 0, 41, 110, 62);
-	PlaceGridWidget(panel, kKFCRubyGridLabelChangeWidgetID, boxes, part, 0, 72, 110, 93);
-	PlaceGridWidget(panel, kKFCRubyGridLabelChangeBaseWidgetID, boxes, part, 0, 96, 110, 116);
+	PlaceGridWidget(panel, kKFCRubyGridLabelChangeWidgetID, boxes, changes, 0, 72, 110, 93);
+	PlaceGridWidget(panel, kKFCRubyGridLabelChangeBaseWidgetID, boxes, changes, 0, 96, 110, 116);
 	PlaceGridWidget(panel, kKFCRubyListLabelWidgetID, listing, listing, 0, 0, 110, 21);
 	PlaceGridWidget(panel, kKFCRubyListNameWidgetID, listing, listing, 115, 0, 330, 21);
 	PlaceGridWidget(panel, kKFCRubyListFirstLabelWidgetID, listing, listing, 0, 26, 110, 47);
 	PlaceGridWidget(panel, kKFCRubyListFirstWidgetID, listing, listing, 115, 26, 285, 47);
 	PlaceGridWidget(panel, kKFCRubyListOtherRubyWidgetID, listing, listing, 115, 52, 330, 71);
+	PlaceGridWidget(panel, kKFCRubyFindOnlyWidgetID, part, part, 0, findOnlyTop, 215, findOnlyTop + 19);
 	ShowRubyButtons(panel);		// (Choose List... is usable with Words in a Ruby List alone)
 	for (int32 k = 0; k < kKFCRubyBoxColumns; ++k)
 	{
@@ -820,8 +829,8 @@ void LayOutRubyGrid(IPanelControlData* panel)
 		const int32 columnRight = stands ? GridColumnLeft(k + 1) - kGridBoxGap : 0;
 		PlaceGridWidget(panel, ReadingBoxID(k), stands && !overLeft, findReads, left, 0, readingRight, 21);
 		PlaceGridWidget(panel, BaseBoxID(k), stands, part, left, 41, columnRight, 62);
-		PlaceGridWidget(panel, ChangeBoxID(k), stands && !overLeft, part, left, 72, readingRight, 93);
-		PlaceGridWidget(panel, ChangeBaseID(k), stands, part, left, 96, columnRight, 116);
+		PlaceGridWidget(panel, ChangeBoxID(k), stands && !overLeft, changes, left, 72, readingRight, 93);
+		PlaceGridWidget(panel, ChangeBaseID(k), stands, changes, left, 96, columnRight, 116);
 		if (k + 1 < kKFCRubyBoxColumns)
 		{
 			const bool between = boxes && (k + 1 < gCols);
@@ -1091,6 +1100,7 @@ void SpreadBaseBox(IPanelControlData* panel, int32 k, const PMString& typed)
 // still composing, asked again a little later.
 ICallbackTimer* gSettleTimer = nil;		// made on first use; given back by ShutdownCleanup (its callback is a raw pointer into this .pln)
 uint32 gPendingBase = 0;				// bit k: base box k changed since it was last settled
+uint32 gPendingKenten = 0;				// the Kenten part's boxes of a custom mark's character (2026-11-03 - C2), the same: bit 0 Kenten:'s, bit 1 Change Kenten To:'s
 const uint32 kSettleComposingMs = 100;	// while the person composes: asked again this much later (the callback's return re-arms it - measured on 21.0, memory icallbacktimer)
 const uint32 kSettleArrivingMs = 30;	// while characters are still on their way: the same, sooner
 
@@ -1106,11 +1116,74 @@ bool InputStillArriving()
 		|| ::PeekMessageW(&msg, nullptr, WM_IME_CHAR, WM_IME_CHAR, PM_NOREMOVE | PM_NOYIELD) != FALSE;
 }
 
+// A custom mark's character as a box holds it: the character, or nothing.
+PMString CharWords(int32 customChar)
+{
+	PMString words;
+	words.SetTranslatable(kFalse);
+	if (customChar > 0)
+		words.AppendW(UTF32TextChar(static_cast<uint32>(customChar)));
+	return words;
+}
+
+// A KENTEN BOX SETTLED (C2, C3): ONE CHARACTER, THE NEWER - what the box held before taken out of what it holds now, and the first of the rest (given "XY" over "X", it keeps "Y"; "XY" pasted in empty, "X"),
+// a space no character of it, a mark that belongs to a character dropped with it (InDesign keeps one 16-bit character, nothing after it). One InDesign cannot keep as a custom mark - past U+FFFF - is refused:
+// the box empty, the face's first line says why. THE KEYBOARD stays in the box, its caret after the character: the next key goes on from there, and the next settling keeps that one.
+void SettleKentenBox(IPanelControlData* panel, const WidgetID& widget, int32& ioChar, const char* name)
+{
+	IControlView* const box = (panel != nil) ? panel->FindWidget(widget) : nil;
+	if (box == nil)
+		return;
+	const PMString typed(WordsOf(box));
+	const std::vector<PMString> chars(CharsOf(typed));
+	size_t pick = 0;
+	if (chars.size() > 1 && ioChar > 0)
+	{
+		for (size_t c = 0; c < chars.size(); ++c)
+		{
+			const WideString one(chars[c]);
+			if (one.begin() != one.end() && static_cast<int32>(static_cast<uint32>(*one.begin())) == ioChar)
+			{
+				pick = (c == 0) ? 1 : 0;
+				break;
+			}
+		}
+	}
+	int32 kept = 0;
+	if (!chars.empty())
+	{
+		const WideString one(chars[pick]);
+		kept = (one.begin() != one.end()) ? static_cast<int32>(static_cast<uint32>(*one.begin())) : 0;
+	}
+	if (kept != 0 && !KFCIsCustomKentenCharacter(static_cast<uint32>(kept)))
+	{
+		PMString why("Custom kenten: \"");
+		why.SetTranslatable(kFalse);
+		why.Append(chars[pick]);
+		why.Append("\" cannot be one - InDesign takes a single character up to U+FFFF.");
+		SayFor(kKindKenten, why, PMString());
+		KFC_DIAG_LOG("KENTAB %s refused (from %s)", name, typed.GetUTF8String().c_str());
+		kept = 0;
+	}
+	else
+		KFC_DIAG_LOG("KENTAB %s=%s (from %s)", name, CharWords(kept).GetUTF8String().c_str(), typed.GetUTF8String().c_str());
+	ioChar = kept;
+	const PMString words(CharWords(kept));
+	if (words != typed)
+	{
+		SetField(panel, widget, words);
+		InterfacePtr<IEditBoxAttributes> field(box, UseDefaultIID());
+		if (field != nil)
+			field->SelectRange(words.CharCount(), words.CharCount());
+	}
+}
+
 uint32 SettleBaseBoxes(void* /*refPtr*/)
 {
-	if (gPendingBase == 0 || gShownFace == nil)
+	if ((gPendingBase == 0 && gPendingKenten == 0) || gShownFace == nil)
 	{
 		gPendingBase = 0;
+		gPendingKenten = 0;
 		return IIdleTask::kEndOfTime;
 	}
 	if (InputStillArriving())
@@ -1134,18 +1207,26 @@ uint32 SettleBaseBoxes(void* /*refPtr*/)
 		if (box != nil)
 			SpreadBaseBox(panel, k, WordsOf(box));
 	}
-	KeepFromBoxes();
-	KFC_DIAG_LOG("RUBYTAB base=%s", gRuby.base.GetUTF8String().c_str());
+	if (pending != 0)
+	{
+		KeepFromBoxes();
+		KFC_DIAG_LOG("RUBYTAB base=%s", gRuby.base.GetUTF8String().c_str());
+	}
+	const uint32 kenten = gPendingKenten;
+	gPendingKenten = 0;
+	if ((kenten & 1u) != 0)
+		SettleKentenBox(panel, kKFCKentenMarkCharWidgetID, gKenten.markChar, "markchar");
+	if ((kenten & 2u) != 0)
+	{
+		SettleKentenBox(panel, kKFCKentenChangeCharWidgetID, gKenten.changeChar, "changechar");
+		ShowFaceButtons(panel);		// (custom with no character asks nothing - C5)
+	}
 	return IIdleTask::kEndOfTime;
 }
 
-// A BASE BOX HEARD: what it holds kept as it stands, and its column's words on the Change side - to be spread at the next idle (SettleBaseBoxes).
-void NoteBaseBox(IPanelControlData* panel, int32 k, const PMString& typed)
+// The settling booked for the next idle (SettleBaseBoxes).
+void BookSettling()
 {
-	gCellBase[k] = typed;
-	gCellBase[k].SetTranslatable(kFalse);
-	SetField(panel, ChangeBaseID(k), gCellBase[k]);
-	gPendingBase |= (1u << k);
 	if (gSettleTimer == nil)
 		gSettleTimer = ::CreateObject2<ICallbackTimer>(kCallbackTimerBoss, IID_ICALLBACKTIMER);
 	if (gSettleTimer == nil)
@@ -1157,6 +1238,23 @@ void NoteBaseBox(IPanelControlData* panel, int32 k, const PMString& typed)
 	gSettleTimer->StartTimer(SettleBaseBoxes, 0, nil);
 }
 
+// A BASE BOX HEARD: what it holds kept as it stands, and its column's words on the Change side - to be spread at the next idle (SettleBaseBoxes).
+void NoteBaseBox(IPanelControlData* panel, int32 k, const PMString& typed)
+{
+	gCellBase[k] = typed;
+	gCellBase[k].SetTranslatable(kFalse);
+	SetField(panel, ChangeBaseID(k), gCellBase[k]);
+	gPendingBase |= (1u << k);
+	BookSettling();
+}
+
+// A KENTEN BOX HEARD (bit 1u Kenten:'s, 2u Change Kenten To:'s): settled at the next idle, as a base box is.
+void NoteKentenBox(uint32 bit)
+{
+	gPendingKenten |= bit;
+	BookSettling();
+}
+
 // (What each Look For: greys and takes away - LayOutRubyGrid - and what a list says of itself.)
 void ShowRubyKind(IPanelControlData* panel)
 {
@@ -1164,25 +1262,84 @@ void ShowRubyKind(IPanelControlData* panel)
 	ShowRubyList(panel);
 }
 
-// The samples beside the Kenten part's lists draw what is kept now (KFCKohakuTab::KentenSampleKind).
-void RedrawKentenSamples(IPanelControlData* panel)
+// ----- the Kenten part's lists and boxes (2026-11-03 - docs/superpowers/specs/2026-11-03-kfc-kenten-face-japanese-design.md)
+
+bool JapaneseKinds();	// (below, with the face)
+
+// THE LISTS' ENTRIES (J3 - KFCUI.fr): 0 the first ([Any], [Leave]), 1 none - Text Without Kenten on Kenten:, the marks taken off on Change Kenten To: (N1, N2) - and k + 1 the IKentenStyle::KentenKind k.
+const int32 kKentenEntryNone = 1;
+
+int32 KentenMarkEntry()
 {
-	IControlView* const markSample = (panel != nil) ? panel->FindWidget(kKFCKentenMarkSampleWidgetID) : nil;
-	if (markSample != nil)
-		markSample->Invalidate();
-	IControlView* const changeSample = (panel != nil) ? panel->FindWidget(kKFCKentenChangeSampleWidgetID) : nil;
-	if (changeSample != nil)
-		changeSample->Invalidate();
-	KFC_DIAG_LOG("KENTAB samples mark=%d change=%d", static_cast<int>(KFCKohakuTab::KentenSampleKind(kKFCKentenMarkSampleWidgetID)), static_cast<int>(KFCKohakuTab::KentenSampleKind(kKFCKentenChangeSampleWidgetID)));
+	return (gKenten.kind == kKFCKentenFindWithout) ? kKentenEntryNone : (gKenten.mark > 0) ? gKenten.mark + 1 : 0;
 }
 
-// Kenten: means nothing to Text Without Kenten: grey there.
-void ShowKentenKind(IPanelControlData* panel)
+int32 KentenChangeEntry()
 {
-	IControlView* const mark = (panel != nil) ? panel->FindWidget(kKFCKentenTabMarkWidgetID) : nil;
-	if (mark != nil)
-		mark->Enable(gKenten.kind == kKFCKentenFindWithout ? kFalse : kTrue);
-	RedrawKentenSamples(panel);
+	return gKenten.removeKenten ? kKentenEntryNone : (gKenten.changeTo > 0) ? gKenten.changeTo + 1 : 0;
+}
+
+// One entry of a list, written over the .fr's (not heard).
+void SetEntry(IPanelControlData* panel, const WidgetID& widget, int32 index, const PMString& words)
+{
+	IControlView* const dropDown = (panel != nil) ? panel->FindWidget(widget) : nil;
+	InterfacePtr<IStringListControlData> strings(dropDown, IID_ISTRINGLISTCONTROLDATA);
+	if (strings == nil || index >= strings->Length() || strings->GetString(index) == words)
+		return;
+	strings->SetString(index, words, kTrue, kFalse);
+}
+
+// JAPANESE WORDS FROM THEIR CODE POINTS: this file is ASCII (the project's .cpp files have no BOM - a character typed here is read as CP932), and an escape written through a tool can come back as the
+// character itself (11-03: it did, and the list said mojibake) - numbers cannot.
+PMString WordsFrom(const uint32* codes, size_t count)
+{
+	PMString words;
+	words.SetTranslatable(kFalse);
+	for (size_t i = 0; i < count; ++i)
+		words.AppendW(UTF32TextChar(codes[i]));
+	return words;
+}
+
+// THE KENTEN LISTS' FIRST ENTRIES IN JAPANESE (J2 - the entries after them are InDesign's own keys, its own tables' words): [subete no kenten] and [henkou shinai]. In another language the part is never shown
+// (KOHAKU-03): the .fr's English stands.
+void ShowKentenFirstEntries(IPanelControlData* panel)
+{
+	if (!JapaneseKinds())
+		return;
+	static const uint32 kAny[] = { 0x5B, 0x3059, 0x3079, 0x3066, 0x306E, 0x570F, 0x70B9, 0x5D };
+	static const uint32 kLeave[] = { 0x5B, 0x5909, 0x66F4, 0x3057, 0x306A, 0x3044, 0x5D };
+	SetEntry(panel, kKFCKentenTabMarkWidgetID, 0, WordsFrom(kAny, sizeof(kAny) / sizeof(kAny[0])));
+	SetEntry(panel, kKFCKentenTabChangeWidgetID, 0, WordsFrom(kLeave, sizeof(kLeave) / sizeof(kLeave[0])));
+}
+
+// RUBY'S LOOK FOR IN JAPANESE (2026-11-03 - the author: "the Look For list in Japanese"; KFC's own words - InDesign has none for these): ruby no tsuita moji, ruby no nai moji, ruby no shirushi,
+// ruby no ichiran (the author's names for the marks and the list), ruby no yure - in the order of the .fr's entries (kKFCRubyFindWith ... kKFCRubyFindVaries). The part is a Japanese InDesign's
+// alone (KOHAKU-03).
+void ShowRubyKindEntries(IPanelControlData* panel)
+{
+	if (!JapaneseKinds())
+		return;
+	static const uint32 kWith[] = { 0x30EB, 0x30D3, 0x306E, 0x4ED8, 0x3044, 0x305F, 0x6587, 0x5B57 };
+	static const uint32 kWithout[] = { 0x30EB, 0x30D3, 0x306E, 0x306A, 0x3044, 0x6587, 0x5B57 };
+	static const uint32 kMarks[] = { 0x30EB, 0x30D3, 0x306E, 0x5370 };
+	static const uint32 kList[] = { 0x30EB, 0x30D3, 0x306E, 0x4E00, 0x89A7 };
+	static const uint32 kVaries[] = { 0x30EB, 0x30D3, 0x306E, 0x63FA, 0x308C };
+	SetEntry(panel, kKFCRubyTabKindWidgetID, kKFCRubyFindWith, WordsFrom(kWith, sizeof(kWith) / sizeof(kWith[0])));
+	SetEntry(panel, kKFCRubyTabKindWidgetID, kKFCRubyFindWithout, WordsFrom(kWithout, sizeof(kWithout) / sizeof(kWithout[0])));
+	SetEntry(panel, kKFCRubyTabKindWidgetID, kKFCRubyFindMarks, WordsFrom(kMarks, sizeof(kMarks) / sizeof(kMarks[0])));
+	SetEntry(panel, kKFCRubyTabKindWidgetID, kKFCRubyFindList, WordsFrom(kList, sizeof(kList) / sizeof(kList[0])));
+	SetEntry(panel, kKFCRubyTabKindWidgetID, kKFCRubyFindVaries, WordsFrom(kVaries, sizeof(kVaries) / sizeof(kVaries[0])));
+}
+
+// THE BOXES (C1): each takes a character while its list says custom - grey otherwise, what it holds kept.
+void ShowKentenBoxes(IPanelControlData* panel)
+{
+	IControlView* const markBox = (panel != nil) ? panel->FindWidget(kKFCKentenMarkCharWidgetID) : nil;
+	if (markBox != nil)
+		markBox->Enable((gKind == kKindKenten && gKenten.kind == kKFCKentenFindWith && gKenten.mark == IKentenStyle::Kenten_Custom) ? kTrue : kFalse);
+	IControlView* const changeBox = (panel != nil) ? panel->FindWidget(kKFCKentenChangeCharWidgetID) : nil;
+	if (changeBox != nil)
+		changeBox->Enable((gKind == kKindKenten && !gKenten.removeKenten && gKenten.changeTo == IKentenStyle::Kenten_Custom) ? kTrue : kFalse);
 }
 
 // A text field's words as they stand now, not translated.
@@ -1385,7 +1542,7 @@ void ShowKind(IPMUnknown* face)
 	ShowPart(panel, kKFCKohakuKentenSectionWidgetID, gKind == kKindKenten);
 	ShowRubyKind(panel);		// (their own greys stand whatever their panels were told; Ruby's buttons with them)
 	ShowRubyButtons(panel);
-	ShowKentenKind(panel);
+	ShowKentenBoxes(panel);
 	ShowFaceButtons(panel);
 	ShowSaid(panel);
 	ShowScopeEntries(face);
@@ -1405,18 +1562,19 @@ void FillKept(IPMUnknown* face)
 	if (rubyFirst != nil)
 		rubyFirst->Select(gRuby.listFirst, kTrue, kFalse);
 	WriteBoxes(panel);
-	InterfacePtr<IDropDownListController> kentenKind(QueryList(face, kKFCKentenTabKindWidgetID));
-	if (kentenKind != nil)
-		kentenKind->Select(gKenten.kind, kTrue, kFalse);
+	ShowKentenFirstEntries(panel);
 	SetField(panel, kKFCKentenTabBaseWidgetID, gKenten.base);
 	InterfacePtr<IDropDownListController> kentenMark(QueryList(face, kKFCKentenTabMarkWidgetID));
 	if (kentenMark != nil)
-		kentenMark->Select(gKenten.mark, kTrue, kFalse);
+		kentenMark->Select(KentenMarkEntry(), kTrue, kFalse);
+	SetField(panel, kKFCKentenMarkCharWidgetID, CharWords(gKenten.markChar));
 	InterfacePtr<IDropDownListController> kentenChange(QueryList(face, kKFCKentenTabChangeWidgetID));
 	if (kentenChange != nil)
-		kentenChange->Select(gKenten.changeTo, kTrue, kFalse);
-	SetBox(panel, kKFCKentenTabRemoveWidgetID, gKenten.removeKenten);
+		kentenChange->Select(KentenChangeEntry(), kTrue, kFalse);
+	SetField(panel, kKFCKentenChangeCharWidgetID, CharWords(gKenten.changeChar));
 	SetBox(panel, kKFCRubyListOtherRubyWidgetID, gRuby.listOtherRuby);
+	SetBox(panel, kKFCRubyFindOnlyWidgetID, gRuby.findOnly);
+	ShowRubyKindEntries(panel);
 	ShowKind(face);
 }
 
@@ -1446,15 +1604,6 @@ bool KFCKohakuTab::IsRubyCurrent(KFCRubyConditions& outConditions)
 	outConditions = gRuby;
 	outConditions.scope = ScopeAsked();
 	return FaceIsCurrent() && gKind == kKindRuby;
-}
-
-int32 KFCKohakuTab::KentenSampleKind(const WidgetID& sample)
-{
-	if (sample == kKFCKentenMarkSampleWidgetID)
-		return (gKenten.kind == kKFCKentenFindWithout) ? 0 : gKenten.mark;
-	if (sample == kKFCKentenChangeSampleWidgetID)
-		return gKenten.removeKenten ? 0 : gKenten.changeTo;
-	return 0;
 }
 
 bool KFCKohakuTab::IsKentenCurrent(KFCKentenConditions& outConditions)
@@ -1551,6 +1700,7 @@ void KFCKohakuTab::ShutdownCleanup()
 		gSettleTimer = nil;
 	}
 	gPendingBase = 0;
+	gPendingKenten = 0;
 	// Fresh values, so the storage goes too.
 	gTable = KFCTableConditions();
 	gRuby = KFCRubyConditions();
@@ -1650,6 +1800,7 @@ public:
 			for (size_t b = 0; b < sizeof(kColumnButtons) / sizeof(kColumnButtons[0]); ++b)
 				AttachToWidget(kColumnButtons[b], IID_IBOOLEANCONTROLDATA, panel);
 			AttachToWidget(kKFCRubyListOtherRubyWidgetID, IID_ITRISTATECONTROLDATA, panel);
+			AttachToWidget(kKFCRubyFindOnlyWidgetID, IID_ITRISTATECONTROLDATA, panel);
 			for (int32 k = 0; k < kKFCRubyBoxColumns; ++k)
 			{
 				AttachToWidget(ReadingBoxID(k), IID_ITEXTCONTROLDATA, panel);
@@ -1663,11 +1814,11 @@ public:
 			AttachToWidget(kKFCTableTabOverridesOnlyWidgetID, IID_ITRISTATECONTROLDATA, panel);
 			AttachToWidget(kKFCTableTabClearOverridesWidgetID, IID_ITRISTATECONTROLDATA, panel);
 			AttachToWidget(kKFCRubyTabKindWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
-			AttachToWidget(kKFCKentenTabKindWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
 			AttachToWidget(kKFCKentenTabBaseWidgetID, IID_ITEXTCONTROLDATA, panel);
 			AttachToWidget(kKFCKentenTabMarkWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
+			AttachToWidget(kKFCKentenMarkCharWidgetID, IID_ITEXTCONTROLDATA, panel);
 			AttachToWidget(kKFCKentenTabChangeWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
-			AttachToWidget(kKFCKentenTabRemoveWidgetID, IID_ITRISTATECONTROLDATA, panel);
+			AttachToWidget(kKFCKentenChangeCharWidgetID, IID_ITEXTCONTROLDATA, panel);
 		}
 		// The front document, followed while shown (Update): its workspace's styles fill the lists, now and as they change.
 		ISession* const session = GetExecutionContextSession();
@@ -1724,6 +1875,7 @@ public:
 		for (size_t b = 0; b < sizeof(kColumnButtons) / sizeof(kColumnButtons[0]); ++b)
 			DetachFromWidget(kColumnButtons[b], IID_IBOOLEANCONTROLDATA, panel);
 		DetachFromWidget(kKFCRubyListOtherRubyWidgetID, IID_ITRISTATECONTROLDATA, panel);
+		DetachFromWidget(kKFCRubyFindOnlyWidgetID, IID_ITRISTATECONTROLDATA, panel);
 		for (int32 k = 0; k < kKFCRubyBoxColumns; ++k)
 		{
 			DetachFromWidget(ReadingBoxID(k), IID_ITEXTCONTROLDATA, panel);
@@ -1737,11 +1889,11 @@ public:
 		DetachFromWidget(kKFCTableTabOverridesOnlyWidgetID, IID_ITRISTATECONTROLDATA, panel);
 		DetachFromWidget(kKFCTableTabClearOverridesWidgetID, IID_ITRISTATECONTROLDATA, panel);
 		DetachFromWidget(kKFCRubyTabKindWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
-		DetachFromWidget(kKFCKentenTabKindWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
 		DetachFromWidget(kKFCKentenTabBaseWidgetID, IID_ITEXTCONTROLDATA, panel);
 		DetachFromWidget(kKFCKentenTabMarkWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
+		DetachFromWidget(kKFCKentenMarkCharWidgetID, IID_ITEXTCONTROLDATA, panel);
 		DetachFromWidget(kKFCKentenTabChangeWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
-		DetachFromWidget(kKFCKentenTabRemoveWidgetID, IID_ITRISTATECONTROLDATA, panel);
+		DetachFromWidget(kKFCKentenChangeCharWidgetID, IID_ITEXTCONTROLDATA, panel);
 	}
 
 	virtual void Update(const ClassID& theChange, ISubject* theSubject, const PMIID& protocol, void* /*changedBy*/)
@@ -1859,6 +2011,15 @@ public:
 			gRuby.listOtherRuby = (theChange == kTrueStateMessage);
 			KFC_DIAG_LOG("RUBYTAB other=%d", gRuby.listOtherRuby ? 1 : 0);
 		}
+		else if (widget == kKFCRubyFindOnlyWidgetID && (theChange == kTrueStateMessage || theChange == kFalseStateMessage))
+		{
+			// FIND ONLY (2026-11-03): nothing is written - the Change side greys, and with it the Change buttons. What Find Next found stays found: the search is the same.
+			gRuby.findOnly = (theChange == kTrueStateMessage);
+			KFC_DIAG_LOG("RUBYTAB findonly=%d", gRuby.findOnly ? 1 : 0);
+			InterfacePtr<IPanelControlData> panel(this, UseDefaultIID());
+			ShowRubyKind(panel);
+			ShowFaceButtons(panel);
+		}
 		else if (widget == kKFCRubyListFirstWidgetID)
 		{
 			InterfacePtr<IDropDownListController> list(view, UseDefaultIID());
@@ -1929,18 +2090,6 @@ public:
 				panel->SetKeyboardFocus(focusTo);
 			KFC_DIAG_LOG("RUBYTAB join %d=%d", static_cast<int>(k), gJoin[k] ? 1 : 0);
 		}
-		else if (widget == kKFCKentenTabKindWidgetID)
-		{
-			InterfacePtr<IDropDownListController> list(view, UseDefaultIID());
-			const int32 entry = (list != nil) ? list->GetSelected() : -1;
-			if (entry >= kKFCKentenFindWith && entry <= kKFCKentenFindWithout)
-				gKenten.kind = entry;
-			ForgetFound();		// (what Find Next found was another Look For's)
-			InterfacePtr<IPanelControlData> panel(this, UseDefaultIID());
-			ShowKentenKind(panel);
-			ShowFaceButtons(panel);
-			KFC_DIAG_LOG("KENTAB kind=%d", static_cast<int>(gKenten.kind));
-		}
 		else if (widget == kKFCKentenTabBaseWidgetID)
 		{
 			gKenten.base = WordsOf(view);
@@ -1948,32 +2097,41 @@ public:
 		}
 		else if (widget == kKFCKentenTabMarkWidgetID)
 		{
+			// KENTEN: - any, none (the occurrences of Base Text with no mark - Look For's Text Without Kenten until 11-03), a kind, custom (J3, N1).
 			InterfacePtr<IDropDownListController> list(view, UseDefaultIID());
 			const int32 entry = (list != nil) ? list->GetSelected() : -1;
+			const bool wasWithout = (gKenten.kind == kKFCKentenFindWithout);
 			if (entry >= 0)
-				gKenten.mark = entry;		// (an entry is its IKentenStyle::KentenKind, 0 = any)
-			KFC_DIAG_LOG("KENTAB mark=%d", static_cast<int>(gKenten.mark));
+			{
+				gKenten.kind = (entry == kKentenEntryNone) ? kKFCKentenFindWithout : kKFCKentenFindWith;
+				gKenten.mark = (entry > kKentenEntryNone) ? entry - 1 : 0;
+			}
+			if (wasWithout != (gKenten.kind == kKFCKentenFindWithout))
+				ForgetFound();		// (what Find Next found was the other Look For's, as it was)
+			KFC_DIAG_LOG("KENTAB mark=%d without=%d", static_cast<int>(gKenten.mark), (gKenten.kind == kKFCKentenFindWithout) ? 1 : 0);
 			InterfacePtr<IPanelControlData> panel(this, UseDefaultIID());
-			RedrawKentenSamples(panel);
+			ShowKentenBoxes(panel);
+			ShowFaceButtons(panel);
 		}
 		else if (widget == kKFCKentenTabChangeWidgetID)
 		{
+			// CHANGE KENTEN TO: - leave, none (the marks off - Remove Kenten until 11-03), a kind, custom (J3, N2).
 			InterfacePtr<IDropDownListController> list(view, UseDefaultIID());
 			const int32 entry = (list != nil) ? list->GetSelected() : -1;
 			if (entry >= 0)
-				gKenten.changeTo = entry;		// (an entry is its IKentenStyle::KentenKind, 0 = leave it)
-			KFC_DIAG_LOG("KENTAB change=%d", static_cast<int>(gKenten.changeTo));
+			{
+				gKenten.removeKenten = (entry == kKentenEntryNone);
+				gKenten.changeTo = (entry > kKentenEntryNone) ? entry - 1 : 0;
+			}
+			KFC_DIAG_LOG("KENTAB change=%d remove=%d", static_cast<int>(gKenten.changeTo), gKenten.removeKenten ? 1 : 0);
 			InterfacePtr<IPanelControlData> panel(this, UseDefaultIID());
-			RedrawKentenSamples(panel);
+			ShowKentenBoxes(panel);
 			ShowFaceButtons(panel);
 		}
-		else if (widget == kKFCKentenTabRemoveWidgetID && (theChange == kTrueStateMessage || theChange == kFalseStateMessage))
+		else if (widget == kKFCKentenMarkCharWidgetID || widget == kKFCKentenChangeCharWidgetID)
 		{
-			gKenten.removeKenten = (theChange == kTrueStateMessage);
-			KFC_DIAG_LOG("KENTAB remove=%d", gKenten.removeKenten ? 1 : 0);
-			InterfacePtr<IPanelControlData> panel(this, UseDefaultIID());
-			RedrawKentenSamples(panel);
-			ShowFaceButtons(panel);
+			// A BOX OF A CUSTOM MARK'S CHARACTER (C2): settled at the next idle - an input method hands a box what it confirms a character at a time.
+			NoteKentenBox((widget == kKFCKentenMarkCharWidgetID) ? 1u : 2u);
 		}
 		// WHAT A QUERY HOLDS WAS CHANGED BY HAND: Find/Change's Query menu says [Custom], as a change on InDesign's own tabs does. (Search: is no part of a query, as InDesign's own Search: is none of its menu's; no button
 		// changes it - Find Next, Find in KFC and How to Use... change nothing, what Change and its kind write is the document, Save List... writes a file; Choose List... changes what a query holds, and says so itself.)
