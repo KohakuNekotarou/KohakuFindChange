@@ -24,6 +24,7 @@
 // Project includes:
 #include "KFCRubyListFile.h"
 #include "KFCRubyList.h"
+#include "KFCModelTypes.h"		// KFCRubyListWhy - the facts the face words in Japanese
 
 namespace
 {
@@ -78,17 +79,25 @@ void SayNamed(PMString& outWhy, const PMString& name, const char* words)
 }
 }	// anonymous namespace
 
-bool KFCRubyListFile::Load(const PMString& path, std::shared_ptr<const KFCRubyList::Words>& outWords, int32& outCount, PMString& outWhy)
+bool KFCRubyListFile::Load(const PMString& path, std::shared_ptr<const KFCRubyList::Words>& outWords, int32& outCount, PMString& outWhy, KFCRubyListWhy* outFacts)
 {
 	outWords.reset();
 	outCount = 0;
 	outWhy.Clear();
 	outWhy.SetTranslatable(kFalse);
+	KFCRubyListWhy facts;		// (the same, as facts - the face's Japanese words: KFCKohakuTab.cpp's ShowRubyList)
+	const auto said = [&](int32 code) -> bool
+	{
+		facts.code = code;
+		if (outFacts != nullptr)
+			*outFacts = facts;
+		return code == KFCRubyListWhy::kOk;
+	};
 	if (path.IsEmpty())
 	{
 		outWhy.Append("Words in a Ruby List reads a file: press Choose List... on the Kohaku+ tab in Edit > Find/Change.");
 		outWhy.SetTranslatable(kFalse);
-		return false;
+		return said(KFCRubyListWhy::kNoFile);
 	}
 	const IDFile file(FileUtils::PMStringToSysFile(path));
 	PMString name;
@@ -98,13 +107,13 @@ bool KFCRubyListFile::Load(const PMString& path, std::shared_ptr<const KFCRubyLi
 	if (!ReadBytes(file, bytes))
 	{
 		SayNamed(outWhy, name, " could not be read.");
-		return false;
+		return said(KFCRubyListWhy::kUnreadable);
 	}
 	std::u32string text;
 	if (!KFCRubyList::DecodeUnicode(bytes, text) && !DecodeCP932(bytes, text))
 	{
 		SayNamed(outWhy, name, " is not text in UTF-8, UTF-16 or Shift_JIS.");
-		return false;
+		return said(KFCRubyListWhy::kNotText);
 	}
 	std::shared_ptr<KFCRubyList::Words> words(std::make_shared<KFCRubyList::Words>());
 	KFCRubyList::Problem problem;
@@ -112,15 +121,21 @@ bool KFCRubyListFile::Load(const PMString& path, std::shared_ptr<const KFCRubyLi
 	KFCRubyList::Parse(text, *words, problem, problems);
 	if (problems > 0)
 	{
+		facts.line = static_cast<int32>(problem.line);
+		facts.otherLine = static_cast<int32>(problem.otherLine);
+		facts.wrongLines = static_cast<int32>(problems);
+		int32 code = KFCRubyListWhy::kTwoReadings;
 		SayNamed(outWhy, name, ": line ");
 		outWhy.AppendNumber(static_cast<int32>(problem.line));
 		switch (problem.why)
 		{
 			case KFCRubyList::kNoReading:
 				outWhy.Append(" has no reading.");
+				code = KFCRubyListWhy::kNoReading;
 				break;
 			case KFCRubyList::kBadMark:
 				outWhy.Append(": a reading needs kanji just before it, or a bar where its base starts.");
+				code = KFCRubyListWhy::kBadMark;
 				break;
 			default:
 				outWhy.Append(" gives the word of line ");
@@ -135,16 +150,16 @@ bool KFCRubyListFile::Load(const PMString& path, std::shared_ptr<const KFCRubyLi
 			outWhy.Append(" lines are wrong.)");
 		}
 		outWhy.SetTranslatable(kFalse);
-		return false;
+		return said(code);
 	}
 	if (words->entries.empty())
 	{
 		SayNamed(outWhy, name, " holds no words.");
-		return false;
+		return said(KFCRubyListWhy::kNoWords);
 	}
 	outCount = static_cast<int32>(words->entries.size());
 	outWords = words;
-	return true;
+	return said(KFCRubyListWhy::kOk);
 }
 
 // End, KFCRubyListFile.cpp.

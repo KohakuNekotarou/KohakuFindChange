@@ -17,12 +17,14 @@
 #include <memory>
 
 namespace KFCRubyList { struct Words; }
+struct KFCRubyListWhy;		// (KFCModelTypes.h)
 
 namespace KFCRubyListFile
 {
 	/** THE WORDS OF THE FILE AT `path`. False = nothing to look for: outWhy says why, whole - no path, a file that cannot be read, no words in it, or the first line that is wrong and how many are
-	    (a list with a wrong line is not used: what its line was to write would be left out without a word). True = outWords the words, outCount how many. */
-	bool Load(const PMString& path, std::shared_ptr<const KFCRubyList::Words>& outWords, int32& outCount, PMString& outWhy);
+	    (a list with a wrong line is not used: what its line was to write would be left out without a word). True = outWords the words, outCount how many. outFacts (when given): the same as
+	    facts, for the Kohaku+ face to word in Japanese (2026-11-04 - IKFCRuns::RubyListFacts). */
+	bool Load(const PMString& path, std::shared_ptr<const KFCRubyList::Words>& outWords, int32& outCount, PMString& outWhy, KFCRubyListWhy* outFacts = nullptr);
 }
 
 #endif // __KFCRubyListFile_h__

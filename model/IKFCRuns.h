@@ -223,6 +223,9 @@ public:
 	/** = KFCReplaceEngine::UnifyRubyHits (appended, under the list's query - 2026-11-03) - an Inconsistent Ruby list's rows given one of their word's readings in one undoable step (a heading's or a
 	    row's right-click "unify"). True = something written; outStatus says what. */
 	virtual bool UnifyRubyRows(const KFCRowsByChapter& rows, const PMString& reading, PMString& outStatus) = 0;
+	/** = KFCRubyListFile::Load (appended - 2026-11-04, the author: "the comment of Words in a Ruby List in Japanese") - RubyListCheck's answer as facts (KFCRubyListWhy), for the Kohaku+ face to
+	    word in Japanese: true = outWords words; false = outWhy.code says why, with its lines. */
+	virtual bool RubyListFacts(const PMString& path, int32& outWords, KFCRubyListWhy& outWhy) = 0;
 };
 
 #endif // __IKFCRuns_h__

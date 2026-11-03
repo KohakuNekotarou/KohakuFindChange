@@ -221,6 +221,12 @@ public:
 	virtual bool CanTcyHit(int32 chapterIdx, int32 hitIdx) { return KFCReplaceEngine::CanTcyHit(chapterIdx, hitIdx); }
 	// (Under the list's query, as ReplaceRows: the same rows' doors and the same writer.)
 	virtual bool UnifyRubyRows(const KFCRowsByChapter& rows, const PMString& reading, PMString& outStatus) { return KFCUnderListQuery(outStatus, true /*writes*/, [&]() { return KFCReplaceEngine::UnifyRubyHits(rows, reading, outStatus); }); }
+	virtual bool RubyListFacts(const PMString& path, int32& outWords, KFCRubyListWhy& outWhy)
+	{
+		std::shared_ptr<const KFCRubyList::Words> words;
+		PMString english;
+		return KFCRubyListFile::Load(path, words, outWords, english, &outWhy);
+	}
 };
 
 CREATE_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)

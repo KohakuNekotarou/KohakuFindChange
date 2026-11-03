@@ -212,6 +212,7 @@ namespace
 		virtual bool TcyRows(const KFCRowsByChapter&, PMString& outStatus) { SayWhy(outStatus); return false; }
 		virtual bool CanTcyHit(int32, int32) { return false; }
 		virtual bool UnifyRubyRows(const KFCRowsByChapter&, const PMString&, PMString& outStatus) { SayWhy(outStatus); return false; }
+		virtual bool RubyListFacts(const PMString&, int32& outWords, KFCRubyListWhy& outWhy) { outWords = 0; outWhy = KFCRubyListWhy(); outWhy.code = KFCRubyListWhy::kNoModel; return false; }
 	};
 
 	class KFCChaptersStandInImpl : public IKFCChapters

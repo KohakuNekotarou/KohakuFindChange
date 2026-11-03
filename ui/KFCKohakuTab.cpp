@@ -875,8 +875,68 @@ void LayOutRubyGrid(IPanelControlData* panel)
 	}
 }
 
+// A RUBY LIST'S FACTS IN JAPANESE (2026-11-04 - the author: "the comment of Words in a Ruby List in Japanese"): the face's first line. The file's name stands beside the list's label, so it is
+// left out (the panel's English says it - KFCRubyListFile::Load).
+PMString RubyListWords(bool ok, int32 words, const KFCRubyListWhy& facts)
+{
+	PMString said;
+	said.SetTranslatable(kFalse);
+	if (ok)
+	{
+		said.AppendNumber(words);
+		said.Append(KFCJa::ListWordsRead());		// N go wo yomimashita.
+		return said;
+	}
+	switch (facts.code)
+	{
+		case KFCRubyListWhy::kNoFile:
+			said.Append("Choose List... ");
+			said.Append(KFCJa::ListChooseTail());
+			break;
+		case KFCRubyListWhy::kUnreadable:
+			said.Append(KFCJa::ListUnreadable());
+			break;
+		case KFCRubyListWhy::kNotText:
+			said.Append("UTF-8");
+			said.Append(KFCJa::Nakaguro());
+			said.Append("UTF-16");
+			said.Append(KFCJa::Nakaguro());
+			said.Append("Shift_JIS ");
+			said.Append(KFCJa::ListNotTextTail());
+			break;
+		case KFCRubyListWhy::kNoWords:
+			said.Append(KFCJa::ListNoWords());
+			break;
+		default:
+		{
+			said.AppendNumber(facts.line);
+			said.Append(KFCJa::LineNth());
+			if (facts.code == KFCRubyListWhy::kNoReading)
+				said.Append(KFCJa::ListNoReading());
+			else if (facts.code == KFCRubyListWhy::kBadMark)
+				said.Append(KFCJa::ListBadMark());
+			else
+			{
+				said.Append(KFCJa::ListTwoReadingsA());
+				said.AppendNumber(facts.otherLine);
+				said.Append(KFCJa::LineNth());
+				said.Append(KFCJa::ListTwoReadingsB());
+			}
+			if (facts.wrongLines > 1)
+			{
+				said.Append(KFCJa::ListWrongLinesA());
+				said.AppendNumber(facts.wrongLines);
+				said.Append(KFCJa::ListWrongLinesB());
+			}
+			break;
+		}
+	}
+	said.SetTranslatable(kFalse);
+	return said;
+}
+
 // WHAT THE PART SAYS OF ITS LIST: the file's name beside Ruby List:, and on the face's lines how many words it holds or why it cannot be used (the author, 11-02: "the same place as the other messages") - read now, as a Find
-// will read it.
+// will read it. In Japanese since 11-04 (RubyListWords); the model half's English when it is not there to give the facts.
 void ShowRubyList(IPanelControlData* panel)
 {
 	if (panel == nil || gKind != kKindRuby || gRuby.kind != kKFCRubyFindList)
@@ -886,13 +946,13 @@ void ShowRubyList(IPanelControlData* panel)
 		FileUtils::GetFileName(FileUtils::PMStringToSysFile(gRuby.listPath), name);
 	name.SetTranslatable(kFalse);
 	int32 words = 0;
+	KFCRubyListWhy facts;
 	PMString said;
-	if (KFCRuns()->RubyListCheck(gRuby.listPath, words, said))
-	{
-		said.Clear();
-		said.AppendNumber(words);
-		said.Append((words == 1) ? " word." : " words.");
-	}
+	const bool ok = KFCRuns()->RubyListFacts(gRuby.listPath, words, facts);
+	if (facts.code == KFCRubyListWhy::kNoModel)
+		(void)KFCRuns()->RubyListCheck(gRuby.listPath, words, said);		// (the stand-in's words: the model half is not there)
+	else
+		said = RubyListWords(ok, words, facts);
 	said.SetTranslatable(kFalse);
 	SetFaceLine(panel, kKFCRubyListNameWidgetID, name);
 	PMString none;
@@ -1292,10 +1352,25 @@ void NoteKentenBox(uint32 bit)
 }
 
 // (What each Look For: greys and takes away - LayOutRubyGrid - and what a list says of itself.)
+// WHAT RUBY MARKS IN TEXT DOES (2026-11-04 - the author: "a comment for Ruby Marks too"), on the face's two lines while nothing else is said there: a button's words stand till Look For changes (the
+// change empties the lines first - the Look For handler's SayFor).
+void ShowRubyMarksNote()
+{
+	if (gKind != kKindRuby || gRuby.kind != kKFCRubyFindMarks || !gSaid[kKindRuby][0].IsEmpty() || !gSaid[kKindRuby][1].IsEmpty())
+		return;
+	PMString second("Replace ");
+	second.Append(KFCJa::Ya());
+	second.Append(" Change ");
+	second.Append(KFCJa::MarksNoteTail());		// Replace ya Change de, oyamoji ni ruby wo tsukete shirushi wo keshimasu.
+	second.SetTranslatable(kFalse);
+	SayFor(kKindRuby, KFCJa::MarksNote(), second);		// honbun no |kanji<<kanji>> no you na shirushi wo sagashimasu.
+}
+
 void ShowRubyKind(IPanelControlData* panel)
 {
 	LayOutRubyGrid(panel);
 	ShowRubyList(panel);
+	ShowRubyMarksNote();
 }
 
 // ----- the Kenten part's lists and boxes (2026-11-03 - docs/superpowers/specs/2026-11-03-kfc-kenten-face-japanese-design.md)

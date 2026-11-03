@@ -330,6 +330,29 @@ struct KFCRubyConditions
 	bool FindsOnly() const { return findOnly && (kind == kKFCRubyFindWith || kind == kKFCRubyFindWithout); }
 };
 
+/** WHAT A RUBY LIST'S FILE IS, AS FACTS (2026-11-04 - the author: "the comment of Words in a Ruby List in Japanese"): the Kohaku+ face words them in Japanese (KFCKohakuTab.cpp's ShowRubyList); the
+    panel keeps the model's English (KFCRubyListFile::Load's outWhy). IKFCRuns::RubyListFacts. */
+struct KFCRubyListWhy
+{
+	enum
+	{
+		kOk = 0,		// it holds words (the count beside it)
+		kNoFile,		// none chosen
+		kUnreadable,	// it could not be read
+		kNotText,		// not text in UTF-8, UTF-16 or Shift_JIS
+		kNoReading,		// line `line` has a mark with no reading
+		kBadMark,		// line `line` has a reading with no kanji just before it and no bar where its base starts
+		kTwoReadings,	// line `line` gives the word of line `otherLine` another reading
+		kNoWords,		// it holds no words
+		kNoModel		// the model half is not there to read it (the UI half's stand-in): its English words stand
+	};
+	int32	code;
+	int32	line;			// the first wrong line (kNoReading, kBadMark, kTwoReadings)
+	int32	otherLine;		// kTwoReadings: the line whose word it reads otherwise
+	int32	wrongLines;		// how many lines are wrong - more than one is said after the first
+	KFCRubyListWhy() : code(kOk), line(0), otherLine(0), wrongLines(0) {}
+};
+
 /** THE KENTEN KIND'S "SEARCH MODE" (the author, 10-31 - KFCKentenSearch.h): the Ruby kind's for its own (KFCKentenSearch::IsTabCurrent). KFC'S ALONE. */
 enum { kKFCKentenSearchMode = 104 };
 

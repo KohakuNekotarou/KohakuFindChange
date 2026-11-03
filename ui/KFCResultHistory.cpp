@@ -744,6 +744,13 @@ namespace
 				label.Append(KFCJa::Bracketed(KFCJa::RubyMarks()));		// (every mark: the boxes ask nothing of it - KFCRubySearch.cpp's WalkMarks)
 			else if (asked.base.IsEmpty() && asked.reading.IsEmpty())
 				label.Append(KFCJa::Bracketed(KFCJa::RubyWith()));
+			else if (asked.reading.IsEmpty())
+			{
+				// A BASE TEXT ALONE (2026-11-04 - the author took the proposal: "base<>" read as an empty reading asked): [ruby ari] base, as [ruby nashi] base and [ruby yure] base.
+				label.Append(KFCJa::Bracketed(KFCJa::RubyWith()));
+				label.Append(" ");
+				label.Append(asked.base);
+			}
 			else
 			{
 				label.Append(asked.base);
