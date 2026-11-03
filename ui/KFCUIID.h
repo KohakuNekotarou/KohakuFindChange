@@ -629,11 +629,9 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultTallHitNodeWidgetID, kKFCUIPrefix + 83)
 DECLARE_PMID(kWidgetIDSpace, kKFCTableTabChangeWidgetID, kKFCUIPrefix + 84)
 DECLARE_PMID(kWidgetIDSpace, kKFCTableTabChangeAllWidgetID, kKFCUIPrefix + 85)
 DECLARE_PMID(kWidgetIDSpace, kKFCTableTabChangeFindWidgetID, kKFCUIPrefix + 86)
-// THE RUBY PART'S BOXES (KFCKohakuTab.cpp - kKFCRubyBoxColumns columns at most; the author, 11-01; eight, fixed, 11-02; four at first, + and - back, 11-03). Find's: a Ruby: box and a Base Text: box a column and a chain between neighbours. Change's, which follow them: a Change Ruby To box and, under it, the column's base text as words - no box.
-// THE COLUMNS' + AND - (2026-11-03 - the author: "eight fixed boxes leave a reading hard to see: four at first, + back, - too, four at least"): the Captions dialog's icons as they stood 11-01 to 11-02 -
-// + on Ruby:'s row, - on Base Text:'s, at the grid's right - their numbers taken again.
-DECLARE_PMID(kWidgetIDSpace, kKFCRubyGridPlusWidgetID, kKFCUIPrefix + 75)
-DECLARE_PMID(kWidgetIDSpace, kKFCRubyGridMinusWidgetID, kKFCUIPrefix + 89)
+// THE RUBY PART'S BOXES (KFCKohakuTab.cpp - kKFCRubyBoxColumns columns; the author, 11-01: + and - between one and twelve; eight, fixed, 11-02; four to eight by + and -, 11-03; five, fixed, 11-04). Find's: a Ruby: box and a Base Text: box a column and a chain between neighbours. Change's, which follow them: a Change Ruby To box and, under it, the column's base text as words - no box.
+// THE CHANGE SIDE'S HEAD (11-04 - the author's labels: "kensaku / ruby / oyamoji / chikan / ruby / oyamoji"): "chikan" over the Change side's two rows. + 75 was the columns' + (11-01 to 11-02, 11-03 to 11-04); + 89, their -, is free.
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyGridLabelChangeHeadWidgetID, kKFCUIPrefix + 75)
 // Numbered in a row: the column is the offset from the first of each (the retired Change Ruby To field and Remove Ruby box, + 74 and + 75, are the grid and its retired +).
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyGridWidgetID, kKFCUIPrefix + 74)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyReadingBox0WidgetID, kKFCUIPrefix + 90)
@@ -641,24 +639,16 @@ DECLARE_PMID(kWidgetIDSpace, kKFCRubyReadingBox1WidgetID, kKFCUIPrefix + 91)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyReadingBox2WidgetID, kKFCUIPrefix + 92)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyReadingBox3WidgetID, kKFCUIPrefix + 93)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyReadingBox4WidgetID, kKFCUIPrefix + 94)
-DECLARE_PMID(kWidgetIDSpace, kKFCRubyReadingBox5WidgetID, kKFCUIPrefix + 95)
-DECLARE_PMID(kWidgetIDSpace, kKFCRubyReadingBox6WidgetID, kKFCUIPrefix + 96)
-DECLARE_PMID(kWidgetIDSpace, kKFCRubyReadingBox7WidgetID, kKFCUIPrefix + 97)
+// (+ 95 to + 97, + 107 to + 109, + 118 to + 120, kKFCPrefix + 45 to + 47 and + 57 to + 59 were the sixth to eighth columns' boxes and chains - five, fixed, since 11-04: free.)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyBaseBox0WidgetID, kKFCUIPrefix + 102)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyBaseBox1WidgetID, kKFCUIPrefix + 103)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyBaseBox2WidgetID, kKFCUIPrefix + 104)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyBaseBox3WidgetID, kKFCUIPrefix + 105)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyBaseBox4WidgetID, kKFCUIPrefix + 106)
-DECLARE_PMID(kWidgetIDSpace, kKFCRubyBaseBox5WidgetID, kKFCUIPrefix + 107)
-DECLARE_PMID(kWidgetIDSpace, kKFCRubyBaseBox6WidgetID, kKFCUIPrefix + 108)
-DECLARE_PMID(kWidgetIDSpace, kKFCRubyBaseBox7WidgetID, kKFCUIPrefix + 109)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyJoin0WidgetID, kKFCUIPrefix + 114)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyJoin1WidgetID, kKFCUIPrefix + 115)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyJoin2WidgetID, kKFCUIPrefix + 116)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyJoin3WidgetID, kKFCUIPrefix + 117)
-DECLARE_PMID(kWidgetIDSpace, kKFCRubyJoin4WidgetID, kKFCUIPrefix + 118)
-DECLARE_PMID(kWidgetIDSpace, kKFCRubyJoin5WidgetID, kKFCUIPrefix + 119)
-DECLARE_PMID(kWidgetIDSpace, kKFCRubyJoin6WidgetID, kKFCUIPrefix + 120)
 // (+ 125 and + 126 were the Kenten part's samples beside its two lists - retired 2026-11-03: the boxes of a custom mark's character stand there now, kKFCPrefix + 86 and + 87.) The Ruby part's Choose List....
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyListChooseWidgetID, kKFCUIPrefix + 127)
 // (This prefix's widget ids run out at + 127. The model half's prefix, the 128 numbers below this one, has no widget of its own: its WidgetID + 0 ... + 30 are spent - KFCID.h says so - and those after them are free. + 128 ON IS THIS PREFIX: kKFCUIPrefix is kKFCPrefix + 128.)
@@ -667,17 +657,11 @@ DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBox1WidgetID, kKFCPrefix + 41)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBox2WidgetID, kKFCPrefix + 42)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBox3WidgetID, kKFCPrefix + 43)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBox4WidgetID, kKFCPrefix + 44)
-DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBox5WidgetID, kKFCPrefix + 45)
-DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBox6WidgetID, kKFCPrefix + 46)
-DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBox7WidgetID, kKFCPrefix + 47)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBase0WidgetID, kKFCPrefix + 52)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBase1WidgetID, kKFCPrefix + 53)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBase2WidgetID, kKFCPrefix + 54)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBase3WidgetID, kKFCPrefix + 55)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBase4WidgetID, kKFCPrefix + 56)
-DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBase5WidgetID, kKFCPrefix + 57)
-DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBase6WidgetID, kKFCPrefix + 58)
-DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBase7WidgetID, kKFCPrefix + 59)
 // The grid's four labels, away with the boxes when the part looks for a ruby list, and what it says of the list (KFCKohakuTab.cpp's LayOutRubyGrid).
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyGridLabelReadingWidgetID, kKFCPrefix + 64)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyGridLabelBaseWidgetID, kKFCPrefix + 65)
@@ -1194,13 +1178,11 @@ DECLARE_PMID(kWidgetIDSpace, kKFCKentenChangeLabelWidgetID, kKFCPrefix + 92)
 // A hit row of a ruby or kenten list, on two lines (the author, 11-01: as KCM's rows): two rows' height, so the panel's rounding (to one row) still leaves no half row.
 #define kKFCResultTallRowHeight	38
 
-// THE RUBY PART'S BOXES (KFCKohakuTab.cpp, KFCUI.fr): how many columns - eight at most, four at first and at least, + and - between (the author, 11-03: "four at first, + back, - too, four at
-// least" - 11-02 had eight, fixed). Their width is the grid's over the columns standing: four wide, eight narrow.
-#define kKFCRubyBoxColumns			8
-#define kKFCRubyBoxColumnsAtFirst	4
-// The + and -: the Captions dialog's own icons (LinksUIID.h's plug-in - as they stood 11-01 to 11-02).
-#define kKFCRubyGridAddIconRsrcID		650
-#define kKFCRubyGridDeleteIconRsrcID	660
+// THE RUBY PART'S BOXES (KFCKohakuTab.cpp, KFCUI.fr): how many columns - five, always (the author, 11-04: "four, no + and -: the boxes larger still", then "the fields as far left as they go -
+// five?" with the labels "kensaku: / ruby: / moji: / chikan: / ruby: / moji:" - "half-width :": the labels' column 30, the boxes from 33 to 330 - 57 or 58 each, for a four-kana
+// reading, gen read minamoto, measured 46 wide with 6 before it and 4 after it in a 56 box; 11-02 had eight fixed, 11-03 four to eight by + and -). A longer word still fits: its rest in the last box, and a reading
+// with spaces there, a word a character, is one a character - InDesign's own Ruby dialog's mono (KFCRubyChangePlan::AddRuns).
+#define kKFCRubyBoxColumns			5
 
 // THE MESSAGE BLOCK AT THE TOP OF THE PANEL, AND THE EDGE THE ILLUSTRATIONS AND THE TREE LINE UP ON.
 //

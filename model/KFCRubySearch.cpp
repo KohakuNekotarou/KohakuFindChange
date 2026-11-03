@@ -1183,8 +1183,8 @@ bool KFCRubySearch::WalkOneDocument(const UIDRef& docRef, const PMString& name, 
 bool KFCRubySearch::WriteDocument(const UIDRef& docRef, const KFCRubyConditions& asked, const std::vector<KFCSearchEngine::ListedPlace>* part, int32& outCount, std::set<size_t>* ioBookSeen)
 {
 	outCount = 0;
-	if (asked.findOnly || asked.kind == kKFCRubyFindVaries)
-		return true;		// (Find Only writes nothing - 11-03; nor Inconsistent Ruby, which has no Change side since 11-03 - HasChangeSide keeps a run from asking either)
+	if (asked.FindsOnly() || asked.kind == kKFCRubyFindVaries)
+		return true;		// (Find Only writes nothing - 11-03, Text With Ruby's and Text Without Ruby's since 11-04; nor Inconsistent Ruby, which has no Change side since 11-03 - HasChangeSide keeps a run from asking either)
 	std::vector<KFCResultModel::Hit> hits;
 	std::map<UID, uint32> versions;
 	bool capped = false;
@@ -1453,16 +1453,15 @@ ErrorCode KFCRubySearch::Apply(const UIDRef& story, TextIndex start, TextIndex e
 	InterfacePtr<IAttrReport> saidReport(said, UseDefaultIID());
 	attrs->ApplyAttribute(onReport);
 	attrs->ApplyAttribute(saidReport);
-	if (end - start > 1)
-	{
-		// ONE READING OVER SEVERAL CHARACTERS: A GROUP (kTAMojiRubyBoss kFalse): under InDesign's default mono, or a mono the characters had, all of it stands on the first character.
-		InterfacePtr<ITextAttrBoolean> mono(::CreateObject2<ITextAttrBoolean>(kTAMojiRubyBoss));
-		if (mono == nil)
-			return kFailure;
-		mono->Set(kFalse);
-		InterfacePtr<IAttrReport> monoReport(mono, UseDefaultIID());
-		attrs->ApplyAttribute(monoReport);
-	}
+	// THE RUBY'S TYPE, ALWAYS WRITTEN. ONE READING OVER SEVERAL CHARACTERS: A GROUP (kTAMojiRubyBoss kFalse) - under InDesign's default mono, or a mono the characters had, all of it would
+	// stand on the first character. OVER ONE CHARACTER: MONO (kTrue - 2026-11-04, the author: "one character, mono ruby"), whatever type the character had (a group's, from an earlier ruby
+	// over it, stood till then): the marks' rule, "one character, mono" (KFCHowTo's Ruby page).
+	InterfacePtr<ITextAttrBoolean> mono(::CreateObject2<ITextAttrBoolean>(kTAMojiRubyBoss));
+	if (mono == nil)
+		return kFailure;
+	mono->Set((end - start > 1) ? kFalse : kTrue);
+	InterfacePtr<IAttrReport> monoReport(mono, UseDefaultIID());
+	attrs->ApplyAttribute(monoReport);
 	InterfacePtr<ICommand> apply(cmds->ApplyCmd(RangeData(start, end), attrs, kCharAttrStrandBoss));
 	return (apply != nil) ? CmdUtils::ProcessCommand(apply) : kFailure;
 }

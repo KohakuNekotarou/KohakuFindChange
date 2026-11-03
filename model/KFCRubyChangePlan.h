@@ -6,7 +6,7 @@
 //
 //  WHAT THE RUBY PART'S CHANGE BOXES WRITE OVER A ROW'S TEXT (docs/superpowers/specs/2026-11-01-kfc-kohaku-trial-fixes-design.md
 //  F18 - F21). The face holds a row of reading boxes over a row of base boxes (the author: a box for the kanji and a box for the
-//  ruby, more with a +, and they can be joined); each reading box is one Piece: its reading, and the base text under it - joined
+//  ruby - five since 11-04 - and they can be joined); each reading box is one Piece: its reading, and the base text under it - joined
 //  boxes' together. A Run is one ruby to write, by code point (a TextIndex counts them) from the row's start.
 //  ONE BOX, ONE RUBY - not one ruby with spaces in its string, as InDesign's own Ruby dialog keeps per-character ruby: read back,
 //  each character holds its own reading, which says at once whether it is right (the 8 measured cases in

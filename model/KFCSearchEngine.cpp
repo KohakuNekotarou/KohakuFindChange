@@ -3963,11 +3963,17 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 			rubyAsked.listFirst = againCopy->rubyListFirst;
 			rubyAsked.listOtherRuby = againCopy->rubyListOtherRuby;
 			rubyAsked.switches = againCopy->ownSwitches;
+			// (Find Only is no part of a list's query: every ruby writer reads it off the tab as it stands - KFCReplaceEngine's RubyFindOnlyNow, the tab's Look For deciding whether it
+			// counts (FindsOnly) - and so does the summary's last offer, below, which reads findOnly as it counts. The walk reads it nowhere.)
+			KFCRubyConditions now;
+			(void)KFCRubySearch::IsTabCurrent(&now);
+			rubyAsked.findOnly = now.FindsOnly();
 		}
 		else
 		{
 			(void)KFCRubySearch::IsTabCurrent(&rubyAsked);
 			rubyAsked.listWords = rubyListWords;
+			rubyAsked.findOnly = rubyAsked.FindsOnly();		// (as it counts - the summary's last offer reads it so)
 		}
 	}
 	KFCKentenConditions kentenAsked;
@@ -4276,6 +4282,10 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 		outSummary.Append(" Click a row to go to its text.");		// (it changes nothing - as QR Code's)
 	else if (tableTab)
 		outSummary.Append(" Click a row to go to its table. Replace gives it the Kohaku+ tab's Change side.");
+	else if (rubyTab && rubyAsked.findOnly)
+		outSummary.Append(" Click a row to go to its text.");		// (Find Only - RUBY-71: no ruby writer writes, and Replace says why)
+	else if (rubyTab && rubyAsked.kind == kKFCRubyFindVaries)
+		outSummary.Append(" Click a row to go to its text. Right-click a heading or a row to give the word one of its readings.");	// (no Change side - RUBY-70, 72)
 	else if (rubyTab && rubyAsked.kind == kKFCRubyFindMarks)
 		outSummary.Append(" Click a row to go to its text. Replace puts its reading on its base and takes the marks out.");	// (the Change side is grey there)
 	else if (rubyTab && rubyAsked.kind == kKFCRubyFindList)

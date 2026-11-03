@@ -4301,7 +4301,7 @@ bool RubyFindOnlyNow()
 {
 	KFCRubyConditions asked;
 	(void)KFCRubySearch::IsTabCurrent(&asked);
-	return asked.findOnly;
+	return asked.FindsOnly();		// (Text With Ruby's and Text Without Ruby's alone since 11-04 - the tab's Look For as it stands)
 }
 
 // THE RUBY TAB'S: what the Change boxes say over the row's text (KFCRubyChangePlan.h) - their readings, or the ruby off when they read nothing (the author, 11-01).
@@ -4329,7 +4329,7 @@ public:
 	}
 	virtual const char* NothingToChange() const
 	{
-		if (fAsked.findOnly)
+		if (fAsked.FindsOnly())
 			return kRubyFindOnlyRefusal;
 		// AN INCONSISTENT RUBY LIST'S ROWS HAVE NO CHANGE SIDE (2026-11-03 - the author: "the Change side's ruby can go"; its rows' Replace and Return grey): a word takes a reading of its own by
 		// its heading's or row's right-click (UnifyRubyHits - the other constructor).
@@ -4952,8 +4952,8 @@ bool KFCReplaceEngine::WriteFacePlaces(int32 mode, const KFCRubyConditions& ruby
 	if (places.empty())
 		return false;
 	const WriteUnderWay writing;
-	// FIND ONLY writes nothing, whatever the kind (the face greys its buttons too).
-	if (mode == kKFCRubySearchMode && ruby.findOnly)
+	// FIND ONLY writes nothing - with Text With Ruby and Text Without Ruby, the Look Fors that show it (11-04 - FindsOnly; the face greys its buttons too).
+	if (mode == kKFCRubySearchMode && ruby.FindsOnly())
 	{
 		out.why.Append(kRubyFindOnlyRefusal);
 		return false;

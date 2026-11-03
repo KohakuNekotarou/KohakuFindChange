@@ -99,12 +99,21 @@ namespace
 		return shown;
 	}
 
-	// ...and how many of them a write of ours has written (Hit::replaced): what every replaced count counts.
+	// A ROW A WRITE OF OURS HAS WRITTEN: a Replace's (Hit::replaced) - and an own tab's, a table's, a ruby's (an Inconsistent Ruby
+	// word's unify too) or a kenten's, which marks the row and leaves its Replace offered (Hit::special - MarkHitOwnChange). Every
+	// replaced count counts it (ROW-06 - the author, 11-04: "unified, and the 0 of 0/1 did not change": an own tab's write was not
+	// counted). A special operation's mark is not a Replace's, and is not counted (Clear Overrides, Tate-chu-yoko, an object's).
+	bool CountedAsWritten(const KFCResultModel::Hit& h)
+	{
+		return h.replaced || h.special == kKFCSpecialTableStyle || h.special == kKFCSpecialRubyChange || h.special == kKFCSpecialKentenChange;
+	}
+
+	// ...and how many of them a write of ours has written (CountedAsWritten): what every replaced count counts.
 	int32 ReplacedRows(const std::vector<KFCResultModel::Hit>& hits)
 	{
 		int32 replaced = 0;
 		for (size_t i = 0; i < hits.size(); ++i)
-			if (hits[i].replaced && !hits[i].cleared)
+			if (CountedAsWritten(hits[i]) && !hits[i].cleared)
 				++replaced;
 		return replaced;
 	}
@@ -882,7 +891,7 @@ int32 KFCResultModel::GetFontReplacedCount(int32 chapterIdx, int32 fontIdx)
 	for (size_t i = 0; i < group->hitIndices.size(); ++i)
 	{
 		const Hit* h = HitAt(chapterIdx, group->hitIndices[i]);
-		if (h != nil && h->replaced)
+		if (h != nil && CountedAsWritten(*h))
 			++replaced;
 	}
 	return replaced;

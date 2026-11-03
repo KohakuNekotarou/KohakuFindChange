@@ -160,7 +160,7 @@ namespace KFCResultTree
 	    row's or a heading's (a story row of such a list); false for any other row. outWord = its word: rows of one word answer one (KFCResults()->GetUnifyFacts). */
 	bool UnifyReadingsOf(const NodeID& row, PMString& outWord, std::vector<PMString>& outReadings);
 
-	/** Item `slot`'s name over the row - "<<reading>> ni soroeru" - false when the row's word has no reading `slot`. */
+	/** Item `slot`'s name over the row - "<<reading>>" (the author, 11-04) - false when the row's word has no reading `slot`. */
 	bool UnifyItemName(const NodeID& row, int32 slot, PMString& outName);
 
 	/** IS THE HIT ROW AN INCONSISTENT RUBY ROW (one whose word has readings to unify to - KFCResults()->GetUnifyFacts)? Such a row has no Change side (2026-11-03 - the author): its Replace greys,

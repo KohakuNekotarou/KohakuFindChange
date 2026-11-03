@@ -324,6 +324,10 @@ struct KFCRubyConditions
 	int32		scope;			// its Search: - IWalkerScopeFactoryUtils::kDocumentScope (at launch), kAllDocumentScope, or over part of the front document kStoryScope, kToEndOfStoryScope, kSelectionScope
 
 	KFCRubyConditions() : kind(kKFCRubyFindWith), listFirst(kKFCRubyListAll), listOtherRuby(false), findOnly(false), scope(0) {}
+
+	/** FIND ONLY AS IT COUNTS (2026-11-04 - the author: "Ruby Marks and Words in a Ruby List need no Find Only check box", "Inconsistent Ruby too"): its box stands with Text With Ruby
+	    and Text Without Ruby alone - hidden with the others, it keeps what it holds (back with those two) and asks nothing. Every writer, grey and word asks this, never findOnly itself. */
+	bool FindsOnly() const { return findOnly && (kind == kKFCRubyFindWith || kind == kKFCRubyFindWithout); }
 };
 
 /** THE KENTEN KIND'S "SEARCH MODE" (the author, 10-31 - KFCKentenSearch.h): the Ruby kind's for its own (KFCKentenSearch::IsTabCurrent). KFC'S ALONE. */

@@ -1107,7 +1107,7 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 			case kKFCUnifyReading4ActionID:
 			case kKFCUnifyReading5ActionID:
 			{
-				// UNIFY TO A READING (2026-11-03): named for the reading of the row's word it gives - "<<reading>> ni soroeru" - while the row has it (a run standing greys everything, above). What
+				// UNIFY TO A READING (2026-11-03): named for the reading of the row's word it gives - "<<reading>>" (11-04; " ni soroeru" after it on 11-03) - while the row has it (a run standing greys everything, above). What
 				// refuses a write (Find Only, a locked row) is said when pressed, as Replace's refusals are.
 				PMString name;
 				const bool named = KFCResultTree::UnifyItemName(RightClickedRow(widget), static_cast<int32>(action.Get() - kKFCUnifyReading0ActionID), name);

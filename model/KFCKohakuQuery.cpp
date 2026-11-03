@@ -421,7 +421,7 @@ bool KFCKohakuQuery::HasChangeSide(const KFCKohakuQueryData& query)
 	if (query.mode == kKFCTableSearchMode)
 		return !query.table.changeStyle.IsEmpty() || query.table.clearOverrides;
 	if (query.mode == kKFCRubySearchMode)
-		return !query.ruby.findOnly && query.ruby.kind != kKFCRubyFindVaries;		// (Find Only writes nothing - 11-03; nor Inconsistent Ruby, which has no Change side since 11-03 - a word is unified by hand; else ruby from marks: the reading is in the mark; any other: boxes reading nothing take the ruby off - the author, as an empty Change To deletes)
+		return !query.ruby.FindsOnly() && query.ruby.kind != kKFCRubyFindVaries;		// (Find Only writes nothing - 11-03; nor Inconsistent Ruby, which has no Change side since 11-03 - a word is unified by hand; else ruby from marks: the reading is in the mark; any other: boxes reading nothing take the ruby off - the author, as an empty Change To deletes)
 	if (query.mode == kKFCKentenSearchMode)
 		return query.kenten.ChangeSideAsks();		// (custom with no character asks nothing - C5)
 	return false;		// (a QR code's list writes nothing)

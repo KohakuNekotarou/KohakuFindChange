@@ -73,7 +73,6 @@
 #include "KFCPanelIcon.h"		// the illustration follows the status line
 #include "KFCDiag.h"			// TREETIME, RETFOCUS and the fault switches - test builds only
 #include "KFCBookPanelLookup.h"	// QueryPanelManager - the panel made active (TakeKeyboard)
-#include "KFCJapanese.h"		// KFCJa::NiSoroeru - an Inconsistent Ruby row's "unify" items
 #include "IApplication.h"
 #include "IEventHandler.h"		// the list's handler - the keyboard's holder (TakeKeyboard)
 #include "IKeyBoard.h"			// GetKeyFocus / AcquireKeyFocus (TakeKeyboard)
@@ -1274,11 +1273,10 @@ bool KFCResultTree::UnifyItemName(const NodeID& row, int32 slot, PMString& outNa
 	std::vector<PMString> readings;
 	if (!UnifyReadingsOf(row, word, readings) || slot < 0 || slot >= static_cast<int32>(readings.size()))
 		return false;
-	// "<<reading>> ni soroeru" (the author's words, 11-03 - KFCJapanese.h: this file is ASCII).
+	// "<<reading>>" alone (the author, 11-04: "<<tarou>> alone is better" - 11-03 had "<<reading>> ni soroeru"). The brackets as code points: this file is ASCII.
 	outName.AppendW(UTF32TextChar(0x300A));
 	outName.Append(readings[static_cast<size_t>(slot)]);
 	outName.AppendW(UTF32TextChar(0x300B));
-	outName.Append(KFCJa::NiSoroeru());
 	outName.SetTranslatable(kFalse);
 	return true;
 }
