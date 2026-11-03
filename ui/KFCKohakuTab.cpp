@@ -74,6 +74,7 @@
 #include "KFCResultTree.h"				// RefreshRows - a list's row of a table the Table part's Change wrote
 #include "KFCRubyChangePlan.h"			// IsSpace - what the base boxes leave out, as the row's text is compared
 #include "KFCTextCut.h"					// KFCIsAttachedMark - a base box takes a character with its marks
+#include "KFCJapanese.h"				// KFCJa - the Ruby and Kenten parts' Japanese words (ShowJapaneseLabels)
 
 namespace
 {
@@ -120,7 +121,7 @@ PMString gCellFindRuby[kKFCRubyBoxColumns];
 PMString gCellBase[kKFCRubyBoxColumns];
 PMString gCellChange[kKFCRubyBoxColumns];
 bool gJoin[kKFCRubyBoxColumns];				// gJoin[k]: column k and the next are one reading - k's boxes, over both base boxes - in Find and Change alike
-const int32 gCols = kKFCRubyBoxColumns;		// how many stand: all of them, always (the author, 11-02: "eight, fixed")
+int32 gCols = kKFCRubyBoxColumnsAtFirst;		// how many stand: four at first and at least, eight at most - + and - between (the author, 11-03: "four at first, + back, - too, four at least"; 11-02 had eight, fixed)
 
 // THE TABLE PART'S FIND NEXT (F3 - F6): the table it found last and how it left things - let go with gLastFound, and for gLastFound's reason.
 KFCTableFound gFoundTable;
@@ -301,8 +302,8 @@ bool ChangeSideAsks()
 		case kKindTable:
 			return !gTable.changeStyle.IsEmpty() || gTable.clearOverrides;
 		case kKindRuby:
-			if (gRuby.findOnly)
-				return false;
+			if (gRuby.findOnly || gRuby.kind == kKFCRubyFindVaries)
+				return false;		// (Find Only; and Inconsistent Ruby, which has no Change side - a word unified by its heading's or row's right-click: 11-03)
 			if (gRuby.kind != kKFCRubyFindWithout)
 				return true;
 			for (size_t p = 0; p < gRuby.change.size(); ++p)
@@ -690,6 +691,17 @@ void KeepFromBoxes()
 	}
 }
 
+// THE COLUMNS STANDING FOR WHAT THE BOXES HOLD (2026-11-03 - four to eight, + and -): as many as the last column holding anything, four at least - a saved query's boxes come back whole, a clean
+// face is four.
+void ColumnsForKept()
+{
+	int32 used = 0;
+	for (int32 k = 0; k < kKFCRubyBoxColumns; ++k)
+		if (!gCellFindRuby[k].IsEmpty() || !gCellBase[k].IsEmpty() || !gCellChange[k].IsEmpty())
+			used = k + 1;
+	gCols = (used > kKFCRubyBoxColumnsAtFirst) ? used : kKFCRubyBoxColumnsAtFirst;
+}
+
 // THE BOXES FROM WHAT IS KEPT - a saved query's pieces, a character of base text a box and those of one piece joined (one reading over them). A file from before Find's boxes holds Ruby: whole: it comes back in the first box. One from before the boxes has no base text in its
 // pieces: its readings in the first boxes and its base text spread over the base boxes - one reading over all of it, as it read.
 void BoxesFromKept()
@@ -726,6 +738,7 @@ void BoxesFromKept()
 			++col;
 		}
 		FillBaseFromKept();
+		ColumnsForKept();
 		if (readings == 1)
 			for (int32 k = 0; k + 1 < gCols; ++k)
 				gJoin[k] = !gCellBase[k + 1].IsEmpty();
@@ -763,20 +776,23 @@ void BoxesFromKept()
 		if (col > kKFCRubyBoxColumns)
 			col = kKFCRubyBoxColumns;
 	}
+	ColumnsForKept();
 }
 
 void ShowRubyButtons(IPanelControlData* panel);	// (below, with the face's buttons)
 
-// WHERE A COLUMN STANDS IN THE GRID (KFCUI.fr): the labels to 110, the columns from 115 at the size twelve of them had between 115 and 422 (the author, 11-02: "from the start this size, eight, fixed" - the
-// eight end at 319, inside the left column's 330).
-const int32 kGridColumnsLeft = 115;
-const int32 kGridColumnsRight = 422;
+// WHERE A COLUMN STANDS IN THE GRID (KFCUI.fr): the labels to 65 - Japanese words (the author, 11-03: "Change Ruby To and the rest in Japanese - each box can be larger") -, the columns from 70 to 304,
+// shared by the columns standing (11-03: four at first - 57 wide each -, eight at most - 27), + and - at the rows' end, 308 to 330 (11-02 had twelve's pitch from 115, eight fixed).
+const int32 kGridLabelsRight = 65;
+const int32 kGridColumnsLeft = 70;
+const int32 kGridColumnsRight = 304;
 const int32 kGridBoxGap = 2;
-const int32 kGridPitchColumns = 12;
+const int32 kGridButtonsLeft = 308;
+const int32 kGridButtonsRight = 330;
 
 int32 GridColumnLeft(int32 k)
 {
-	return kGridColumnsLeft + ((kGridColumnsRight - kGridColumnsLeft + kGridBoxGap) * k) / kGridPitchColumns;
+	return kGridColumnsLeft + ((kGridColumnsRight - kGridColumnsLeft + kGridBoxGap) * k) / gCols;
 }
 
 // A widget of the grid put where it goes, or away: hidden is disabled too (ShowPart's rule).
@@ -802,20 +818,26 @@ void LayOutRubyGrid(IPanelControlData* panel)
 	// NOR DOES RUBY MARKS IN TEXT (the author, 11-02: "not needed? then hide them"): the reading is in the mark, and every mark is a row - a row's own Replace is how one is left out. They go, and what they hold asks nothing of it (KFCRubySearch.cpp's WalkMarks).
 	const bool boxes = !listing && !(part && gRuby.kind == kKFCRubyFindMarks);
 	const bool findReads = part && gRuby.kind != kKFCRubyFindWithout && gRuby.kind != kKFCRubyFindVaries;
+	// NOR DOES INCONSISTENT RUBY ASK THE CHANGE SIDE ANYTHING (2026-11-03 - the author: "the Change side's ruby can go too"): a word is unified by a heading's or a row's right-click, to a reading
+	// of its own - the Change row goes, Find's rows stand.
+	const bool changeRow = boxes && !(part && gRuby.kind == kKFCRubyFindVaries);
 	// FIND ONLY (2026-11-03) greys the Change side - its label, its boxes and the base text under them - and stands at the part's left (the author: "on the left"), under what the part shows: the boxes, a
 	// list's three lines, or, with the marks, nothing.
 	const bool changes = part && !gRuby.findOnly;
-	const int32 findOnlyTop = boxes ? 118 : listing ? 76 : 0;
-	PlaceGridWidget(panel, kKFCRubyGridLabelReadingWidgetID, boxes, findReads, 0, 0, 110, 21);
-	PlaceGridWidget(panel, kKFCRubyGridLabelBaseWidgetID, boxes, part, 0, 41, 110, 62);
-	PlaceGridWidget(panel, kKFCRubyGridLabelChangeWidgetID, boxes, changes, 0, 72, 110, 93);
-	PlaceGridWidget(panel, kKFCRubyGridLabelChangeBaseWidgetID, boxes, changes, 0, 96, 110, 116);
-	PlaceGridWidget(panel, kKFCRubyListLabelWidgetID, listing, listing, 0, 0, 110, 21);
-	PlaceGridWidget(panel, kKFCRubyListNameWidgetID, listing, listing, 115, 0, 330, 21);
-	PlaceGridWidget(panel, kKFCRubyListFirstLabelWidgetID, listing, listing, 0, 26, 110, 47);
-	PlaceGridWidget(panel, kKFCRubyListFirstWidgetID, listing, listing, 115, 26, 285, 47);
-	PlaceGridWidget(panel, kKFCRubyListOtherRubyWidgetID, listing, listing, 115, 52, 330, 71);
+	const int32 findOnlyTop = boxes ? (changeRow ? 118 : 72) : listing ? 76 : 0;
+	PlaceGridWidget(panel, kKFCRubyGridLabelReadingWidgetID, boxes, findReads, 0, 0, kGridLabelsRight, 21);
+	PlaceGridWidget(panel, kKFCRubyGridLabelBaseWidgetID, boxes, part, 0, 41, kGridLabelsRight, 62);
+	PlaceGridWidget(panel, kKFCRubyGridLabelChangeWidgetID, changeRow, changes, 0, 72, kGridLabelsRight, 93);
+	PlaceGridWidget(panel, kKFCRubyGridLabelChangeBaseWidgetID, changeRow, changes, 0, 96, kGridLabelsRight, 116);
+	PlaceGridWidget(panel, kKFCRubyListLabelWidgetID, listing, listing, 0, 0, kGridLabelsRight, 21);
+	PlaceGridWidget(panel, kKFCRubyListNameWidgetID, listing, listing, kGridColumnsLeft, 0, 330, 21);
+	PlaceGridWidget(panel, kKFCRubyListFirstLabelWidgetID, listing, listing, 0, 26, kGridLabelsRight, 47);
+	PlaceGridWidget(panel, kKFCRubyListFirstWidgetID, listing, listing, kGridColumnsLeft, 26, kGridColumnsLeft + 170, 47);
+	PlaceGridWidget(panel, kKFCRubyListOtherRubyWidgetID, listing, listing, kGridColumnsLeft, 52, 330, 71);
 	PlaceGridWidget(panel, kKFCRubyFindOnlyWidgetID, part, part, 0, findOnlyTop, 215, findOnlyTop + 19);
+	// THE COLUMNS' + AND - (11-03): + at Ruby:'s row's end, - at Base Text:'s, with the boxes; grey at eight and at four.
+	PlaceGridWidget(panel, kKFCRubyGridPlusWidgetID, boxes, part && gCols < kKFCRubyBoxColumns, kGridButtonsLeft, 0, kGridButtonsRight, 20);
+	PlaceGridWidget(panel, kKFCRubyGridMinusWidgetID, boxes, part && gCols > kKFCRubyBoxColumnsAtFirst, kGridButtonsLeft, 41, kGridButtonsRight, 61);
 	ShowRubyButtons(panel);		// (Choose List... is usable with Words in a Ruby List alone)
 	for (int32 k = 0; k < kKFCRubyBoxColumns; ++k)
 	{
@@ -829,8 +851,8 @@ void LayOutRubyGrid(IPanelControlData* panel)
 		const int32 columnRight = stands ? GridColumnLeft(k + 1) - kGridBoxGap : 0;
 		PlaceGridWidget(panel, ReadingBoxID(k), stands && !overLeft, findReads, left, 0, readingRight, 21);
 		PlaceGridWidget(panel, BaseBoxID(k), stands, part, left, 41, columnRight, 62);
-		PlaceGridWidget(panel, ChangeBoxID(k), stands && !overLeft, changes, left, 72, readingRight, 93);
-		PlaceGridWidget(panel, ChangeBaseID(k), stands, changes, left, 96, columnRight, 116);
+		PlaceGridWidget(panel, ChangeBoxID(k), stands && changeRow && !overLeft, changes, left, 72, readingRight, 93);
+		PlaceGridWidget(panel, ChangeBaseID(k), stands && changeRow, changes, left, 96, columnRight, 116);
 		if (k + 1 < kKFCRubyBoxColumns)
 		{
 			const bool between = boxes && (k + 1 < gCols);
@@ -1064,17 +1086,18 @@ void SpreadBaseBox(IPanelControlData* panel, int32 k, const PMString& typed)
 		SetField(panel, ChangeBaseID(k), one);
 		return;
 	}
+	// (Past the last box STANDING, all the rest in it - the author, 11-03: the boxes do not grow by themselves; + makes room.)
 	int32 last = k;
 	for (size_t c = 0; c < chars.size(); ++c)
 	{
 		const int32 place = k + static_cast<int32>(c);
-		if (place < kKFCRubyBoxColumns)
+		if (place < gCols)
 		{
 			last = place;
 			gCellBase[place] = chars[c];
 		}
 		else
-			gCellBase[kKFCRubyBoxColumns - 1].Append(chars[c]);
+			gCellBase[gCols - 1].Append(chars[c]);
 	}
 	for (int32 place = k; place <= last; ++place)
 	{
@@ -1289,46 +1312,39 @@ void SetEntry(IPanelControlData* panel, const WidgetID& widget, int32 index, con
 	strings->SetString(index, words, kTrue, kFalse);
 }
 
-// JAPANESE WORDS FROM THEIR CODE POINTS: this file is ASCII (the project's .cpp files have no BOM - a character typed here is read as CP932), and an escape written through a tool can come back as the
-// character itself (11-03: it did, and the list said mojibake) - numbers cannot.
-PMString WordsFrom(const uint32* codes, size_t count)
-{
-	PMString words;
-	words.SetTranslatable(kFalse);
-	for (size_t i = 0; i < count; ++i)
-		words.AppendW(UTF32TextChar(codes[i]));
-	return words;
-}
-
-// THE KENTEN LISTS' FIRST ENTRIES IN JAPANESE (J2 - the entries after them are InDesign's own keys, its own tables' words): [subete no kenten] and [henkou shinai]. In another language the part is never shown
-// (KOHAKU-03): the .fr's English stands.
-void ShowKentenFirstEntries(IPanelControlData* panel)
+// THE JAPANESE WORDS OF THE RUBY AND KENTEN PARTS (2026-11-03 - the author's: "kenten is Japanese, so Japanese words"; "the Look For list in Japanese"; "Change Ruby To and the rest in Japanese -
+// the boxes can be larger"; their names - KFCJapanese.h, which holds every such word as code points): written over the .fr's as the face is shown. In another language the parts are never shown
+// (KOHAKU-03): the .fr's stand. The labels' column is 65 wide for these words (KFCUI.fr).
+void ShowJapaneseLabels(IPanelControlData* panel)
 {
 	if (!JapaneseKinds())
 		return;
-	static const uint32 kAny[] = { 0x5B, 0x3059, 0x3079, 0x3066, 0x306E, 0x570F, 0x70B9, 0x5D };
-	static const uint32 kLeave[] = { 0x5B, 0x5909, 0x66F4, 0x3057, 0x306A, 0x3044, 0x5D };
-	SetEntry(panel, kKFCKentenTabMarkWidgetID, 0, WordsFrom(kAny, sizeof(kAny) / sizeof(kAny[0])));
-	SetEntry(panel, kKFCKentenTabChangeWidgetID, 0, WordsFrom(kLeave, sizeof(kLeave) / sizeof(kLeave[0])));
-}
-
-// RUBY'S LOOK FOR IN JAPANESE (2026-11-03 - the author: "the Look For list in Japanese"; KFC's own words - InDesign has none for these): ruby no tsuita moji, ruby no nai moji, ruby no shirushi,
-// ruby no ichiran (the author's names for the marks and the list), ruby no yure - in the order of the .fr's entries (kKFCRubyFindWith ... kKFCRubyFindVaries). The part is a Japanese InDesign's
-// alone (KOHAKU-03).
-void ShowRubyKindEntries(IPanelControlData* panel)
-{
-	if (!JapaneseKinds())
-		return;
-	static const uint32 kWith[] = { 0x30EB, 0x30D3, 0x306E, 0x4ED8, 0x3044, 0x305F, 0x6587, 0x5B57 };
-	static const uint32 kWithout[] = { 0x30EB, 0x30D3, 0x306E, 0x306A, 0x3044, 0x6587, 0x5B57 };
-	static const uint32 kMarks[] = { 0x30EB, 0x30D3, 0x306E, 0x5370 };
-	static const uint32 kList[] = { 0x30EB, 0x30D3, 0x306E, 0x4E00, 0x89A7 };
-	static const uint32 kVaries[] = { 0x30EB, 0x30D3, 0x306E, 0x63FA, 0x308C };
-	SetEntry(panel, kKFCRubyTabKindWidgetID, kKFCRubyFindWith, WordsFrom(kWith, sizeof(kWith) / sizeof(kWith[0])));
-	SetEntry(panel, kKFCRubyTabKindWidgetID, kKFCRubyFindWithout, WordsFrom(kWithout, sizeof(kWithout) / sizeof(kWithout[0])));
-	SetEntry(panel, kKFCRubyTabKindWidgetID, kKFCRubyFindMarks, WordsFrom(kMarks, sizeof(kMarks) / sizeof(kMarks[0])));
-	SetEntry(panel, kKFCRubyTabKindWidgetID, kKFCRubyFindList, WordsFrom(kList, sizeof(kList) / sizeof(kList[0])));
-	SetEntry(panel, kKFCRubyTabKindWidgetID, kKFCRubyFindVaries, WordsFrom(kVaries, sizeof(kVaries) / sizeof(kVaries[0])));
+	// Kenten's lists' first entries (J2 - the entries after them are InDesign's own keys, its own tables' words), and its labels.
+	SetEntry(panel, kKFCKentenTabMarkWidgetID, 0, KFCJa::AnyKenten());
+	SetEntry(panel, kKFCKentenTabChangeWidgetID, 0, KFCJa::LeaveKenten());
+	SetField(panel, kKFCKentenBaseLabelWidgetID, KFCJa::LabelBase());
+	SetField(panel, kKFCKentenMarkLabelWidgetID, KFCJa::LabelKenten());
+	SetField(panel, kKFCKentenChangeLabelWidgetID, KFCJa::LabelChangeKenten());
+	// Ruby's Look For, in the order of the .fr's entries (kKFCRubyFindWith ... kKFCRubyFindVaries).
+	SetEntry(panel, kKFCRubyTabKindWidgetID, kKFCRubyFindWith, KFCJa::RubyWith());
+	SetEntry(panel, kKFCRubyTabKindWidgetID, kKFCRubyFindWithout, KFCJa::RubyWithout());
+	SetEntry(panel, kKFCRubyTabKindWidgetID, kKFCRubyFindMarks, KFCJa::RubyMarks());
+	SetEntry(panel, kKFCRubyTabKindWidgetID, kKFCRubyFindList, KFCJa::RubyList());
+	SetEntry(panel, kKFCRubyTabKindWidgetID, kKFCRubyFindVaries, KFCJa::RubyVaries());
+	// Ruby's labels, its Find Only, and a ruby list's three lines (its Occurrences: in kKFCRubyListAll ... kKFCRubyListFirstInBook's order).
+	SetField(panel, kKFCRubyLookForLabelWidgetID, KFCJa::LabelLookFor());
+	SetField(panel, kKFCRubyGridLabelReadingWidgetID, KFCJa::LabelRuby());
+	SetField(panel, kKFCRubyGridLabelBaseWidgetID, KFCJa::LabelBase());
+	SetField(panel, kKFCRubyGridLabelChangeWidgetID, KFCJa::LabelChangeRuby());
+	SetField(panel, kKFCRubyGridLabelChangeBaseWidgetID, KFCJa::LabelBase());
+	SetField(panel, kKFCRubyFindOnlyWidgetID, KFCJa::FindOnly());
+	SetField(panel, kKFCRubyListLabelWidgetID, KFCJa::LabelList());
+	SetField(panel, kKFCRubyListFirstLabelWidgetID, KFCJa::LabelWhich());
+	SetEntry(panel, kKFCRubyListFirstWidgetID, kKFCRubyListAll, KFCJa::ListAll());
+	SetEntry(panel, kKFCRubyListFirstWidgetID, kKFCRubyListFirstInStory, KFCJa::FirstInStory());
+	SetEntry(panel, kKFCRubyListFirstWidgetID, kKFCRubyListFirstInDocument, KFCJa::FirstInDocument());
+	SetEntry(panel, kKFCRubyListFirstWidgetID, kKFCRubyListFirstInBook, KFCJa::FirstInBook());
+	SetField(panel, kKFCRubyListOtherRubyWidgetID, KFCJa::OtherRuby());
 }
 
 // THE BOXES (C1): each takes a character while its list says custom - grey otherwise, what it holds kept.
@@ -1553,6 +1569,7 @@ void FillKept(IPMUnknown* face)
 {
 	InterfacePtr<IPanelControlData> panel(face, UseDefaultIID());
 	ShowKindEntries(face);
+	ShowJapaneseLabels(panel);		// (first: the lists' entries are written before an entry is selected)
 	SetBox(panel, kKFCTableTabOverridesOnlyWidgetID, gTable.overridesOnly);
 	SetBox(panel, kKFCTableTabClearOverridesWidgetID, gTable.clearOverrides);
 	InterfacePtr<IDropDownListController> rubyKind(QueryList(face, kKFCRubyTabKindWidgetID));
@@ -1562,7 +1579,6 @@ void FillKept(IPMUnknown* face)
 	if (rubyFirst != nil)
 		rubyFirst->Select(gRuby.listFirst, kTrue, kFalse);
 	WriteBoxes(panel);
-	ShowKentenFirstEntries(panel);
 	SetField(panel, kKFCKentenTabBaseWidgetID, gKenten.base);
 	InterfacePtr<IDropDownListController> kentenMark(QueryList(face, kKFCKentenTabMarkWidgetID));
 	if (kentenMark != nil)
@@ -1574,7 +1590,6 @@ void FillKept(IPMUnknown* face)
 	SetField(panel, kKFCKentenChangeCharWidgetID, CharWords(gKenten.changeChar));
 	SetBox(panel, kKFCRubyListOtherRubyWidgetID, gRuby.listOtherRuby);
 	SetBox(panel, kKFCRubyFindOnlyWidgetID, gRuby.findOnly);
-	ShowRubyKindEntries(panel);
 	ShowKind(face);
 }
 
@@ -1715,6 +1730,7 @@ void KFCKohakuTab::ShutdownCleanup()
 		gCellBase[k] = PMString();
 		gCellChange[k] = PMString();
 	}
+	gCols = kKFCRubyBoxColumnsAtFirst;
 	for (int32 k = 0; k < kKindCount; ++k)
 	{
 		gSaid[k][0] = PMString();
@@ -1801,6 +1817,8 @@ public:
 				AttachToWidget(kColumnButtons[b], IID_IBOOLEANCONTROLDATA, panel);
 			AttachToWidget(kKFCRubyListOtherRubyWidgetID, IID_ITRISTATECONTROLDATA, panel);
 			AttachToWidget(kKFCRubyFindOnlyWidgetID, IID_ITRISTATECONTROLDATA, panel);
+			AttachToWidget(kKFCRubyGridPlusWidgetID, IID_ITRISTATECONTROLDATA, panel);
+			AttachToWidget(kKFCRubyGridMinusWidgetID, IID_ITRISTATECONTROLDATA, panel);
 			for (int32 k = 0; k < kKFCRubyBoxColumns; ++k)
 			{
 				AttachToWidget(ReadingBoxID(k), IID_ITEXTCONTROLDATA, panel);
@@ -1876,6 +1894,8 @@ public:
 			DetachFromWidget(kColumnButtons[b], IID_IBOOLEANCONTROLDATA, panel);
 		DetachFromWidget(kKFCRubyListOtherRubyWidgetID, IID_ITRISTATECONTROLDATA, panel);
 		DetachFromWidget(kKFCRubyFindOnlyWidgetID, IID_ITRISTATECONTROLDATA, panel);
+		DetachFromWidget(kKFCRubyGridPlusWidgetID, IID_ITRISTATECONTROLDATA, panel);
+		DetachFromWidget(kKFCRubyGridMinusWidgetID, IID_ITRISTATECONTROLDATA, panel);
 		for (int32 k = 0; k < kKFCRubyBoxColumns; ++k)
 		{
 			DetachFromWidget(ReadingBoxID(k), IID_ITEXTCONTROLDATA, panel);
@@ -2020,6 +2040,43 @@ public:
 			ShowRubyKind(panel);
 			ShowFaceButtons(panel);
 		}
+		else if (widget == kKFCRubyGridPlusWidgetID && theChange == kTrueStateMessage)
+		{
+			// + (2026-11-03 - the author: "four at first, + back"): a column more, a clean one, eight at most - the columns standing share the row, each narrower.
+			if (gCols < kKFCRubyBoxColumns)
+				++gCols;
+			KeepFromBoxes();
+			InterfacePtr<IPanelControlData> panel(this, UseDefaultIID());
+			LayOutRubyGrid(panel);
+			KFC_DIAG_LOG("RUBYTAB cols=%d", static_cast<int>(gCols));
+		}
+		else if (widget == kKFCRubyGridMinusWidgetID && theChange == kTrueStateMessage)
+		{
+			// - (11-03 - "- too, four at least"): THE LAST COLUMN GOES, what it held with it (the Captions dialog's - no asking, as 11-01 had it), and the chain before it: the next + brings a clean one.
+			InterfacePtr<IPanelControlData> panel(this, UseDefaultIID());
+			if (gCols > kKFCRubyBoxColumnsAtFirst)
+			{
+				--gCols;
+				gCellFindRuby[gCols].Clear();
+				gCellFindRuby[gCols].SetTranslatable(kFalse);
+				gCellBase[gCols].Clear();
+				gCellBase[gCols].SetTranslatable(kFalse);
+				gCellChange[gCols].Clear();
+				gCellChange[gCols].SetTranslatable(kFalse);
+				gJoin[gCols - 1] = false;
+				SetField(panel, ReadingBoxID(gCols), gCellFindRuby[gCols]);
+				SetField(panel, BaseBoxID(gCols), gCellBase[gCols]);
+				SetField(panel, ChangeBoxID(gCols), gCellChange[gCols]);
+				SetField(panel, ChangeBaseID(gCols), gCellBase[gCols]);
+				SetBox(panel, JoinID(gCols - 1), false);
+			}
+			KeepFromBoxes();
+			const WidgetID focusTo(LetGoOfGoingBox());
+			LayOutRubyGrid(panel);
+			if (focusTo != kInvalidWidgetID && panel != nil)
+				panel->SetKeyboardFocus(focusTo);
+			KFC_DIAG_LOG("RUBYTAB cols=%d", static_cast<int>(gCols));
+		}
 		else if (widget == kKFCRubyListFirstWidgetID)
 		{
 			InterfacePtr<IDropDownListController> list(view, UseDefaultIID());
@@ -2136,7 +2193,7 @@ public:
 		// WHAT A QUERY HOLDS WAS CHANGED BY HAND: Find/Change's Query menu says [Custom], as a change on InDesign's own tabs does. (Search: is no part of a query, as InDesign's own Search: is none of its menu's; no button
 		// changes it - Find Next, Find in KFC and How to Use... change nothing, what Change and its kind write is the document, Save List... writes a file; Choose List... changes what a query holds, and says so itself.)
 		if (widget != kKFCKohakuTabScopeWidgetID && widget != kKFCQRTabFindNextWidgetID && widget != kKFCTableTabChangeWidgetID && widget != kKFCTableTabChangeAllWidgetID
-			&& widget != kKFCTableTabChangeFindWidgetID && !IsColumnButton(widget)
+			&& widget != kKFCTableTabChangeFindWidgetID && !IsColumnButton(widget) && widget != kKFCRubyGridPlusWidgetID		// (+ brings a clean column: what the query holds stands - 11-03, as 11-01 had it)
 			&& (protocol != IID_ITRISTATECONTROLDATA || theChange == kTrueStateMessage || theChange == kFalseStateMessage))
 			KFCKohakuQueryMenu::FaceChanged();
 	}

@@ -3999,6 +3999,8 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 									}
 								),
 								// RUBY: the labels one width so the fields stand in a line, each against its field (right-aligned - the author, 11-02: no blank after Look For: and the like, the lists where they were). The text fields notify at every key stroke: the panel's Find may be pressed with one still focused (KFCKohakuTab.h).
+								// THE LABELS IN JAPANESE, 65 WIDE (2026-11-03 - the author: "Change Ruby To and the rest in Japanese - each box can be larger"): the face writes them as it is shown (KFCKohakuTab.cpp's ShowJapaneseLabels) - the part
+								// is a Japanese InDesign's alone (KOHAKU-03) -, the fields from 70.
 								EVEGenericPanelWidget
 								(
 									kKFCKohakuRubySectionWidgetID, kPMRsrcID_None,
@@ -4007,7 +4009,7 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 									kTrue, kTrue,
 									kEVEAlignLeft | kEVENoSpaceAfter | kEVEArrangeChildrenInColumn | kEVENoMargin,
 									{
-										// Look For: [Text With Ruby] - its entries in Japanese as the face is shown (2026-11-03 - the author: "the Look For list in Japanese"; KFCKohakuTab.cpp's ShowRubyKindEntries): these are the order and a
+										// Look For: [Text With Ruby] - its entries in Japanese as the face is shown (2026-11-03 - the author: "the Look For list in Japanese"; KFCKohakuTab.cpp's ShowJapaneseLabels): these are the order and a
 										// fallback.
 										EVEGenericPanelWidget
 										(
@@ -4017,13 +4019,15 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 											kTrue, kTrue,
 											kEVEAlignLeft | kEVERegularSpaceAfter | kEVEArrangeChildrenInRow | kEVENoMargin,
 											{
+												// (Its words the face's, in Japanese - kensaku taishou: - as it is shown: KFCKohakuTab.cpp's ShowJapaneseLabels. None here: EVE would widen the label to an English one's width and
+												// push the list right - 2026-11-03, the labels' column 65 wide since the author's "the labels in Japanese - the boxes larger".)
 												EVEStaticTextWidget
 												(
-													kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone,
-													Frame(0, 0, 110, 21)
+													kKFCRubyLookForLabelWidgetID, kSysStaticTextPMRsrcId, kBindNone,
+													Frame(0, 0, 65, 21)
 													kTrue, kTrue, kAlignRight,
 													kDontEllipsize, kTrue,
-													kKFCRubyTabLookForKey,
+													"",
 													0,
 													kEVERegularSpaceAfter,
 												),
@@ -4043,9 +4047,9 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 												),
 											}
 										),
-										// THE BOXES (the author, 11-01: boxes for the ruby and the kanji, joined - Find's, and Change Ruby To's following them; 11-02: eight, fixed, no + or -). Not arranged: KFCKohakuTab.cpp places each by its column
-										// (LayOutRubyGrid - the frames here are the column-less default). Find: a Ruby: box over a Base Text: box, a chain between neighbours (InDesign's own - its Scale dialog's chain). Change: a Change Ruby To box,
-										// and the column's base text under it, as words: it is Find's, not to be edited.
+										// THE BOXES (the author, 11-01: boxes for the ruby and the kanji, joined - Find's, and Change Ruby To's following them; 11-02: eight, fixed, no + or -; 11-03: four at first, + and - back, four to
+										// eight, as wide as the columns standing share). Not arranged: KFCKohakuTab.cpp places each by its column (LayOutRubyGrid - the frames here are the column-less default). Find: a Ruby: box over a Base Text:
+										// box, a chain between neighbours (InDesign's own - its Scale dialog's chain). Change: a Change Ruby To box, and the column's base text under it, as words: it is Find's, not to be edited.
 										EVEGenericPanelWidget
 										(
 											kKFCRubyGridWidgetID, kPMRsrcID_None,
@@ -4057,7 +4061,7 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 												EVEStaticTextWidget
 												(
 													kKFCRubyGridLabelReadingWidgetID, kSysStaticTextPMRsrcId, kBindNone,
-													Frame(0, 0, 110, 21)
+													Frame(0, 0, 65, 21)
 													kTrue, kTrue, kAlignRight,
 													kDontEllipsize, kTrue,
 													kKFCRubyTabReadingKey,
@@ -4067,7 +4071,7 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 												EVEStaticTextWidget
 												(
 													kKFCRubyGridLabelBaseWidgetID, kSysStaticTextPMRsrcId, kBindNone,
-													Frame(0, 41, 110, 62)
+													Frame(0, 41, 65, 62)
 													kTrue, kTrue, kAlignRight,
 													kDontEllipsize, kTrue,
 													kKFCRubyTabBaseKey,
@@ -4077,7 +4081,7 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 												EVEStaticTextWidget
 												(
 													kKFCRubyGridLabelChangeWidgetID, kSysStaticTextPMRsrcId, kBindNone,
-													Frame(0, 72, 110, 93)
+													Frame(0, 72, 65, 93)
 													kTrue, kTrue, kAlignRight,
 													kDontEllipsize, kTrue,
 													kKFCRubyTabChangeKey,
@@ -4087,7 +4091,7 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 												EVEStaticTextWidget
 												(
 													kKFCRubyGridLabelChangeBaseWidgetID, kSysStaticTextPMRsrcId, kBindNone,
-													Frame(0, 96, 110, 116)
+													Frame(0, 96, 65, 116)
 													kTrue, kTrue, kAlignRight,
 													kDontEllipsize, kTrue,
 													kKFCRubyTabBaseKey,
@@ -4099,7 +4103,7 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 												EVEStaticTextWidget
 												(
 													kKFCRubyListLabelWidgetID, kSysStaticTextPMRsrcId, kBindNone,
-													Frame(0, 0, 110, 21)
+													Frame(0, 0, 65, 21)
 													kTrue, kTrue, kAlignRight,
 													kDontEllipsize, kTrue,
 													kKFCRubyListWordKey,
@@ -4109,7 +4113,7 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 												KFCQueryFixedTextWidget
 												(
 													kKFCRubyListNameWidgetID, kSysStaticTextPMRsrcId, kBindNone,
-													Frame(115, 0, 330, 21)
+													Frame(70, 0, 330, 21)
 													kTrue, kTrue, kAlignLeft,
 													kEllipsizeMiddle, kFalse,
 													"",
@@ -4119,7 +4123,7 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 												EVEStaticTextWidget
 												(
 													kKFCRubyListFirstLabelWidgetID, kSysStaticTextPMRsrcId, kBindNone,
-													Frame(0, 26, 110, 47)
+													Frame(0, 26, 65, 47)
 													kTrue, kTrue, kAlignRight,
 													kDontEllipsize, kTrue,
 													kKFCRubyListWhichKey,
@@ -4129,7 +4133,7 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 												EVEDropDownListWidget
 												(
 													kKFCRubyListFirstWidgetID, kSysDropDownPMRsrcId, kBindNone,
-													Frame(115, 26, 285, 47)
+													Frame(70, 26, 240, 47)
 													kTrue, kTrue,
 													{{
 														kKFCRubyListEveryKey,
@@ -4142,9 +4146,29 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 												EVECheckBoxWidget
 												(
 													kKFCRubyListOtherRubyWidgetID, kSysCheckBoxPMRsrcId, kBindNone,
-													Frame(115, 52, 330, 71)
+													Frame(70, 52, 330, 71)
 													kTrue, kTrue, kAlignLeft,
 													kKFCRubyListOtherRubyKey,		// "Include Text With Other Ruby" (the author's proposal 2)
+													kEVENoSpaceAfter,
+												),
+												// THE COLUMNS' + AND - (2026-11-03 - the author: "four at first, + back, - too, four at least"): the Captions dialog's own icons and size, as they stood 11-01 to 11-02 - + at Ruby:'s row's end,
+												// - at Base Text:'s (LayOutRubyGrid places them; the boxes share what is left of the row).
+												EVERollOverIconButtonWidget
+												(
+													kKFCRubyGridPlusWidgetID, kKFCRubyGridAddIconRsrcID, kLinksUIPluginID,	// WidgetId, RsrcId
+													kBindNone,
+													Frame(308, 0, 330, 20)		// the Captions dialog's size
+													kTrue, kTrue,
+													kADBEIconSuiteButtonType,
+													kEVENoSpaceAfter,
+												),
+												EVERollOverIconButtonWidget
+												(
+													kKFCRubyGridMinusWidgetID, kKFCRubyGridDeleteIconRsrcID, kLinksUIPluginID,	// WidgetId, RsrcId
+													kBindNone,
+													Frame(308, 41, 330, 61)
+													kTrue, kTrue,
+													kADBEIconSuiteButtonType,
 													kEVENoSpaceAfter,
 												),
 												KFC_RUBY_BOX(kKFCRubyReadingBox0WidgetID, 0, 21),
@@ -4204,7 +4228,8 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 								// docs/superpowers/specs/2026-11-03-kfc-kenten-face-japanese-design.md J1 - J3): ITS OWN KEYS, translated by its own tables - none, the ten kinds, custom - after the first entry, [Any] or
 								// [Leave], whose Japanese the face writes in (KFCKohakuTab.cpp). An entry k + 1 is the IKentenStyle::KentenKind k; entry 1, none, is Text Without Kenten on Kenten: and the marks taken
 								// off on Change Kenten To: (N1, N2 - Look For and Remove Kenten went). Beside each list a box of one character, a custom mark's (C1). THE THREE ROWS' FIELDS STAND ONE OVER THE OTHER
-								// (the author, 11-03 - A2): every label 115 wide (Change Kenten To: is 115 in the dialog's font - measured; at 110 EVE widened its own and pushed its list 5 right), every field 170.
+								// (the author, 11-03 - A2): every label one width, every field 170. THE LABELS IN JAPANESE, 65 WIDE (11-03 later - the author: "Kenten's labels in Japanese too"): the face writes them as it is shown
+								// (KFCKohakuTab.cpp's ShowJapaneseLabels); none here - an English word wider than the label made EVE widen it and push its list right (measured with Change Kenten To:, at 110).
 								EVEGenericPanelWidget
 								(
 									kKFCKohakuKentenSectionWidgetID, kPMRsrcID_None,
@@ -4224,11 +4249,11 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 											{
 												EVEStaticTextWidget
 												(
-													kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone,
-													Frame(0, 0, 115, 21)
+													kKFCKentenBaseLabelWidgetID, kSysStaticTextPMRsrcId, kBindNone,
+													Frame(0, 0, 65, 21)
 													kTrue, kTrue, kAlignRight,
 													kDontEllipsize, kTrue,
-													kKFCRubyTabBaseKey,
+													"",					// (oyamoji: - the face's - ShowJapaneseLabels)
 													0,
 													kEVERegularSpaceAfter,
 												),
@@ -4261,11 +4286,11 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 											{
 												EVEStaticTextWidget
 												(
-													kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone,
-													Frame(0, 0, 115, 21)
+													kKFCKentenMarkLabelWidgetID, kSysStaticTextPMRsrcId, kBindNone,
+													Frame(0, 0, 65, 21)
 													kTrue, kTrue, kAlignRight,
 													kDontEllipsize, kTrue,
-													kKFCKentenTabMarkKey,
+													"",					// (kenten: - the face's - ShowJapaneseLabels)
 													0,
 													kEVERegularSpaceAfter,
 												),
@@ -4322,11 +4347,11 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 											{
 												EVEStaticTextWidget
 												(
-													kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone,
-													Frame(0, 0, 115, 21)
+													kKFCKentenChangeLabelWidgetID, kSysStaticTextPMRsrcId, kBindNone,
+													Frame(0, 0, 65, 21)
 													kTrue, kTrue, kAlignRight,
 													kDontEllipsize, kTrue,
-													kKFCKentenTabChangeKey,
+													"",					// (chikan kenten: - the face's - ShowJapaneseLabels)
 													0,
 													kEVERegularSpaceAfter,
 												),

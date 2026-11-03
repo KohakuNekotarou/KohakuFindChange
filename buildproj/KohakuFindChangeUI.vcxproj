@@ -289,6 +289,7 @@
       <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCBookPanelPlacement.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCColorTextView.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCKentenMark.h"/>
+    <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCJapanese.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCFindChangeMinimize.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCAppBarSearchEnter.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCHitMarkerView.h"/>

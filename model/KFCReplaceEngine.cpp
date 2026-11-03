@@ -4308,7 +4308,7 @@ bool RubyFindOnlyNow()
 class RubyWrite : public OwnTabWrite
 {
 public:
-	explicit RubyWrite(const KFCQueryCopy* list)
+	explicit RubyWrite(const KFCQueryCopy* list) : fVariesReplace(list != nil && list->rubyKind == kKFCRubyFindVaries)
 	{
 		(void)KFCRubySearch::IsTabCurrent(&fAsked);
 		fPieces = KFCRubySearch::PlanPieces(fAsked);
@@ -4317,7 +4317,7 @@ public:
 	}
 	// AN INCONSISTENT RUBY ROW GIVEN ONE OF ITS WORD'S READINGS (2026-11-03 - a heading's or a row's "unify" item - KFCReplaceEngine::UnifyRubyHits): that reading over the row's whole text, as one
 	// Change Ruby To box with no Base Text writes it, whatever the boxes hold. Find Only stands as the tab says (NothingToChange).
-	RubyWrite(const KFCQueryCopy* list, const PMString& unifyTo)
+	RubyWrite(const KFCQueryCopy* list, const PMString& unifyTo) : fVariesReplace(false)
 	{
 		(void)KFCRubySearch::IsTabCurrent(&fAsked);
 		KFCRubyConditions one;
@@ -4331,6 +4331,10 @@ public:
 	{
 		if (fAsked.findOnly)
 			return kRubyFindOnlyRefusal;
+		// AN INCONSISTENT RUBY LIST'S ROWS HAVE NO CHANGE SIDE (2026-11-03 - the author: "the Change side's ruby can go"; its rows' Replace and Return grey): a word takes a reading of its own by
+		// its heading's or row's right-click (UnifyRubyHits - the other constructor).
+		if (fVariesReplace)
+			return "Replace: an Inconsistent Ruby row takes a reading of its word by the right-click on its heading or on it, in the panel.";
 		return (KFCRubyChangePlan::Check(fPieces) == KFCRubyChangePlan::kReadingOverNoBase)
 			? "Replace: a Change Ruby To box on the Kohaku+ tab stands over no Base Text - type it in that column's Base Text box, or join the column to the one beside it, in Edit > Find/Change." : nil;
 	}
@@ -4373,6 +4377,7 @@ private:
 	KFCRubyConditions						fAsked;
 	std::vector<KFCRubyChangePlan::Piece>	fPieces;
 	KFCOwnSwitches							fSwitches;
+	bool									fVariesReplace;		// a Replace of an Inconsistent Ruby list's rows - refused (NothingToChange)
 };
 
 // A RUBY LIST'S (KFCRubyList.h): what the line of the row's word says, whatever the Change side does - and the words the list was found with, not the file as it stands now: what a row draws over it is what it gets.
@@ -4951,6 +4956,12 @@ bool KFCReplaceEngine::WriteFacePlaces(int32 mode, const KFCRubyConditions& ruby
 	if (mode == kKFCRubySearchMode && ruby.findOnly)
 	{
 		out.why.Append(kRubyFindOnlyRefusal);
+		return false;
+	}
+	// NOR INCONSISTENT RUBY, which has no Change side (2026-11-03 - the face greys Change, Change All and Change/Find on it).
+	if (mode == kKFCRubySearchMode && ruby.kind == kKFCRubyFindVaries)
+	{
+		out.why.Append("Inconsistent Ruby has no Change side: unify a word by the right-click on its heading or on its row, in the panel.");
 		return false;
 	}
 	// THE WRITER: a row's Replace's, for the kind and its Look For (ReplaceOwnTabRows' choice). A mark's write moves text and has none: its own write, the later places first.

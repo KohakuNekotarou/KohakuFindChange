@@ -34,6 +34,7 @@
 #include "KFCPanelTitle.h"			// Update - the tab's scope written before the search
 #include "KFCResultNodeID.h"
 #include "KFCTextCut.h"				// KFCSafeCut - where the tier name's words may be cut
+#include "KFCJapanese.h"			// KFCJa - the Ruby and Kenten tiers' names in Japanese (2026-11-03)
 #include "FileUtils.h"				// IsEqual - the query the dialog's Find searched last, by its file
 
 namespace
@@ -673,7 +674,8 @@ namespace
 			label.Append(" Find:\"[Warichu]\"");
 			return label;
 		}
-		// THE KENTEN KIND'S THE SAME: Find:"base<mark>" as its rows draw it; Find:"base" (no kenten) for Text Without Kenten; [Any Kenten] with nothing asked.
+		// THE KENTEN KIND'S THE SAME: Find:"base<mark>" as its rows draw it; Find:"base(kenten nashi)" for its none; [subete no kenten] with nothing asked - in Japanese since 2026-11-03 (the author: "the
+		// Find"" on the panel in Japanese"; KFCJapanese.h - the part's own words: its list's first entry, its none).
 		if (mode == kKFCKentenSearchMode)
 		{
 			KFCKentenConditions asked;
@@ -682,10 +684,10 @@ namespace
 			if (asked.kind == kKFCKentenFindWithout)
 			{
 				label.Append(asked.base);
-				label.Append(" (no kenten)");
+				label.Append(KFCJa::Parenthesized(KFCJa::KentenNone()));
 			}
 			else if (asked.base.IsEmpty() && asked.mark == 0)
-				label.Append("[Any Kenten]");
+				label.Append(KFCJa::AnyKenten());
 			else
 			{
 				label.Append(asked.base);
@@ -699,7 +701,9 @@ namespace
 			label.Append("\"");
 			return label;
 		}
-		// THE RUBY TAB'S THE SAME: Find:"base<reading>" as its rows draw it; Find:"base" (no ruby) for Text Without Ruby; [Any Ruby] with nothing asked.
+		// THE RUBY TAB'S THE SAME: Find:"base<reading>" as its rows draw it, and the other Look Fors by their names in brackets, what narrows them after - in Japanese since 2026-11-03 (the author: "the
+		// Find"" on the panel in Japanese - ruby yure"; the Look For list's own words - KFCJapanese.h): [ruby ari] with nothing asked, [ruby nashi] base, [ruby shirushi], [ruby ichiran] file
+		// (its Occurrences and Include Text With Other Ruby after it), [ruby yure] base.
 		if (mode == kKFCRubySearchMode)
 		{
 			KFCRubyConditions asked;
@@ -707,8 +711,9 @@ namespace
 			label.Append(" Find:\"");
 			if (asked.kind == kKFCRubyFindWithout)
 			{
+				label.Append(KFCJa::Bracketed(KFCJa::RubyWithout()));
+				label.Append(" ");
 				label.Append(asked.base);
-				label.Append(" (no ruby)");
 			}
 			else if (asked.kind == kKFCRubyFindList)
 			{
@@ -716,17 +721,19 @@ namespace
 				PMString listName;
 				FileUtils::GetFileName(FileUtils::PMStringToSysFile(asked.listPath), listName);
 				listName.SetTranslatable(kFalse);
-				label.Append("[Ruby List] ");
+				label.Append(KFCJa::Bracketed(KFCJa::RubyList()));
+				label.Append(" ");
 				label.Append(listName);
 				if (asked.listFirst != kKFCRubyListAll)
-					label.Append((asked.listFirst == kKFCRubyListFirstInStory) ? " (First in Story)" : (asked.listFirst == kKFCRubyListFirstInDocument) ? " (First in Document)" : " (First in Book)");
+					label.Append(KFCJa::Parenthesized((asked.listFirst == kKFCRubyListFirstInStory) ? KFCJa::FirstInStory()
+						: (asked.listFirst == kKFCRubyListFirstInDocument) ? KFCJa::FirstInDocument() : KFCJa::FirstInBook()));
 				if (asked.listOtherRuby)
-					label.Append(" (With Other Ruby)");		// (Include Text With Other Ruby - the author's proposal 2)
+					label.Append(KFCJa::Parenthesized(KFCJa::OtherRuby()));		// (Include Text With Other Ruby - the author's proposal 2)
 			}
 			else if (asked.kind == kKFCRubyFindVaries)
 			{
 				// INCONSISTENT RUBY (the author's proposal 3): what Base Text narrows it to, after the kind (Ruby: is not read - 11-03, KFCRubySearch.cpp's WalkVaries).
-				label.Append("[Inconsistent Ruby]");
+				label.Append(KFCJa::Bracketed(KFCJa::RubyVaries()));
 				if (!asked.base.IsEmpty())
 				{
 					label.Append(" ");
@@ -734,9 +741,9 @@ namespace
 				}
 			}
 			else if (asked.kind == kKFCRubyFindMarks)
-				label.Append("[Ruby Marks]");		// (every mark: the boxes ask nothing of it - KFCRubySearch.cpp's WalkMarks)
+				label.Append(KFCJa::Bracketed(KFCJa::RubyMarks()));		// (every mark: the boxes ask nothing of it - KFCRubySearch.cpp's WalkMarks)
 			else if (asked.base.IsEmpty() && asked.reading.IsEmpty())
-				label.Append("[Any Ruby]");
+				label.Append(KFCJa::Bracketed(KFCJa::RubyWith()));
 			else
 			{
 				label.Append(asked.base);

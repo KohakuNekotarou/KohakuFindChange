@@ -1183,8 +1183,8 @@ bool KFCRubySearch::WalkOneDocument(const UIDRef& docRef, const PMString& name, 
 bool KFCRubySearch::WriteDocument(const UIDRef& docRef, const KFCRubyConditions& asked, const std::vector<KFCSearchEngine::ListedPlace>* part, int32& outCount, std::set<size_t>* ioBookSeen)
 {
 	outCount = 0;
-	if (asked.findOnly)
-		return true;		// (Find Only writes nothing - 11-03; HasChangeSide keeps a run from asking it)
+	if (asked.findOnly || asked.kind == kKFCRubyFindVaries)
+		return true;		// (Find Only writes nothing - 11-03; nor Inconsistent Ruby, which has no Change side since 11-03 - HasChangeSide keeps a run from asking either)
 	std::vector<KFCResultModel::Hit> hits;
 	std::map<UID, uint32> versions;
 	bool capped = false;

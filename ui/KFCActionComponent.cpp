@@ -1094,8 +1094,9 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 				// Several rows selected together, the right-clicked among them: while any of them can be - the rows and the
 				// question the Replace itself takes (RowsOfRightClick, CanReplaceAny).
 				int32 chapter = -1, hit = -1;
+				// (Grey on an Inconsistent Ruby row: it has no Change side - its word is unified by the items under it - 2026-11-03.)
 				const bool enable = RightClickedHit(widget, chapter, hit)
-					&& KFCResultTree::CanReplaceAny(KFCResultTree::RowsOfRightClick(chapter, hit));
+					&& KFCResultTree::CanReplaceAny(KFCResultTree::RowsOfRightClick(chapter, hit)) && !KFCResultTree::IsUnifyRow(chapter, hit);
 				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 				break;
 			}

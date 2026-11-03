@@ -163,6 +163,10 @@ namespace KFCResultTree
 	/** Item `slot`'s name over the row - "<<reading>> ni soroeru" - false when the row's word has no reading `slot`. */
 	bool UnifyItemName(const NodeID& row, int32 slot, PMString& outName);
 
+	/** IS THE HIT ROW AN INCONSISTENT RUBY ROW (one whose word has readings to unify to - KFCResults()->GetUnifyFacts)? Such a row has no Change side (2026-11-03 - the author): its Replace greys,
+	    and Return writes nothing on it - it is unified by the right-click (UnifyRows). */
+	bool IsUnifyRow(int32 chapterIdx, int32 hitIdx);
+
 	/** Item `slot`'s write: a heading's every row, or the hit row - the rows selected together when it is one of them (RowsOfRightClick) - those of the row's word, given its reading `slot`
 	    (ReplaceRows with unifyTo). True = something written. */
 	bool UnifyRows(const NodeID& row, int32 slot);

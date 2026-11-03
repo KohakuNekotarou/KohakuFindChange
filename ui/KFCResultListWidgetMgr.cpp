@@ -73,6 +73,7 @@
 #include "KFCPanelIcon.h"		// the illustration follows the status line
 #include "KFCDiag.h"			// TREETIME, RETFOCUS and the fault switches - test builds only
 #include "KFCBookPanelLookup.h"	// QueryPanelManager - the panel made active (TakeKeyboard)
+#include "KFCJapanese.h"		// KFCJa::NiSoroeru - an Inconsistent Ruby row's "unify" items
 #include "IApplication.h"
 #include "IEventHandler.h"		// the list's handler - the keyboard's holder (TakeKeyboard)
 #include "IKeyBoard.h"			// GetKeyFocus / AcquireKeyFocus (TakeKeyboard)
@@ -1170,6 +1171,16 @@ bool KFCResultTree::ReplaceRows(const KFCRowsByChapter& rows, PMString* outStatu
 	int32 shownChapter = -1, shownHit = -1;
 	if (!LastSelectedHit(rows, shownChapter, shownHit) || RefusedWhileRunning())
 		return false;
+	// AN INCONSISTENT RUBY LIST'S ROWS HAVE NO CHANGE SIDE (2026-11-03 - the author: their Replace and Return grey): Return writes nothing on them, and the line says how one is unified.
+	if (unifyTo == nil && IsUnifyRow(shownChapter, shownHit))
+	{
+		PMString how("Inconsistent Ruby: a word takes one of its readings by the right-click on its heading or on its row.");
+		how.SetTranslatable(kFalse);
+		ShowStatus(how);
+		if (outStatus != nil)
+			*outStatus = how;
+		return false;
+	}
 	// Nothing to write when none can be replaced - the menu greys Replace by the same question; Return does nothing then.
 	if (!CanReplaceAny(rows))
 		return false;
@@ -1263,15 +1274,19 @@ bool KFCResultTree::UnifyItemName(const NodeID& row, int32 slot, PMString& outNa
 	std::vector<PMString> readings;
 	if (!UnifyReadingsOf(row, word, readings) || slot < 0 || slot >= static_cast<int32>(readings.size()))
 		return false;
-	// "<<reading>> ni soroeru" (the author's words, 11-03) - from code points: this file is ASCII (memory file-edit-escape-and-newline-traps).
-	static const uint32 kNiSoroeru[] = { 0x306B, 0x305D, 0x308D, 0x3048, 0x308B };
+	// "<<reading>> ni soroeru" (the author's words, 11-03 - KFCJapanese.h: this file is ASCII).
 	outName.AppendW(UTF32TextChar(0x300A));
 	outName.Append(readings[static_cast<size_t>(slot)]);
 	outName.AppendW(UTF32TextChar(0x300B));
-	for (size_t c = 0; c < sizeof(kNiSoroeru) / sizeof(kNiSoroeru[0]); ++c)
-		outName.AppendW(UTF32TextChar(kNiSoroeru[c]));
+	outName.Append(KFCJa::NiSoroeru());
 	outName.SetTranslatable(kFalse);
 	return true;
+}
+
+bool KFCResultTree::IsUnifyRow(int32 chapterIdx, int32 hitIdx)
+{
+	PMString word, readings;
+	return KFCResults()->GetUnifyFacts(chapterIdx, -1, hitIdx, word, readings);
 }
 
 bool KFCResultTree::UnifyRows(const NodeID& row, int32 slot)

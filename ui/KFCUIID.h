@@ -603,8 +603,9 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQRTabFindNextWidgetID, kKFCUIPrefix + 60)
 DECLARE_PMID(kWidgetIDSpace, kKFCQRTabStatusWidgetID, kKFCUIPrefix + 61)
 DECLARE_PMID(kWidgetIDSpace, kKFCQRTabNoteWidgetID, kKFCUIPrefix + 62)
 DECLARE_PMID(kWidgetIDSpace, kKFCKohakuTabKindWidgetID, kKFCUIPrefix + 63)
-// (+ 64 was the QR Code part, + 87 and + 88 the Table part's two lines, + 75 and + 89 the Ruby boxes' + and -, kKFCPrefix + 70 a ruby list's line - the face's two lines say all of it now; and the Ruby boxes' columns 9 to 12,
-// + 98 to + 101, + 110 to + 113, + 121 to + 124, kKFCPrefix + 48 to + 51 and + 60 to + 63: eight, fixed (the author, 11-02). Retired - not given to anything else.)
+// (+ 64 was the QR Code part, + 87 and + 88 the Table part's two lines, kKFCPrefix + 70 a ruby list's line - the face's two lines say all of it now; and the Ruby boxes' columns 9 to 12,
+// + 98 to + 101, + 110 to + 113, + 121 to + 124, kKFCPrefix + 48 to + 51 and + 60 to + 63: eight at most (the author, 11-02). Retired - not given to anything else. + 75 and + 89, the Ruby boxes' + and -,
+// retired 11-02, stand again since 11-03 - below.)
 DECLARE_PMID(kWidgetIDSpace, kKFCTableTabFindStyleWidgetID, kKFCUIPrefix + 65)
 DECLARE_PMID(kWidgetIDSpace, kKFCTableTabOverridesOnlyWidgetID, kKFCUIPrefix + 66)
 DECLARE_PMID(kWidgetIDSpace, kKFCTableTabChangeStyleWidgetID, kKFCUIPrefix + 67)
@@ -628,7 +629,11 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultTallHitNodeWidgetID, kKFCUIPrefix + 83)
 DECLARE_PMID(kWidgetIDSpace, kKFCTableTabChangeWidgetID, kKFCUIPrefix + 84)
 DECLARE_PMID(kWidgetIDSpace, kKFCTableTabChangeAllWidgetID, kKFCUIPrefix + 85)
 DECLARE_PMID(kWidgetIDSpace, kKFCTableTabChangeFindWidgetID, kKFCUIPrefix + 86)
-// THE RUBY PART'S BOXES (KFCKohakuTab.cpp - kKFCRubyBoxColumns columns; the author, 11-01, and eight, fixed, 11-02). Find's: a Ruby: box and a Base Text: box a column and a chain between neighbours. Change's, which follow them: a Change Ruby To box and, under it, the column's base text as words - no box.
+// THE RUBY PART'S BOXES (KFCKohakuTab.cpp - kKFCRubyBoxColumns columns at most; the author, 11-01; eight, fixed, 11-02; four at first, + and - back, 11-03). Find's: a Ruby: box and a Base Text: box a column and a chain between neighbours. Change's, which follow them: a Change Ruby To box and, under it, the column's base text as words - no box.
+// THE COLUMNS' + AND - (2026-11-03 - the author: "eight fixed boxes leave a reading hard to see: four at first, + back, - too, four at least"): the Captions dialog's icons as they stood 11-01 to 11-02 -
+// + on Ruby:'s row, - on Base Text:'s, at the grid's right - their numbers taken again.
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyGridPlusWidgetID, kKFCUIPrefix + 75)
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyGridMinusWidgetID, kKFCUIPrefix + 89)
 // Numbered in a row: the column is the offset from the first of each (the retired Change Ruby To field and Remove Ruby box, + 74 and + 75, are the grid and its retired +).
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyGridWidgetID, kKFCUIPrefix + 74)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyReadingBox0WidgetID, kKFCUIPrefix + 90)
@@ -706,6 +711,11 @@ DECLARE_PMID(kWidgetIDSpace, kKFCKentenMarkCharWidgetID, kKFCPrefix + 86)
 DECLARE_PMID(kWidgetIDSpace, kKFCKentenChangeCharWidgetID, kKFCPrefix + 87)
 // THE RUBY PART'S FIND ONLY (2026-11-03 - the author: "Ruby too, a search that does not replace - a check box?"): under its boxes.
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyFindOnlyWidgetID, kKFCPrefix + 88)
+// THE LABELS THE FACE WRITES IN JAPANESE that had no number (2026-11-03 - the author: "Change Ruby To and the rest in Japanese - the boxes can be larger"): Ruby's Look For:, Kenten's three.
+DECLARE_PMID(kWidgetIDSpace, kKFCRubyLookForLabelWidgetID, kKFCPrefix + 89)
+DECLARE_PMID(kWidgetIDSpace, kKFCKentenBaseLabelWidgetID, kKFCPrefix + 90)
+DECLARE_PMID(kWidgetIDSpace, kKFCKentenMarkLabelWidgetID, kKFCPrefix + 91)
+DECLARE_PMID(kWidgetIDSpace, kKFCKentenChangeLabelWidgetID, kKFCPrefix + 92)
 
 
 // "About Plug-ins" sub-menu:
@@ -906,7 +916,7 @@ DECLARE_PMID(kWidgetIDSpace, kKFCRubyFindOnlyWidgetID, kKFCPrefix + 88)
 #define kKFCTableTabChangeStyleKey		kKFCStringPrefix "kKFCTableTabChangeStyleKey"
 #define kKFCTableTabLeaveStyleKey		kKFCStringPrefix "kKFCTableTabLeaveStyleKey"
 #define kKFCTableTabClearOverridesKey	kKFCStringPrefix "kKFCTableTabClearOverridesKey"
-#define kKFCRubyTabLookForKey			kKFCStringPrefix "kKFCRubyTabLookForKey"
+// (kKFCRubyTabLookForKey, kKFCKentenTabMarkKey and kKFCKentenTabChangeKey went 2026-11-03: those labels are the face's Japanese words - KFCJapanese.h - and the .fr holds none for them.)
 #define kKFCRubyTabWithKey				kKFCStringPrefix "kKFCRubyTabWithKey"
 #define kKFCRubyTabWithoutKey			kKFCStringPrefix "kKFCRubyTabWithoutKey"
 #define kKFCRubyTabMarksKey				kKFCStringPrefix "kKFCRubyTabMarksKey"
@@ -935,9 +945,7 @@ DECLARE_PMID(kWidgetIDSpace, kKFCRubyFindOnlyWidgetID, kKFCPrefix + 88)
 #define kKFCTableTabChangeFindKey		kKFCStringPrefix "kKFCTableTabChangeFindKey"
 #define kKFCKohakuTabKentenKey			kKFCStringPrefix "kKFCKohakuTabKentenKey"
 #define kKFCKohakuTabWarichuKindKey		kKFCStringPrefix "kKFCKohakuTabWarichuKindKey"	// Find:'s fifth, a Japanese InDesign's (key_collisions.py: "kKFCKohakuTabWarichuKey" had kKFCRubyListSaveFileKey's length and sum)
-#define kKFCKentenTabMarkKey			kKFCStringPrefix "kKFCKentenTabMarkKey"
 #define kKFCKentenTabAnyMarkKey			kKFCStringPrefix "kKFCKentenTabAnyMarkKey"
-#define kKFCKentenTabChangeKey			kKFCStringPrefix "kKFCKentenTabChangeKey"
 // (The kinds' own keys went 2026-11-03: Kenten: and Change Kenten To: list InDesign's own keys for them - "None", "Black sesame" ... "Custom", its kenten dialog's words - KFCUI.fr.)
 
 // Other StringKeys:
@@ -1186,8 +1194,13 @@ DECLARE_PMID(kWidgetIDSpace, kKFCRubyFindOnlyWidgetID, kKFCPrefix + 88)
 // A hit row of a ruby or kenten list, on two lines (the author, 11-01: as KCM's rows): two rows' height, so the panel's rounding (to one row) still leaves no half row.
 #define kKFCResultTallRowHeight	38
 
-// THE RUBY PART'S BOXES (KFCKohakuTab.cpp, KFCUI.fr): how many columns - eight, fixed, at the size twelve had (the author, 11-02: "from the start this size, eight boxes, fixed, no + or -").
+// THE RUBY PART'S BOXES (KFCKohakuTab.cpp, KFCUI.fr): how many columns - eight at most, four at first and at least, + and - between (the author, 11-03: "four at first, + back, - too, four at
+// least" - 11-02 had eight, fixed). Their width is the grid's over the columns standing: four wide, eight narrow.
 #define kKFCRubyBoxColumns			8
+#define kKFCRubyBoxColumnsAtFirst	4
+// The + and -: the Captions dialog's own icons (LinksUIID.h's plug-in - as they stood 11-01 to 11-02).
+#define kKFCRubyGridAddIconRsrcID		650
+#define kKFCRubyGridDeleteIconRsrcID	660
 
 // THE MESSAGE BLOCK AT THE TOP OF THE PANEL, AND THE EDGE THE ILLUSTRATIONS AND THE TREE LINE UP ON.
 //
