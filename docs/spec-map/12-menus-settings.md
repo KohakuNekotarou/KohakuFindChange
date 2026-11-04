@@ -66,7 +66,7 @@
   - 訂正:
 
 - **SET-05** `Find in …` ＝範囲に対象が無い（Book Scope ON でブックが無い・章の無いブック／OFF で文書が無い）か、検索と置換のタブが Colour のとき灰色（FIND-17）。
-  `Change All in Book` ＝Book Scope が OFF・対象のブックが無い・パネルにヒットの行がある・タブが Colour・検索する文字も形式も無い（Object タブでは Find Object Format も検索のオブジェクトスタイルも空）とき灰色（REP-33・OBJ-13）。
+  `Change All in Book` ＝Book Scope が OFF・対象のブックが無い・タブが Colour・検索する文字も形式も無い（Object タブでは Find Object Format も検索のオブジェクトスタイルも空）とき灰色（REP-33・OBJ-13）。（「パネルにヒットの行がある」も灰色だったのは 2026-11-04 まで＝今は自分で一覧を外して走る・REP-33。）
   （1.4.0・17-objects.md＝1.3 までは、どちらも Object のタブでも灰色だった。）
   `Find Objects on Active Layer` ＝`Find in …` の灰色の条件に加えて、検索と置換のタブが Object でないとき・前面の文書の Layers パネルにレイヤーが無いとき灰色（OBJ-21・2026-10-17 夜）。
   `Clear Results` ＝ヒットの行が無いとき灰色（0件のブックの行だけのときも・REP-34）。ただし段を積んでいる間（ROW-39）は、ヒットの行が無くても押せる（2026-10-14）。

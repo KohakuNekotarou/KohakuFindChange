@@ -999,13 +999,13 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 				// Change All in Book: the book's alone (the no-track Change All spec's F18 - a document's
 				// Change All is InDesign's own dialog's). Its name says when the run takes only the Book panel's
 				// selected documents - "Change All in Selected Documents" (the query dialog's spec, section
-				// 4-4) - from the model, as Find's is. Grey with Book Scope off, while the panel holds a list (Clear
-				// Results first), with no book or chapter to run on (haveTarget), on the Colour tab, and with nothing
-				// to find (on the Object tab: an empty Find Object Format) - the no-track Change All spec's section 4;
-				// a run standing up greys everything above.
+				// 4-4) - from the model, as Find's is. Grey with Book Scope off, with no book or chapter to run on
+				// (haveTarget), on the Colour tab, and with nothing to find (on the Object tab: an empty Find Object
+				// Format) - the no-track Change All spec's section 4; a run standing up greys everything above. NOT grey
+				// over a list since 2026-11-04 (the author: "can Clear Results be done by itself?"): the run lets the list go
+				// itself, and its Ctrl+Z puts it back (KFCChangeAll::Run).
 				const bool canRun = KFCChapters()->IsBookScopeOn()
 					&& haveTarget
-					&& KFCResults()->GetTotalHitCount() <= 0
 					&& KFCRuns()->CanSearchTab(KFCRuns()->CurrentSearchMode())
 					&& KFCRuns()->HasFindQueryNow();
 				listToUpdate->SetNthActionState(i, canRun ? kEnabledAction : kDisabled_Unselected);

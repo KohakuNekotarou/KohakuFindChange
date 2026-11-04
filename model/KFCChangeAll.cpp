@@ -301,14 +301,12 @@ int32 KFCChangeAll::Run(const PMString& listWords, PMString& outSummary)
 	}
 	const RunningFlagGuard runningGuard;
 	KFC_DIAG_PHASE(phaseRun, "change-all");		// a test build's timer (KFCDiag.h)
-	// ONLY WITH NO LIST: a list describes the documents as they were searched, and a Change All
-	// under it would leave it describing text that is gone. The menu greys the item; a caller that never went through
-	// the menu (a shortcut, a script firing the action) is turned away here.
-	if (KFCResultModel::GetTotalHitCount() > 0)
-	{
-		outSummary.Append("Change All: the panel holds a list - choose Clear Results first.");
-		return 0;
-	}
+	// A LIST STANDING IS LET GO BY THE RUN ITSELF (2026-11-04 - the author: "Change All in Book: Clear Results first - can it be
+	// done by itself?"): at the commit point below, as a query run lets its list go - a text tab's run copies it first
+	// (RunRecorder), so its Ctrl+Z puts the list back with the writes. (Until then the menu greyed the item over a list and a door
+	// here turned a script's press away - "Change All: the panel holds a list - choose Clear Results first.": a list describes the
+	// documents as they were searched, and one left under a Change All would describe text that is gone. Letting it go first
+	// keeps that true.)
 	if (!KFCSearchEngine::CanSearchTab(KFCSearchEngine::CurrentSearchMode()))
 	{
 		outSummary.Append("Change All: the Colour tab is not supported.");

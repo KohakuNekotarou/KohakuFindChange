@@ -184,9 +184,9 @@
   段の見出しは `[Change All/Book] Find:"cat" Change:"dog"  (N/N)`（検索の段と同じ言葉）・行は書いた行（`Changed`・`cat → dog`・行の末尾にクエリの名前は付けない）＝Run の行と同じく Replace／Restore from Copy／Special Operations と段の Narrow Down／Search These Results Again は灰色（QRY-38 の決まり）。メッセージ＝`3 replaced in 2 chapter(s). Listed 3 place(s).  By chapter: …`（`By chapter:` は今どおり最後）。行は 1000 まで・探した数と書いた数が合わない章は一覧から外して言う・変更履歴のある物語は入らない（Run と同じ）。
   取り消し（Ctrl+Z）で書き込みと一緒に一覧も前の姿に戻り、やり直しで一覧も戻る（メッセージ欄 `Undo: Change All`）。キャンセル・失敗でも、押す前の一覧（0件の検索の段など）に戻る（それまでは空になった）。**Object タブは一覧を作らない**（書いて数えるのは今どおり・メッセージ `The Object tab's changes are not listed.`）。
   遅さ＝章ごとに「すべてを置換」の前に1回探す分だけ遅くなる（作者に伝えた上での「Listありのみ」）。回帰＝`ca-cases.tsv` の `cal-*`・Change All を押すケースの期待を直した（`all-book` ほか）。
-  使えるのは **Book Scope が ON・対象のブックがある・パネルにヒットの行が無い・検索できるタブ・検索する文字か形式がある** とき（それ以外は灰色）。
+  使えるのは **Book Scope が ON・対象のブックがある・検索できるタブ・検索する文字か形式がある** とき（それ以外は灰色）。（2026-11-04 までは「パネルにヒットの行が無い」も条件だった＝下の★★★。）
   ★1.4.0 から **Object タブでも使える**（Find Object Format か検索のオブジェクトスタイルがあるとき・章ごとに本体のオブジェクトの「すべてを置換」＝OBJ-13）。灰色になるタブは Colour だけ。（1.4.0・17-objects.md）
-  ヒットの行があるときは先に Clear Results（REP-34）。スクリプトなどから押されたら `Change All: the panel holds a list - choose Clear Results first.` と断る。
+  ★★★**一覧があっても走り、自分で一覧を外す**（2026-11-04 作者「Change All in Book をするときは、先に Clear Results　自動的にクリアレサルトできないかな」）＝クエリの Run と同じく、走り始めの位置（扉を全部通った後）で一覧を捨て、終わると Change All の一覧が出る。**Ctrl+Z で書き込みと一緒に、外した一覧も戻る**（Run と同じ記録＝回帰 `all-list-autoclear-undo`＝ブックの検索の一覧 `(0/3)` が3行とも戻る）。履歴の段も、走った Change All は今どおり全部手放す（ROW-41）。Object タブは一覧を作らないので、外した一覧は取り消しでも戻らない（手で Clear Results したのと同じ）。（それまでは、ヒットの行があると灰色で、先に Clear Results（REP-34）・スクリプトなどから押されたら `Change All: the panel holds a list - choose Clear Results first.` と断っていた。回帰 `all-grey-list` の期待はこの日に「走って一覧が替わる」へ。）
   （0件のブックの検索の後＝ブックの行だけのときは使える。）ブック以外（文書・ストーリー・選択範囲）は本体の「検索と置換」の「すべてを置換」を使う。
   ★**走り始めるとき（扉をすべて通った後）に、そのとき出ている結果を捨てる**＝0件の検索の `<ブック>  (0/0)` の行は消え、終わると Change All の一覧に替わる（2026-11-04 から＝上の★★。それまではパネルは空になった）。
   （2026-10-09 の最終検査 D9-3・それまでは行が残った。残った行は、書いた本の後でも "(0/0)" と読め、しかも KFC が覚える「検索したブック」は Change All のブックに替わっていた＝別のブックで走らせると、Change All のブックを閉じたときに「Results cleared - the book was closed.」で行が消え、行のブックを閉じても行は残った。回帰＝`ca-after-other-book-empty`。）

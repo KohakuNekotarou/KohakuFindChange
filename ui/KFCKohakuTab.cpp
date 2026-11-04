@@ -68,6 +68,7 @@
 #include "KFCAppBarSearchEnter.h"		// KFCMirrorAppBarFieldNow - the Application Bar's field shows the tab's nothing
 #include "KFCJump.h"					// LandOnQRCode, LandOnPlace - Find Next lands as a row's click does
 #include "KFCBookPanelLookup.h"		// QueryPanelManager - Find in KFC shows the panel first
+#include "KFCPanelAlpha.h"				// KFCQueryFindChangeWindow - the dialog's window, whose edit controls the ruby boxes are
 #include "KFCResultHistory.h"			// Find - Find in KFC is the panel's own Find
 #include "KFCModelAccess.h"				// KFCRuns()->QRCodeNext - the QR code after the one found last (the model's)
 #include "KFCKohakuQueryMenu.h"			// the face shown and hidden, and what it asks changed: Find/Change's own Query menu
@@ -820,6 +821,71 @@ void PlaceGridWidget(IPanelControlData* panel, const WidgetID& widget, bool show
 	view->ShowView(shown ? kTrue : kFalse);
 }
 
+// THE BOXES' TEXT CENTRED (2026-11-04 - the author: "can the input fields be centred?" - "yes": a reading over its base text, as ruby stands over it). No SDK door aligns an edit
+// box's text (IEditBoxAttributes has none) - but each box is a Windows edit control under Drover's own windows (measured: OS_ViewContainer > OS_EditTextContainer > Edit, one a box),
+// created left-aligned, which takes ES_CENTER afterwards (measured 11-04 from outside: the style set, the frame read again, the text drawn centred). No door hands a widget's control
+// either, so each is found by place: an Edit window of the Find/Change dialog standing wholly in a box's box on screen (IControlView::GetBBox -> WindowToGlobal, KFCBookPanelPlacement's way),
+// at least as wide as the box less its frame - so a smaller field of another part that a box's place happens to hold is left alone. A box not found (its window not placed yet, or another
+// scale between the two) keeps its text on the left, as before; the next lay-out asks again. KFC is Windows' alone (memory windows-only-plugins).
+struct BoxesOnScreen
+{
+	std::vector<RECT>	boxes;
+	int32				centred;
+	BoxesOnScreen() : centred(0) {}
+};
+
+BOOL CALLBACK CentreEditInABox(HWND child, LPARAM param)
+{
+	wchar_t cls[8] = { 0 };
+	if (::GetClassNameW(child, cls, 8) == 0 || ::lstrcmpiW(cls, L"Edit") != 0)
+		return TRUE;
+	RECT r;
+	if (!::GetWindowRect(child, &r))
+		return TRUE;
+	BoxesOnScreen* const on = reinterpret_cast<BoxesOnScreen*>(param);
+	for (size_t k = 0; k < on->boxes.size(); ++k)
+	{
+		const RECT& box = on->boxes[k];
+		const bool inside = r.left >= box.left - 1 && r.top >= box.top - 1 && r.right <= box.right + 1 && r.bottom <= box.bottom + 1;
+		if (!inside || (r.right - r.left) < (box.right - box.left) - 14)
+			continue;
+		const LONG_PTR style = ::GetWindowLongPtrW(child, GWL_STYLE);
+		if ((style & (ES_CENTER | ES_RIGHT)) != ES_CENTER)
+		{
+			::SetWindowLongPtrW(child, GWL_STYLE, (style & ~static_cast<LONG_PTR>(ES_CENTER | ES_RIGHT)) | ES_CENTER);
+			::SetWindowPos(child, nullptr, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+			::InvalidateRect(child, nullptr, TRUE);
+			++on->centred;
+		}
+		break;
+	}
+	return TRUE;
+}
+
+void CentreRubyBoxText(IPanelControlData* panel)
+{
+	HWND const dialog = KFCQueryFindChangeWindow();
+	if (dialog == nullptr || panel == nil)
+		return;
+	BoxesOnScreen on;
+	for (int32 k = 0; k < kKFCRubyBoxColumns; ++k)
+	{
+		const WidgetID ids[3] = { ReadingBoxID(k), BaseBoxID(k), ChangeBoxID(k) };
+		for (int32 i = 0; i < 3; ++i)
+		{
+			IControlView* const view = panel->FindWidget(ids[i]);
+			if (view == nil || !view->IsVisible())
+				continue;
+			const SysRect g(::ToSys(view->WindowToGlobal(view->GetBBox())));
+			RECT r = { SysRectLeft(g), SysRectTop(g), SysRectRight(g), SysRectBottom(g) };
+			on.boxes.push_back(r);
+		}
+	}
+	if (!on.boxes.empty())
+		::EnumChildWindows(dialog, CentreEditInABox, reinterpret_cast<LPARAM>(&on));
+	KFC_DIAG_LOG("RUBYTAB centred %d of %d box(es)", static_cast<int>(on.centred), static_cast<int>(on.boxes.size()));
+}
+
 // THE GRID AS THE COLUMNS AND THE JOINS NOW SAY (the frames set here, no EVE layout: the window keeps its size - InDesign's LinkInfoPanelObserver places its widgets the same way). Each column's base box and its words on the Change side are its own; a reading box - Find's, and
 // Change's, which follow it (the author, 11-01) - runs over the columns joined to it, and the boxes it runs over are away. GREY: Find's Ruby:, its label too, with Text Without Ruby, whose search has no reading, and with
 // Inconsistent Ruby, whose search reads none (11-03 - the author: "not needed - grey, no typing in it"; KFCRubySearch.cpp's WalkVaries); and all of it with the part hidden.
@@ -877,6 +943,8 @@ void LayOutRubyGrid(IPanelControlData* panel)
 			PlaceGridWidget(panel, JoinID(k), between, part, middle - 10, 21, middle + 10, 41);
 		}
 	}
+	if (part)
+		CentreRubyBoxText(panel);		// the boxes' text centred - their places on screen as just set (2026-11-04)
 }
 
 // A RUBY LIST'S FACTS IN JAPANESE (2026-11-04 - the author: "the comment of Words in a Ruby List in Japanese"): the face's first line. The file's name stands beside the list's label, so it is
