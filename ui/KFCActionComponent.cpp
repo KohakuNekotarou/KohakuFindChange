@@ -519,16 +519,18 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 
 		case kKFCChangeAllActionID:
 		{
-			// Change All in Book (No List) (the author's calls - F6 and F18 of
+			// Change All in Book (the author's calls - F6 and F18 of
 			// docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md): InDesign's own Change All
-			// over the book's chapters, no list. The engine keeps its own doors and says why on a refusal
+			// over the book's chapters - and, since 2026-11-04 (the author: "list alone"), the list of what it wrote, its tier
+			// named by the query's words as a search's tier is ("[Change All/Book] Find:"cat" Change:"dog"" - KFCResultHistory's
+			// QueryLabel less its bracketed tab, read before the run). The engine keeps its own doors and says why on a refusal
 			// (KFCChangeAll::Run). Not while a landing is under way - Find's reason (KFCJump::IsLanding).
 			if (KFCJump::IsLanding())
 				break;
 			KFCPanelTitle::Update();
 			PMString summary;
 			const uint32 setBefore = KFCResults()->GetResultSetId();
-			(void)KFCRuns()->ChangeAll(summary);
+			(void)KFCRuns()->ChangeAllListed(KFCResultHistory::ChangeAllListWords(), summary);
 			// A run that went through made the list anew (its commit point): the tiers kept above it go with it (the stacked
 			// results' spec, section 2-4).
 			KFCResultHistory::DropStackIfRemade(setBefore);
@@ -994,9 +996,9 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 			}
 			case kKFCChangeAllActionID:
 			{
-				// Change All in Book (No List): the book's alone (the no-track Change All spec's F18 - a document's
+				// Change All in Book: the book's alone (the no-track Change All spec's F18 - a document's
 				// Change All is InDesign's own dialog's). Its name says when the run takes only the Book panel's
-				// selected documents - "Change All in Selected Documents (No List)" (the query dialog's spec, section
+				// selected documents - "Change All in Selected Documents" (the query dialog's spec, section
 				// 4-4) - from the model, as Find's is. Grey with Book Scope off, while the panel holds a list (Clear
 				// Results first), with no book or chapter to run on (haveTarget), on the Colour tab, and with nothing
 				// to find (on the Object tab: an empty Find Object Format) - the no-track Change All spec's section 4;

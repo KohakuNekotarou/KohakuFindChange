@@ -111,6 +111,7 @@ namespace
 		virtual bool ListDrawsTwoLines() { return false; }
 		virtual bool ListIsOwnKind() { return false; }
 		virtual bool GetUnifyFacts(int32, int32, int32, PMString& outWord, PMString& outReadings) { outWord.Clear(); outReadings.Clear(); return false; }
+		virtual bool IsChangeAllList() { return false; }
 	};
 
 	class KFCRunsStandInImpl : public IKFCRuns
@@ -145,7 +146,7 @@ namespace
 		virtual const char* QueryKindName(int32) { return "?"; }
 		virtual int32 RunQueries(const std::vector<IDFile>&, PMString& outSummary) { SayWhy(outSummary); return 0; }
 		virtual bool DescribeRunScope(PMString& outWords) { SayWhy(outWords); return false; }
-		virtual const char* ChangeAllCommandName() { return "Change All in Book (No List)"; }
+		virtual const char* ChangeAllCommandName() { return "Change All in Book"; }
 		virtual bool PreviewHit(int32, int32, PMString& outAfter) { outAfter.clear(); return false; }
 		virtual bool LoadSavedQuery(const IDFile&) { return false; }
 		virtual KFCResultModel::RowLocation LocateRow(int32, int32, const UIDRef&, TextIndex&, TextIndex&) { return KFCResultModel::kRowNotFound; }
@@ -213,6 +214,7 @@ namespace
 		virtual bool CanTcyHit(int32, int32) { return false; }
 		virtual bool UnifyRubyRows(const KFCRowsByChapter&, const PMString&, PMString& outStatus) { SayWhy(outStatus); return false; }
 		virtual bool RubyListFacts(const PMString&, int32& outWords, KFCRubyListWhy& outWhy) { outWords = 0; outWhy = KFCRubyListWhy(); outWhy.code = KFCRubyListWhy::kNoModel; return false; }
+		virtual int32 ChangeAllListed(const PMString&, PMString& outSummary) { SayWhy(outSummary); return 0; }
 	};
 
 	class KFCChaptersStandInImpl : public IKFCChapters

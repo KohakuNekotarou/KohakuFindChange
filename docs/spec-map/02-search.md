@@ -163,7 +163,7 @@
 
 - **FIND-29b** ★バーの幅は**対象の大きさで割る**（2026-10-18 作者「進捗バーを章の大きさで割る　やりましょう」・設計書 `docs/superpowers/specs/2026-10-18-kfc-copy-results-progress-share-design.md`）――
   ブックの章は**ブックが控えている章のファイルの大きさ**（`IBookContent::GetSize`＝章を開かずに読める・DOM の `BookContent.size` と同じ値）、開いている文書（All Documents）は**ページ数**で、バーの全体を比で配る。読めない章は平均として数え、どの対象にも均等の4分の1の幅は残す（小さい章でもバーが動く）。バー全体の長さと行の文（`Chapter 3 / 12 - …`）は今までどおり。
-  対象＝ブックの検索（Find・Narrow Down・Search These Results Again）・All Documents・物の検索・Search This Story／Document Again の部分・Change All in Book (No List)・クエリの実行（クエリ1つの幅を文書の大きさで配る）。変わるのはバーの進み方だけ＝結果・文・取り消しは変わらない。
+  対象＝ブックの検索（Find・Narrow Down・Search These Results Again）・All Documents・物の検索・Search This Story／Document Again の部分・Change All in Book・クエリの実行（クエリ1つの幅を文書の大きさで配る）。変わるのはバーの進み方だけ＝結果・文・取り消しは変わらない。
   ✅ 実機（2026-10-18・テスト用ビルド・`work/note-scripts/2026-10-18-kfc-narrow/p1.ps1`・記録 `PROGSHARE`）＝章 909312／1667072／1138688 バイト → 7343／13462／9195（計 30000）・物の検索 734／1346／920（計 3000）・All Documents 1／12／3 ページ → 2449／22041／5510（1ページの文書は均等の4分の1まで上げた）。
   - 訂正:
 
@@ -210,7 +210,7 @@
   - 訂正:
 
 - **FIND-37** ★上限（**300 行**・GEN-34）で止まったときは ` Stopped at the 300 limit - narrow the search, or use Change All in InDesign's Find/Change.` を書き足す
-  （ブックの検索は `… or use Change All in Book (No List).`＝F9・F18）。上限で止まると、それより先の章・文書は歩かない。
+  （ブックの検索は `… or use Change All in Book.`＝F9・F18）。上限で止まると、それより先の章・文書は歩かない。
   集める＝描くなので、` Showing first … in the panel.` の文は無い（2026-10-06）。
   （2026-10-05 夜〜10-06 は上限 10,000・描く 1,000 で、` Stopped at the 10000 safety limit - narrow your search.` と ` Showing first 1000 in the panel. …` の2つ、
   2026-10-04〜05 は上限 5,000、その前は上限 10,000 で ` Showing first 5000 in the panel.` も付いていた。）

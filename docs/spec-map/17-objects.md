@@ -9,7 +9,7 @@
 ## 1. 何ができるか
 
 - **OBJ-01** ★「検索と置換」が **Object タブ**のとき、文字のタブと同じ4つが使える ――
-  ①一覧（Find in …・ブックも）②行の置換（右クリックの `Replace`・Return・Shift+Return）③Change All in Book (No List) ④Run Saved Queries... のクエリの実行
+  ①一覧（Find in …・ブックも）②行の置換（右クリックの `Replace`・Return・Shift+Return）③Change All in Book ④Run Saved Queries... のクエリの実行
   （2026-10-09 作者の依頼「ver1.4.0として、オブジェクトの検索を追加したい」・4つとも作者の選択）。Colour タブは今どおり断る（FIND-07）。（O1）
   - 訂正:
 
@@ -150,7 +150,7 @@
 
 ## 6. Change All in Book とクエリの実行
 
-- **OBJ-13** Change All in Book (No List) を Object タブでも使える（入口・灰色の条件・章を全部開いて抱える・取り消し1段・書いた章に窓・0の章は返す・`By chapter:` は文字と同じ＝REP-33）。
+- **OBJ-13** Change All in Book を Object タブでも使える（入口・灰色の条件・章を全部開いて抱える・取り消し1段・書いた章に窓・0の章は返す・`By chapter:` は文字と同じ＝REP-33）。
   章ごとに本体のオブジェクトの「すべてを置換」。
   ・**Find Object Format（と検索のオブジェクトスタイル）が空なら灰色**（ブックの全部のフレームを書き換えてしまうため）。スクリプトなどから押されたら
   `Change All: nothing to find on the Object tab - set Find Object Format or an object style in Edit > Find/Change first.`

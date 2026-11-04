@@ -1,4 +1,4 @@
-# 06. 置換 ― 行の Replace と Change All in Book (No List)
+# 06. 置換 ― 行の Replace と Change All in Book
 
 > コード地図での位置: ブロック **9**（`model/KFCReplaceEngine.*`＝行の Replace・`model/KFCChangeAll.*`＝Change All in Book と Clear Results）。
 > 2026-10-06 夜の作者の決定（docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md 第5版・F16）で、一覧から書くのは**行の Replace だけ**になった（Change Checked・チェックボックス・Check All／Uncheck All・ストーリーと文書の行の Replace はやめた）。★その後 2026-10-17 から、行の右クリックの **Restore from Copy**（REP-38）・**Special Operations ▸ Create Outlines**（文字の行＝REP-39・物の行＝OBJ-19）・物の行のほかの特殊操作（OBJ-20）も一覧から書く（2026-10-19 ブロック5のコメントの回＝注の「the one write from the list」を外した）。番号は使い回さない。
@@ -19,7 +19,7 @@
 
 - **REP-03** ★行の Replace は**1件ずつ** ―― その行のストーリーを、本体の「次を検索」のコマンドで一致へ進み、それがその行の一致なら、本体の置換のコマンドでその一致を置換する。
   ★この骨格は確定（2026-07-31・再設計を提案しない）。本体の「すべてを置換」は行の Replace には使わない＝その1行だけを渡す口が無く、置換後の範囲も返さないため。
-  ブックの一致を一度に書くのは Change All in Book (No List)（REP-33）で、こちらは本体の「すべてを置換」そのもの。
+  ブックの一致を一度に書くのは Change All in Book（REP-33）で、こちらは本体の「すべてを置換」そのもの。
   - 訂正:
 
 - **REP-04** 行は「どのスレッドの、どこから、何文字」で見分ける。置換の途中で、置換そのものが新しく作った一致（検索では出なかったもの）は**飛ばす**。
@@ -88,7 +88,7 @@
 ## 5. 書き込みと、その後
 
 - **REP-16** 行の Replace は**1回が取り消しの1段**（「編集 > 取り消し」の名前はどの UI 言語でも `Replace`＝GEN-35）。
-  Change All in Book (No List) は**ブック全体で1段**（`すべてを置換`／英語 UI は `Change All`）＝どの章を前にして Ctrl+Z しても、全部の章が一緒に戻る
+  Change All in Book は**ブック全体で1段**（`すべてを置換`／英語 UI は `Change All`）＝どの章を前にして Ctrl+Z しても、全部の章が一緒に戻る
   （章ごとの段にすると、取り消した章以外の履歴だけが消えて戻せなくなった＝2026-07-28 実測）。
   - 訂正:
 
@@ -177,18 +177,22 @@
   ★**押したまま（キーの自動反復）では1回だけ**（2026-10-09・ヘッダーの読み直し52の提案の案 A・作者の承認）＝反復のキーは受け取って、置換も移動もしない（それまでは反復のたびに置換して次へ進み、1秒押すと十数行が書かれる見込みだった）。Return も Shift+Return も同じ。たくさんを一度に書くのは Change All。アプリケーションバーの検索欄も、押したままの Return は1回だけ。回帰＝`ret-shift-held`（押し下げ3回で1行だけ）／`ret-shift-held-armed`（テスト用ビルドの故障スイッチ `return-repeat` で検査を外すと、何行も書かれる＝検査が効いていることの証拠）。
   - 訂正:
 
-## 7. Change All in Book (No List) と Clear Results
+## 7. Change All in Book と Clear Results
 
-- **REP-33** ★**Change All in Book (No List)**（パネルのメニュー）＝ブックの全章の一致を、**本体の「すべてを置換」で**一度に書く（2026-10-06・F18）。一覧は作らない。
+- **REP-33** ★**Change All in Book**（パネルのメニュー）＝ブックの全章の一致を、**本体の「すべてを置換」で**一度に書く（2026-10-06・F18）。
+  ★★**2026-11-04 から置換した箇所の一覧を出す**（作者「速度の為に置換はAllでやりますが、置換結果をListにする事可能かな？」→「Listありのみで一度お願いします」＝設計書 `docs/superpowers/specs/2026-11-04-kfc-change-all-in-book-list-design.md`・それまでの名前は `Change All in Book (No List)`）＝クエリの Run の一覧（QRY-31〜）と同じ部品＝章ごとに「すべてを置換」の**直前に同じ条件で探して一致を控え、書いた後の本文で場所を求める**。
+  段の見出しは `[Change All/Book] Find:"cat" Change:"dog"  (N/N)`（検索の段と同じ言葉）・行は書いた行（`Changed`・`cat → dog`・行の末尾にクエリの名前は付けない）＝Run の行と同じく Replace／Restore from Copy／Special Operations と段の Narrow Down／Search These Results Again は灰色（QRY-38 の決まり）。メッセージ＝`3 replaced in 2 chapter(s). Listed 3 place(s).  By chapter: …`（`By chapter:` は今どおり最後）。行は 1000 まで・探した数と書いた数が合わない章は一覧から外して言う・変更履歴のある物語は入らない（Run と同じ）。
+  取り消し（Ctrl+Z）で書き込みと一緒に一覧も前の姿に戻り、やり直しで一覧も戻る（メッセージ欄 `Undo: Change All`）。キャンセル・失敗でも、押す前の一覧（0件の検索の段など）に戻る（それまでは空になった）。**Object タブは一覧を作らない**（書いて数えるのは今どおり・メッセージ `The Object tab's changes are not listed.`）。
+  遅さ＝章ごとに「すべてを置換」の前に1回探す分だけ遅くなる（作者に伝えた上での「Listありのみ」）。回帰＝`ca-cases.tsv` の `cal-*`・Change All を押すケースの期待を直した（`all-book` ほか）。
   使えるのは **Book Scope が ON・対象のブックがある・パネルにヒットの行が無い・検索できるタブ・検索する文字か形式がある** とき（それ以外は灰色）。
   ★1.4.0 から **Object タブでも使える**（Find Object Format か検索のオブジェクトスタイルがあるとき・章ごとに本体のオブジェクトの「すべてを置換」＝OBJ-13）。灰色になるタブは Colour だけ。（1.4.0・17-objects.md）
   ヒットの行があるときは先に Clear Results（REP-34）。スクリプトなどから押されたら `Change All: the panel holds a list - choose Clear Results first.` と断る。
   （0件のブックの検索の後＝ブックの行だけのときは使える。）ブック以外（文書・ストーリー・選択範囲）は本体の「検索と置換」の「すべてを置換」を使う。
-  ★**走り始めるとき（扉をすべて通った後）に、そのとき出ている結果を捨てる**＝0件の検索の `<ブック>  (0/0)` の行は消え、パネルは空になる（クエリ連続実行は 2026-10-31 から一覧を作る＝QRY-31。ここは今も作らない）。
+  ★**走り始めるとき（扉をすべて通った後）に、そのとき出ている結果を捨てる**＝0件の検索の `<ブック>  (0/0)` の行は消え、終わると Change All の一覧に替わる（2026-11-04 から＝上の★★。それまではパネルは空になった）。
   （2026-10-09 の最終検査 D9-3・それまでは行が残った。残った行は、書いた本の後でも "(0/0)" と読め、しかも KFC が覚える「検索したブック」は Change All のブックに替わっていた＝別のブックで走らせると、Change All のブックを閉じたときに「Results cleared - the book was closed.」で行が消え、行のブックを閉じても行は残った。回帰＝`ca-after-other-book-empty`。）
   章を全部開いて持ってから、**ブック全体で取り消しの1段**として書く（REP-16）。キャンセル・失敗は全部戻す（REP-18）。
   書いた章には窓を付け、何も書かなかった章は閉じて返す。何か書いたらパネルの絵が**鉛筆を持った猫**になる（次の検索で戻る）。
-  Find/Change Selected Documents (Book) でブックパネルの一部の文書を選んでいる間は、その文書だけを書き、名前は `Change All in Selected Documents (No List)`（SCOPE-26〜・2026-10-07）。
+  Find/Change Selected Documents (Book) でブックパネルの一部の文書を選んでいる間は、その文書だけを書き、名前は `Change All in Selected Documents`（SCOPE-26〜・2026-10-07）。
   ★**探す所の無い章は、何も書かずに通る**（2026-10-12・実機で見つけた N-4）＝テキストフレームが1つも無い章（写真だけの章など）・マスターページにだけ文字があり Include Master Pages が OFF（既定）の章。
   本体の「すべてを置換」はそうした章にエラー無しで「失敗」と答え、それまでは `Stopped - nothing was changed: InDesign's Change All failed in <章>.` で**全部の章を巻き戻していた**（本体の `app.changeText()` はそうした文書を黙って通る）。今は「探し終えた・0件」として扱い、ほかの書かなかった章と同じく閉じて返す。
   （空のテキストフレームだけの章・一致の無い章は、もとから0件で通っていた。）回帰＝`ca-book-notext-chapters`（写真の章とマスターだけの章を飛ばして `3 replaced in 2 chapter(s).`）／`-armed`（テスト用ビルドの故障スイッチ `scope-walk-off` で昔の形＝写真の章で止まる）。

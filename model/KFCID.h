@@ -234,7 +234,7 @@ DECLARE_PMID(kImplementationIDSpace, kKFCCopyStoreImpl, kKFCPrefix + 47)
 #define kKFCRotateStepKey					kKFCStringPrefix "kKFCRotateStepKey"
 #define kKFCShearStepKey					kKFCStringPrefix "kKFCShearStepKey"
 #define kKFCRunQueriesStepKey		kKFCStringPrefix "kKFCRunQueriesStepKey"	// the query run's undo step (KFCQuerySequence)
-#define kKFCChangeAllStepKey		kKFCStringPrefix "kKFCChangeAllStepKey"	// Change All in Book (No List)'s undo step (KFCChangeAll)
+#define kKFCChangeAllStepKey		kKFCStringPrefix "kKFCChangeAllStepKey"	// Change All in Book's undo step (KFCChangeAll)
 
 // RETIRED (not reused): the script element IDs of app.kfcStatus / app.kfcResults, and
 // with them the four-character ScriptIDs 'pKBs' / 'pKBr' (docs/ai-notes/kes-scriptid-registry.md).

@@ -4,7 +4,7 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  Change All in Book (No List) and Clear Results - see KFCChangeAll.h.
+//  Change All in Book and Clear Results - see KFCChangeAll.h.
 //
 //========================================================================================
 
@@ -49,7 +49,11 @@
 #include "KFCProgressBar.h"		// the run's bar - the UI half's, asked for through IKFCUIServices
 #include "KFCResultModel.h"
 #include "KFCRunGuard.h"
+#include "KFCRunList.h"			// the list it leaves (2026-11-04 - a query run's: what each chapter's Change All wrote, placed)
 #include "KFCSearchEngine.h"
+#include "KFCUndoFollow.h"		// RunRecorder / MarkWrite - its list follows its Undo and Redo, as a query run's
+
+#include <memory>		// std::unique_ptr - the run's recorder, a text tab's alone
 
 namespace
 {
@@ -119,9 +123,10 @@ const char* KFCChangeAll::CommandName()
 		PMString bookName;
 		KFCBookScope::BookSelection selection;
 		if (KFCBookScope::DescribeTargetBook(bookName, selection) && selection.selected > 0)
-			return "Change All in Selected Documents (No List)";
+			return "Change All in Selected Documents";
 	}
-	return "Change All in Book (No List)";
+	// (No "(No List)" since 2026-11-04 - the author: "list alone": it leaves the list of what it wrote.)
+	return "Change All in Book";
 }
 
 bool KFCChangeAll::InitWalk(const UIDRef& docRef, int32 selectionScope, const WalkerScopeOptions& scopeOptions,
@@ -277,7 +282,7 @@ bool KFCChangeAll::ClearResults(PMString& outStatus)
 	return true;
 }
 
-int32 KFCChangeAll::Run(PMString& outSummary)
+int32 KFCChangeAll::Run(const PMString& listWords, PMString& outSummary)
 {
 	KFC_DIAG_WRITTEN_DOCS_CHECK("change-all");	// (test builds: when the run is over - KFCDiagWrittenDocs.h)
 	outSummary.Clear();
@@ -364,7 +369,7 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 	// follow - not the reason.
 	if (!KFCBookScope::IsBookScopeOn())
 	{
-		outSummary.Append("Change All in Book (No List) needs Book Scope on.");
+		outSummary.Append("Change All in Book needs Book Scope on.");
 		return 0;
 	}
 	KFCSearchEngine::RunScope scope;
@@ -400,6 +405,16 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 	// THE PANEL'S PICTURE STAYS WHAT IT WAS (spec map PNL-07 / PNL-08): the results go, the fact that a search has run does
 	// not - DropResults' Clear() takes it away with them, and only a Change All that WROTE changes the picture (the pencil
 	// cat, NoteChangeAllWrote at the end).
+	// THE LIST IT LEAVES (2026-11-04 - the author: "list alone"; docs/superpowers/specs/2026-11-04-kfc-change-all-in-book-list-design.md
+	// C1 - C3): a text tab's run is recorded as a query run is - the list as it is now copied BEFORE DropResults lets it go
+	// (KFCUndoFollow::RunRecorder: what a cancel, a failure past this point and the run's Ctrl+Z put back), named "Change All" on
+	// the message line. The Object tab's lists nothing (C4): no recorder, the panel left as it always was.
+	std::unique_ptr<KFCUndoFollow::RunRecorder> recorder;
+	if (!objectTab)
+	{
+		recorder.reset(new KFCUndoFollow::RunRecorder);
+		recorder->SetName("Change All");
+	}
 	const bool hadRun = KFCResultModel::HasRun();
 	KFCBookScope::ReleaseHeldDocs(true /*close now*/);
 	KFCSearchEngine::DropResults();
@@ -415,6 +430,8 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 	KFCBookScope::BookSelection selection;		// selected 0 = the whole book (Find/Change Selected Documents (Book))
 	if (!KFCBookScope::ListBookChapters(listed, bookName, &selection) || listed.empty())
 	{
+		if (recorder)
+			recorder->RestoreBefore();		// the commit point has passed: the list goes back as it was (the query run's rule)
 		outSummary.Append(KFCSearchEngine::kBookHasNoChapters);		// the door's own words (ResolveRunTarget)
 		return 0;
 	}
@@ -424,6 +441,8 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 	if (targets.empty())
 	{
 		KFCBookScope::ReleaseHeldDocs(true);
+		if (recorder)
+			recorder->RestoreBefore();
 		outSummary.Append("No chapter could be opened - nothing was changed.");
 		KFCBookScope::AppendUnopenableNote(outSummary, unopenable);
 		return 0;
@@ -436,6 +455,11 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 	}
 	WalkerScopeOptions scopeOptions;
 	KFCSearchEngine::GetKFCWalkerScopeOptions(scopeOptions);
+	// Every text model of the chapters read before a character is written (the run's Undo follows them), and the list's
+	// recorder made over them - one "query", named by its words (KFCRunList's byChangeAll).
+	if (recorder)
+		recorder->ReadStories(targets);
+	KFCRunList::Recorder runList(std::vector<PMString>(1, listWords), targets, true /*byChangeAll*/);
 
 	// ===== ONE SEQUENCE AROUND EVERY CHAPTER - one Ctrl+Z for the whole book.
 	int32 replaced = 0;
@@ -449,6 +473,8 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 	if (seq == nil)
 	{
 		KFCBookScope::ReleaseHeldDocs(true);
+		if (recorder)
+			recorder->RestoreBefore();
 		outSummary.Append("Could not start an undoable step - nothing was changed.");
 		return 0;
 	}
@@ -489,6 +515,8 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 				continue;
 			}
 			int32 count = 0, partial = 0;
+			if (!objectTab)		// (just before: the same text, the same walk - the list's, as the query run's)
+				runList.RecordBefore(d, 0, static_cast<int32>(IWalkerScopeFactoryUtils::kDocumentScope), scopeOptions);
 			const bool wrote = objectTab
 				? KFCObjectReplace::ReplaceAllInDoc(targets[d].docRef, count, partial)
 				: WriteDocument(targets[d].docRef, static_cast<int32>(IWalkerScopeFactoryUtils::kDocumentScope), scopeOptions, count);
@@ -499,6 +527,8 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 				why.Append(targets[d].shortName);
 				break;
 			}
+			if (!objectTab)
+				runList.RecordAfter(d, 0, count);
 			partially += partial;
 			if (count > 0)
 			{
@@ -516,6 +546,12 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 		failed = true;
 		why = ErrorUtils::PMGetGlobalErrorString();
 	}
+	// THE MARK - inside the sequence, so the run's Undo and Redo are heard and its list follows them (KFCUndoFollow::MarkWrite -
+	// the query run's rule). A text tab's alone (the Object tab leaves no list). Not on a document gone since it was written.
+	if (recorder && !cancelled && !failed)
+		for (size_t t = 0; t < targets.size(); ++t)
+			if (wroteTo[t] && KFCBookScope::IsDocStillOpen(targets[t].docRef))
+				KFCUndoFollow::MarkWrite(targets[t].docRef.GetDataBase());
 	if (cancelled || failed)
 		CmdUtils::AbortCommandSequence(seq);
 	else
@@ -530,6 +566,8 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 		// the text is back; the "unsaved" flags are put back by hand (AbortCommandSequence leaves them - PutRunDocumentsBack)
 		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 		PutRunDocumentsBack(targets, wasModified);
+		if (recorder)
+			recorder->RestoreBefore();		// the list as it was before the run (the query run's rule)
 		KFCResultModel::NoteChangeAllWrote(false);		// the panel's pencil cat: nothing was written
 		if (cancelled)
 			outSummary.Append("Cancelled - nothing was changed.");
@@ -554,6 +592,21 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 	// query run's rule too.
 	std::vector<PMString> unclosed;
 	LeaveRunDocuments(targets, wasModified, wroteTo, unclosed);
+
+	// ===== THE LIST IT LEAVES (2026-11-04 - the design's C2): a new list of what it wrote, made past the write with the chapters
+	// written given their windows - and kept with the run's Undo step (recorder->Keep: its Redo puts this list back). Making rows
+	// writes nothing, as a search's do. With no row (nothing written), the panel is left EMPTY as it always was. A text tab's alone:
+	// the Object tab's run lists nothing (C4 - said below).
+	PMString listSaid;
+	if (recorder)
+	{
+		KFCResultModel::Clear();
+		KFCSearchEngine::ForgetSearchedFindFormat();
+		KFCResultModel::NoteRun();
+		KFCResultModel::NoteChangeAllWrote(replaced > 0);		// the panel's pencil cat (KFCPanelIcon) - in the list's snapshot
+		(void)runList.FileList(true /*fromBook*/, false /*allDocuments*/, KFCResultModel::kScopeBook, bookName, listSaid);
+		recorder->Keep();
+	}
 
 	// ===== THE MESSAGE (section 4 of the no-track design KFCChangeAll.h names; the selected documents' form - section 4-4
 	// of docs/superpowers/specs/_done/2026-10-07-kfc-query-dialog-and-selected-documents-design.md).
@@ -588,10 +641,20 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 		AppendPartially(outSummary, partially);
 		outSummary.Append(".");		// one undo step; nothing said of Ctrl+Z (the no-track spec's F20)
 	}
+	// What it says of its list (KFCRunList::FileList's words - " Listed N place(s)." and why any are missing), right after the
+	// count; the Object tab's, that there is none (the design's C4).
+	if (replaced > 0)
+	{
+		if (recorder)
+			outSummary.Append(listSaid);
+		else
+			outSummary.Append(" The Object tab's changes are not listed.");
+	}
 	KFCBookScope::AppendUnopenableNote(outSummary, unopenable);
 	KFCBookScope::AppendUnclosedNote(outSummary, unclosed);
 	AppendByChapter(outSummary, written);		// last - see AppendByChapter
-	KFCResultModel::NoteChangeAllWrote(replaced > 0);		// the panel's pencil cat (KFCPanelIcon)
+	if (!recorder)
+		KFCResultModel::NoteChangeAllWrote(replaced > 0);		// the panel's pencil cat (KFCPanelIcon) - a text tab's noted with its list
 	return replaced;
 }
 

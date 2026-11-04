@@ -340,7 +340,7 @@ void KeepRowAt(IDataBase* db, std::vector<RowNow>& rowNow, std::vector<int32>& k
 
 // ======================================================================================================
 // NOT InDesign's CHANGE ALL. A row's Replace writes that row and nothing else; InDesign's Change All writes every
-// match of its scope and is KFCChangeAll's (Change All in Book (No List), and each query of a query run). A
+// match of its scope and is KFCChangeAll's (Change All in Book, and each query of a query run). A
 // Change All over each story with the rows NOT asked for taken back record by record afterwards was tried and
 // dropped (the author's call) - it is in git history (c876bc7 and before).
 // ======================================================================================================

@@ -91,7 +91,7 @@
 #include "KFCDiag.h"			// the fault switch queries-run (RunSearch's head)
 #include "KFCDiagCommands.h"	// the test build's command count (KFC_DIAG_COMMANDS)
 #include "KFCQuerySequence.h"	// RunFromDiagSwitch - the test build's way into the query run
-#include "KFCChangeAll.h"		// CommandName - the limit's note names Change All in Book (No List)
+#include "KFCChangeAll.h"		// CommandName - the limit's note names Change All in Book
 #include "KFCObjectSearch.h"	// the Object tab's listing, its Search: and its query
 #include "KFCQRCodes.h"			// the QR Code tab's reading (the test build's probe - RunSearch's head)
 #include "KFCQRSearch.h"		// the QR Code tab's listing, its Search: - and whether it is the tab now
@@ -4259,7 +4259,7 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 		{
 			outSummary.Append(objects ? " limit - narrow the search (Narrow Down > Pages...), or use " : " limit - narrow the search, or use ");
 			if (fromBook)
-				outSummary.Append(KFCChangeAll::CommandName());				// Change All in Book (No List) - F18
+				outSummary.Append(KFCChangeAll::CommandName());				// Change All in Book - F18
 			else
 				outSummary.Append("Change All in InDesign's Find/Change");	// a document's: InDesign's own (F18)
 			outSummary.Append(".");

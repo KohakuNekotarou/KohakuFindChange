@@ -251,7 +251,7 @@
 - **QRY-38** ★**Run の行でできること**＝着地（クリック・矢印・Next／Previous Result）・Copy Rows・Clear from Results・段の Copy These Results／Clear These Results・目玉。**書く操作は灰色**＝Replace・Restore from Copy（写しが無い）・Special Operations（Clear Overrides・Create Outlines）。Return など、メニューを通らない道も断る（`Replace: this list records a query run - its rows are not written again.`）。**探し直しも灰色**＝段の Narrow Down・Search These Results Again、物語の行の Search This Story Again、文書の行の Search This Document Again（探し直す検索が無い＝`... this list records a query run - no search made it.`）。
   - 訂正:
 
-- **QRY-39** **次の検索は Run の一覧を段として残す**（検索の段と同じ）＝灰色の段から切り替えられ、切り替えても「検索と置換」の設定は変えない（Run の一覧にクエリは無い）。Change All in Book (No List) は一覧を作らない（名前のとおり・F18）。⚠**Run の一覧がある間は Change All in Book は断る**（検索の一覧と同じ＝`Change All: the panel holds a list - choose Clear Results first.`）。
+- **QRY-39** **次の検索は Run の一覧を段として残す**（検索の段と同じ）＝灰色の段から切り替えられ、切り替えても「検索と置換」の設定は変えない（Run の一覧にクエリは無い）。Change All in Book は一覧を作らない（名前のとおり・F18）。⚠**Run の一覧がある間は Change All in Book は断る**（検索の一覧と同じ＝`Change All: the panel holds a list - choose Clear Results first.`）。
   - 訂正:
 
 ---

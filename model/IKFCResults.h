@@ -153,6 +153,9 @@ public:
 	/** = KFCResultModel::GetUnifyFacts (appended - 2026-11-03, Inconsistent Ruby's headings) - a row's (hitIdx >= 0) or a heading's word, as its rows are put together (rows of one word answer one),
 	    and the word's other readings, tab-separated, the most read first: what the row's and the heading's menus offer to unify it to. False = none. */
 	virtual bool GetUnifyFacts(int32 chapterIdx, int32 groupIdx, int32 hitIdx, PMString& outWord, PMString& outReadings) = 0;
+	/** = KFCResultModel::RunByChangeAll (appended - 2026-11-04) - the live run list is Change All in Book's: a tier's heading names
+	    it "[Change All/Book] <its words>" (GetRunNames) rather than "[Run/...] <its queries>". */
+	virtual bool IsChangeAllList() = 0;
 };
 
 #endif // __IKFCResults_h__

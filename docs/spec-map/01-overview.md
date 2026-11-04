@@ -13,7 +13,7 @@
 
 - **GEN-02** 一覧の行をクリックすると、その箇所へ画面が移動して印が出る（1.4.0 からは、選べる一致なら印でなく**選択**＝第5章 JMP-29）。行の Replace（右クリックのメニュー／行を選んで Return キー）で**その1行を**置換できる。Shift+Return は置換して、次の置換できる行へ進む（→ 第6章 REP-32b）。
   1.4.0 から、Ctrl／Shift＋クリック・Shift＋↑↓・Select All Rows で**行をまとめて選び**（第4章 ROW-34〜38）、Return で**まとめて置換**できる（どの文書の行でも取り消し1段＝第6章 REP-36）。（1.4.0）
-  ★2026-10-06 からチェックボックスは無い（Change Checked と一緒にやめた・F16）。ブックの一致を一度に書くのは **Change All in Book (No List)**（→ 第6章 REP-33）。
+  ★2026-10-06 からチェックボックスは無い（Change Checked と一緒にやめた・F16）。ブックの一致を一度に書くのは **Change All in Book**（→ 第6章 REP-33）。
   - 訂正:
 
 - **GEN-03** ★**検索条件を入力する欄はパネルに無い。** 何を探すか（検索文字列・タブ・オプション・書式）は、
@@ -97,7 +97,7 @@
   - 訂正:
 
 - **GEN-16** 文書の中身を変える操作は次のものだけ ――
-  行の **Replace**（ヒットの行の右クリックのメニュー／行を選んで Return キー。1.4.0 から、まとめて選んだ行も＝REP-36）／**Change All in Book (No List)**／クエリ連続実行（パネルメニューの **Run Saved Queries...**＝第16章。2026-10-07 にダイアログができた＝それまではテスト用の入口だけだった）。
+  行の **Replace**（ヒットの行の右クリックのメニュー／行を選んで Return キー。1.4.0 から、まとめて選んだ行も＝REP-36）／**Change All in Book**／クエリ連続実行（パネルメニューの **Run Saved Queries...**＝第16章。2026-10-07 にダイアログができた＝それまではテスト用の入口だけだった）。
   **どれも1回が「編集 > 取り消し」の1段**になる（Change All in Book はブック全体で1段・まとめて選んだ行の置換とクエリ連続実行は、文書がいくつでも全体で1段）。
   書き込みが失敗して**巻き戻ったときは、本文と一緒に「変更あり」の印も入る前の状態に戻す**（Change All in Book のキャンセルも、行の Replace の失敗も）
   ＝保存済みの文書が、何も変わっていないのに未保存になることは無い。
@@ -208,7 +208,7 @@
   - 訂正:
 
 - **GEN-34** ★件数の上限は**文字の一覧 300 行・物の一覧 1000 行**（2026-10-06・F9＝作者「最大を３００にする／３００でStop」。2026-10-18 から物の一覧〈Object タブの検索・Frames of These Matches の一覧＝OBJ-22〉は 1000＝300／500／1000 で検索と特殊操作の時間を測って決めた・作者が承認＝設計書 `docs/superpowers/specs/2026-10-18-kfc-narrow-down-design.md` §3-1 の M6）。検索は上限まで集め、**パネルは全部描く**。
-  300 で止まったら ` Stopped at the 300 limit - narrow the search, or use Change All in InDesign's Find/Change.`（ブックの検索は `… or use Change All in Book (No List).`）。物の一覧は ` Stopped at the 1000 limit - narrow the search (Narrow Down > Pages...), or use …`（Narrow Down で分けて取れる＝ROW-46）。Narrow Down の段は条件に通った行で数える。
+  300 で止まったら ` Stopped at the 300 limit - narrow the search, or use Change All in InDesign's Find/Change.`（ブックの検索は `… or use Change All in Book.`）。物の一覧は ` Stopped at the 1000 limit - narrow the search (Narrow Down > Pages...), or use …`（Narrow Down で分けて取れる＝ROW-46）。Narrow Down の段は条件に通った行で数える。
   一覧の行は1つずつ見て置換するためのもので、それより多い置換は Change All の仕事（ブックは KFC の Change All in Book、それ以外は本体の「すべてを置換」）。
   クエリ連続実行は一覧を作らないので、この上限は無い（本体の Change All で書く）。
   パネルが描く数は一覧が持つ数そのもの＝描く側に別の上限は無い（行を足す道はどれも 300 で止まる＝検索・Search This Story／Document Again・オブジェクトの検索）。

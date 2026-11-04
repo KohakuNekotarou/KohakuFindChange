@@ -15,7 +15,7 @@
   Find in Document
   Next Result
   Previous Result
-  Change All in Book (No List)
+  Change All in Book
   Clear Results
   Copy Results
   Run Saved Queries...
@@ -41,16 +41,16 @@
   （`Change Checked` と `Show Changes by KohakuFindChange` は 2026-10-06 に外した。`Run Saved Queries...` と `Find/Change Selected Documents (Book)` は 2026-10-07 に足した＝第16章・SCOPE-26〜。`Run Saved Queries...` は同じ日の夜に `Clear Results` の下へ1つ下げた＝作者の依頼。2026-10-14 に作者がトグルの区画を並べ替えた＝それまでは `Keep Previous Results` が `Hide Previous Chapter` の上・窓のトグルは `Translucent Find/Change`・`Minimizable Find/Change`・`Translucent Panel`・`Remember Book Panel Placement` の順。同じ日に `Keep Previous Results` を外した＝パネルの Find はいつも段を積む（SET-24・ROW-39）。`Find Objects on Active Layer` は 2026-10-17 夜に Find の下へ足した＝OBJ-21。`Copy Results` は 2026-10-18 に Clear Results の下へ足した＝ROW-48。同じ日の午後に `Find Objects on Active Layer` を外した＝段の見出しの Narrow Down ▸ On Active Layer へ移した（ROW-46）。）
   - 訂正: 2026-10-08＝最後の項目は、それまで SDK 共通の文字列で `About this plug-in...` と出ていた（この地図の表記と食い違っていた）。作者「英語として正しい方で」→ほかの項目と同じく語頭を大文字にし、ハイフンの後ろも大文字の `About This Plug-In...`（InDesign のメニューバーの `Plug-Ins`・このパネルのまとまり `Kohaku Plug-Ins` と同じ）。KFC 専用のキー `kKFCAboutThisPlugInMenuKey`（SDK のキーは自作のプラグイン全部が共有するので値を変えない）。
 
-- **SET-02** ★`Find in …`・`Next Result`・`Previous Result`・`Change All in Book (No List)`・`Clear Results`・`Run Saved Queries...` の間に区切り線は無い（探すことと、一覧を使わない置換と、その前の片付けが1つのまとまり）。
+- **SET-02** ★`Find in …`・`Next Result`・`Previous Result`・`Change All in Book`・`Clear Results`・`Run Saved Queries...` の間に区切り線は無い（探すことと、一覧を使わない置換と、その前の片付けが1つのまとまり）。
   トグルの並びは ABC 順（2026-10-14 の作者の並べ替え＝SET-01。それまでは、検索にかかわるもの〈Book Scope・Find/Change Selected Documents (Book)・Hide Previous Chapter・アプリケーションバー〉が先、窓の見た目が後だった）。
   - 訂正:
 
 - **SET-03** 項目の名前は**どの UI 言語でも英語**（GEN-35）。名前が変わるのは2つ ―― `Find in …`（範囲によって `Find in Book`／`Find in Document`／`Find in Story` など＝GEN-28）と、
-  Find/Change Selected Documents (Book) でブックの一部を選んでいる間の `Find in Selected Documents`／`Change All in Selected Documents (No List)`（SCOPE-31・2026-10-07）。
+  Find/Change Selected Documents (Book) でブックの一部を選んでいる間の `Find in Selected Documents`／`Change All in Selected Documents`（SCOPE-31・2026-10-07）。
   灰色のときも、範囲つきの名前は出る。
   - 訂正:
 
-- **SET-24** ★~~Keep Previous Results~~（トグル）は**外した**（2026-10-14・同じ日に足して同じ日に外した＝作者「この機能をディフォルトにしましょうか、Keepでとぐるはやめに」）＝**パネルの Find（メニュー・ショートカット・アプリケーションバーの Return）は、いつもそれまでの一覧を段として残し、新しい一覧をその下に積む**（ROW-39）。クエリのダイアログの Find も同じ（QRY-29）。段を消すのは Clear Results・Run・Change All in Book (No List)（ROW-41）。
+- **SET-24** ★~~Keep Previous Results~~（トグル）は**外した**（2026-10-14・同じ日に足して同じ日に外した＝作者「この機能をディフォルトにしましょうか、Keepでとぐるはやめに」）＝**パネルの Find（メニュー・ショートカット・アプリケーションバーの Return）は、いつもそれまでの一覧を段として残し、新しい一覧をその下に積む**（ROW-39）。クエリのダイアログの Find も同じ（QRY-29）。段を消すのは Clear Results・Run・Change All in Book（ROW-41）。
   足していた間は、パネルの Find は ON のときだけ積み・OFF（既定）は一覧を入れ替えて段も消し・Save Panel Settings がキー `keepPreviousResults` で保存した。そのキーは今は読まない（古い設定ファイルにあっても無いのと同じ）。ActionID（`kKFCUIPrefix + 53`）は使い直さない。
   - 訂正:
 
@@ -66,7 +66,7 @@
   - 訂正:
 
 - **SET-05** `Find in …` ＝範囲に対象が無い（Book Scope ON でブックが無い・章の無いブック／OFF で文書が無い）か、検索と置換のタブが Colour のとき灰色（FIND-17）。
-  `Change All in Book (No List)` ＝Book Scope が OFF・対象のブックが無い・パネルにヒットの行がある・タブが Colour・検索する文字も形式も無い（Object タブでは Find Object Format も検索のオブジェクトスタイルも空）とき灰色（REP-33・OBJ-13）。
+  `Change All in Book` ＝Book Scope が OFF・対象のブックが無い・パネルにヒットの行がある・タブが Colour・検索する文字も形式も無い（Object タブでは Find Object Format も検索のオブジェクトスタイルも空）とき灰色（REP-33・OBJ-13）。
   （1.4.0・17-objects.md＝1.3 までは、どちらも Object のタブでも灰色だった。）
   `Find Objects on Active Layer` ＝`Find in …` の灰色の条件に加えて、検索と置換のタブが Object でないとき・前面の文書の Layers パネルにレイヤーが無いとき灰色（OBJ-21・2026-10-17 夜）。
   `Clear Results` ＝ヒットの行が無いとき灰色（0件のブックの行だけのときも・REP-34）。ただし段を積んでいる間（ROW-39）は、ヒットの行が無くても押せる（2026-10-14）。
@@ -132,7 +132,7 @@
 
 ## 4. キーボードショートカット
 
-- **SET-13** ★ショートカットを割り当てられるのは**8つだけ** ―― `Open Find/Change...`・`Find in …`・`Next Result`・`Previous Result`・`Change All in Book (No List)`・`Run Saved Queries...`・`Clear Results`・`Copy Results`
+- **SET-13** ★ショートカットを割り当てられるのは**8つだけ** ―― `Open Find/Change...`・`Find in …`・`Next Result`・`Previous Result`・`Change All in Book`・`Run Saved Queries...`・`Clear Results`・`Copy Results`
   （`Next Result`・`Previous Result` は 2026-10-30 に足した＝JMP-35。**既定のショートカットは付けない**＝利用者が選ぶ・本体の「次を検索」とぶつけない。）
   （`Find Objects on Active Layer` は 2026-10-18 午後に外れた＝パネルメニューから段の見出しの Narrow Down ▸ On Active Layer へ移した・Narrow Down は段の上でしか押せないので割り当てない＝ROW-46。ほかに本体の決まりで、ウィンドウメニューの `Kohaku Find/Change`〈パネルを出す〉も割り当てられる＝KIDMCP の `inspect_ui actions` の shortcuts の列で確かめた・2026-10-18。）
   （`Copy Results` は 2026-10-18 に足した＝作者の決定「だしましょう」。行の `Copy Rows`・段の `Copy These Results` は出さない＝押した行・段が要る。一覧の中の Ctrl+C は Copy Rows と同じ＝ショートカットの設定とは別。）

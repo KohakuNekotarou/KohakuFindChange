@@ -34,8 +34,11 @@ namespace KFCRunList
 	class Recorder
 	{
 	public:
-		/** queryNames = the run's queries, in its order, named as the dialog names them; targets = its documents, opened. */
-		Recorder(const std::vector<PMString>& queryNames, const std::vector<KFCBookScope::ChapterDoc>& targets);
+		/** queryNames = the run's queries, in its order, named as the dialog names them; targets = its documents, opened.
+		    byChangeAll (2026-11-04 - docs/superpowers/specs/2026-11-04-kfc-change-all-in-book-list-design.md): the run is Change All
+		    in Book's - one "query", named by its words ("Find:"cat" Change:"dog""): the list is marked so (a tier's heading reads
+		    "[Change All/Book] ..." - KFCResultModel::SetRunByChangeAll) and its rows name no query. */
+		Recorder(const std::vector<PMString>& queryNames, const std::vector<KFCBookScope::ChapterDoc>& targets, bool byChangeAll = false);
 
 		/** Just before query `query` is written in document `target`, inside the run's sequence: the walk that write takes
 		    (KFCChangeAll::InitWalk), every match selected and kept, and the text of each story holding one. Find/Change holds
@@ -89,6 +92,7 @@ namespace KFCRunList
 		std::vector<size_t>							fDocOfTarget;
 		bool										fObjectQuery;
 		bool										fKohakuQuery;
+		bool										fByChangeAll;	// Change All in Book's list (the constructor's byChangeAll)
 
 		Recorder(const Recorder&);
 		Recorder& operator=(const Recorder&);

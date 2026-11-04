@@ -784,6 +784,21 @@ PMString KFCResultHistory::QueryLabel()
 	return LabelForTab(KFCRuns()->CurrentSearchMode());
 }
 
+PMString KFCResultHistory::ChangeAllListWords()
+{
+	// "[Text] Find:"cat" Change:"dog"" -> "Find:"cat" Change:"dog"": what follows the bracketed tab and its space (LabelForTab
+	// always starts so).
+	const PMString label(QueryLabel());
+	const std::string all(label.GetUTF8String());
+	const std::string::size_type close = all.find("] ");
+	PMString words;
+	words.SetTranslatable(kFalse);
+	if (!all.empty() && all[0] == '[' && close != std::string::npos)
+		words.SetUTF8String(all.substr(close + 2));
+	words.SetTranslatable(kFalse);
+	return words;
+}
+
 PMString KFCResultHistory::HeldQueryLabel()
 {
 	// InDesign's own tab - also while KFC's QR Code tab is shown, whose mode is still the tab shown before it.
@@ -817,7 +832,7 @@ bool KFCResultHistory::DropStack()
 {
 	const bool was = IsStacking();
 	// The model's tiers go with the copies - the lists, their query copies and the writes kept for them (the spec's section
-	// 3-1: Clear Results, a Run and Change All in Book (No List) let every tier go).
+	// 3-1: Clear Results, a Run and Change All in Book let every tier go).
 	KFCRuns()->DropKeptTiers();
 	// Fresh values, not Clear(): the storage goes with them.
 	gKept = std::vector<KeptTier>();
@@ -862,9 +877,11 @@ PMString KFCResultHistory::LiveTierLabel()
 	if (KFCResults()->ListIsRunList())
 	{
 		// A QUERY RUN'S LIST: "[Run/Document] a, b" - its queries that wrote what it lists (the run list spec's R7), kept with it.
+		// CHANGE ALL IN BOOK'S (2026-11-04 - its design's D2): "[Change All/Book] Find:"cat" Change:"dog"" - its names are the
+		// query's words (ChangeAllListWords).
 		PMString names;
 		KFCResults()->GetRunNames(names);
-		PMString run("[Run] ");
+		PMString run(KFCResults()->IsChangeAllList() ? "[Change All] " : "[Run] ");
 		run.SetTranslatable(kFalse);
 		run.Append(names);
 		label = WithScope(run, KFCResults()->GetSearchScope());

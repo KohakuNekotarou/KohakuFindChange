@@ -77,7 +77,7 @@ public:
 	// promise to every built caller).
 	/** = KFCSearchEngine::SetQuery. */
 	virtual bool SetQuery(const PMString& text, int32 mode) = 0;
-	/** = KFCChangeAll::Run - Change All in Book (No List). */
+	/** = KFCChangeAll::Run with no words for its list's heading - Change All in Book (ChangeAllListed, appended, gives them). */
 	virtual int32 ChangeAll(PMString& outSummary) = 0;
 	/** = KFCChangeAll::ClearResults. */
 	virtual bool ClearResults(PMString& outStatus) = 0;
@@ -93,7 +93,7 @@ public:
 	virtual int32 RunQueries(const std::vector<IDFile>& files, PMString& outSummary) = 0;
 	/** = KFCSearchEngine::DescribeRunScope - the query dialog's Runs on: line (false = Cannot run: ...). */
 	virtual bool DescribeRunScope(PMString& outWords) = 0;
-	/** = KFCChangeAll::CommandName - "Change All in Book (No List)" / "Change All in Selected Documents (No List)". */
+	/** = KFCChangeAll::CommandName - "Change All in Book" / "Change All in Selected Documents" ("(No List)" until 2026-11-04). */
 	virtual const char* ChangeAllCommandName() = 0;
 	/** = KFCQueryScope::PreviewHit (appended, under the list's query) - a GREP row's after-text, written and thrown
 	    away (KFCReplaceEngine::PreviewHit). */
@@ -226,6 +226,11 @@ public:
 	/** = KFCRubyListFile::Load (appended - 2026-11-04, the author: "the comment of Words in a Ruby List in Japanese") - RubyListCheck's answer as facts (KFCRubyListWhy), for the Kohaku+ face to
 	    word in Japanese: true = outWords words; false = outWhy.code says why, with its lines. */
 	virtual bool RubyListFacts(const PMString& path, int32& outWords, KFCRubyListWhy& outWhy) = 0;
+	/** = KFCChangeAll::Run (appended - 2026-11-04, the author: "list alone" - docs/superpowers/specs/2026-11-04-kfc-change-all-in-book-list-design.md) -
+	    Change All in Book, leaving the list of what it wrote: listWords = the query's words its tier's heading names it by
+	    ("Find:"cat" Change:"dog"" - the UI's, a search's tier's words). The panel's command calls this; ChangeAll above is it with
+	    no words. */
+	virtual int32 ChangeAllListed(const PMString& listWords, PMString& outSummary) = 0;
 };
 
 #endif // __IKFCRuns_h__

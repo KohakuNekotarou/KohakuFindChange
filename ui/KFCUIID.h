@@ -361,7 +361,7 @@ DECLARE_PMID(kActionIDSpace, kKFCOpenFindChangeActionID, kKFCUIPrefix + 44)
 // search field of InDesign's application bar shows Find/Change's query, and Return in it searches with
 // this panel. OFF by default. See KFCAppBarSearchEnter.h.
 DECLARE_PMID(kActionIDSpace, kKFCAppBarSearchEnterActionID, kKFCUIPrefix + 45)
-// Change All in Book (No List) and Clear Results (docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md
+// Change All in Book and Clear Results (docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md
 // F6 and F18): InDesign's own Change All over the book's chapters, no list; the list emptied so it can run.
 DECLARE_PMID(kActionIDSpace, kKFCChangeAllActionID, kKFCUIPrefix + 46)
 DECLARE_PMID(kActionIDSpace, kKFCClearResultsActionID, kKFCUIPrefix + 47)
@@ -731,7 +731,7 @@ DECLARE_PMID(kWidgetIDSpace, kKFCKentenChangeLabelWidgetID, kKFCPrefix + 92)
 #define kKFCAppBarSearchEnterMenuKey	kKFCStringPrefix "kKFCAppBarSearchEnterMenuKey"
 // "Save Panel Settings": write the settings above to a file of our own, read back at startup.
 #define kKFCSavePanelSettingsMenuKey	kKFCStringPrefix "kKFCSavePanelSettingsMenuKey"
-// Change All in Book (No List) and Clear Results.
+// Change All in Book and Clear Results.
 #define kKFCChangeAllMenuKey			kKFCStringPrefix "kKFCChangeAllMenuKey"
 #define kKFCClearResultsMenuKey			kKFCStringPrefix "kKFCClearResultsMenuKey"
 // The hit row's own right-click menu.
@@ -1000,7 +1000,7 @@ DECLARE_PMID(kWidgetIDSpace, kKFCKentenChangeLabelWidgetID, kKFCPrefix + 92)
 // Menu item positions:
 //
 // The flyout, as KFCUI.fr lays it out (the author's arrangement):
-//    0.5 - 1.3    the commands: Open Find/Change..., Find in <scope>, Change All in Book (No List), Clear Results,
+//    0.5 - 1.3    the commands: Open Find/Change..., Find in <scope>, Change All in Book, Clear Results,
 //                 Copy Results, Run Saved Queries... (the two that write to the DOCUMENTS among them)
 //   ---- 2.0
 //    2.2 - 2.9    the check-mark toggles (Block 3 below)
@@ -1011,7 +1011,7 @@ DECLARE_PMID(kWidgetIDSpace, kKFCKentenChangeLabelWidgetID, kKFCPrefix + 92)
 // Positions that a new order allowed to stay were left where they were, so only the items that
 // actually moved carry new numbers.
 
-// Block 1 - the search, then Change All in Book (No List), Clear Results, Copy Results and Run Saved Queries...
+// Block 1 - the search, then Change All in Book, Clear Results, Copy Results and Run Saved Queries...
 // with no rule between (the author's call), then a rule. The scope the search runs on is set by Book Scope
 // (Change All runs on the book alone - F18).
 // Open Find/Change... leads the block: open the dialog, type the query, then search.
@@ -1021,7 +1021,7 @@ DECLARE_PMID(kWidgetIDSpace, kKFCKentenChangeLabelWidgetID, kKFCPrefix + 92)
 // assignable (the next-overrides-restore spec's A1).
 #define kKFCNextResultMenuItemPosition		1.05
 #define kKFCPreviousResultMenuItemPosition	1.07
-// Change All in Book (No List) under Find, then Clear Results (the spec's section 4).
+// Change All in Book under Find, then Clear Results (the spec's section 4).
 #define kKFCChangeAllMenuItemPosition		1.1
 #define kKFCClearResultsMenuItemPosition	1.25
 // Copy Results under Clear Results: the list's rows as text on the clipboard (the copy-results spec).

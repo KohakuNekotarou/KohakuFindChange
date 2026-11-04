@@ -194,8 +194,9 @@ PMString ChainWords(const Place& place)
 }
 }	// anonymous namespace
 
-KFCRunList::Recorder::Recorder(const std::vector<PMString>& queryNames, const std::vector<KFCBookScope::ChapterDoc>& targets)
-	: fNames(queryNames), fTargets(targets), fObjectQuery(false), fKohakuQuery(false)
+KFCRunList::Recorder::Recorder(const std::vector<PMString>& queryNames, const std::vector<KFCBookScope::ChapterDoc>& targets,
+	bool byChangeAll)
+	: fNames(queryNames), fTargets(targets), fObjectQuery(false), fKohakuQuery(false), fByChangeAll(byChangeAll)
 {
 	fDocOfTarget.reserve(targets.size());
 	for (size_t t = 0; t < targets.size(); ++t)
@@ -465,6 +466,7 @@ int32 KFCRunList::Recorder::FileList(bool fromBook, bool allDocuments, KFCResult
 				names.Append(fNames[q]);
 			}
 		KFCResultModel::SetRunNames(names);
+		KFCResultModel::SetRunByChangeAll(fByChangeAll);		// (Change All in Book's list: its names are the query's words - 11-04)
 		KFCSearchEngine::CollectTally tally;
 		for (size_t r = 0; r < rows.size(); ++r)
 		{
@@ -486,7 +488,8 @@ int32 KFCRunList::Recorder::FileList(bool fromBook, bool allDocuments, KFCResult
 				hit.runChain = ChainWords(place);
 				hit.runNames.Clear();
 				hit.runNames.SetTranslatable(kFalse);
-				const std::vector<int32_t> queries(KFCRunListChain::QueriesOf(place));
+				// (Change All in Book's rows name no query: there is one, the heading's - 2026-11-04.)
+				const std::vector<int32_t> queries(fByChangeAll ? std::vector<int32_t>() : KFCRunListChain::QueriesOf(place));
 				for (size_t q = 0; q < queries.size(); ++q)
 				{
 					if (q > 0)

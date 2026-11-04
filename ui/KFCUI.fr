@@ -716,7 +716,7 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCPreviousResultMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// Change All in Book (No List): InDesign's own Change All over the book's chapters, no list (KFCChangeAll).
+		// Change All in Book: InDesign's own Change All over the book's chapters, no list (KFCChangeAll).
 		// Greyed with Book Scope off (F18 - a document's Change All is InDesign's own dialog's).
 		kKFCChangeAllActionID,
 		kKFCTargetMenuPath
@@ -1444,12 +1444,12 @@ resource ActionDef (kSDKDefActionResourceID)
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
 
-		// Change All in Book (No List). kCustomEnabling: UpdateActionStates greys it (Book Scope off - F18 -, a list on
+		// Change All in Book. kCustomEnabling: UpdateActionStates greys it (Book Scope off - F18 -, a list on
 		// the panel, no book to run on, the Colour tab, nothing to find - on the Object tab an empty Find Object Format).
 		// In the Keyboard Shortcuts editor under Palette Menus, like Find.
 		kKFCActionComponentBoss,
 		kKFCChangeAllActionID,
-		kKFCChangeAllMenuKey,			// "Change All in Book (No List)"
+		kKFCChangeAllMenuKey,			// "Change All in Book"
 		kKFCPanelMenuActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,

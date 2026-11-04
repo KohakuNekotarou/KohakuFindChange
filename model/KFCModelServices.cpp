@@ -98,6 +98,7 @@ public:
 	virtual bool ListIsQRCodes() { return KFCResultModel::ListIsQRCodes(); }
 	virtual bool ListIsRunList() { return KFCResultModel::ListIsRunList(); }
 	virtual void GetRunNames(PMString& out) { out = KFCResultModel::RunNames(); }
+	virtual bool IsChangeAllList() { return KFCResultModel::ListIsRunList() && KFCResultModel::RunByChangeAll(); }
 	virtual bool ListHasOwnChangeTab() { return KFCResultModel::ListHasOwnChangeTab(); }
 	virtual bool ListIsTables() { return KFCResultModel::ListIsTables(); }
 	virtual bool ListDrawsTwoLines() { return KFCResultModel::ListDrawsTwoLines(); }
@@ -128,7 +129,7 @@ public:
 	virtual bool IsPositionOverset(const UIDRef& storyRef, TextIndex pos) { return KFCSearchEngine::IsPositionOverset(storyRef, pos); }
 	virtual KFCOversetLoc FindOversetLocator(const UIDRef& storyRef, TextIndex pos) { return KFCFindOversetLocator(storyRef, pos); }
 	virtual bool SetQuery(const PMString& text, int32 mode) { return KFCSearchEngine::SetQuery(text, mode); }
-	virtual int32 ChangeAll(PMString& outSummary) { return KFCChangeAll::Run(outSummary); }
+	virtual int32 ChangeAll(PMString& outSummary) { return KFCChangeAll::Run(PMString(), outSummary); }
 	virtual bool ClearResults(PMString& outStatus) { return KFCChangeAll::ClearResults(outStatus); }
 	virtual bool HasFindQueryNow() { return KFCSearchEngine::HasFindQueryNow(); }
 	virtual void ListSavedQueries(std::vector<KFCSavedQuery>& out) { KFCSavedQueries::List(out); }
@@ -227,6 +228,7 @@ public:
 		PMString english;
 		return KFCRubyListFile::Load(path, words, outWords, english, &outWhy);
 	}
+	virtual int32 ChangeAllListed(const PMString& listWords, PMString& outSummary) { return KFCChangeAll::Run(listWords, outSummary); }
 };
 
 CREATE_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)

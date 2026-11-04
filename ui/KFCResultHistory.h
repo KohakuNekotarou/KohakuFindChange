@@ -9,7 +9,7 @@
 //  query). A search into the panel - the panel's Find and the query dialog's Find - puts the list it replaces above the new
 //  one as a TIER: a copy of its rows as they were, drawn grey (never selected, no jump, no menu, not followed by Ctrl+Z).
 //  The list the model holds is the LIVE tier, under them, and works as the list always has. Clear Results, a Run of the
-//  query dialog and Change All in Book (No List) take the tiers away when they make a list anew; past 10 kept tiers the
+//  query dialog and Change All in Book take the tiers away when they make a list anew; past 10 kept tiers the
 //  oldest goes, and the status line says so.
 //  A CLICK ON A GREY ROW - OR ON A GREY TIER'S OWN ROW - SWITCHES TO ITS TIER
 //  (docs/superpowers/specs/2026-10-14-kfc-tier-switch-v2-design.md - the author's calls): the model puts that tier's
@@ -93,13 +93,18 @@ namespace KFCResultHistory
 	    names its tier by it; the query dialog's Find puts the query's place in the run order in front. */
 	PMString QueryLabel();
 
+	/** THE WORDS CHANGE ALL IN BOOK'S LIST IS NAMED BY (2026-11-04 - docs/superpowers/specs/2026-11-04-kfc-change-all-in-book-list-design.md
+	    D2): QueryLabel less its bracketed tab - "Find:"cat" Change:"dog"" - which its tier's heading puts after "[Change All/Book]"
+	    (LiveTierLabel). Empty for a tab with nothing to say in words (Object - which lists nothing). Read before the run. */
+	PMString ChangeAllListWords();
+
 	/** The same name for the query Find/Change HOLDS now, on InDesign's own tab - also while KFC's QR Code tab is shown,
 	    whose mode is still the tab shown before it (IKFCRuns::FindChangeTabAndScope): what a list's name is read against once
 	    its query is stated for a row operation (QueryReadsAsTier), and what the live tier is renamed to after a replace
 	    (RenameLiveFromQuery). QueryLabel's own answer whenever the QR Code tab is not shown. */
 	PMString HeldQueryLabel();
 
-	/** A LIST MADE ANEW ELSEWHERE - a Run of the query dialog, Change All in Book (No List): the tiers go when the list the
+	/** A LIST MADE ANEW ELSEWHERE - a Run of the query dialog, Change All in Book: the tiers go when the list the
 	    model holds is not the one it held before (`setBefore` = KFCResults()->GetResultSetId() before it ran). A run turned
 	    away leaves them. THE LIST IT REPLACED KEEPS ITS NAME (the author's call): the live tier's name and the query
 	    dialog's last Find stay, each under its result set, unread until that list is the live one again - a query run's

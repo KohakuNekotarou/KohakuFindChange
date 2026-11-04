@@ -573,6 +573,16 @@ PMString KFCResultModel::RunNames()
 	return names;
 }
 
+void KFCResultModel::SetRunByChangeAll(bool byChangeAll)
+{
+	gHeader.runByChangeAll = byChangeAll;
+}
+
+bool KFCResultModel::RunByChangeAll()
+{
+	return gHeader.runByChangeAll;
+}
+
 void KFCResultModel::CloseChapter(int32 chapterIdx, const IDFile* closedFile)
 {
 	Chapter* c = ChapterAt(chapterIdx);

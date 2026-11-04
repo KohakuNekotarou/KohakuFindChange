@@ -123,8 +123,12 @@ namespace KFCUndoFollow
 		void ReadStories(const std::vector<KFCBookScope::ChapterDoc>& docs);
 		void Keep();
 		void RestoreBefore();
+		/** The run's name on the message line ("Undo: <name>"), set before Keep - a literal, as StepRecorder::SetName's. Not
+		    named: "Run Queries". Change All in Book's is "Change All" (it leaves a list since 2026-11-04). */
+		void SetName(const char* name);
 	private:
 		bool fOpen;
+		const char* fName;
 		RunRecorder(const RunRecorder&);
 		RunRecorder& operator=(const RunRecorder&);
 	};

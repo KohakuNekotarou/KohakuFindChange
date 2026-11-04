@@ -588,11 +588,14 @@ void WatchDoc(IDataBase* db)
 	}
 }
 
-// A write's name on the message line - the menu item that made it: "Run Queries" for the query run, the one write that
-// reshapes the whole list; a write of rows' own name (StepRecorder::SetName), or "Replace".
+// A write's name on the message line - the menu item that made it: "Run Queries" for the query run, a write that reshapes
+// the whole list - or its own name (RunRecorder::SetName: "Change All", Change All in Book's, which leaves a list since
+// 2026-11-04); a write of rows' own name (StepRecorder::SetName), or "Replace".
 const char* WriteName(const Step& step)
 {
-	return step.whole ? "Run Queries" : (step.name != nil ? step.name : "Replace");
+	if (step.whole)
+		return (step.name != nil) ? step.name : "Run Queries";
+	return (step.name != nil) ? step.name : "Replace";
 }
 
 // A WRITE MADE ON A KEPT TIER'S LIST - a write of rows (a query run's whole set never names a tier: a run that goes
@@ -832,7 +835,7 @@ void KFCUndoFollow::StepRecorder::RecordItem(int32 chapterIdx, UID item, bool wi
 }
 
 KFCUndoFollow::RunRecorder::RunRecorder()
-	: fOpen(true)
+	: fOpen(true), fName(nil)
 {
 	OpenRecording();		// its result set: the list as it stands - RestoreBefore goes back to it
 	KFCResultModel::TakeModelSnapshot(gRecording.before);
@@ -866,6 +869,7 @@ void KFCUndoFollow::RunRecorder::Keep()
 	fOpen = false;
 	Step step;		// done (the run stands)
 	step.whole = true;
+	step.name = fName;		// (nil: "Run Queries" - WriteName)
 	step.resultSet = KFCResultModel::GetResultSetId();		// the list the run left - a new result set
 	step.resultSetBefore = gRecording.resultSet;			// ...and the one it found, which its Undo puts back
 	step.layoutBefore = gRecording.layout;
@@ -882,6 +886,11 @@ void KFCUndoFollow::RunRecorder::Keep()
 	if (step.stories.empty())
 		return;
 	KeepStep(step);
+}
+
+void KFCUndoFollow::RunRecorder::SetName(const char* name)
+{
+	fName = name;
 }
 
 void KFCUndoFollow::RunRecorder::RestoreBefore()

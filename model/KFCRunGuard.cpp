@@ -24,7 +24,7 @@ bool KFCRunGuard::IsAnyRunning()
 	// this is one cheap read per engine and can be asked as often as a caller likes - including from
 	// inside an action-enablement pass, which runs every time a menu is opened.
 	return KFCSearchEngine::IsSearching()
-		|| KFCChangeAll::IsRunning()			// Change All in Book (No List)
+		|| KFCChangeAll::IsRunning()			// Change All in Book
 		|| KFCQuerySequence::IsRunning()		// the query run: every query's Change All under one sequence
 		|| KFCReplaceEngine::IsReplacing();		// a write from the list (KFCReplaceEngine::WriteUnderWay)
 }

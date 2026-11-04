@@ -8,7 +8,7 @@
 //  KFCUI.fr, and exactly one of them is visible and enabled at a time.
 //
 //  The pictures: before anything has been run, once something HAS been run, and once a Change All
-//  has written something - Change All in Book (No List), or a query run (a row's Replace leaves the
+//  has written something - Change All in Book, or a query run (a row's Replace leaves the
 //  picture as it was - Choose() in KFCPanelIcon.cpp). Adding one: a widget id and a PNG resource
 //  id in KFCUIID.h, the widget and its PNGA / PNGR lines in KFCUI.fr, and a row in kIcons
 //  (KFCPanelIcon.cpp) - plus the test that

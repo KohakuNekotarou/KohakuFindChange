@@ -100,7 +100,7 @@
 ## 6. 一覧で効く操作と、灰色の操作
 
 - **QR-18** ★効く＝クリック・矢印のジャンプ・段の見出しの **Search These Results Again**・**Clear These Results**・文書の行の **Search This Document Again**（どちらも、その一覧を作ったときの範囲で QR をもう一度集める）・段の切り替え。
-  **灰色**＝Replace（右クリック・Return・Shift+Return）・Change All in Book (No List)・Special Operations・Create Outlines・Restore from Copy・Narrow Down・Search Text in These Objects（作者「置換はいいです」）。
+  **灰色**＝Replace（右クリック・Return・Shift+Return）・Change All in Book・Special Operations・Create Outlines・Restore from Copy・Narrow Down・Search Text in These Objects（作者「置換はいいです」）。
   ショートカットなどで届いても model が断る：置換の類＝`… these rows are QR codes - nothing is changed from this list (click a row to go to its QR code).`／Narrow Down＝`a list of QR codes is not narrowed - it lists every QR code.`／Search Text in These Objects＝`these are QR codes - their frames hold no text.`／Change All in Book＝`Change All: the Find/Change dialog is on the QR Code tab. This panel lists QR codes there - nothing to change.`（Q13）回帰 `qr-menus-grey`・`qr-changeall-greyed`・`qr-list-again`・`qr-doc-again`
   - 訂正:
 

@@ -54,7 +54,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCRememberBookPanelMenuKey,	"Remember Book Panel Placement",
                 kKFCAppBarSearchEnterMenuKey,	"Link the Application Bar's Search Field to This Panel",
                 kKFCSavePanelSettingsMenuKey,	"Save Panel Settings",
-                kKFCChangeAllMenuKey,			"Change All in Book (No List)",
+                kKFCChangeAllMenuKey,			"Change All in Book",
                 kKFCClearResultsMenuKey,		"Clear Results",
                 kKFCReplaceHitMenuKey,			"Replace",
                 kKFCSearchStoryAgainMenuKey,	"Search This Story Again",

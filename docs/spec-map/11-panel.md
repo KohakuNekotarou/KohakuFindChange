@@ -36,7 +36,7 @@
 
 - **PNL-07** メッセージ欄の横の絵は**3枚**で、状態で入れ替わる ――
   何も実行していない＝猫（`Kohakuneko_OFF32.png`）／検索をした＝探している猫（`KohakuFind32.png`）／
-  **Change All in Book (No List) かクエリ連続実行で何か置換した**＝鉛筆を持った猫（`KohakuChange32.png`）。
+  **Change All in Book かクエリ連続実行で何か置換した**＝鉛筆を持った猫（`KohakuChange32.png`）。
   結果が消えると（文書を閉じた・新しい検索・Clear Results）、それに合った絵に戻る。
   - 訂正:
 
@@ -94,7 +94,7 @@
   ★**2026-10-28 の作者の文面**（デスクトップの `KFC How to Use（日本語）.txt` 13:10・検索の節の1行）＝検索できるタブに「QR Code（KohakuFindChange）」を足した（「の5つのタブ」→「のタブ」）・英語はその訳。作者の綴り「KohakuFindChage」は n を足して直した（作者に伝えた）。アプリケーションバーの検索欄の行（QR Code タブでは欄が空＝QR-22）は作者の文面のまま触っていない。（2.0.0・✅全件の回 `1028b`＝770/770 PASS）
   ★**日本語は作者の文面そのまま、英語はそれに1行ずつ合わせる**（2026-10-09 朝 `33fecee`＝Change Checked と Show Changes の節を外した。同じ日の夜、作者が書いた「保存したクエリを順に実行」の節を足した＝作者「HOWTOにクエリダイアログの件がのってなかったですね」）。
   （2026-10-06 の英語だけの書き直し（行の Replace・Change All in Book・Clear Results・300件）は、10-09 朝に日本語に合わせたときに無くなった。）
-  - ⬜ How to Use に載っていない項目＝Change All in Book (No List)・Find/Change Selected Documents (Book)・Clear Results・Search This Story Again・Search This Document Again・Select All Rows（「結果の見方」は「右クリックメニュー」の一語）・Translucent／Minimizable の設定・Save Panel Settings（足すかは作者）。
+  - ⬜ How to Use に載っていない項目＝Change All in Book・Find/Change Selected Documents (Book)・Clear Results・Search This Story Again・Search This Document Again・Select All Rows（「結果の見方」は「右クリックメニュー」の一語）・Translucent／Minimizable の設定・Save Panel Settings（足すかは作者）。
   - ✅（2026-10-18 午後）**作者の文面に差し替えた**（デスクトップの `KFC-How-To-Use-ja.txt` を作者が直したもの＝Ctrl+Return・Narrow Down は短く、Copy Results の行を足し、Create Outlines と Frames の Replace の行は外した）。中身は10＝**特殊操作（Special Operations）**の節を足した（作者の依頼「Special Operations の項目を HowTo に」「簡素に」＝1行・私の下書きを作者が直した＝「（Create Outlines など）」を外した・同じ日 13:51 のデスクトップのファイル）。英語はそれに1行ずつ合わせた。
   - ✅（2026-10-18 夜）「保存したクエリを順に実行」の節に **Find** の行を足した＝クエリのダイアログの Find（QRY-29）だけが載っていなかった（ブロック1の不具合の回の観察）→作者「Find の簡素な説明を追加したのを」＝私の下書きを作者が直した（「結果をパネルの一番下に足します（置換はしません）」を外した）＝デスクトップの `KFC-How-To-Use-Queries-ja.txt` を一字一句そのまま・英語はそれに1行合わせた。
   - ✅（2026-10-27 夜）**QR コードの一覧（QR Code タブ）**の節＝作者の文面（私の下書きをデスクトップの `KFC How to Use（日本語）.txt` に出し、作者が直したもの＝「全部」を外し、行のクリックの行を短く〈矢印キーと閉じた章の一言を外した〉、タブの Find Next と「QR コードの行は置換しない」の行を外した）＝一字一句そのまま・英語はそれに1行ずつ合わせた。

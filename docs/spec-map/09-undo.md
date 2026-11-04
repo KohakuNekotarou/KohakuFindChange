@@ -21,7 +21,7 @@
   2026-10-18 から**文字の行の Create Outlines**（REP-39）も ―― 1つの段（文書をまたいでも1段）。取り消すと行は書く前に戻り、やり直すと `Outlined`（2026-10-18 実測＝置換していない行で。⬜置換済みの行をアウトラインにした段の取り消しは未測）。
   2026-10-30 から**文字の行の Clear Overrides**（REP-40）も ―― 1つの段（文書をまたいでも1段・Edit メニューの名前 `Clear Overrides`）。取り消すと上書きが戻り、行の `Cleared` と目玉が外れる。やり直すとまた `Cleared`（回帰 `overrides-clear-undo`）。
   **一覧から行を外す**（Clear from Results・Ctrl+Return＝ROW-47）と **Narrow Down**（ROW-46）は文書を変えないので、取り消しの段にならない＝外した行は取り消しでもやり直しでも戻らない。
-  Change All in Book (No List) は一覧が無いときだけ走り、一覧を作らないので、追いかけるものが無い（文書は Ctrl+Z で戻る）。
+  Change All in Book は一覧が無いときだけ走る。2026-11-04 からは置換した箇所の一覧を作り（REP-33）、クエリの Run と同じく**1つの段ごと追いかける**＝取り消すと書き込みと一緒に押す前の一覧に戻り、やり直すと Change All の一覧に戻る（メッセージ欄 `Undo: Change All - the rows are back as they were before it.`／`Redo: Change All - the rows are as they were after it.`・回帰 `cal-undo-redo`・`all-book-undo`）。（それまでは一覧を作らないので、追いかけるものが無かった。）
   （Change Checked・ストーリーと文書の行の Replace・Replace Again・Reject Change・Accept Change・Accept All Changes by KohakuFindChange は 2026-10-06 に外した。）
   - 訂正:
 

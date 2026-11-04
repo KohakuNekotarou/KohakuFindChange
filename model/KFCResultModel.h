@@ -445,6 +445,11 @@ namespace KFCResultModel
 	    a, b"). Kept with the list, so an Undo and a Redo of the run bring it with it - empty for any other list. */
 	void SetRunNames(const PMString& names);
 	PMString RunNames();
+	/** WAS THE RUN LIST MADE BY CHANGE ALL IN BOOK (docs/superpowers/specs/2026-11-04-kfc-change-all-in-book-list-design.md - the author,
+	    2026-11-04: "list alone")? Then its RunNames are the query's words ("Find:"cat" Change:"dog"") and a tier's heading names it
+	    "[Change All/Book] ..." rather than "[Run/...]"; its rows carry no query name. Kept with the list, as RunNames. */
+	void SetRunByChangeAll(bool byChangeAll);
+	bool RunByChangeAll();
 	/** Is the list A TABLE LIST - KFC's Table tab's (KFCTableSearch: its search mode kKFCTableSearchMode)? Text rows standing on each
 	    table's character. Its Replace is a table style's (KFCReplaceEngine); it is not narrowed (the table tab spec's T11). */
 	bool ListIsTables();
@@ -513,7 +518,7 @@ namespace KFCResultModel
 	void NoteRun();
 	bool HasRun();
 
-	/** DID THE LAST COMMAND WRITE WITH InDesign's CHANGE ALL - Change All in Book (No List), or a query run - AND CHANGE
+	/** DID THE LAST COMMAND WRITE WITH InDesign's CHANGE ALL - Change All in Book, or a query run - AND CHANGE
 	    SOMETHING (the author's call)? The panel's pencil cat says so (KFCPanelIcon). Set at the end of those runs - false
 	    for one that wrote nothing, was cancelled or failed; a row's Replace does not touch it. Clear() puts it down, so
 	    the next search, Clear Results or a closing document takes the picture back; a query run's Undo puts back the one
@@ -1150,8 +1155,9 @@ namespace KFCResultModel
 		bool			changeAllWrote;	// NoteChangeAllWrote
 		std::shared_ptr<const KFCQueryCopy>	query;	// SetQueryCopy - the search's query, copied (null = not a search's list)
 		PMString		runNames;		// SetRunNames - a query run's list's queries
+		bool			runByChangeAll;	// SetRunByChangeAll - the run list is Change All in Book's (2026-11-04)
 		ListHeader() : fromBook(false), fromAllDocuments(false), searchScope(kScopeDocument), searchMode(-1), hasRun(false),
-			changeAllWrote(false) {}
+			changeAllWrote(false), runByChangeAll(false) {}
 	};
 
 	/** The whole result set - for the one write that replaces it, the query run (KFCUndoFollow::RunRecorder). Its

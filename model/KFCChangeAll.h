@@ -4,10 +4,12 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  CHANGE ALL IN BOOK (NO LIST) AND CLEAR RESULTS (docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md
+//  CHANGE ALL IN BOOK AND CLEAR RESULTS (docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md
 //  F6, F18 and section 4). InDesign's own Change All (kReplaceAllTextCmdBoss) over the book's chapters - Book Scope on
-//  only (F18: a document's Change All is InDesign's own dialog's) - once a chapter, in ONE undo step, with no list: the
-//  panel says how many were replaced, and how many in each chapter. Track Changes is each story's own
+//  only (F18: a document's Change All is InDesign's own dialog's) - once a chapter, in ONE undo step: the panel says how
+//  many were replaced, and how many in each chapter - and, since 2026-11-04 (the author: "list alone" -
+//  docs/superpowers/specs/2026-11-04-kfc-change-all-in-book-list-design.md), lists what it wrote as a query run lists it
+//  (KFCRunList: each chapter's matches walked just before its Change All, placed after it). Track Changes is each story's own
 //  setting, left as it is (F1). Runs only while the panel holds no list; Clear Results empties it
 //  (docs/superpowers/specs/_done/2026-10-05-kfc-change-all-no-list-design.md C4, C8). What may stand then - a search that found
 //  nothing, a book's "(0/0)" row - is thrown away at the run's commit point, as the query run throws its list away
@@ -32,14 +34,17 @@ class ITextWalkerScope;
 
 namespace KFCChangeAll
 {
-	/** Change All in Book (No List). outSummary = the panel's message line - "N replaced in M chapter(s)." (or the
-	    selected documents' form), the notes, and last "  By chapter: <name> (<n>), ..." for the chapters written, in
-	    the book's order, ten at most (the author's addition). Returns how many were replaced (0 for a
-	    refusal, a cancel or a failure - outSummary says which). Refused with Book Scope off (the menu greys it then;
-	    a caller that never went through the menu is told why). */
-	int32 Run(PMString& outSummary);
+	/** Change All in Book. outSummary = the panel's message line - "N replaced in M chapter(s)." (or the
+	    selected documents' form), what it says of its list (" Listed N place(s)." ...), the notes, and last "  By chapter:
+	    <name> (<n>), ..." for the chapters written, in the book's order, ten at most (the author's addition). Returns how many
+	    were replaced (0 for a refusal, a cancel or a failure - outSummary says which). Refused with Book Scope off (the menu
+	    greys it then; a caller that never went through the menu is told why). listWords (2026-11-04) = the query's words the
+	    list's heading names it by ("Find:"cat" Change:"dog"" - the UI's, as a search's tier's): a text tab's run leaves the list of
+	    what it wrote (KFCRunList, its Undo and Redo followed - KFCUndoFollow::RunRecorder, "Change All"); the Object tab's lists
+	    nothing, and says so. */
+	int32 Run(const PMString& listWords, PMString& outSummary);
 
-	/** The command's name - "Change All in Book (No List)", or "Change All in Selected Documents (No List)" while
+	/** The command's name - "Change All in Book", or "Change All in Selected Documents" while
 	    Find/Change Selected Documents (Book) narrows it: the menu's (IKFCRuns::ChangeAllCommandName) and
 	    the one the search's row limit (KFCResultModel::ListLimit) names. */
 	const char* CommandName();
