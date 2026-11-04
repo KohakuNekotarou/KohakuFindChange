@@ -508,6 +508,12 @@ DECLARE_PMID(kActionIDSpace, kKFCUnifyReading5ActionID, kKFCUIPrefix + 119)
 #define kKFCUnifyReadingItems	6		// (the items above: a word read seven ways or more offers its six most read)
 // A tier's heading's Search Text in These Tables (the author, 10-31: list the tables, then search the text in them - KFCResultHistory::SearchTextInObjects). + 112.
 DECLARE_PMID(kActionIDSpace, kKFCSearchTextInTablesActionID, kKFCUIPrefix + 112)
+// REPLACE ALL ROWS on a STORY or DOCUMENT row's right-click menu (the author, 2026-11-04: "a menu on the result's story and
+// document rows that replaces each at once"): every hit row under that row replaced in one press - the write Select All Rows
+// and then Return makes (KFCResultTree::ReplaceRows), with nothing selected or opened. Not the retired + 30 / + 35 (the
+// story and document rows' Replace of their TICKED rows, gone with Change Checked - spec F16): this one takes every row, and
+// a shortcut recorded against those IDs must not bind to it. + 120: the next after the highest spent.
+DECLARE_PMID(kActionIDSpace, kKFCReplaceAllRowsActionID, kKFCUIPrefix + 120)
 
 
 // WidgetIDs:
@@ -629,7 +635,7 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultTallHitNodeWidgetID, kKFCUIPrefix + 83)
 DECLARE_PMID(kWidgetIDSpace, kKFCTableTabChangeWidgetID, kKFCUIPrefix + 84)
 DECLARE_PMID(kWidgetIDSpace, kKFCTableTabChangeAllWidgetID, kKFCUIPrefix + 85)
 DECLARE_PMID(kWidgetIDSpace, kKFCTableTabChangeFindWidgetID, kKFCUIPrefix + 86)
-// THE RUBY PART'S BOXES (KFCKohakuTab.cpp - kKFCRubyBoxColumns columns; the author, 11-01: + and - between one and twelve; eight, fixed, 11-02; four to eight by + and -, 11-03; five, fixed, 11-04). Find's: a Ruby: box and a Base Text: box a column and a chain between neighbours. Change's, which follow them: a Change Ruby To box and, under it, the column's base text as words - no box.
+// THE RUBY PART'S BOXES (KFCKohakuTab.cpp - kKFCRubyBoxColumns columns; the author, 11-01: + and - between one and twelve; eight, fixed, 11-02; four to eight by + and -, 11-03; five, fixed, 11-04; four, fixed, 11-04 later). Find's: a Ruby: box and a Base Text: box a column and a chain between neighbours. Change's, which follow them: a Change Ruby To box and, under it, the column's base text as words - no box.
 // THE CHANGE SIDE'S HEAD (11-04 - the author's labels: "kensaku / ruby / oyamoji / chikan / ruby / oyamoji"): "chikan" over the Change side's two rows. + 75 was the columns' + (11-01 to 11-02, 11-03 to 11-04); + 89, their -, is free.
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyGridLabelChangeHeadWidgetID, kKFCUIPrefix + 75)
 // Numbered in a row: the column is the offset from the first of each (the retired Change Ruby To field and Remove Ruby box, + 74 and + 75, are the grid and its retired +).
@@ -638,17 +644,15 @@ DECLARE_PMID(kWidgetIDSpace, kKFCRubyReadingBox0WidgetID, kKFCUIPrefix + 90)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyReadingBox1WidgetID, kKFCUIPrefix + 91)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyReadingBox2WidgetID, kKFCUIPrefix + 92)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyReadingBox3WidgetID, kKFCUIPrefix + 93)
-DECLARE_PMID(kWidgetIDSpace, kKFCRubyReadingBox4WidgetID, kKFCUIPrefix + 94)
-// (+ 95 to + 97, + 107 to + 109, + 118 to + 120, kKFCPrefix + 45 to + 47 and + 57 to + 59 were the sixth to eighth columns' boxes and chains - five, fixed, since 11-04: free.)
+// (+ 95 to + 97, + 107 to + 109, + 118 to + 120, kKFCPrefix + 45 to + 47 and + 57 to + 59 were the sixth to eighth columns' boxes and chains - five, fixed, from 11-04: free. + 94, + 106, + 117,
+// kKFCPrefix + 44 and + 56 were the fifth column's - four, fixed, since later on 11-04 (the author: "four boxes"): free.)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyBaseBox0WidgetID, kKFCUIPrefix + 102)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyBaseBox1WidgetID, kKFCUIPrefix + 103)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyBaseBox2WidgetID, kKFCUIPrefix + 104)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyBaseBox3WidgetID, kKFCUIPrefix + 105)
-DECLARE_PMID(kWidgetIDSpace, kKFCRubyBaseBox4WidgetID, kKFCUIPrefix + 106)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyJoin0WidgetID, kKFCUIPrefix + 114)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyJoin1WidgetID, kKFCUIPrefix + 115)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyJoin2WidgetID, kKFCUIPrefix + 116)
-DECLARE_PMID(kWidgetIDSpace, kKFCRubyJoin3WidgetID, kKFCUIPrefix + 117)
 // (+ 125 and + 126 were the Kenten part's samples beside its two lists - retired 2026-11-03: the boxes of a custom mark's character stand there now, kKFCPrefix + 86 and + 87.) The Ruby part's Choose List....
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyListChooseWidgetID, kKFCUIPrefix + 127)
 // (This prefix's widget ids run out at + 127. The model half's prefix, the 128 numbers below this one, has no widget of its own: its WidgetID + 0 ... + 30 are spent - KFCID.h says so - and those after them are free. + 128 ON IS THIS PREFIX: kKFCUIPrefix is kKFCPrefix + 128.)
@@ -656,12 +660,10 @@ DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBox0WidgetID, kKFCPrefix + 40)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBox1WidgetID, kKFCPrefix + 41)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBox2WidgetID, kKFCPrefix + 42)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBox3WidgetID, kKFCPrefix + 43)
-DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBox4WidgetID, kKFCPrefix + 44)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBase0WidgetID, kKFCPrefix + 52)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBase1WidgetID, kKFCPrefix + 53)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBase2WidgetID, kKFCPrefix + 54)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBase3WidgetID, kKFCPrefix + 55)
-DECLARE_PMID(kWidgetIDSpace, kKFCRubyChangeBase4WidgetID, kKFCPrefix + 56)
 // The grid's four labels, away with the boxes when the part looks for a ruby list, and what it says of the list (KFCKohakuTab.cpp's LayOutRubyGrid).
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyGridLabelReadingWidgetID, kKFCPrefix + 64)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyGridLabelBaseWidgetID, kKFCPrefix + 65)
@@ -740,6 +742,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCKentenChangeLabelWidgetID, kKFCPrefix + 92)
 #define kKFCSearchDocumentAgainMenuKey	kKFCStringPrefix "kKFCSearchDocumentAgainMenuKey"
 // The book, document and story rows' menus.
 #define kKFCSelectAllRowsMenuKey		kKFCStringPrefix "kKFCSelectAllRowsMenuKey"
+// ...and the document and story rows' Replace All Rows (measured against every other key - key_collisions.py: none reads alike).
+#define kKFCReplaceAllRowsMenuKey		kKFCStringPrefix "kKFCReplaceAllRowsMenuKey"
 // A tier's own row's menu. NOT "kKFCClearTheseResultsMenuKey" (measured): that key has the length and the
 // character sum of kKFCInternalPopupMenuNameKey (24 characters, 2448 each after the prefix), and the menu drew the
 // internal popup's key in its place - InDesign's string lookup took the one for the other. A new key is checked against
@@ -1060,10 +1064,12 @@ DECLARE_PMID(kWidgetIDSpace, kKFCKentenChangeLabelWidgetID, kKFCPrefix + 92)
 // give (the searches first and the one that takes away last under a rule; Special Operations in the Object menu's order).
 // ONE EXCEPTION, REPLACE (2.1.1, the author's call of 2026-10-29: the replace item of a found row's right-click menu at
 // the very top): first in a hit row's menu and in an object row's, ahead of the abc order, which the rest keeps. Still
-// one number for both, and still no rule under it.
+// one number for both, and still no rule under it. Replace All Rows (2026-11-04 - the story and document rows' replace item)
+// stands first in their menus the same way.
 #define kKFCReplaceHitMenuItemPosition			0.5		// Replace (a hit row's) - first, ahead of the abc order (2.1.1)
 #define kKFCUnifyReadingMenuItemPosition		0.6		// Unify to a reading (an Inconsistent Ruby row's and heading's) - under Replace, one a 0.01 (11-03)
 #define kKFCObjectReplaceMenuItemPosition		0.5		// Replace (an object row's - the same action) - first as well
+#define kKFCReplaceAllRowsMenuItemPosition		0.5		// Replace All Rows (a story or document row's) - first as well (2026-11-04)
 #define kKFCClearFromResultsMenuItemPosition	1.0		// Clear from Results
 #define kKFCClearTheseResultsMenuItemPosition	2.0		// Clear These Results
 #define kKFCCopyRowsMenuItemPosition			3.0		// Copy Rows
@@ -1178,11 +1184,12 @@ DECLARE_PMID(kWidgetIDSpace, kKFCKentenChangeLabelWidgetID, kKFCPrefix + 92)
 // A hit row of a ruby or kenten list, on two lines (the author, 11-01: as KCM's rows): two rows' height, so the panel's rounding (to one row) still leaves no half row.
 #define kKFCResultTallRowHeight	38
 
-// THE RUBY PART'S BOXES (KFCKohakuTab.cpp, KFCUI.fr): how many columns - five, always (the author, 11-04: "four, no + and -: the boxes larger still", then "the fields as far left as they go -
-// five?" with the labels "kensaku: / ruby: / moji: / chikan: / ruby: / moji:" - "half-width :": the labels' column 30, the boxes from 33 to 330 - 57 or 58 each, for a four-kana
-// reading, gen read minamoto, measured 46 wide with 6 before it and 4 after it in a 56 box; 11-02 had eight fixed, 11-03 four to eight by + and -). A longer word still fits: its rest in the last box, and a reading
-// with spaces there, a word a character, is one a character - InDesign's own Ruby dialog's mono (KFCRubyChangePlan::AddRuns).
-#define kKFCRubyBoxColumns			5
+// THE RUBY PART'S BOXES (KFCKohakuTab.cpp, KFCUI.fr): how many columns - four, always (the author, later on 11-04: "moji to oyamoji, the boxes four" - the labels "kensaku: / ruby: / oyamoji: /
+// chikan: / ruby: / oyamoji:", their column to 42, the boxes from 45 to 330 - 69 or 70 each. Before it on 11-04: five, the labels' column 30 with "moji:", the boxes from 33 - 57 or 58 each, a
+// four-kana reading, gen read minamoto, measured 46 wide with 6 before it and 4 after it in a 56 box; earlier on 11-04 "four, no + and -: the boxes larger still"; 11-02 eight fixed, 11-03 four to
+// eight by + and -). A longer word still fits: its rest in the last box, and a reading with spaces there, a word a character, is one a character - InDesign's own Ruby dialog's mono
+// (KFCRubyChangePlan::AddRuns).
+#define kKFCRubyBoxColumns			4
 
 // THE MESSAGE BLOCK AT THE TOP OF THE PANEL, AND THE EDGE THE ILLUSTRATIONS AND THE TREE LINE UP ON.
 //

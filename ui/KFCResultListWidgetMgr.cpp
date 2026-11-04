@@ -1160,6 +1160,11 @@ bool KFCResultTree::CanReplaceAny(const KFCRowsByChapter& rows)
 	return AnyRowCan(rows, [](int32 chapter, int32 hit) { return KFCRuns()->CanReplaceHit(chapter, hit); });
 }
 
+bool KFCResultTree::CanReplaceAllRows(const KFCRowsByChapter& rows)
+{
+	return CanReplaceAny(rows) && !AnyRowCan(rows, [](int32 chapter, int32 hit) { return IsUnifyRow(chapter, hit); });
+}
+
 bool KFCResultTree::ReplaceRows(const KFCRowsByChapter& rows, PMString* outStatus, const PMString* unifyTo)
 {
 	// NOT WHILE A LANDING IS UNDER WAY (KFCJump::IsLanding - its message loop can dispatch a Return or a menu item): a write

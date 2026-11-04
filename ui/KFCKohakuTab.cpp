@@ -787,14 +787,17 @@ void BoxesFromKept()
 
 void ShowRubyButtons(IPanelControlData* panel);	// (below, with the face's buttons)
 
-// WHERE A COLUMN STANDS IN THE GRID (KFCUI.fr): the labels to 30 - short Japanese words, the colon half-width (the author, 11-04: "kensaku: / ruby: / moji: / chikan: / ruby: / moji:" - "the
-// fields as far left as they go, the boxes larger - five?"; "moji for the base text"; "half-width :" as the others) -, the columns from 33 to 330, shared by the five with 2 between - 57 or 58 wide each, more than a
-// four-kana reading needs (minamoto: 46, with 6 before it and 4 after it in a 56 box - measured 11-04). (11-04 before it: no colons, to 35, the columns from 39 - 56 or 57; four from 70, 63 wide;
-// 11-03 four to eight to 304, + and - beyond; 11-02 twelve's pitch from 115, eight fixed.)
-const int32 kGridLabelsRight = 30;
-const int32 kGridColumnsLeft = 33;
+// WHERE A COLUMN STANDS IN THE GRID (KFCUI.fr): the labels to 42 - short Japanese words, the colon half-width (the author, later on 11-04: "moji to oyamoji, the boxes four" - "kensaku: / ruby: /
+// oyamoji: / chikan: / ruby: / oyamoji:", oyamoji: a character wider than moji:) -, the columns from 45 (the Look For list's left: its label's 42 and EVE's small space) to 330, shared by the four with 2
+// between - 69 or 70 wide each. (Before it on 11-04: "moji:" to 30, five from 33 - 57 or 58, more than a four-kana reading needs: minamoto 46, with 6 before it and 4 after it in a 56 box, measured;
+// no colons to 35, the columns from 39 - 56 or 57; four from 70, 63 wide. 11-03 four to eight to 304, + and - beyond; 11-02 twelve's pitch from 115, eight fixed.)
+const int32 kGridLabelsRight = 42;
+const int32 kGridColumnsLeft = 45;
 const int32 kGridColumnsRight = 330;
 const int32 kGridBoxGap = 2;
+// A BASE TEXT BOX IS SQUARE (the author, later on 11-04: "the oyamoji boxes are too long - can they be square?", drawn as a wide box with a small one centred under it): one character wide - a
+// kanji's 12 or so with the box's 6 before it and 4 after it (measured 11-04 on the reading boxes) - under the middle of its column's reading box. The 21 of its height is the edit box's own.
+const int32 kBaseBoxWidth = 23;
 // THE CHANGE SIDE'S ROWS (11-04): its head "chikan" (the author's), then its readings and the base text's words under them - where Find Only stood (it stands on Look For's row now, KFCUI.fr).
 const int32 kChangeHeadTop = 66;
 const int32 kChangeTop = 86;
@@ -863,7 +866,8 @@ void LayOutRubyGrid(IPanelControlData* panel)
 		const int32 readingRight = stands ? GridColumnLeft(last + 1) - kGridBoxGap : 0;
 		const int32 columnRight = stands ? GridColumnLeft(k + 1) - kGridBoxGap : 0;
 		PlaceGridWidget(panel, ReadingBoxID(k), stands && !overLeft, findReads, left, 0, readingRight, 21);
-		PlaceGridWidget(panel, BaseBoxID(k), stands, part, left, 41, columnRight, 62);
+		const int32 baseLeft = stands ? (left + columnRight - kBaseBoxWidth) / 2 : 0;		// (square, centred under the column - kBaseBoxWidth)
+		PlaceGridWidget(panel, BaseBoxID(k), stands, part, baseLeft, 41, baseLeft + kBaseBoxWidth, 62);
 		PlaceGridWidget(panel, ChangeBoxID(k), stands && changeRow && !overLeft, changes, left, kChangeTop, readingRight, kChangeTop + 21);
 		PlaceGridWidget(panel, ChangeBaseID(k), stands && changeRow, changes, left, kChangeBaseTop, columnRight, kChangeBaseTop + 20);
 		if (k + 1 < kKFCRubyBoxColumns)
@@ -1463,10 +1467,10 @@ void ShowJapaneseLabels(IPanelControlData* panel)
 	// Ruby's labels, its Find Only, and a ruby list's three lines (its Occurrences: in kKFCRubyListAll ... kKFCRubyListFirstInBook's order).
 	SetField(panel, kKFCRubyLookForLabelWidgetID, KFCJa::LabelSearch());
 	SetField(panel, kKFCRubyGridLabelReadingWidgetID, KFCJa::LabelRuby());
-	SetField(panel, kKFCRubyGridLabelBaseWidgetID, KFCJa::LabelText());
+	SetField(panel, kKFCRubyGridLabelBaseWidgetID, KFCJa::LabelBase());		// (oyamoji: - the author, later on 11-04: "moji to oyamoji"; the Kenten part's own word)
 	SetField(panel, kKFCRubyGridLabelChangeHeadWidgetID, KFCJa::LabelChange());
 	SetField(panel, kKFCRubyGridLabelChangeWidgetID, KFCJa::LabelRuby());
-	SetField(panel, kKFCRubyGridLabelChangeBaseWidgetID, KFCJa::LabelText());
+	SetField(panel, kKFCRubyGridLabelChangeBaseWidgetID, KFCJa::LabelBase());
 	SetField(panel, kKFCRubyFindOnlyWidgetID, KFCJa::FindOnly());
 	SetField(panel, kKFCRubyListLabelWidgetID, KFCJa::LabelList());
 	SetField(panel, kKFCRubyListFirstLabelWidgetID, KFCJa::LabelWhich());

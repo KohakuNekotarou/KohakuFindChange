@@ -42,12 +42,11 @@ KFC_JA_WORD(RubyMarks,			0x30EB, 0x30D3, 0x5370)									// ruby shirushi (Ruby 
 KFC_JA_WORD(RubyList,			0x30EB, 0x30D3, 0x4E00, 0x89A7)							// ruby ichiran (Words in a Ruby List)
 KFC_JA_WORD(RubyVaries,			0x30EB, 0x30D3, 0x63FA, 0x308C)							// ruby yure (Inconsistent Ruby)
 
-// ----- the Ruby part's labels and its list's (11-04 - the author's: "kensaku: / ruby: / moji: / chikan: / ruby: / moji:" - "oyamoji just oya", then "moji is better than oya" - the labels' column
-// as narrow as they are, the boxes wider; the colon half-width, as the face's own Find: and Search: - the author: "the same as the others", "half-width :", "chikan too, a colon"; chikan a head
-// over the Change side's two rows)
+// ----- the Ruby part's labels and its list's (11-04 - the author's: "kensaku: / ruby: / moji: / chikan: / ruby: / moji:" - "oyamoji just oya", then "moji is better than oya", and later that day
+// "moji to oyamoji" - its base text's two labels the Kenten part's LabelBase, below; the colon half-width, as the face's own Find: and Search: - the author: "the same as the others", "half-width :",
+// "chikan too, a colon"; chikan a head over the Change side's two rows)
 KFC_JA_WORD(LabelSearch,		0x691C, 0x7D22, 0x3A)									// kensaku: (Look For:)
 KFC_JA_WORD(LabelRuby,			0x30EB, 0x30D3, 0x3A)									// ruby: (Ruby: - Find's row and Change's)
-KFC_JA_WORD(LabelText,			0x6587, 0x5B57, 0x3A)									// moji: (Base Text: - Find's row and the Change side's words)
 KFC_JA_WORD(LabelChange,		0x7F6E, 0x63DB, 0x3A)									// chikan: (the Change side's head, over its two rows)
 KFC_JA_WORD(FindOnly,			0x691C, 0x7D22, 0x306E, 0x307F)							// kensaku nomi (Find Only)
 KFC_JA_WORD(LabelList,			0x4E00, 0x89A7, 0x3A)									// ichiran: (Ruby List:)
@@ -87,7 +86,7 @@ KFC_JA_WORD(Ya,					0x3084)													// ya (Replace ya Change)
 KFC_JA_WORD(MarksNoteTail,		0x3067, 0x3001, 0x89AA, 0x6587, 0x5B57, 0x306B, 0x30EB, 0x30D3, 0x3092, 0x4ED8, 0x3051, 0x3066, 0x5370, 0x3092, 0x6D88, 0x3057, 0x307E, 0x3059, 0x3002)	// de, oyamoji ni ruby wo tsukete shirushi wo keshimasu.
 
 // ----- the Kenten part's labels and its lists' first entries (J2) - the colon half-width as the Ruby part's (11-04: one face, one colon)
-KFC_JA_WORD(LabelBase,			0x89AA, 0x6587, 0x5B57, 0x3A)							// oyamoji: (Base Text:)
+KFC_JA_WORD(LabelBase,			0x89AA, 0x6587, 0x5B57, 0x3A)							// oyamoji: (Base Text: - the Ruby part's two rows too, since later on 11-04)
 KFC_JA_WORD(LabelKenten,		0x570F, 0x70B9, 0x3A)									// kenten: (Kenten:)
 KFC_JA_WORD(LabelChangeKenten,	0x7F6E, 0x63DB, 0x570F, 0x70B9, 0x3A)					// chikan kenten: (Change Kenten To:)
 KFC_JA_WORD(AnyKenten,			0x5B, 0x3059, 0x3079, 0x3066, 0x306E, 0x570F, 0x70B9, 0x5D)		// [subete no kenten] ([Any Kenten] - InDesign's own words for it)

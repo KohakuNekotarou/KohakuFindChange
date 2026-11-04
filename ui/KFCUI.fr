@@ -899,6 +899,19 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCSearchDocumentAgainMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// ----- Replace All Rows: the story and document rows' menus (the author's call of 2026-11-04) -----
+		// Every hit row under the row right-clicked replaced in one press - closed rows too, nothing selected or opened
+		// (KFCResultTree::ReplaceRows: one undo step, no prompt). First in both menus, as Replace is in a hit row's.
+		kKFCReplaceAllRowsActionID,
+		kKFCResultStoryMenuName
+		kKFCReplaceAllRowsMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCReplaceAllRowsActionID,
+		kKFCResultDocumentMenuName
+		kKFCReplaceAllRowsMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 		// ----- Select All Rows: the book, document and story rows' menus (the author's call) -----
 		// Every hit row under the row right-clicked selected, for Return to replace them all together
 		// (KFCResultTree::SelectAllRows).
@@ -1504,6 +1517,18 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKFCActionComponentBoss,
 		kKFCSelectAllRowsActionID,
 		kKFCSelectAllRowsMenuKey,		// "Select All Rows"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// Replace All Rows - a story or document row's right-click menu (the author's call of 2026-11-04).
+		// kCustomEnabling: UpdateActionStates greys it when it comes with no such row (pressed by ID), while no row under it
+		// can be replaced, over an Inconsistent Ruby list (no Change side) or while a run is up.
+		kKFCActionComponentBoss,
+		kKFCReplaceAllRowsActionID,
+		kKFCReplaceAllRowsMenuKey,		// "Replace All Rows"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
@@ -4020,11 +4045,11 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 											kEVEAlignLeft | kEVERegularSpaceAfter | kEVEArrangeChildrenInRow | kEVENoMargin,
 											{
 												// (Its words the face's, in Japanese - kensaku, 11-04 (kensaku taishou: before) - as it is shown: KFCKohakuTab.cpp's ShowJapaneseLabels. None here: EVE would widen the label to an English one's width and
-												// push the list right - 2026-11-03, the labels' column narrow since the author's "the labels in Japanese - the boxes larger": 30 since 11-04.)
+												// push the list right - 2026-11-03, the labels' column narrow since the author's "the labels in Japanese - the boxes larger": 30 on 11-04, 42 since later that day - oyamoji:.)
 												EVEStaticTextWidget
 												(
 													kKFCRubyLookForLabelWidgetID, kSysStaticTextPMRsrcId, kBindNone,
-													Frame(0, 0, 30, 21)
+													Frame(0, 0, 42, 21)
 													kTrue, kTrue, kAlignRight,
 													kDontEllipsize, kTrue,
 													"",
@@ -4058,7 +4083,7 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 											}
 										),
 										// THE BOXES (the author, 11-01: boxes for the ruby and the kanji, joined - Find's, and Change Ruby To's following them; 11-02: eight, fixed, no + or -; 11-03: four at first, + and - back, four to
-										// eight, as wide as the columns standing share; 11-04: five, fixed, the labels to 30 - "chikan" a head over the Change side's rows). Not arranged: KFCKohakuTab.cpp places each by its column (LayOutRubyGrid - the frames here are the column-less default). Find: a Ruby: box over a Base Text:
+										// eight, as wide as the columns standing share; 11-04: five, fixed, the labels to 30 - "chikan" a head over the Change side's rows; later on 11-04: four, fixed, the labels to 42 - oyamoji:). Not arranged: KFCKohakuTab.cpp places each by its column (LayOutRubyGrid - the frames here are the column-less default). Find: a Ruby: box over a Base Text:
 										// box, a chain between neighbours (InDesign's own - its Scale dialog's chain). Change: a Change Ruby To box, and the column's base text under it, as words: it is Find's, not to be edited.
 										EVEGenericPanelWidget
 										(
@@ -4071,7 +4096,7 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 												EVEStaticTextWidget
 												(
 													kKFCRubyGridLabelReadingWidgetID, kSysStaticTextPMRsrcId, kBindNone,
-													Frame(0, 0, 30, 21)
+													Frame(0, 0, 42, 21)
 													kTrue, kTrue, kAlignRight,
 													kDontEllipsize, kTrue,
 													kKFCRubyTabReadingKey,
@@ -4081,7 +4106,7 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 												EVEStaticTextWidget
 												(
 													kKFCRubyGridLabelBaseWidgetID, kSysStaticTextPMRsrcId, kBindNone,
-													Frame(0, 41, 30, 62)
+													Frame(0, 41, 42, 62)
 													kTrue, kTrue, kAlignRight,
 													kDontEllipsize, kTrue,
 													kKFCRubyTabBaseKey,
@@ -4091,7 +4116,7 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 												EVEStaticTextWidget
 												(
 													kKFCRubyGridLabelChangeHeadWidgetID, kSysStaticTextPMRsrcId, kBindNone,
-													Frame(0, 66, 30, 84)
+													Frame(0, 66, 42, 84)
 													kTrue, kTrue, kAlignRight,
 													kDontEllipsize, kTrue,
 													"",		// (chikan - the face's: ShowJapaneseLabels)
@@ -4101,7 +4126,7 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 												EVEStaticTextWidget
 												(
 													kKFCRubyGridLabelChangeWidgetID, kSysStaticTextPMRsrcId, kBindNone,
-													Frame(0, 86, 30, 107)
+													Frame(0, 86, 42, 107)
 													kTrue, kTrue, kAlignRight,
 													kDontEllipsize, kTrue,
 													kKFCRubyTabChangeKey,
@@ -4111,7 +4136,7 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 												EVEStaticTextWidget
 												(
 													kKFCRubyGridLabelChangeBaseWidgetID, kSysStaticTextPMRsrcId, kBindNone,
-													Frame(0, 110, 30, 130)
+													Frame(0, 110, 42, 130)
 													kTrue, kTrue, kAlignRight,
 													kDontEllipsize, kTrue,
 													kKFCRubyTabBaseKey,
@@ -4123,7 +4148,7 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 												EVEStaticTextWidget
 												(
 													kKFCRubyListLabelWidgetID, kSysStaticTextPMRsrcId, kBindNone,
-													Frame(0, 0, 30, 21)
+													Frame(0, 0, 42, 21)
 													kTrue, kTrue, kAlignRight,
 													kDontEllipsize, kTrue,
 													kKFCRubyListWordKey,
@@ -4133,7 +4158,7 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 												KFCQueryFixedTextWidget
 												(
 													kKFCRubyListNameWidgetID, kSysStaticTextPMRsrcId, kBindNone,
-													Frame(33, 0, 330, 21)
+													Frame(45, 0, 330, 21)
 													kTrue, kTrue, kAlignLeft,
 													kEllipsizeMiddle, kFalse,
 													"",
@@ -4143,7 +4168,7 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 												EVEStaticTextWidget
 												(
 													kKFCRubyListFirstLabelWidgetID, kSysStaticTextPMRsrcId, kBindNone,
-													Frame(0, 26, 30, 47)
+													Frame(0, 26, 42, 47)
 													kTrue, kTrue, kAlignRight,
 													kDontEllipsize, kTrue,
 													kKFCRubyListWhichKey,
@@ -4153,7 +4178,7 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 												EVEDropDownListWidget
 												(
 													kKFCRubyListFirstWidgetID, kSysDropDownPMRsrcId, kBindNone,
-													Frame(33, 26, 203, 47)
+													Frame(45, 26, 215, 47)
 													kTrue, kTrue,
 													{{
 														kKFCRubyListEveryKey,
@@ -4166,7 +4191,7 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 												EVECheckBoxWidget
 												(
 													kKFCRubyListOtherRubyWidgetID, kSysCheckBoxPMRsrcId, kBindNone,
-													Frame(33, 52, 330, 71)
+													Frame(45, 52, 330, 71)
 													kTrue, kTrue, kAlignLeft,
 													kKFCRubyListOtherRubyKey,		// "Include Text With Other Ruby" (the author's proposal 2)
 													kEVENoSpaceAfter,
@@ -4175,26 +4200,21 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 												KFC_RUBY_BOX(kKFCRubyReadingBox1WidgetID, 0, 21),
 												KFC_RUBY_BOX(kKFCRubyReadingBox2WidgetID, 0, 21),
 												KFC_RUBY_BOX(kKFCRubyReadingBox3WidgetID, 0, 21),
-												KFC_RUBY_BOX(kKFCRubyReadingBox4WidgetID, 0, 21),
 												KFC_RUBY_CHAIN(kKFCRubyJoin0WidgetID),
 												KFC_RUBY_CHAIN(kKFCRubyJoin1WidgetID),
 												KFC_RUBY_CHAIN(kKFCRubyJoin2WidgetID),
-												KFC_RUBY_CHAIN(kKFCRubyJoin3WidgetID),
 												KFC_RUBY_BASE_BOX(kKFCRubyBaseBox0WidgetID),
 												KFC_RUBY_BASE_BOX(kKFCRubyBaseBox1WidgetID),
 												KFC_RUBY_BASE_BOX(kKFCRubyBaseBox2WidgetID),
 												KFC_RUBY_BASE_BOX(kKFCRubyBaseBox3WidgetID),
-												KFC_RUBY_BASE_BOX(kKFCRubyBaseBox4WidgetID),
 												KFC_RUBY_BOX(kKFCRubyChangeBox0WidgetID, 86, 107),
 												KFC_RUBY_BOX(kKFCRubyChangeBox1WidgetID, 86, 107),
 												KFC_RUBY_BOX(kKFCRubyChangeBox2WidgetID, 86, 107),
 												KFC_RUBY_BOX(kKFCRubyChangeBox3WidgetID, 86, 107),
-												KFC_RUBY_BOX(kKFCRubyChangeBox4WidgetID, 86, 107),
 												KFC_RUBY_WORDS(kKFCRubyChangeBase0WidgetID),
 												KFC_RUBY_WORDS(kKFCRubyChangeBase1WidgetID),
 												KFC_RUBY_WORDS(kKFCRubyChangeBase2WidgetID),
 												KFC_RUBY_WORDS(kKFCRubyChangeBase3WidgetID),
-												KFC_RUBY_WORDS(kKFCRubyChangeBase4WidgetID),
 											}
 										),
 									}

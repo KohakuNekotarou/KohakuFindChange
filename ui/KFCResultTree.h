@@ -175,6 +175,12 @@ namespace KFCResultTree
 	    row menu greys Replace by (KFCActionComponent) and ReplaceRows asks first. */
 	bool CanReplaceAny(const KFCRowsByChapter& rows);
 
+	/** CAN REPLACE ALL ROWS RUN ON THESE ROWS - a story or document row's every hit row (the author's call of 2026-11-04: the
+	    rows under it replaced in one press, through ReplaceRows): any of them can be replaced (CanReplaceAny) and none is an
+	    Inconsistent Ruby row (IsUnifyRow - no Change side: such rows are unified by the right-click). The one question the
+	    menu greys the item by (KFCActionComponent). */
+	bool CanReplaceAllRows(const KFCRowsByChapter& rows);
+
 	/** THE HIT ROWS SELECTED TOGETHER now: by document, in the order drawn; outObjects (optional) = object rows
 	    rather than text rows. false when nothing is selected, or a story, document or book row is
 	    (KFCResultTreeController.cpp). */

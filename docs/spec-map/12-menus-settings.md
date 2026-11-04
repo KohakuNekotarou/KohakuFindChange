@@ -114,6 +114,7 @@
   ```
 
   （2026-10-09 にストーリーの行＝REP-35、10-10 に文書の行の Search This Document Again＝REP-37、10-11 に Select All Rows とブックの行のメニュー＝ROW-38。（1.4.0））
+  （2026-11-04 にストーリーと文書の行の一番上に Replace All Rows＝ROW-50。今の並びは ROW-32 の絵。）
   （2026-10-09〜10-10 の形＝ヒットの行（`Replace` の1つ）とストーリーの行（`Search This Story Again` の1つ）だけ。それまでの「ヒットの行だけ」は 2026-10-09 に直した。）
   （Reject／Accept の仲間・Replace Again・Check All／Uncheck All・本／文書／ストーリー／run の行のメニューは 2026-10-06 に外した。）
   - 訂正:

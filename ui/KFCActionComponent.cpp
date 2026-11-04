@@ -202,6 +202,21 @@ bool ClearTargetRows(IPMUnknown* widget, KFCRowsByChapter& out)
 	return KFCRowCount(out) > 0;
 }
 
+// THE ROWS REPLACE ALL ROWS WRITES (the author's call of 2026-11-04 - "a menu on the result's story and document rows that
+// replaces each at once"): every hit row under the story or document row right-clicked, closed rows too (RowsUnder - Select
+// All Rows' walk). false = neither of those rows, or none under it. The menu's grey state and the action ask it - one answer
+// for both. (Not the book row's: the author named the story and document rows.)
+bool ReplaceAllRowsTarget(IPMUnknown* widget, KFCRowsByChapter& out)
+{
+	out.clear();
+	int32 chapter = -1, group = -1;
+	if (RightClickedStory(widget, chapter, group))
+		(void)KFCResultTree::RowsUnder(KFCResultNodeID::CreateFont(chapter, group), out);
+	else if (RightClickedDocument(widget, chapter))
+		(void)KFCResultTree::RowsUnder(KFCResultNodeID::Create(chapter), out);
+	return KFCRowCount(out) > 0;
+}
+
 // THE ROWS COPY ROWS COPIES (docs/superpowers/specs/2026-10-18-kfc-copy-results-progress-share-design.md): the rows Clear from
 // Results would take off (ClearTargetRows) - and on the book row, every row of the list (outAll). false = neither, or no row
 // to copy. The menu's grey state and the action ask it - one answer for both.
@@ -710,6 +725,18 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			break;
 		}
 
+		case kKFCReplaceAllRowsActionID:
+		{
+			// A story or document row's right-click menu (the author's call of 2026-11-04): every hit row under the row it was
+			// popped over, in one press - the write Select All Rows and then Return make (ReplaceRows: one undo step, no
+			// prompt, a row that cannot be replaced left and counted by its reason), with nothing selected or opened. No such
+			// row (the action pressed by its ActionID): nothing.
+			KFCRowsByChapter rows;
+			if (ReplaceAllRowsTarget(widget, rows))
+				(void)KFCResultTree::ReplaceRows(rows);
+			break;
+		}
+
 		case kKFCClearTheseResultsActionID:
 		{
 			// A tier's own row's right-click menu (the tier-switch v2 spec's R9) - the tier it was popped over, alone:
@@ -1150,6 +1177,17 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 				// found nothing) rather than doing nothing: the author's call.
 				const NodeID row(SelectAllRowsTarget(widget));
 				const bool enable = row.IsValid() && KFCResultTree::CanSelectAllRows(row);
+				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
+				break;
+			}
+			case kKFCReplaceAllRowsActionID:
+			{
+				// A story or document row's menu: Replace All Rows while a row under it can be replaced - grey on one whose rows
+				// are all replaced, locked or gone, and over an Inconsistent Ruby list (no Change side: its rows' Replace greys
+				// too) (KFCResultTree::CanReplaceAllRows; a run standing greys everything, above). What refuses a write when
+				// pressed (Find Only, a changed query) is said then, as the rows' Replace says it.
+				KFCRowsByChapter rows;
+				const bool enable = ReplaceAllRowsTarget(widget, rows) && KFCResultTree::CanReplaceAllRows(rows);
 				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 				break;
 			}

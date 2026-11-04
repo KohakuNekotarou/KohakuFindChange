@@ -60,6 +60,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCSearchStoryAgainMenuKey,	"Search This Story Again",
                 kKFCSearchDocumentAgainMenuKey,	"Search This Document Again",
                 kKFCSelectAllRowsMenuKey,		"Select All Rows",
+                kKFCReplaceAllRowsMenuKey,		"Replace All Rows",
                 kKFCClearTierResultsMenuKey,	"Clear These Results",
                 kKFCSearchTierAgainMenuKey,	"Search These Results Again",
                 kKFCSearchTextInObjectsMenuKey,	"Search Text in These Objects",

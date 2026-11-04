@@ -166,11 +166,13 @@
                    Copy Rows
                    Special Operations ▸ Arrange ▸・Clear Object Style Overrides・Create Outlines（OBJ-19）・Delete・Fitting ▸・
                                         Hide・Lock・Move to Active Layer・Show・Transform ▸・Unlock（OBJ-20）
-  ストーリーの行   Clear from Results
+  ストーリーの行   Replace All Rows（2026-11-04 から一番上＝ROW-50）
+                   Clear from Results
                    Copy Rows
                    Search This Story Again
                    Select All Rows
-  文書の行         Clear from Results
+  文書の行         Replace All Rows（2026-11-04 から一番上＝ROW-50）
+                   Clear from Results
                    Copy Rows
                    Search This Document Again
                    Select All Rows
@@ -185,7 +187,7 @@
 
   （2026-10-18 午後の abc 順の前は、探す系を上に、一覧から外す Clear from Results を一番下の区切り線の後に、特殊操作は本体の Object メニューの並びと区切り線で並べていた。2.1.0 までは Replace も abc 順の中＝Copy Rows の後だった。）
 
-  （ヒットの行の Replace＝2026-10-06・F16／ストーリーの行＝2026-10-09＝REP-35／文書の行の Search This Document Again＝2026-10-10＝REP-37／Select All Rows とブックの行のメニュー＝2026-10-11＝ROW-38。どれも作者の依頼。）
+  （ヒットの行の Replace＝2026-10-06・F16／ストーリーの行＝2026-10-09＝REP-35／文書の行の Search This Document Again＝2026-10-10＝REP-37／Select All Rows とブックの行のメニュー＝2026-10-11＝ROW-38／ストーリーと文書の行の Replace All Rows＝2026-11-04＝ROW-50。どれも作者の依頼。）
   ヒットの行の Replace は、その行が**まとめて選んだ行の1つなら選んだ行すべて**、そうでなければその1行を置換する（REP-36）。選んだ行のどれも置換できないとき灰色で、メニューは灰色の Replace を見せて開く（SET-11・2026-10-17 から。それまでは開かなかった）。
   Search This Story Again／Search This Document Again は実行中だけ灰色（断る理由はメッセージ欄＝REP-35・REP-37）。Select All Rows は実行中と、下にヒットの行が無い行で灰色（ROW-38）。
   右クリックは選択を変えない（ROW-37）。（1.4.0）
@@ -239,6 +241,14 @@
   ★下にヒットの行が1つも無い行（0件のブックの行・探し直して `(0/0)` の文書の行）では**灰色**（2026-10-11 作者の決定＝それまでは押せて、何も選ばずメッセージ欄も何も言わなかった）。
   灰色の Select All Rows もメニューに出る（2026-10-17 から＝SET-11）＝文書の行のメニューは Search This Document Again と灰色の Select All Rows、ブックの行のメニューは灰色の Select All Rows だけで開く（それまでは灰色を出さず＝KFC の `removeDisabledItems = kTrue`。文書の行は Search This Document Again だけ、ブックの行はメニューが開かなかった）。回帰＝`sel-zero-row-greyed`・`sel-zero-book-no-menu`（期待は DISABLED）。
   ★行の右クリックのメニューの項目（Replace・Search This Story Again・Search This Document Again・Select All Rows）は、**そのメニューを開いた行にだけ**効く＝スクリプトが ActionID で押すと、どの行のメニューでもないので灰色で、何もしない（2026-10-13 作者の決定＝どの行かを本体の行のメニューと同じくメニューの widget から読むようにした。それまでは右クリックのたびに行を控えていて、古い控えの守りが要った＝10-11 午後の C-2：ブックの行を右クリックして何も押さずに閉じ、文書の範囲で検索し直した一覧に、スクリプトが Select All Rows を撃つと全行を選んでいた。回帰＝`ctx-book-stash-docsearch`・`ctx-hit-stash-story-rclick`＝今も「何もしない」を確かめる）。
+  - 訂正:
+
+- **ROW-50** ★**Replace All Rows**（ストーリー・文書の行の右クリック・2026-11-04 作者の依頼「パネルの結果のStoryとドキュメントの部分にそれぞれで一括に置換するメニューが欲しい」）＝**その行の下のヒットの行を1手で全部置換する**＝ROW-38 の Select All Rows→Return（REP-36）の2手を1手に。
+  書き込みはまとめて選んだ行の置換と同じ（`KFCResultTree::ReplaceRows`＝取り消しは1段・確認なし・置換できない行は飛ばして理由ごとに数える＝`Replaced 1 of 2 rows: ID:… #2. Left as they were: 1 already replaced.`）。
+  **閉じている行の下も**開かずに置換する（開き具合はそのまま）。**一覧の選択は変えない**（物の行は、まとめて選んだ行の置換と同じく、最後の行の文書を前に）。
+  灰色＝下の行が1つも置換できない（全部置換済み・ロック・見失った）／ルビ揺れの一覧（置換側が無い＝その行の Replace も灰色＝RUBY-70）／実行中。灰色の項目もメニューに出る（SET-11）。押したときに断るもの（ルビの検索のみ・検索の後に変わった条件）は、行の Replace と同じくメッセージ欄で言う。
+  スクリプトが ActionID で押すと、どの行のメニューでもないので灰色で何もしない（ROW-38 の★の決まり）。並びは**一番上**（2.1.1 のヒットの行の Replace と同じ＝ROW-32）。**ブックの行には付けない**（作者が名指ししたのはストーリーと文書の行＝ブックの一覧の全部は Select All Rows→Return）。
+  （10-06 の第5版まであったストーリー・文書の行の `Replace` は「✓した行」を置換した＝✓と一緒に外した＝第5版の F16。Replace All Rows は✓なしで下の行を全部＝ActionID も別＝`KFCUIID.h` の + 120。）回帰＝`sel-cases.tsv` の `rar-*`（14件）。
   - 訂正:
 
 ---
