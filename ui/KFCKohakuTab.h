@@ -60,6 +60,10 @@ namespace KFCKohakuTab
 	    its icons and Search:. */
 	bool IsWarichuCurrent(KFCWarichuConditions& outConditions);
 
+	/** IS THE SCRIPT LABEL KIND FIND/CHANGE'S NOW (docs/superpowers/specs/2026-11-04-kfc-script-label-design.md S1 - asked by the model through IKFCUIServices::ScriptLabelTabConditions), and
+	    what it asks as it stands, either way: its Key:, Find Label:, Change Label:, Case Sensitive, Whole Label and Search: - a row's Replace reads its Change side whatever is shown. */
+	bool IsScriptLabelCurrent(KFCScriptLabelConditions& outConditions);
+
 	/** A SAVED QUERY STATES ITS OWN TAB (the query dialog's Find - KFCQueryDialog, once the query is loaded): the Kohaku tab steps aside until the person shows its face again or picks in its Find:, so
 	    the Find searches what the query says. */
 	void YieldToSavedQuery();

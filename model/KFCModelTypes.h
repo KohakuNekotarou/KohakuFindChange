@@ -403,6 +403,47 @@ struct KFCWarichuConditions
 	KFCWarichuConditions() : scope(0) {}
 };
 
+/** THE SCRIPT LABEL KIND'S "SEARCH MODE" (the author, 11-04: "list the script labels in the results, and search and replace them by their words" -
+    docs/superpowers/specs/2026-11-04-kfc-script-label-design.md S1; KFCScriptLabelSearch.h): every page item that carries a script label. KFC'S ALONE -
+    never handed to InDesign. */
+enum { kKFCScriptLabelSearchMode = 106 };
+
+/** WHAT THE SCRIPT LABEL KIND ASKS (the face's - KFCKohakuTab, read by IKFCUIServices::ScriptLabelTabConditions; a label list keeps its find side in its
+    query copy, so its searches again ask what its search asked) - the design's S2, S4 and S7. */
+struct KFCScriptLabelConditions
+{
+	PMString	key;			// the label's key as typed; empty = the Script Label panel's own (IScriptLabel::kDefaultScriptLabelKey - "Label")
+	PMString	find;			// the words looked for in a label; empty = every item with a label in that key
+	PMString	change;			// what a row's Replace writes: in place of each find - or the whole label, with whole or an empty find
+	bool		caseSensitive;	// find compared case by case; off = a and A the same (nothing else folded: no width, no kana)
+	bool		whole;			// find is the whole label, and Replace writes the whole label
+	int32		scope;			// its Search: - IWalkerScopeFactoryUtils::kDocumentScope (at launch) or kAllDocumentScope (the QR Code kind's two - S2)
+
+	KFCScriptLabelConditions() : caseSensitive(false), whole(false), scope(0) {}
+};
+
+/** WHERE THE SCRIPT LABEL PART'S FIND NEXT GOES ON FROM (IKFCRuns::ScriptLabelNext - S9): the item it found last (gNull / kInvalidUID = none) -
+    compared, never followed. */
+struct KFCScriptLabelLook
+{
+	UIDRef	lastDoc;
+	UID		lastItem;
+
+	KFCScriptLabelLook() : lastItem(kInvalidUID) {}
+};
+
+/** WHAT THE SCRIPT LABEL PART'S FIND NEXT FOUND (IKFCRuns::ScriptLabelNext): the item, what keeps it from being selected (the kKFCQRReach* bits below),
+    and the face's first line. */
+struct KFCScriptLabelFound
+{
+	UIDRef		doc;		// gNull = nothing found
+	UID			item;
+	int32		reach;
+	PMString	words;
+
+	KFCScriptLabelFound() : item(kInvalidUID), reach(0) {}
+};
+
 /** A KIND OF KENTEN AS THE PAGE'S OWN MARKS READ (IKentenStyle::KentenKind's numbers: U+FE45 the sesame dot and the rest) - what a kenten row and a kenten list's name draw. Custom, its own character
     when it is known (2026-11-03 - C6), an asterisk when it is not. */
 inline UTF32TextChar KFCKentenMarkCharacter(int32 mark, int32 customChar = 0)
@@ -464,7 +505,8 @@ struct KFCTableConditions
 /** IS THIS MODE ONE A SAVED QUERY OF THE KOHAKU+ TAB IS OF (KFCKohakuQuery.h)? */
 inline bool KFCIsKohakuQueryMode(int32 mode)
 {
-	return mode == kKFCQRCodeSearchMode || mode == kKFCTableSearchMode || mode == kKFCRubySearchMode || mode == kKFCKentenSearchMode || mode == kKFCWarichuSearchMode;
+	return mode == kKFCQRCodeSearchMode || mode == kKFCTableSearchMode || mode == kKFCRubySearchMode || mode == kKFCKentenSearchMode || mode == kKFCWarichuSearchMode
+		|| mode == kKFCScriptLabelSearchMode;
 }
 
 /** WHAT A SAVED QUERY OF THE KOHAKU+ TAB HOLDS: its kind (kKFCTableSearchMode ...) and what that kind asks. A query's scope is no part of it: it runs on what Search: says when it runs. */
@@ -475,6 +517,7 @@ struct KFCKohakuQueryData
 	KFCRubyConditions	ruby;
 	KFCKentenConditions	kenten;
 	KFCWarichuConditions	warichu;
+	KFCScriptLabelConditions	label;
 
 	KFCKohakuQueryData() : mode(-1) {}
 };

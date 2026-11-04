@@ -545,6 +545,11 @@ bool KFCResultModel::ListIsWarichu()
 	return gHeader.searchMode == static_cast<int32>(kKFCWarichuSearchMode);
 }
 
+bool KFCResultModel::ListIsScriptLabels()
+{
+	return gHeader.searchMode == static_cast<int32>(kKFCScriptLabelSearchMode);
+}
+
 bool KFCResultModel::ListHasOwnChangeTab()
 {
 	return ListIsTables() || ListIsRuby() || ListIsKenten();

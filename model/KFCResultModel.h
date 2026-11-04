@@ -460,6 +460,10 @@ namespace KFCResultModel
 	/** Is the list A WARICHU LIST - the Warichu kind's (KFCWarichuSearch: its search mode kKFCWarichuSearchMode)? Text rows on each stretch of warichu, one line each; nothing writes them but a text row's
 	    Special Operations (no Replace - docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md A4). */
 	bool ListIsWarichu();
+	/** Is the list A SCRIPT LABEL LIST - the Script Label kind's (KFCScriptLabelSearch: its search mode kKFCScriptLabelSearchMode -
+	    docs/superpowers/specs/2026-11-04-kfc-script-label-design.md)? Object rows, one for each page item whose label the kind found; their
+	    Replace writes the label (S7). */
+	bool ListIsScriptLabels();
 	/** Is the list A KOHAKU+ KIND'S, with a Change side or not (ListHasOwnChangeTab, or a warichu list)? Its conditions are its tab's: not searched again by story or over part of a document, not
 	    narrowed, and its rows are counted as the object lists' (one a thing). */
 	bool ListIsOwnKind();

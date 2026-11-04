@@ -44,6 +44,7 @@
 #include "KFCRubySearch.h"			// IsTabCurrent - the Ruby tab, and what it asks
 #include "KFCRubyListFile.h"		// Load - what the Ruby part says of a ruby list
 #include "KFCKentenSearch.h"		// ...and the Kenten kind
+#include "KFCScriptLabelSearch.h"	// ...and the Script Label kind: what it asks, its face's buttons
 #include "KFCKohakuQuery.h"			// a saved query of the Kohaku+ tab
 #include "KFCTierStore.h"
 
@@ -104,6 +105,7 @@ public:
 	virtual bool ListDrawsTwoLines() { return KFCResultModel::ListDrawsTwoLines(); }
 	virtual bool ListIsOwnKind() { return KFCResultModel::ListIsOwnKind(); }
 	virtual bool GetUnifyFacts(int32 chapterIdx, int32 groupIdx, int32 hitIdx, PMString& outWord, PMString& outReadings) { return KFCResultModel::GetUnifyFacts(chapterIdx, groupIdx, hitIdx, outWord, outReadings); }
+	virtual bool ListIsScriptLabels() { return KFCResultModel::ListIsScriptLabels(); }
 };
 
 CREATE_PMINTERFACE(KFCResultsSession, kKFCResultsImpl)
@@ -229,6 +231,10 @@ public:
 		return KFCRubyListFile::Load(path, words, outWords, english, &outWhy);
 	}
 	virtual int32 ChangeAllListed(const PMString& listWords, PMString& outSummary) { return KFCChangeAll::Run(listWords, outSummary); }
+	virtual bool ScriptLabelConditions(KFCScriptLabelConditions& outConditions) { return KFCScriptLabelSearch::IsTabCurrent(&outConditions); }
+	virtual bool ScriptLabelNext(const KFCScriptLabelLook& look, KFCScriptLabelFound& out) { return KFCScriptLabelSearch::Next(look, out); }
+	virtual bool ScriptLabelChangeFound(const KFCScriptLabelFound& found, PMString& outWords) { return KFCScriptLabelSearch::ChangeFound(found, outWords); }
+	virtual bool ScriptLabelChangeAll(int32& outChanged, int32& outMatched, PMString& outWords) { return KFCScriptLabelSearch::ChangeAll(outChanged, outMatched, outWords); }
 };
 
 CREATE_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)

@@ -156,6 +156,9 @@ public:
 	/** = KFCResultModel::RunByChangeAll (appended - 2026-11-04) - the live run list is Change All in Book's: a tier's heading names
 	    it "[Change All/Book] <its words>" (GetRunNames) rather than "[Run/...] <its queries>". */
 	virtual bool IsChangeAllList() = 0;
+	/** = KFCResultModel::ListIsScriptLabels (appended - docs/superpowers/specs/2026-11-04-kfc-script-label-design.md) - the live list is the Script Label kind's:
+	    object rows, a page item's label each, written by their Replace (S5, S7). */
+	virtual bool ListIsScriptLabels() = 0;
 };
 
 #endif // __IKFCResults_h__

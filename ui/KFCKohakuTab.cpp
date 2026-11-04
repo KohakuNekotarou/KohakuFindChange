@@ -1772,6 +1772,12 @@ bool KFCKohakuTab::IsWarichuCurrent(KFCWarichuConditions& outConditions)
 	return FaceIsCurrent() && gKind == kKindWarichu;
 }
 
+bool KFCKohakuTab::IsScriptLabelCurrent(KFCScriptLabelConditions& outConditions)
+{
+	outConditions = KFCScriptLabelConditions();
+	return false;
+}
+
 void KFCKohakuTab::YieldToSavedQuery()
 {
 	gYield = true;

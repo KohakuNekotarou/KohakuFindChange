@@ -86,8 +86,9 @@ DECLARE_PMID(kInterfaceIDSpace, IID_IKFCUIBOUNDARY, kKFCPrefix + 14)
 // its layout - or only what one of its fields means (KFCSpecialParams::y became Shear's axis as well: the layout the
 // same, but a half that did not read it would shear the other way); kKFCVersion is in the stamp too, so two releases
 // never pass for one. What each revision changed is this file's history (git log -p -- model/KFCBoundaryID.h).
-// (46, 2026-11-04: IKFCRuns::ChangeAllListed and IKFCResults::IsChangeAllList appended - Change All in Book's list.)
-#define kKFCBoundaryRevision	"46"
+// (47, 2026-11-04: the Script Label kind - IKFCUIServices::ScriptLabelTabConditions, IKFCRuns::ScriptLabelConditions / Next / ChangeFound / ChangeAll
+//  and IKFCResults::ListIsScriptLabels appended; KFCKohakuQueryData gained its label conditions.)
+#define kKFCBoundaryRevision	"47"
 #define kKFCBoundaryStamp		kKFCVersion "/" kKFCBoundaryRevision
 
 #endif // __KFCBoundaryID_h__

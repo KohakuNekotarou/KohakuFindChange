@@ -178,6 +178,9 @@ public:
 	virtual bool				KentenTabConditions(KFCKentenConditions& outConditions) = 0;
 	/** IS THE KOHAKU+ TAB'S WARICHU KIND FIND/CHANGE'S NOW (appended - docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md; KFCWarichuSearch::IsTabCurrent asks it) - the same for its conditions. */
 	virtual bool				WarichuTabConditions(KFCWarichuConditions& outConditions) = 0;
+	/** IS THE KOHAKU+ TAB'S SCRIPT LABEL KIND FIND/CHANGE'S NOW (appended - docs/superpowers/specs/2026-11-04-kfc-script-label-design.md; KFCScriptLabelSearch::IsTabCurrent asks it) -
+	    the same for its conditions, answered either way: a row's Replace reads its Change side whichever kind is shown. */
+	virtual bool				ScriptLabelTabConditions(KFCScriptLabelConditions& outConditions) = 0;
 };
 
 /** HOW THE MODEL HALF ASKS FOR IKFCUIServices - the only way. IKFCUIServices has no kDefaultIID, so a Query of its

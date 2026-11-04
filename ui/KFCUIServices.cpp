@@ -603,6 +603,11 @@ public:
 	{
 		return KFCKohakuTab::IsWarichuCurrent(outConditions);
 	}
+
+	virtual bool ScriptLabelTabConditions(KFCScriptLabelConditions& outConditions)
+	{
+		return KFCKohakuTab::IsScriptLabelCurrent(outConditions);
+	}
 };
 
 CREATE_PMINTERFACE(KFCUIServices, kKFCUIServicesImpl)

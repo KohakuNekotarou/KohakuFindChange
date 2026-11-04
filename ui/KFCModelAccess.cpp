@@ -112,6 +112,7 @@ namespace
 		virtual bool ListIsOwnKind() { return false; }
 		virtual bool GetUnifyFacts(int32, int32, int32, PMString& outWord, PMString& outReadings) { outWord.Clear(); outReadings.Clear(); return false; }
 		virtual bool IsChangeAllList() { return false; }
+		virtual bool ListIsScriptLabels() { return false; }
 	};
 
 	class KFCRunsStandInImpl : public IKFCRuns
@@ -215,6 +216,16 @@ namespace
 		virtual bool UnifyRubyRows(const KFCRowsByChapter&, const PMString&, PMString& outStatus) { SayWhy(outStatus); return false; }
 		virtual bool RubyListFacts(const PMString&, int32& outWords, KFCRubyListWhy& outWhy) { outWords = 0; outWhy = KFCRubyListWhy(); outWhy.code = KFCRubyListWhy::kNoModel; return false; }
 		virtual int32 ChangeAllListed(const PMString&, PMString& outSummary) { SayWhy(outSummary); return 0; }
+		virtual bool ScriptLabelConditions(KFCScriptLabelConditions& outConditions) { outConditions = KFCScriptLabelConditions(); return false; }
+		virtual bool ScriptLabelNext(const KFCScriptLabelLook&, KFCScriptLabelFound& out) { out = KFCScriptLabelFound(); SayWhy(out.words); return false; }
+		virtual bool ScriptLabelChangeFound(const KFCScriptLabelFound&, PMString& outWords) { SayWhy(outWords); return false; }
+		virtual bool ScriptLabelChangeAll(int32& outChanged, int32& outMatched, PMString& outWords)
+		{
+			outChanged = 0;
+			outMatched = 0;
+			SayWhy(outWords);
+			return false;
+		}
 	};
 
 	class KFCChaptersStandInImpl : public IKFCChapters

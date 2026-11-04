@@ -231,6 +231,15 @@ public:
 	    ("Find:"cat" Change:"dog"" - the UI's, a search's tier's words). The panel's command calls this; ChangeAll above is it with
 	    no words. */
 	virtual int32 ChangeAllListed(const PMString& listWords, PMString& outSummary) = 0;
+	/** = KFCScriptLabelSearch::IsTabCurrent (appended - 2026-11-04, the author: "list the script labels in the results, and search and replace them by their words" -
+	    docs/superpowers/specs/2026-11-04-kfc-script-label-design.md) - what the Kohaku+ face's Script Label kind asks; true = it is Find/Change's kind now. */
+	virtual bool ScriptLabelConditions(KFCScriptLabelConditions& outConditions) = 0;
+	/** = KFCScriptLabelSearch::Next (appended - S9) - the face's Find Next on Script Label. */
+	virtual bool ScriptLabelNext(const KFCScriptLabelLook& look, KFCScriptLabelFound& out) = 0;
+	/** = KFCScriptLabelSearch::ChangeFound (appended) - its Change. */
+	virtual bool ScriptLabelChangeFound(const KFCScriptLabelFound& found, PMString& outWords) = 0;
+	/** = KFCScriptLabelSearch::ChangeAll (appended) - its Change All: every label of the Search: the kind finds, given its Change side in one undoable step. */
+	virtual bool ScriptLabelChangeAll(int32& outChanged, int32& outMatched, PMString& outWords) = 0;
 };
 
 #endif // __IKFCRuns_h__
