@@ -305,6 +305,18 @@ void KFCQueryCopier::CaptureWarichu(KFCQueryCopy& out)
 	out.valid = true;
 }
 
+void KFCQueryCopier::CaptureScriptLabels(KFCQueryCopy& out, const KFCScriptLabelConditions& asked)
+{
+	out = KFCQueryCopy();
+	out.mode = static_cast<int32>(kKFCScriptLabelSearchMode);
+	out.label = asked;
+	out.label.change.Clear();		// (a row's Replace reads the face's Change side as it stands)
+	out.label.change.SetTranslatable(kFalse);	// (Clear puts the mark back to "translate" - memory pmstring-untranslatable-mark-lifecycle)
+	out.label.key.SetTranslatable(kFalse);
+	out.label.find.SetTranslatable(kFalse);
+	out.valid = true;
+}
+
 void KFCQueryCopier::CaptureRuby(KFCQueryCopy& out, int32 kind, const PMString& base, const PMString& reading)
 {
 	out = KFCQueryCopy();

@@ -99,6 +99,9 @@ struct KFCQueryCopy
 	int32		kentenMarkChar;			// ...a custom mark's character it asked for (2026-11-03); 0 = every custom mark
 	// A RUBY OR KENTEN LIST'S: what its search took in and took for the same. (Not the five bool16s above: those are a tab of InDesign's, read and stated back; these were never any of InDesign's.)
 	KFCOwnSwitches	ownSwitches;
+	// A SCRIPT LABEL LIST'S (CaptureScriptLabels): what it looked for - its key, its words, Case Sensitive, Whole Label - what its searches again ask,
+	// whatever the face shows then. (Its Change side is never kept: a row's Replace writes what the face asks as it stands - S7.)
+	KFCScriptLabelConditions	label;
 
 	KFCQueryCopy();
 };
@@ -128,6 +131,10 @@ namespace KFCQueryCopier
 
 	/** A WARICHU LIST'S (KFCWarichuSearch - docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md): the mode, kKFCWarichuSearchMode - it asks nothing but its icons (ownSwitches, set by the caller). */
 	void CaptureWarichu(KFCQueryCopy& out);
+
+	/** A SCRIPT LABEL LIST'S (KFCScriptLabelSearch - docs/superpowers/specs/2026-11-04-kfc-script-label-design.md): the mode, kKFCScriptLabelSearchMode, and its find side - nothing
+	    of Find/Change's, nothing stated back. */
+	void CaptureScriptLabels(KFCQueryCopy& out, const KFCScriptLabelConditions& asked);
 
 	/** State `copy` back into Find/Change: the tab, then every field that differs from what the dialog holds now, with the
 	    dialog's own commands (KFCFindChangeCmds; the formats with kClearFindFormatCmdBoss / kClearChangeFormatCmdBoss and

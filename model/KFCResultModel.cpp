@@ -557,7 +557,7 @@ bool KFCResultModel::ListHasOwnChangeTab()
 
 bool KFCResultModel::ListIsOwnKind()
 {
-	return ListHasOwnChangeTab() || ListIsWarichu();
+	return ListHasOwnChangeTab() || ListIsWarichu() || ListIsScriptLabels();
 }
 
 bool KFCResultModel::ListDrawsTwoLines()

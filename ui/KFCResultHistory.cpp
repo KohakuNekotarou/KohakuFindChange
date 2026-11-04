@@ -668,6 +668,23 @@ namespace
 			label.Append("\"");
 			return label;
 		}
+		// THE SCRIPT LABEL KIND'S WORDS ARE ITS OWN FACE'S (docs/superpowers/specs/2026-11-04-kfc-script-label-design.md S2): Key:"<key>" when the face names
+		// one, then Find:"<its words>" - [Any Label] when it asks none (every label of the key).
+		if (mode == kKFCScriptLabelSearchMode)
+		{
+			KFCScriptLabelConditions asked;
+			(void)KFCRuns()->ScriptLabelConditions(asked);
+			if (!asked.key.IsEmpty())
+			{
+				label.Append(" Key:\"");
+				label.Append(asked.key);
+				label.Append("\"");
+			}
+			label.Append(" Find:\"");
+			label.Append(asked.find.IsEmpty() ? PMString("[Any Label]") : asked.find);
+			label.Append("\"");
+			return label;
+		}
 		// THE WARICHU KIND ASKS NOTHING BUT ITS ICONS (docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md A3): Find:"[Warichu]".
 		if (mode == kKFCWarichuSearchMode)
 		{
