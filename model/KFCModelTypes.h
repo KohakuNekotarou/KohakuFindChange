@@ -211,6 +211,9 @@ enum KFCSpecialOp
 	// A TEXT row's Special Operations > Tate-chu-yoko (docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md B4): its mark alone - the row reads
 	// "Tate-chu-yoko". Written by KFCReplaceEngine::TcyHits, never by SpecialRows.
 	kKFCSpecialTextTcy,
+	// A script label row's Replace (the Script Label kind - docs/superpowers/specs/2026-11-04-kfc-script-label-design.md S8): its mark alone - the row reads "Labeled", counted as
+	// written, and can be written again. Written by KFCReplaceEngine's label rows, never by SpecialRows.
+	kKFCSpecialScriptLabel,
 	kKFCSpecialOpCount
 };
 
@@ -412,22 +415,25 @@ enum { kKFCScriptLabelSearchMode = 106 };
     query copy, so its searches again ask what its search asked) - the design's S2, S4 and S7. */
 struct KFCScriptLabelConditions
 {
-	PMString	key;			// the label's key as typed; empty = the Script Label panel's own (IScriptLabel::kDefaultScriptLabelKey - "Label")
+	PMString	key;			// the label's key as typed; empty = EVERY key (the author, 11-04: "a blank ScriptKey finds them all?") - the Script Label panel's own (IScriptLabel::kDefaultScriptLabelKey) and every insertLabel key (IScriptLabel::GetTags)
 	PMString	find;			// the words looked for in a label; empty = every item with a label in that key
 	PMString	change;			// what a row's Replace writes: in place of each find - or the whole label, with whole or an empty find
-	bool		caseSensitive;	// find compared case by case; off = a and A the same (nothing else folded: no width, no kana)
-	bool		whole;			// find is the whole label, and Replace writes the whole label
+	bool		caseSensitive;	// find compared case by case - ALWAYS since 11-04 (the author: "drop the case box - always case sensitive"): nothing sets it off now (no box,
+							// no query attribute, no test line); off would fold a and A alone (no width, no kana)
+	bool		whole;			// find is the whole label, and Replace writes the whole label - Match:'s Text (Whole Label)
+	bool		grep;			// find is a regular expression (the author, 11-04: "add regular expressions, please"), change may take $1, $& (ECMAScript's - KFCScriptLabelSearch) - Match:'s GREP
 	int32		scope;			// its Search: - IWalkerScopeFactoryUtils::kDocumentScope (at launch) or kAllDocumentScope (the QR Code kind's two - S2)
 
-	KFCScriptLabelConditions() : caseSensitive(false), whole(false), scope(0) {}
+	KFCScriptLabelConditions() : caseSensitive(true), whole(false), grep(false), scope(0) {}
 };
 
 /** WHERE THE SCRIPT LABEL PART'S FIND NEXT GOES ON FROM (IKFCRuns::ScriptLabelNext - S9): the item it found last (gNull / kInvalidUID = none) -
     compared, never followed. */
 struct KFCScriptLabelLook
 {
-	UIDRef	lastDoc;
-	UID		lastItem;
+	UIDRef		lastDoc;
+	UID			lastItem;
+	PMString	lastKey;	// ...and which of its labels (an item can hold several keys' - an empty Script Key: lists each)
 
 	KFCScriptLabelLook() : lastItem(kInvalidUID) {}
 };
@@ -438,6 +444,7 @@ struct KFCScriptLabelFound
 {
 	UIDRef		doc;		// gNull = nothing found
 	UID			item;
+	PMString	key;		// the key of the label it found (the item's own of that key is what Change writes)
 	int32		reach;
 	PMString	words;
 

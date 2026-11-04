@@ -240,6 +240,9 @@ public:
 	virtual bool ScriptLabelChangeFound(const KFCScriptLabelFound& found, PMString& outWords) = 0;
 	/** = KFCScriptLabelSearch::ChangeAll (appended) - its Change All: every label of the Search: the kind finds, given its Change side in one undoable step. */
 	virtual bool ScriptLabelChangeAll(int32& outChanged, int32& outMatched, PMString& outWords) = 0;
+	/** = KFCScriptLabelSearch::LabelNow (appended - revision 48, the author 11-04: "the label shown in the dialog's lower part, on several lines") - the label of the item the face's
+	    Find Next found (found.key's), as it reads now; empty when none, or the item or its document is gone. Read only. */
+	virtual PMString ScriptLabelNow(const KFCScriptLabelFound& found) = 0;
 };
 
 #endif // __IKFCRuns_h__

@@ -14,8 +14,12 @@
 #include "IDataBase.h"
 #include "IHierarchy.h"
 #include "IObjectWalker.h"
-#include "IScript.h"					// a page item's label - GetTag (not IScriptLabel: memory script-label-read-through-iscript)
-#include "IScriptLabel.h"				// kDefaultScriptLabelKey - the Script Label panel's own key
+#include "IScript.h"					// a page item's label - GetTag (not IScriptLabel: memory script-label-read-through-iscript); GetTags - every key's (IScript is an IScriptLabel)
+#include "IScriptLabel.h"				// kDefaultScriptLabelKey - the Script Label panel's own key; ScriptLabelKeyValueList
+#include "IScriptUtils.h"				// SetScriptingTag - the official door to a label's write (Write)
+#include "RequestContext.h"				// EngineContext - default-constructed: no engine is asking
+#include "ScriptData.h"					// ScriptList
+#include "Utils.h"
 #include "IWalkerScopeFactoryUtils.h"	// kDocumentScope, kAllDocumentScope
 
 // General includes:
@@ -28,14 +32,19 @@
 #include "TextWalkerServiceProviderID.h"	// kObjectWalkerBoss
 #include "WideString.h"
 
+#include <map>
+#include <regex>						// std::wregex - Find Label: as GREP (the author, 11-04: "add regular expressions, please")
 #include <set>
 #include <string>
+#include <utility>
 
 // Project includes:
 #include "KFCScriptLabelSearch.h"
 #include "IKFCUIServices.h"				// ScriptLabelTabConditions - the kind is the UI half's (KFCQueryUIServices)
 #include "KFCDiag.h"
-#include "KFCObjectSearch.h"			// BuildRow - a row as an object row is
+#include "KFCObjectSearch.h"			// BuildRow - a row as an object row is; Fingerprint, ReadItemPlace - a written row's marks
+#include "KFCPageItemFacts.h"			// ItemIsThere - the face's Change asks its item first; IsPageItemLockedForEdit, IsFrameOnLockedLayer - IsLockedNow
+#include "KFCReplaceEngine.h"			// WriteFaceLabels - the face's Change and Change All write in its step
 #include "KFCProgressBar.h"				// KFCSetCountedTask too - the bar's line
 #include "KFCTextCut.h"					// KFCSafeCut
 
@@ -45,8 +54,10 @@ namespace
 // A document's share of the bar (the bar moves between documents: a document's labels are read in one go - KFCQRSearch's).
 const int32 kLabelDocSpan = 100;
 
-// A row's label is kept to this many characters - the panel cuts it again to its width when it draws (KFCQRSearch's kQRMaxContentChars).
+// A row's label is kept to this many characters - the panel cuts it again to its width when it draws (KFCQRSearch's kQRMaxContentChars) -
+// of which the label before its match keeps this many, its end (the match is what the row is for).
 const int32 kLabelMaxChars = 200;
+const int32 kLabelHeadChars = 80;
 
 // A LABEL AS CODE POINTS, case-folded or not (Matches and NewValue compare these). Folded one code point at a time, each to its own lowercase
 // where that is one code point too - so a position here is a position in the label (a string's ToLower can change its length: U+0130).
@@ -68,6 +79,212 @@ std::u32string U32Of(const PMString& words, bool fold)
 		out.push_back(static_cast<char32_t>(v));
 	}
 	return out;
+}
+
+// [from, from + count) of code points as a PMString (count npos: to the end).
+PMString WordsOfU32(const std::u32string& s, size_t from, size_t count)
+{
+	WideString wide;
+	const size_t end = (count == std::u32string::npos || from + count > s.size()) ? s.size() : from + count;
+	for (size_t c = from; c < end; ++c)
+		wide.Append(UTF32TextChar(static_cast<uint32>(s[c])));
+	PMString out(wide);
+	out.SetTranslatable(kFalse);
+	return out;
+}
+
+// A PMString's UTF-16 units as a std::wstring and back - what std::wregex reads and writes (wchar_t is UTF-16: KFC is Windows' alone).
+std::wstring WideOf(const PMString& s)
+{
+	int32 n = 0;
+	const UTF16TextChar* buf = s.GrabUTF16Buffer(&n);
+	return (buf != nil && n > 0) ? std::wstring(reinterpret_cast<const wchar_t*>(buf), static_cast<size_t>(n)) : std::wstring();
+}
+
+PMString WordsOfWide(const std::wstring& w)
+{
+	PMString out;
+	out.SetTranslatable(kFalse);
+	if (!w.empty())
+		out.AppendW(reinterpret_cast<const UTF16TextChar*>(w.data()), static_cast<int32>(w.size()));
+	out.SetTranslatable(kFalse);
+	return out;
+}
+
+// FIND LABEL: AS GREP (the author, 11-04): ECMAScript's grammar (std::wregex - InDesign's own GREP engine is no public door), Case Sensitive off = icase. Compiled once
+// for a pattern and its case - a walk asks it of every label - and kept per thread (a model plug-in keeps no state threads share). valid false: why = std::regex_error's words.
+struct GrepCompiled
+{
+	bool			set;
+	std::wstring	pattern;
+	bool			icase;
+	bool			valid;
+	std::string		why;
+	std::wregex		re;
+	GrepCompiled() : set(false), icase(false), valid(false) {}
+};
+
+const GrepCompiled& GrepOf(const KFCScriptLabelConditions& asked)
+{
+	thread_local GrepCompiled kept;
+	const std::wstring pattern(WideOf(asked.find));
+	const bool icase = !asked.caseSensitive;
+	if (!kept.set || kept.pattern != pattern || kept.icase != icase)
+	{
+		kept.set = true;
+		kept.pattern = pattern;
+		kept.icase = icase;
+		kept.why.clear();
+		try
+		{
+			kept.re.assign(pattern, icase ? (std::regex_constants::ECMAScript | std::regex_constants::icase) : std::regex_constants::ECMAScript);
+			kept.valid = true;
+		}
+		catch (const std::regex_error& e)
+		{
+			kept.valid = false;
+			kept.why = e.what();
+		}
+	}
+	return kept;
+}
+
+// A LABEL AGAINST THE CONDITIONS, SPLIT WHERE IT MATCHES (S4 - and the author, 11-04: "only the found characters dark, the rest faint", as a text row draws its match):
+// pre, the match (the first one - every one for a Replace), post. No find: the whole label matches; Whole Label: the whole label or nothing. False = no match (the
+// parts are not set) - an empty label never matches, nor a GREP that is no regular expression.
+struct LabelParts
+{
+	PMString	pre;
+	PMString	match;
+	PMString	post;
+};
+
+bool FirstMatch(const PMString& label, const KFCScriptLabelConditions& asked, LabelParts* outParts)
+{
+	if (label.IsEmpty())
+		return false;
+	LabelParts parts;
+	parts.pre.SetTranslatable(kFalse);
+	parts.post.SetTranslatable(kFalse);
+	parts.match = label;
+	parts.match.SetTranslatable(kFalse);
+	if (asked.find.IsEmpty())
+	{
+		if (outParts != nil)
+			*outParts = parts;
+		return true;
+	}
+	if (asked.grep)
+	{
+		const GrepCompiled& g = GrepOf(asked);
+		if (!g.valid)
+			return false;
+		const std::wstring w(WideOf(label));
+		try
+		{
+			std::wsmatch m;
+			if (asked.whole)
+			{
+				if (!std::regex_match(w, m, g.re))
+					return false;
+			}
+			else
+			{
+				if (!std::regex_search(w, m, g.re))
+					return false;
+				const size_t at = static_cast<size_t>(m.position(0));
+				const size_t length = static_cast<size_t>(m.length(0));
+				parts.pre = WordsOfWide(w.substr(0, at));
+				parts.match = WordsOfWide(w.substr(at, length));
+				parts.post = WordsOfWide(w.substr(at + length));
+			}
+		}
+		catch (const std::regex_error&)
+		{
+			return false;		// (a pattern too complex for a label - std::regex's error_complexity / error_stack: no match)
+		}
+		if (outParts != nil)
+			*outParts = parts;
+		return true;
+	}
+	const bool fold = !asked.caseSensitive;
+	const std::u32string folded(U32Of(label, fold));
+	const std::u32string find(U32Of(asked.find, fold));
+	if (asked.whole)
+	{
+		if (folded != find)
+			return false;
+	}
+	else
+	{
+		const size_t at = folded.find(find);
+		if (at == std::u32string::npos)
+			return false;
+		const std::u32string original(U32Of(label, false));
+		parts.pre = WordsOfU32(original, 0, at);
+		parts.match = WordsOfU32(original, at, find.size());
+		parts.post = WordsOfU32(original, at + find.size(), std::u32string::npos);
+	}
+	if (outParts != nil)
+		*outParts = parts;
+	return true;
+}
+
+// THE PARTS KEPT SHORT (kLabelMaxChars in all, never inside a character - KFCSafeCut): the label before the match keeps its end, kLabelHeadChars of it; a match
+// longer than all of it is cut and nothing follows; what follows fills the rest.
+void CutParts(LabelParts& parts)
+{
+	if (parts.pre.CharCount() > kLabelHeadChars)
+	{
+		parts.pre.Remove(0, KFCSafeCut(parts.pre, parts.pre.CharCount() - kLabelHeadChars));
+		PMString cut;
+		cut.SetTranslatable(kFalse);
+		cut.AppendW(static_cast<UTF32TextChar>(kTextChar_Ellipse));
+		cut.Append(parts.pre);
+		parts.pre = cut;
+	}
+	if (parts.match.CharCount() > kLabelMaxChars)
+	{
+		parts.match.Remove(KFCSafeCut(parts.match, kLabelMaxChars), kMaxInt32);
+		parts.match.AppendW(static_cast<UTF32TextChar>(kTextChar_Ellipse));
+		parts.post.Clear();
+	}
+	const int32 room = kLabelMaxChars - parts.pre.CharCount() - parts.match.CharCount();
+	if (parts.post.CharCount() > (room > 0 ? room : 0))
+	{
+		parts.post.Remove(KFCSafeCut(parts.post, room > 0 ? room : 0), kMaxInt32);
+		parts.post.AppendW(static_cast<UTF32TextChar>(kTextChar_Ellipse));
+	}
+	parts.pre.SetTranslatable(kFalse);
+	parts.match.SetTranslatable(kFalse);
+	parts.post.SetTranslatable(kFalse);
+}
+
+// A ROW'S TEXT FOR THE FACE'S LINE: without its "ID<uid>:" head - "<name>  <label>" (KFCQRSearch::Next's way).
+PMString LineOf(const PMString& rowText)
+{
+	PMString text(rowText);
+	text.SetTranslatable(kFalse);
+	const CharCounter colon = text.IndexOfWChar(UTF32TextChar(':'), 0);
+	if (colon >= 0)
+		text.Remove(0, colon + 1);
+	return text;
+}
+
+// The row's whole line: what it draws, faint and dark run together.
+PMString WholeLineOf(const KFCResultModel::Hit& hit)
+{
+	PMString line(hit.preText);
+	line.Append(hit.matchText);
+	line.Append(hit.postText);
+	line.SetTranslatable(kFalse);
+	return line;
+}
+
+// THE SCRIPT LABEL PANEL'S OWN KEY? (its labels' rows name no key - every other key's do)
+bool IsPanelKey(const PMString& key)
+{
+	return key.IsEqual(IScriptLabel::kDefaultScriptLabelKey) != kFalse;
 }
 
 // NOT A PAGE ITEM OF ITS OWN, going up from one: a spread's layer (the top of an item's own tree), the spread, and the wrapper an inline or
@@ -151,48 +368,147 @@ bool CollectItems(const UIDRef& docRef, std::vector<UID>& outItems)
 	return true;
 }
 
-// A LABEL'S ROW (S5): itemUID = the item, matchText = "ID<uid>:<the Layers panel's name>  <label>" - the object rows' head (BuildRow: its
-// name, its place, its fingerprint), then the label as it stands, cut where a row's text is kept short (never inside a character -
-// KFCSafeCut). The panel draws its line breaks as marks (KFCResultModel::MarkUpBreaksForDisplay) and cuts it again to its width.
-void BuildRow(const UIDRef& docRef, UID item, const PMString& label, KFCResultModel::Hit& out)
+// AN ITEM'S LABELS THE CONDITIONS LOOK AT, (key, label) - its labels that are not empty: the key asked's alone, or with no key asked EVERY key's (the author, 11-04:
+// "a blank ScriptKey finds them all?") - the Script Label panel's first, then each one a script put under a key of its own (IScriptLabel::GetTags; the panel's key
+// is not taken twice should the list hold it too).
+void LabelsOf(IDataBase* db, UID item, const KFCScriptLabelConditions& asked, std::vector<std::pair<PMString, PMString> >& out)
 {
-	KFCObjectSearch::BuildRow(docRef, item, out);
-	PMString shown(label);
-	shown.SetTranslatable(kFalse);
-	if (shown.CharCount() > kLabelMaxChars)
+	out.clear();
+	if (db == nil || item == kInvalidUID || !db->IsValidUID(item))
+		return;
+	InterfacePtr<IScript> script(db, item, UseDefaultIID());
+	if (script == nil)
+		return;
+	if (!asked.key.IsEmpty())
 	{
-		shown.Remove(KFCSafeCut(shown, kLabelMaxChars), kMaxInt32);
-		shown.AppendW(static_cast<UTF32TextChar>(kTextChar_Ellipse));
+		PMString key(asked.key);
+		key.SetTranslatable(kFalse);
+		PMString label(script->GetTag(key));
+		label.SetTranslatable(kFalse);
+		if (!label.IsEmpty())
+			out.push_back(std::make_pair(key, label));
+		return;
 	}
-	out.matchText.Append("  ");
-	out.matchText.Append(shown);
-	out.matchText.SetTranslatable(kFalse);
+	PMString panelKey(IScriptLabel::kDefaultScriptLabelKey);
+	panelKey.SetTranslatable(kFalse);
+	PMString own(script->GetTag(panelKey));
+	own.SetTranslatable(kFalse);
+	if (!own.IsEmpty())
+		out.push_back(std::make_pair(panelKey, own));
+	const IScriptLabel::ScriptLabelKeyValueList all(script->GetTags());
+	for (size_t i = 0; i < all.size(); ++i)
+	{
+		PMString key(all[i].Key());
+		key.SetTranslatable(kFalse);
+		PMString label(all[i].Value());
+		label.SetTranslatable(kFalse);
+		if (key.IsEmpty() || label.IsEmpty() || IsPanelKey(key))
+			continue;
+		out.push_back(std::make_pair(key, label));
+	}
 }
 
-// ONE DOCUMENT'S LABELS AS ROWS, in the walk's order: at most `limit` (outCapped when there were more). false = no walker.
-bool WalkDoc(const UIDRef& docRef, size_t limit, const KFCScriptLabelConditions& asked, std::vector<KFCResultModel::Hit>& outHits, bool& outCapped)
+// A LABEL'S ROW (S5): itemUID = the item, labelKey = its label's key; the object rows' head (KFCObjectSearch::BuildRow: "ID<uid>:<the Layers panel's name>", its place,
+// its fingerprint), then - two spaces after - "<key>: " for a key that is not the Script Label panel's, then the label as it stands, cut short (CutParts). With the
+// conditions: faint up to the match, the match dark, faint after it (preText / matchText / postText - a text row's three). Without (a written row's words - RowWords):
+// the whole line in matchText.
+void BuildRow(const UIDRef& docRef, UID item, const PMString& key, const PMString& label, const KFCScriptLabelConditions* asked, KFCResultModel::Hit& out)
+{
+	KFCObjectSearch::BuildRow(docRef, item, out);
+	PMString head(out.matchText);
+	head.SetTranslatable(kFalse);
+	head.Append("  ");
+	if (!IsPanelKey(key))
+	{
+		head.Append(key);
+		head.Append(": ");
+	}
+	LabelParts parts;
+	if (asked == nil || !FirstMatch(label, *asked, &parts))
+	{
+		parts.pre.Clear();
+		parts.match = label;
+		parts.post.Clear();
+	}
+	CutParts(parts);
+	if (asked == nil)
+	{
+		out.matchText = head;
+		out.matchText.Append(parts.pre);
+		out.matchText.Append(parts.match);
+		out.matchText.Append(parts.post);
+		out.preText.Clear();
+		out.postText.Clear();
+	}
+	else
+	{
+		out.preText = head;
+		out.preText.Append(parts.pre);
+		out.matchText = parts.match;
+		out.postText = parts.post;
+	}
+	out.preText.SetTranslatable(kFalse);
+	out.matchText.SetTranslatable(kFalse);
+	out.postText.SetTranslatable(kFalse);
+	out.labelKey = key;
+	out.labelKey.SetTranslatable(kFalse);
+}
+
+// ONE DOCUMENT'S LABELS AS ROWS, in the walk's order - an item's keys in LabelsOf's: at most `limit` (outCapped when there were more). false = no walker. `place`
+// with `placeKey` (Find Next's last found - an empty placeKey: any of the item's): its row too, where the walk meets it, whether its label matches or not - a place to
+// go on from (Next); *outPlaceMatches says whether it matched (left as it was when it is not met).
+bool WalkDoc(const UIDRef& docRef, size_t limit, const KFCScriptLabelConditions& asked, std::vector<KFCResultModel::Hit>& outHits, bool& outCapped,
+	UID place = kInvalidUID, const PMString& placeKey = PMString(), bool* outPlaceMatches = nil)
 {
 	outCapped = false;
 	std::vector<UID> items;
 	if (!CollectItems(docRef, items))
 		return false;
 	IDataBase* const db = docRef.GetDataBase();
-	const PMString key(KFCScriptLabelSearch::KeyOf(asked));
+	KFCScriptLabelConditions placeAsked(asked);
+	placeAsked.key = placeKey;		// (the place's own label is read under its own key, whatever Script Key: asks)
+	std::vector<std::pair<PMString, PMString> > labels;
 	for (size_t i = 0; i < items.size(); ++i)
 	{
-		const PMString label(KFCScriptLabelSearch::LabelOf(db, items[i], key));
-		if (!KFCScriptLabelSearch::Matches(label, asked))
-			continue;
-		if (outHits.size() >= limit)
+		const bool atPlace = (place != kInvalidUID && items[i] == place);
+		LabelsOf(db, items[i], atPlace ? placeAsked : asked, labels);
+		for (size_t l = 0; l < labels.size(); ++l)
 		{
-			outCapped = true;
-			break;
+			const bool matches = KFCScriptLabelSearch::Matches(labels[l].second, asked);
+			const bool isPlace = atPlace && (placeKey.IsEmpty() || labels[l].first.IsEqual(placeKey));
+			if (isPlace && outPlaceMatches != nil)
+				*outPlaceMatches = matches;
+			if (!matches && !isPlace)
+				continue;
+			if (outHits.size() >= limit)
+			{
+				outCapped = true;
+				return true;
+			}
+			KFCResultModel::Hit hit;
+			BuildRow(docRef, items[i], labels[l].first, labels[l].second, &asked, hit);
+			outHits.push_back(hit);
 		}
-		KFCResultModel::Hit hit;
-		BuildRow(docRef, items[i], label, hit);
-		outHits.push_back(hit);
 	}
 	return true;
+}
+
+// The documents a face's button walks (S2, S9): every open one over All Documents, the front one over Document - none: outWords says so.
+bool RangeDocs(const KFCScriptLabelConditions& asked, std::vector<KFCBookScope::ChapterDoc>& outDocs, PMString& outWords)
+{
+	outDocs.clear();
+	if (asked.scope == IWalkerScopeFactoryUtils::kAllDocumentScope)
+		KFCBookScope::ListOpenDocuments(outDocs);
+	else
+	{
+		IDocument* const doc = KFCBookScope::ActiveDocument();		// non-owning
+		if (doc != nil)
+			outDocs.push_back(KFCBookScope::DocAsChapter(doc));
+	}
+	if (!outDocs.empty())
+		return true;
+	outWords.Append("No document is open.");
+	return false;
 }
 
 }	// anonymous namespace
@@ -226,10 +542,10 @@ bool KFCScriptLabelSearch::IsTabCurrent(KFCScriptLabelConditions* outConditions)
 				conditions.find = value;
 			else if (line.compare(0, 7, "change=") == 0)
 				conditions.change = value;
-			else if (line == "case=1")
-				conditions.caseSensitive = true;
 			else if (line == "whole=1")
 				conditions.whole = true;
+			else if (line == "grep=1")
+				conditions.grep = true;
 			else if (line == "scope=all")
 				conditions.scope = IWalkerScopeFactoryUtils::kAllDocumentScope;
 		}
@@ -272,22 +588,79 @@ PMString KFCScriptLabelSearch::LabelOf(IDataBase* db, UID item, const PMString& 
 
 bool KFCScriptLabelSearch::Matches(const PMString& label, const KFCScriptLabelConditions& asked)
 {
-	if (label.IsEmpty())
-		return false;
-	if (asked.find.IsEmpty())
+	return FirstMatch(label, asked, nil);
+}
+
+bool KFCScriptLabelSearch::GrepIsValid(const KFCScriptLabelConditions& asked, PMString& outWhy)
+{
+	outWhy.Clear();
+	outWhy.SetTranslatable(kFalse);
+	if (!asked.grep || asked.find.IsEmpty())
 		return true;
-	const bool fold = !asked.caseSensitive;
-	const std::u32string words(U32Of(label, fold));
-	const std::u32string find(U32Of(asked.find, fold));
-	return asked.whole ? (words == find) : (words.find(find) != std::u32string::npos);
+	const GrepCompiled& g = GrepOf(asked);
+	if (g.valid)
+		return true;
+	outWhy.Append("Find Label: is not a GREP expression this kind can read (");
+	outWhy.Append(g.why.c_str());
+	outWhy.Append(") - nothing was searched.");
+	outWhy.SetTranslatable(kFalse);
+	return false;
 }
 
 PMString KFCScriptLabelSearch::NewValue(const PMString& label, const KFCScriptLabelConditions& asked)
 {
-	(void)asked;
-	PMString same(label);
-	same.SetTranslatable(kFalse);
-	return same;
+	// NO FIND LABEL, OR WHOLE LABEL WITHOUT GREP: Change Label: as it stands (S7). GREP: every match given Change Label:, its $1, $& and $$ read as ECMAScript reads them
+	// (std::regex_replace) - Whole Label: the whole label is the match. Otherwise every occurrence of Find Label: in the label, left to right and none over another,
+	// given Change Label: - found as Matches finds it (folded unless Case Sensitive: a position in the folded label is the same position in the label - U32Of),
+	// the rest of the label kept as it was.
+	PMString out;
+	if (asked.find.IsEmpty() || (asked.whole && !asked.grep))
+		out = asked.change;
+	else if (asked.grep)
+	{
+		out = label;
+		const GrepCompiled& g = GrepOf(asked);
+		if (g.valid)
+		{
+			const std::wstring w(WideOf(label));
+			const std::wstring format(WideOf(asked.change));
+			try
+			{
+				if (asked.whole)
+				{
+					std::wsmatch m;
+					if (std::regex_match(w, m, g.re))
+						out = WordsOfWide(m.format(format));
+				}
+				else
+					out = WordsOfWide(std::regex_replace(w, g.re, format));
+			}
+			catch (const std::regex_error&)
+			{
+				out = label;		// (nothing written for a label the pattern cannot be run on - callers count it as already as asked)
+			}
+		}
+	}
+	else
+	{
+		const bool fold = !asked.caseSensitive;
+		const std::u32string folded(U32Of(label, fold));
+		const std::u32string find(U32Of(asked.find, fold));
+		const std::u32string original(U32Of(label, false));
+		const std::u32string change(U32Of(asked.change, false));
+		std::u32string result;
+		size_t at = 0;
+		for (size_t hit = folded.find(find, at); hit != std::u32string::npos; hit = folded.find(find, at))
+		{
+			result.append(original, at, hit - at);
+			result.append(change);
+			at = hit + find.size();		// (find is not empty: the loop moves on)
+		}
+		result.append(original, at, std::u32string::npos);
+		out = WordsOfU32(result, 0, std::u32string::npos);
+	}
+	out.SetTranslatable(kFalse);
+	return out;
 }
 
 void KFCScriptLabelSearch::CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBook,
@@ -364,52 +737,326 @@ bool KFCScriptLabelSearch::WalkOneDocument(const UIDRef& docRef, const PMString&
 	return walked && !outCancelled;
 }
 
-PMString KFCScriptLabelSearch::RowWords(IDataBase* db, UID item, const PMString& label)
+PMString KFCScriptLabelSearch::RowWords(IDataBase* db, UID item, const PMString& key, const PMString& label)
 {
 	KFCResultModel::Hit hit;
 	if (db != nil)
-		BuildRow(UIDRef(db, db->GetRootUID()), item, label, hit);
+		BuildRow(UIDRef(db, db->GetRootUID()), item, key, label, nil, hit);
 	hit.matchText.SetTranslatable(kFalse);
 	return hit.matchText;
 }
 
 bool KFCScriptLabelSearch::Next(const KFCScriptLabelLook& look, KFCScriptLabelFound& out)
 {
-	(void)look;
 	out = KFCScriptLabelFound();
-	return false;
+	out.words.SetTranslatable(kFalse);
+	// THE RANGE - the tab's Search: (All Documents or Document - S2), no book: Find Next is the dialog's, as QR Code's (KFCQRSearch::Next).
+	KFCScriptLabelConditions asked;
+	(void)IsTabCurrent(&asked);
+	if (!GrepIsValid(asked, out.words))
+		return false;
+	const bool allDocuments = (asked.scope == IWalkerScopeFactoryUtils::kAllDocumentScope);
+	std::vector<KFCBookScope::ChapterDoc> docs;
+	if (!RangeDocs(asked, docs, out.words))
+		return false;
+	// EVERY LABEL OF THE RANGE THAT MATCHES, IN THE LIST'S ORDER (S9): document by document, each one's in page order (the order the list files them in -
+	// KFCSearchEngine::FileChapter), an item's keys in their order. Walked anew at every press: a label written or taken away since is met. The one found last
+	// stands among them as a PLACE (WalkDoc's `place`) even when its label no longer matches - Change and Change/Find write it so - and is no candidate then.
+	struct Found
+	{
+		size_t					doc;
+		KFCResultModel::Hit		hit;
+		bool					placeOnly;		// the one found last, whose label no longer matches
+	};
+	std::vector<Found> found;
+	size_t candidates = 0;
+	for (size_t d = 0; d < docs.size(); ++d)
+	{
+		const bool lastHere = look.lastDoc.GetDataBase() != nil && docs[d].docRef.GetDataBase() == look.lastDoc.GetDataBase() && look.lastItem != kInvalidUID;
+		std::vector<KFCResultModel::Hit> hits;
+		bool capped = false;
+		bool lastMatches = true;
+		if (!WalkDoc(docs[d].docRef, static_cast<size_t>(KFCResultModel::kKFCCollectObjectLimit), asked, hits, capped,
+				lastHere ? look.lastItem : kInvalidUID, look.lastKey, &lastMatches))
+			continue;
+		KFCResultModel::OrderHitsByPage(hits);
+		for (size_t h = 0; h < hits.size(); ++h)
+		{
+			Found one;
+			one.doc = d;
+			one.hit = hits[h];
+			one.placeOnly = lastHere && !lastMatches && hits[h].itemUID == look.lastItem
+				&& (look.lastKey.IsEmpty() || hits[h].labelKey.IsEqual(look.lastKey));
+			if (!one.placeOnly)
+				++candidates;
+			found.push_back(one);
+		}
+	}
+	if (candidates == 0)
+		return false;		// (no words: the face says InDesign's own "Cannot find a match." - S9)
+	// THE ONE AFTER THE ONE FOUND LAST - the first when that is not among them (gone, or another document's) - and after the last one the first again, silently (InDesign's own Find Next).
+	size_t next = found.size();
+	for (size_t k = 0; k < found.size() && next == found.size(); ++k)
+		if (!found[k].placeOnly)
+			next = k;
+	for (size_t k = 0; k < found.size(); ++k)
+	{
+		if (look.lastDoc.GetDataBase() != nil && docs[found[k].doc].docRef.GetDataBase() == look.lastDoc.GetDataBase()
+			&& found[k].hit.itemUID == look.lastItem && (look.lastKey.IsEmpty() || found[k].hit.labelKey.IsEqual(look.lastKey)))
+		{
+			for (size_t step = 1; step <= found.size(); ++step)
+			{
+				const size_t j = (k + step) % found.size();
+				if (!found[j].placeOnly)
+				{
+					next = j;
+					break;
+				}
+			}
+			break;
+		}
+	}
+	const Found& one = found[next];
+	out.doc = docs[one.doc].docRef;
+	out.item = one.hit.itemUID;
+	out.key = one.hit.labelKey;
+	out.key.SetTranslatable(kFalse);
+	if (one.hit.isLocked)
+		out.reach |= kKFCQRReachLocked;
+	if (one.hit.isHidden)
+		out.reach |= kKFCQRReachHidden;
+	if (one.hit.onHiddenSpread)
+		out.reach |= kKFCQRReachHiddenSpread;
+	if (one.hit.isOverset)
+		out.reach |= kKFCQRReachOverset;
+	// THE LINE (QR Code's): the row's text without its "ID<uid>:" head - "<name>  <label>" - then where it stands, and its document over All Documents.
+	out.words.Append(LineOf(WholeLineOf(one.hit)));
+	if (one.hit.isOverset)
+		out.words.Append(" - overset text");
+	else if (one.hit.onPasteboard)
+		out.words.Append(" - pasteboard");
+	else
+	{
+		out.words.Append(" - page ");
+		out.words.Append(one.hit.pageString);
+	}
+	if (allDocuments)
+	{
+		out.words.Append(" - ");
+		out.words.Append(docs[one.doc].shortName);
+	}
+	return true;
 }
 
 bool KFCScriptLabelSearch::ChangeFound(const KFCScriptLabelFound& found, PMString& outWords)
 {
-	(void)found;
+	outWords.Clear();
 	outWords.SetTranslatable(kFalse);
-	return false;
+	KFCScriptLabelConditions asked;
+	(void)IsTabCurrent(&asked);
+	if (!GrepIsValid(asked, outWords))
+		return false;
+	// THE DOORS - nothing written yet (KFCTableSearch::ChangeFound's): its document, its item, its lock, its label as Find Next found it.
+	if (found.doc == UIDRef::gNull || !KFCBookScope::IsDocStillOpen(found.doc))
+	{
+		outWords.Append("That item's document has been closed - press Find Next.");
+		return false;
+	}
+	IDataBase* const db = found.doc.GetDataBase();
+	if (found.item == kInvalidUID || !KFCPageItemFacts::ItemIsThere(db, found.item))
+	{
+		outWords.Append("That item is no longer there - press Find Next.");
+		return false;
+	}
+	if (IsLockedNow(db, found.item))		// (read now, as the Table part's Change reads its frame: a lock set or taken off since Find Next counts as it stands)
+	{
+		outWords.Append("That item is locked - not changed.");
+		return false;
+	}
+	const PMString key(found.key.IsEmpty() ? KeyOf(asked) : found.key);
+	const PMString label(LabelOf(db, found.item, key));
+	if (!Matches(label, asked))
+	{
+		outWords.Append("That item's label no longer reads as Find Label: asks - press Find Next.");
+		return false;
+	}
+	KFCReplaceEngine::FaceLabel one;
+	one.doc = found.doc;
+	one.item = found.item;
+	one.key = key;
+	one.value = NewValue(label, asked);
+	if (one.value == label)
+	{
+		outWords.Append("That label already reads as the Change side asks.");
+		return false;
+	}
+	if (!KFCReplaceEngine::WriteFaceLabels(std::vector<KFCReplaceEngine::FaceLabel>(1, one), outWords))
+		return false;
+	outWords.Append("Changed: ");
+	outWords.Append(LineOf(RowWords(db, found.item, key, one.value)));
+	KFC_DIAG_LOG("LABELBTN change wrote words=%s", outWords.GetUTF8String().c_str());
+	return true;
 }
 
 bool KFCScriptLabelSearch::ChangeAll(int32& outChanged, int32& outMatched, PMString& outWords)
 {
 	outChanged = 0;
 	outMatched = 0;
+	outWords.Clear();
 	outWords.SetTranslatable(kFalse);
-	return false;
+	KFCScriptLabelConditions asked;
+	(void)IsTabCurrent(&asked);
+	if (!GrepIsValid(asked, outWords))
+		return false;
+	// THE RANGE - Find Next's (S2, S9).
+	std::vector<KFCBookScope::ChapterDoc> docs;
+	if (!RangeDocs(asked, docs, outWords))
+		return false;
+	// EVERY MATCHING LABEL OF THE RANGE - no rows filed, so no rows' limit - given the Change side, one Ctrl+Z (WriteFaceLabels); a locked item's left, and one that already reads as asked.
+	const size_t kNoRowsLimit = 1000000;
+	std::vector<KFCReplaceEngine::FaceLabel> labels;
+	int32 locked = 0, asAsked = 0;
+	for (size_t d = 0; d < docs.size(); ++d)
+	{
+		std::vector<KFCResultModel::Hit> hits;
+		bool capped = false;
+		if (!WalkDoc(docs[d].docRef, kNoRowsLimit, asked, hits, capped))
+			continue;
+		IDataBase* const db = docs[d].docRef.GetDataBase();
+		for (size_t h = 0; h < hits.size(); ++h)
+		{
+			++outMatched;
+			if (IsLockedNow(db, hits[h].itemUID))
+			{
+				++locked;
+				continue;
+			}
+			const PMString label(LabelOf(db, hits[h].itemUID, hits[h].labelKey));
+			KFCReplaceEngine::FaceLabel one;
+			one.doc = docs[d].docRef;
+			one.item = hits[h].itemUID;
+			one.key = hits[h].labelKey;
+			one.value = NewValue(label, asked);
+			if (one.value == label)
+			{
+				++asAsked;
+				continue;
+			}
+			labels.push_back(one);
+		}
+	}
+	if (!labels.empty() && !KFCReplaceEngine::WriteFaceLabels(labels, outWords))
+		return false;
+	outChanged = static_cast<int32>(labels.size());
+	outWords.AppendNumber(outChanged);
+	outWords.Append(" of ");
+	outWords.AppendNumber(outMatched);
+	outWords.Append(" label(s) changed.");
+	if (locked + asAsked > 0)
+	{
+		outWords.Append(" Left as they were:");
+		const char* sep = " ";
+		if (locked > 0)
+		{
+			outWords.Append(sep);
+			outWords.AppendNumber(locked);
+			outWords.Append(" locked");
+			sep = ", ";
+		}
+		if (asAsked > 0)
+		{
+			outWords.Append(sep);
+			outWords.AppendNumber(asAsked);
+			outWords.Append(" already as asked");
+		}
+		outWords.Append(".");
+	}
+	KFC_DIAG_LOG("LABELBTN changeall changed=%d matched=%d", static_cast<int>(outChanged), static_cast<int>(outMatched));
+	return true;
 }
 
 bool KFCScriptLabelSearch::WriteDocument(const UIDRef& docRef, const KFCScriptLabelConditions& asked, int32& outCount)
 {
-	(void)docRef;
-	(void)asked;
+	// A QUERY RUN'S WRITE OF ONE DOCUMENT (KFCTableSearch::WriteDocument's shape): inside the run's own step, no rows - every label the conditions find, given their Change side; a
+	// locked item's left, and one that already reads as asked. False = InDesign would not write one (the run takes its step back) - or a GREP that is no regular expression.
 	outCount = 0;
-	return false;
+	PMString why;
+	if (!GrepIsValid(asked, why))
+		return false;
+	std::vector<KFCResultModel::Hit> hits;
+	bool capped = false;
+	if (!WalkDoc(docRef, static_cast<size_t>(kMaxInt32), asked, hits, capped))
+		return false;
+	IDataBase* const db = docRef.GetDataBase();
+	for (size_t h = 0; h < hits.size(); ++h)
+	{
+		if (IsLockedNow(db, hits[h].itemUID))
+			continue;
+		const PMString label(LabelOf(db, hits[h].itemUID, hits[h].labelKey));
+		const PMString value(NewValue(label, asked));
+		if (value == label)
+			continue;
+		if (Write(db, hits[h].itemUID, hits[h].labelKey, value) != kSuccess)
+			return false;
+		++outCount;
+	}
+	return true;
 }
 
 ErrorCode KFCScriptLabelSearch::Write(IDataBase* db, UID item, const PMString& key, const PMString& value)
 {
-	(void)db;
-	(void)item;
-	(void)key;
-	(void)value;
-	return kFailure;
+	// THROUGH IScriptUtils, THE DOOR ADOBE LEAVES OPEN (IScriptTagCmdData.h: plug-ins do not call its Set APIs; SetScriptingTag processes the same command). The EngineContext is
+	// default-constructed - no script engine is asking, KFC is: KCM's KCMWritePageLabels, measured 2026-09-07 - the command takes it and the step lands on the undo stack. The caller's
+	// step holds it.
+	if (db == nil || item == kInvalidUID || !db->IsValidUID(item))
+		return kFailure;
+	InterfacePtr<IScript> script(db, item, UseDefaultIID());
+	Utils<IScriptUtils> scriptUtils;
+	if (script == nil || !scriptUtils)
+		return kFailure;
+	ScriptList list;
+	list.push_back(script);
+	return scriptUtils->SetScriptingTag(list, EngineContext(), value, key);
+}
+
+void KFCScriptLabelSearch::MarkRowWritten(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, UID item, const PMString& key, const PMString& value)
+{
+	// (KFCObjectSpecial's E7, for one row: the print and the place as the write left them - an object row's own marks, MarkHitSpecial leaving an object row alone.)
+	IDataBase* const db = docRef.GetDataBase();
+	uint64 print = 0;
+	uint32 length = 0;
+	(void)KFCObjectSearch::Fingerprint(UIDRef(db, item), print, length);
+	KFCResultModel::Hit place;
+	const bool read = KFCObjectSearch::ReadItemPlace(docRef, item, place);
+	KFCResultModel::MarkItemOwnChange(chapterIdx, hitIdx, kKFCSpecialScriptLabel, RowWords(db, item, key, value), print, length, read ? &place : nil);
+}
+
+PMString KFCScriptLabelSearch::LabelNow(const KFCScriptLabelFound& found)
+{
+	PMString none;
+	none.SetTranslatable(kFalse);
+	if (found.doc == UIDRef::gNull || found.item == kInvalidUID || !KFCBookScope::IsDocStillOpen(found.doc))
+		return none;
+	IDataBase* const db = found.doc.GetDataBase();
+	if (!KFCPageItemFacts::ItemIsThere(db, found.item))
+		return none;
+	PMString key(found.key);
+	if (key.IsEmpty())
+		key = IScriptLabel::kDefaultScriptLabelKey;
+	key.SetTranslatable(kFalse);
+	return LabelOf(db, found.item, key);
+}
+
+bool KFCScriptLabelSearch::IsLockedNow(IDataBase* db, UID item)
+{
+	// An object row's "locked" (KFCObjectSearch::BuildRow's facts), read at the write.
+	return db != nil && item != kInvalidUID
+		&& (KFCPageItemFacts::IsPageItemLockedForEdit(db, item) || KFCPageItemFacts::IsFrameOnLockedLayer(db, item));
+}
+
+const char* KFCScriptLabelSearch::OnlyReplaceWords()
+{
+	return "these rows are script labels - only a row's Replace writes them (the Kohaku+ tab's Change Label:).";
 }
 
 // End, KFCScriptLabelSearch.cpp.

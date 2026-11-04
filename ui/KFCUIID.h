@@ -627,6 +627,19 @@ DECLARE_PMID(kWidgetIDSpace, kKFCKohakuKentenSectionWidgetID, kKFCUIPrefix + 76)
 DECLARE_PMID(kWidgetIDSpace, kKFCKentenTabBaseWidgetID, kKFCUIPrefix + 78)
 DECLARE_PMID(kWidgetIDSpace, kKFCKentenTabMarkWidgetID, kKFCUIPrefix + 79)
 DECLARE_PMID(kWidgetIDSpace, kKFCKentenTabChangeWidgetID, kKFCUIPrefix + 80)
+// THE SCRIPT LABEL PART (docs/superpowers/specs/2026-11-04-kfc-script-label-design.md S2): the part, Key:, Find Label: and Change Label: (their labels have no id: nothing
+// finds them). + 8 ... + 13 - numbers this prefix never gave a widget: the widgets retired before the 2026-10-01 split kept the model prefix's numbers (below).
+DECLARE_PMID(kWidgetIDSpace, kKFCKohakuLabelSectionWidgetID, kKFCUIPrefix + 8)
+DECLARE_PMID(kWidgetIDSpace, kKFCLabelTabKeyWidgetID, kKFCUIPrefix + 9)
+DECLARE_PMID(kWidgetIDSpace, kKFCLabelTabFindWidgetID, kKFCUIPrefix + 10)
+DECLARE_PMID(kWidgetIDSpace, kKFCLabelTabChangeWidgetID, kKFCUIPrefix + 11)
+// (+ 12 was the Case Sensitive box - gone 2026-11-04, always case by case (the author: "drop the case box"); + 13 the Whole Label box - an entry of Match: the same day (the
+// author: "these three chosen in a list?"). Retired - not given to anything else.)
+// ...Match: - Contains, Whole Label or GREP, how Find Label: is read (the author, 11-04: GREP, then "these three chosen in a list", "that list above Find"; + 14 was the GREP box
+// the same day) - and the box of the label Find Next found, on several lines (the author, 11-04: "the label shown in the dialog's lower part, on several lines") - + 14, + 15,
+// as free as + 8 ... + 13.
+DECLARE_PMID(kWidgetIDSpace, kKFCLabelTabMatchWidgetID, kKFCUIPrefix + 14)
+DECLARE_PMID(kWidgetIDSpace, kKFCLabelTabShownWidgetID, kKFCUIPrefix + 15)
 // Save Query's name (the value dialog's view for it)
 DECLARE_PMID(kWidgetIDSpace, kKFCValueQueryNameWidgetID, kKFCUIPrefix + 82)
 // A hit row on two lines (a ruby or kenten list's - KFCResultListWidgetMgr)
@@ -932,8 +945,18 @@ DECLARE_PMID(kWidgetIDSpace, kKFCKentenChangeLabelWidgetID, kKFCPrefix + 92)
 #define kKFCTableTabChangeAllKey		kKFCStringPrefix "kKFCTableTabChangeAllKey"
 #define kKFCTableTabChangeFindKey		kKFCStringPrefix "kKFCTableTabChangeFindKey"
 #define kKFCKohakuTabKentenKey			kKFCStringPrefix "kKFCKohakuTabKentenKey"
-#define kKFCKohakuTabWarichuKindKey		kKFCStringPrefix "kKFCKohakuTabWarichuKindKey"	// Find:'s fifth, a Japanese InDesign's (key_collisions.py: "kKFCKohakuTabWarichuKey" had kKFCRubyListSaveFileKey's length and sum)
+#define kKFCKohakuTabWarichuKindKey		kKFCStringPrefix "kKFCKohakuTabWarichuKindKey"	// Find:'s last, a Japanese InDesign's (key_collisions.py: "kKFCKohakuTabWarichuKey" had kKFCRubyListSaveFileKey's length and sum)
 #define kKFCKentenTabAnyMarkKey			kKFCStringPrefix "kKFCKentenTabAnyMarkKey"
+// The Script Label kind (docs/superpowers/specs/2026-11-04-kfc-script-label-design.md S1, S2): Find:'s first entry in every language (the author's order, 11-04), and its part's words (key_collisions.py: no other key of the
+// length and sum of any of the six - 11-04).
+#define kKFCKohakuTabScriptLabelKey		kKFCStringPrefix "kKFCKohakuTabScriptLabelKey"
+#define kKFCLabelTabKeyKey				kKFCStringPrefix "kKFCLabelTabKeyKey"
+#define kKFCLabelTabFindKey				kKFCStringPrefix "kKFCLabelTabFindKey"
+#define kKFCLabelTabChangeKey			kKFCStringPrefix "kKFCLabelTabChangeKey"
+#define kKFCLabelTabWholeKey			kKFCStringPrefix "kKFCLabelTabWholeKey"	// (Match:'s entries since 11-04 - this one, Contains and GREP; kKFCLabelTabCaseKey went with its box the same day)
+#define kKFCLabelTabGrepKey				kKFCStringPrefix "kKFCLabelTabGrepKey"	// (key_collisions.py: no other key of its length and sum - 11-04)
+#define kKFCLabelTabMatchKey			kKFCStringPrefix "kKFCLabelTabMatchKey"
+#define kKFCLabelTabContainsKey			kKFCStringPrefix "kKFCLabelTabContainsKey"
 // (The kinds' own keys went 2026-11-03: Kenten: and Change Kenten To: list InDesign's own keys for them - "None", "Black sesame" ... "Custom", its kenten dialog's words - KFCUI.fr.)
 
 // Other StringKeys:

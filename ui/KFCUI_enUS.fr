@@ -206,6 +206,14 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCKohakuTabKentenKey,			"Kenten",
                 kKFCKohakuTabWarichuKindKey,	"Warichu",
                 kKFCKentenTabAnyMarkKey,		"[Any Kenten]",
+                kKFCKohakuTabScriptLabelKey,	"Script Label",
+                kKFCLabelTabKeyKey,				"Script Key:",		// (the author, 11-04: "Key alone is hard to follow - Script Key or the like")
+                kKFCLabelTabFindKey,			"Find Label:",
+                kKFCLabelTabChangeKey,			"Change Label:",
+                kKFCLabelTabMatchKey,			"Match:",			// (the author, 11-04: Contains, Whole Label and GREP chosen in a list above Find Label: - English in every language)
+                kKFCLabelTabContainsKey,		"Text (Contains)",	// (the author, 11-04: "TEXT (Contains) reads well?" - Find/Change's Text and GREP tabs' words)
+                kKFCLabelTabWholeKey,			"Text (Whole Label)",
+                kKFCLabelTabGrepKey,			"GREP",
                 kKFCRubyTabWithKey,				"Text With Ruby",
                 kKFCRubyTabWithoutKey,			"Text Without Ruby",
                 kKFCRubyTabMarksKey,			"Ruby Marks in Text",

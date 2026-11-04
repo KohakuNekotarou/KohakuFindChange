@@ -78,6 +78,7 @@
 #include "KFCRubySearch.h"		// a ruby row's Replace - the Ruby tab's
 #include "KFCRubyList.h"		// ...and a ruby list's
 #include "KFCKentenSearch.h"	// a kenten row's Replace - the Kenten kind's
+#include "KFCScriptLabelSearch.h"	// a script label row's Replace - LabelOf, Matches, NewValue, Write, IsLockedNow
 #include "IKentenStyle.h"		// Kenten_None - Remove Kenten
 #include "KFCQueryCopy.h"		// rubyKind - a list of ruby marks
 #include "ITableModel.h"
@@ -1344,6 +1345,7 @@ static bool RefuseOwnTabRow(const char* what, PMString& outStatus)
 
 // The own tabs' Replace (below - ClearOverridesHits' neighbour).
 static bool ReplaceOwnTabRows(const KFCRowsByChapter& rowsByChapter, PMString& outStatus);
+static bool ReplaceLabelRows(const KFCRowsByChapter& rowsByChapter, PMString& outStatus);		// (a script label list's - below, with the own tabs')
 
 bool KFCReplaceEngine::CanReplaceHit(int32 chapterIdx, int32 hitIdx)
 {
@@ -2244,12 +2246,13 @@ bool KFCReplaceEngine::ReplaceHit(int32 chapterIdx, int32 hitIdx, PMString& outS
 	}
 	if (RefuseWarichuRow(outStatus) || RefuseRunListRow("Replace", outStatus))
 		return false;
-	if (KFCResultModel::ListHasOwnChangeTab())
+	// A SCRIPT LABEL LIST'S ROW: its item's label (ReplaceLabelRows) - an object row, but never InDesign's object replace.
+	if (KFCResultModel::ListHasOwnChangeTab() || KFCResultModel::ListIsScriptLabels())
 	{
 		KFCRowsByChapter one(1);
 		one[0].chapter = chapterIdx;
 		one[0].hits.push_back(hitIdx);
-		return ReplaceOwnTabRows(one, outStatus);
+		return KFCResultModel::ListIsScriptLabels() ? ReplaceLabelRows(one, outStatus) : ReplaceOwnTabRows(one, outStatus);
 	}
 	if (!CanReplaceHit(chapterIdx, hitIdx))
 	{
@@ -2287,6 +2290,8 @@ bool KFCReplaceEngine::ReplaceHits(const KFCRowsByChapter& rowsByChapter, PMStri
 	}
 	if (RefuseWarichuRow(outStatus) || RefuseRunListRow("Replace", outStatus))
 		return false;
+	if (KFCResultModel::ListIsScriptLabels())
+		return ReplaceLabelRows(rowsByChapter, outStatus);		// (ReplaceHit's note)
 	if (KFCResultModel::ListHasOwnChangeTab())
 		return ReplaceOwnTabRows(rowsByChapter, outStatus);
 	// OBJECT ROWS: InDesign's object replace, row by row (KFCObjectReplace::ReplaceRows - it asks each row).
@@ -4157,6 +4162,7 @@ enum OwnTabRefusal
 	kOwnTabAsAsked,		// it already reads as the Change side asks: counted, not written
 	kOwnTabBaseDiffers,	// its text is not what the Ruby part's base boxes hold
 	kOwnTabCountDiffers,	// no base boxes, and the Change side's readings are neither one nor one a character of it
+	kOwnTabItemGone,		// an object row's item is no longer in its document (a script label row's - ReplaceLabelRows)
 	kOwnTabRefusalCount
 };
 
@@ -4174,6 +4180,7 @@ const char* OwnTabRefusalWords(OwnTabRefusal why)
 		case kOwnTabAsAsked:		return "already as asked";
 		case kOwnTabBaseDiffers:	return "base text differs";
 		case kOwnTabCountDiffers:	return "readings do not fit";
+		case kOwnTabItemGone:		return "item gone";
 		default:					return "";
 	}
 }
@@ -4193,6 +4200,7 @@ const char* OwnTabRefusalSentence(OwnTabRefusal why)
 		case kOwnTabAsAsked:		return "this row already reads as its tab asks.";
 		case kOwnTabBaseDiffers:	return "this row's text is not what the Base Text boxes hold - clear those boxes to give the reading to the whole row.";
 		case kOwnTabCountDiffers:	return "the Change Ruby To boxes hold neither one reading nor one for each character of this row.";
+		case kOwnTabItemGone:		return "this row's item is no longer in the document. Search again.";
 		default:					return "this row cannot be replaced.";
 	}
 }
@@ -4776,6 +4784,229 @@ bool WriteOwnTabRows(OwnTabWrite& how, const KFCRowsByChapter& rowsByChapter, PM
 }
 }	// anonymous namespace
 
+// ======================================================================================================
+// A SCRIPT LABEL LIST'S ROWS, REPLACED (docs/superpowers/specs/2026-11-04-kfc-script-label-design.md S7, S8). Each row's item given the label NewValue makes of the one it holds: under the
+// list's own key, Find Label:, Case Sensitive and Whole Label (what found the row - the list's query copy), with the Kohaku+ tab's Change Label: as it stands now (a Replace is always the
+// settings as they stand - a text row's Change To's rule). THE ROWS ARE OBJECT ROWS - an item each, no text: an object row's doors (the row's own flags, its document reached, its item still
+// there), then the label as the list found it (else edited since - unless KFC's own write is what it reads: already as asked) and the label it would get (the same: counted, not written).
+// ONE undo step, KFC's mark in it; each written row marked Labeled (MarkHitOwnChange), its words read again. WriteOwnTabRows' shape and words.
+// ======================================================================================================
+namespace
+{
+// One row to write, as the doors found it.
+struct LabelRow
+{
+	int32		hit;
+	UID			item;
+	PMString	key;		// the key of the label the row stands for (Hit::labelKey - an item has a row per key when no key was asked)
+	PMString	value;		// the label it is given
+	bool		done;
+	LabelRow() : hit(-1), item(kInvalidUID), done(false) {}
+};
+
+// One document's rows in the write.
+struct LabelChapter
+{
+	int32					chapterIdx;
+	UIDRef					docRef;
+	std::vector<LabelRow>	rows;
+	int32					written;
+	LabelChapter() : chapterIdx(-1), written(0) {}
+};
+}	// anonymous namespace
+
+static bool ReplaceLabelRows(const KFCRowsByChapter& rowsByChapter, PMString& outStatus)
+{
+	KFC_DIAG_WRITTEN_DOCS_CHECK("label-rows");	// (test builds: after DocsAfterWrite, below - KFCDiagWrittenDocs.h)
+	outStatus.Clear();
+	outStatus.SetTranslatable(kFalse);
+	// (The run guard is the callers' - ReplaceRows in the UI half, as WriteOwnTabRows' note says.)
+	const size_t total = KFCRowCount(rowsByChapter);
+	if (total == 0)
+		return false;
+	// WHAT FOUND THE ROWS - the list's copy: its key, words, case and whole - and the Change side as it stands now.
+	KFCScriptLabelConditions now;
+	(void)KFCScriptLabelSearch::IsTabCurrent(&now);
+	const std::shared_ptr<const KFCQueryCopy> listCopy(KFCResultModel::GetQueryCopy());
+	KFCScriptLabelConditions asked((listCopy != nil) ? listCopy->label : now);
+	asked.change = now.change;
+	const PMString key(KFCScriptLabelSearch::KeyOf(asked));
+
+	// THE DOORS, ROW BY ROW: nothing written yet.
+	int32 counts[kOwnTabRefusalCount] = {};
+	OwnTabRefusal lastWhy = kOwnTabOk;
+	std::vector<LabelChapter> chapters;
+	KFCReplaceEngine::DocsAfterWrite docsAfter;
+	size_t toWrite = 0;
+	for (size_t c = 0; c < rowsByChapter.size(); ++c)
+	{
+		LabelChapter chapter;
+		chapter.chapterIdx = rowsByChapter[c].chapter;
+		// The row's own flags first: a chapter with nothing to write is not opened.
+		std::vector<int32> candidates;
+		const std::vector<int32>& hits = rowsByChapter[c].hits;
+		for (size_t k = 0; k < hits.size(); ++k)
+		{
+			const KFCReplaceEngine::GreyedReason greyed = KFCReplaceEngine::WhyGreyed(chapter.chapterIdx, hits[k]);
+			const OwnTabRefusal why = (greyed == KFCReplaceEngine::kGreyedNot) ? kOwnTabOk
+				: (greyed == KFCReplaceEngine::kGreyedLocked) ? kOwnTabLocked : kOwnTabMissing;
+			if (why != kOwnTabOk)
+			{
+				++counts[why];
+				lastWhy = why;
+				continue;
+			}
+			candidates.push_back(hits[k]);
+		}
+		if (candidates.empty())
+			continue;
+		// Its document, by its file first: a closed chapter is reopened windowless and held, as a Replace reaches it.
+		IDFile file;
+		OwnTabRefusal docWhy = kOwnTabOk;
+		if (!KFCResultModel::GetChapterLocation(chapter.chapterIdx, chapter.docRef, file))
+			docWhy = kOwnTabNoDoc;
+		else if (!KFCBookScope::ReachChapterDoc(file, chapter.docRef))
+			docWhy = kOwnTabNotOpened;
+		if (docWhy != kOwnTabOk)
+		{
+			counts[docWhy] += static_cast<int32>(candidates.size());
+			lastWhy = docWhy;
+			continue;
+		}
+		KFCResultModel::RebindChapterDoc(chapter.chapterIdx, chapter.docRef);
+		IDataBase* const db = chapter.docRef.GetDataBase();
+		for (size_t k = 0; k < candidates.size(); ++k)
+		{
+			LabelRow row;
+			row.hit = candidates[k];
+			row.item = KFCResultModel::GetHitItem(chapter.chapterIdx, row.hit);
+			row.key = KFCResultModel::GetHitLabelKey(chapter.chapterIdx, row.hit);
+			if (row.key.IsEmpty())
+				row.key = key;		// (a row of no key of its own: the list's)
+			OwnTabRefusal why = kOwnTabOk;
+			if (row.item == kInvalidUID || !KFCResultModel::RowItemIsThere(chapter.chapterIdx, row.hit, db))
+				why = kOwnTabItemGone;
+			else if (KFCScriptLabelSearch::IsLockedNow(db, row.item))
+				why = kOwnTabLocked;		// (read at the write, as the own tabs' rows read their frame's lock - the row's own flag is the search's)
+			else
+			{
+				const PMString label(KFCScriptLabelSearch::LabelOf(db, row.item, row.key));
+				if (!KFCScriptLabelSearch::Matches(label, asked))
+					why = (KFCResultModel::GetHitSpecial(chapter.chapterIdx, row.hit) == kKFCSpecialScriptLabel) ? kOwnTabAsAsked : kOwnTabEdited;	// (KFC's own write is what it reads)
+				else
+				{
+					row.value = KFCScriptLabelSearch::NewValue(label, asked);
+					if (row.value == label)
+						why = kOwnTabAsAsked;
+				}
+			}
+			if (why != kOwnTabOk)
+			{
+				++counts[why];
+				lastWhy = why;
+				continue;
+			}
+			chapter.rows.push_back(row);
+		}
+		docsAfter.Reached(chapter.docRef, !chapter.rows.empty());
+		toWrite += chapter.rows.size();
+		if (!chapter.rows.empty())
+			chapters.push_back(chapter);
+	}
+	if (toWrite == 0)
+	{
+		outStatus.Append("Replace: ");
+		if (total == 1)
+			outStatus.Append(OwnTabRefusalSentence(lastWhy));
+		else
+		{
+			outStatus.Append("none of the ");
+			outStatus.AppendNumber(static_cast<int32>(total));
+			outStatus.Append(" selected rows can be written - ");
+			AppendCountsByWhy(outStatus, counts, OwnTabRefusalWords);
+			outStatus.Append(".");
+		}
+		return false;
+	}
+	// EVERY DOCUMENT TO WRITE STILL OPEN once the last is reached (a Replace's rule).
+	const bool acrossDocuments = chapters.size() > 1;
+	for (size_t c = 0; acrossDocuments && c < chapters.size(); ++c)
+	{
+		if (!KFCBookScope::IsDocStillOpen(chapters[c].docRef))
+		{
+			outStatus.Append("Replace: a document of the selected rows has been closed - nothing was changed.");
+			return false;
+		}
+	}
+
+	// RECORDED FOR THE PANEL'S FOLLOWING OF UNDO: one step for every document of it - each row's item, by its print (KFCObjectSearch::Fingerprint).
+	std::vector<int32> chapterIdxs;
+	for (size_t c = 0; c < chapters.size(); ++c)
+		chapterIdxs.push_back(chapters[c].chapterIdx);
+	KFCUndoFollow::StepRecorder recorder(chapterIdxs);
+	recorder.SetName("Change Script Label");
+	for (size_t c = 0; c < chapters.size(); ++c)
+		for (size_t k = 0; k < chapters[c].rows.size(); ++k)
+			recorder.RecordItem(chapters[c].chapterIdx, chapters[c].rows[k].item);
+	bool ok = false;
+	bool failed = false;
+	int32 writtenRows = 0;
+	{
+		KFCReplaceEngine::WriteStep step;
+		if (!KFCReplaceEngine::BeginWriteStep(acrossDocuments, step, kKFCLabelChangeStepKey, "Change Script Label"))
+		{
+			outStatus.Append(acrossDocuments ? "Replace: InDesign would not start an undoable step - nothing was changed."
+				: "Replace: InDesign would not start a command sequence - nothing was changed.");
+			return false;
+		}
+		for (size_t c = 0; c < chapters.size() && !failed; ++c)
+		{
+			IDataBase* const db = chapters[c].docRef.GetDataBase();
+			for (size_t k = 0; k < chapters[c].rows.size(); ++k)
+			{
+				LabelRow& row = chapters[c].rows[k];
+				if (KFCScriptLabelSearch::Write(db, row.item, row.key, row.value) != kSuccess)
+				{
+					failed = true;
+					break;
+				}
+				KFC_DIAG_LOG("LABELWRITE chapter=%d row=%d item=%u", chapters[c].chapterIdx, row.hit, static_cast<unsigned>(row.item.Get()));
+				row.done = true;
+				++chapters[c].written;
+				KFCScriptLabelSearch::MarkRowWritten(chapters[c].chapterIdx, row.hit, chapters[c].docRef, row.item, row.key, row.value);		// (an object row's marks: MarkHitOwnChange leaves one alone)
+			}
+			writtenRows += chapters[c].written;
+		}
+		// THE ERROR STATE AT THE END (a Replace's rule): anything standing here is a failure nothing reported.
+		ok = !failed && writtenRows > 0 && ErrorUtils::PMGetGlobalErrorCode() == kSuccess;
+		if (ok)
+			for (size_t c = 0; c < chapters.size(); ++c)
+				if (chapters[c].written > 0)
+					KFCUndoFollow::MarkWrite(chapters[c].docRef.GetDataBase());	// in this step, so its Undo / Redo is heard
+		KFCReplaceEngine::EndWriteStep(step, ok);
+	}
+	if (!ok)
+	{
+		KFCResultModel::RollBackRows();
+		outStatus.Append(failed ? "Replace: InDesign would not write a label - nothing was changed." : "Replace: no row was written.");
+		return false;
+	}
+	recorder.Keep();
+	for (size_t c = 0; c < chapters.size(); ++c)
+	{
+		if (chapters[c].written == 0)
+			continue;
+		docsAfter.Wrote(chapters[c].docRef);
+		KFC_DIAG_NOTE_WRITE(chapters[c].docRef);
+	}
+
+	// WHAT IT DID (SayRowsWritten): "Labeled ID:262." / "Labeled 2 of 3 items: ID:262, ID:270. Left as they were: 1 locked."
+	PMString leftWords;
+	AppendCountsByWhy(leftWords, counts, OwnTabRefusalWords);
+	SayRowsWritten(outStatus, "Labeled", "items", RowsDone(chapters), total, leftWords);
+	return true;
+}
+
 static bool ReplaceOwnTabRows(const KFCRowsByChapter& rowsByChapter, PMString& outStatus)
 {
 	if (KFCResultModel::ListIsKenten())
@@ -4933,6 +5164,115 @@ bool KFCReplaceEngine::WriteFaceTables(const std::vector<FaceTable>& tables, boo
 		IDFile file;
 		if (KFCResultModel::GetChapterLocation(c->first, chapterDoc, file))
 			NoteStoryVersions(c->first, chapterDoc.GetDataBase(), c->second);	// as KFC left them
+	}
+	recorder.Keep();
+	for (size_t d = 0; d < docs.size(); ++d)
+	{
+		docsAfter.Wrote(docs[d]);
+		KFC_DIAG_NOTE_WRITE(docs[d]);
+	}
+	return true;
+}
+
+bool KFCReplaceEngine::WriteFaceLabels(const std::vector<FaceLabel>& labels, PMString& outWhy)
+{
+	KFC_DIAG_WRITTEN_DOCS_CHECK("label-buttons");	// (test builds: after DocsAfterWrite, below - KFCDiagWrittenDocs.h)
+	outWhy.Clear();
+	outWhy.SetTranslatable(kFalse);
+	if (labels.empty())
+		return false;
+	const WriteUnderWay writing;
+	DocsAfterWrite docsAfter;
+	std::vector<UIDRef> docs;
+	for (size_t t = 0; t < labels.size(); ++t)
+	{
+		if (std::find(docs.begin(), docs.end(), labels[t].doc) != docs.end())
+			continue;
+		docs.push_back(labels[t].doc);
+		docsAfter.Reached(labels[t].doc, true);
+	}
+
+	// THE SCRIPT LABEL LIST'S ROWS OF THESE ITEMS: marked in this step, and only then is the step followed - a write with no row of the list has nothing for an Undo to put back on it
+	// (WriteFaceTables' rule).
+	struct ListRow
+	{
+		int32	chapter;
+		int32	hit;
+		size_t	label;
+	};
+	std::vector<ListRow> listRows;
+	std::vector<int32> chapterIdxs;
+	std::set<IDataBase*> followed;
+	if (KFCResultModel::ListIsScriptLabels())
+	{
+		const int32 chapterCount = KFCResultModel::GetChapterCount();
+		for (int32 c = 0; c < chapterCount; ++c)
+		{
+			UIDRef chapterDoc;
+			IDFile file;
+			if (!KFCResultModel::GetChapterLocation(c, chapterDoc, file))
+				continue;
+			// (a row stands for its item's label of ITS key: an empty Script Key: lists an item once for each key - Hit::labelKey)
+			std::map<std::pair<UID, std::string>, size_t> theirs;
+			for (size_t t = 0; t < labels.size(); ++t)
+				if (labels[t].doc == chapterDoc)
+					theirs[std::make_pair(labels[t].item, std::string(labels[t].key.GetUTF8String()))] = t;
+			if (theirs.empty())
+				continue;
+			bool any = false;
+			const int32 hitCount = KFCResultModel::GetHitCount(c);
+			for (int32 h = 0; h < hitCount; ++h)
+			{
+				const std::map<std::pair<UID, std::string>, size_t>::const_iterator one =
+					theirs.find(std::make_pair(KFCResultModel::GetHitItem(c, h), std::string(KFCResultModel::GetHitLabelKey(c, h).GetUTF8String())));
+				if (one == theirs.end())
+					continue;
+				const ListRow row = { c, h, one->second };
+				listRows.push_back(row);
+				any = true;
+			}
+			if (any)
+			{
+				chapterIdxs.push_back(c);
+				followed.insert(chapterDoc.GetDataBase());
+			}
+		}
+	}
+	KFCUndoFollow::StepRecorder recorder(chapterIdxs);
+	recorder.SetName("Change Script Label");
+	for (size_t r = 0; r < listRows.size(); ++r)
+		recorder.RecordItem(listRows[r].chapter, labels[listRows[r].label].item);
+
+	bool ok = false;
+	{
+		WriteStep step;
+		if (!BeginWriteStep(docs.size() > 1, step, kKFCLabelChangeStepKey, "Change Script Label"))
+		{
+			outWhy.Append("InDesign would not start an undoable step - nothing was changed.");
+			return false;
+		}
+		bool failed = false;
+		for (size_t t = 0; t < labels.size() && !failed; ++t)
+			if (KFCScriptLabelSearch::Write(labels[t].doc.GetDataBase(), labels[t].item, labels[t].key, labels[t].value) != kSuccess)
+				failed = true;
+		ok = !failed && ErrorUtils::PMGetGlobalErrorCode() == kSuccess;
+		if (ok)
+		{
+			for (size_t r = 0; r < listRows.size(); ++r)
+			{
+				const FaceLabel& one = labels[listRows[r].label];
+				KFCScriptLabelSearch::MarkRowWritten(listRows[r].chapter, listRows[r].hit, one.doc, one.item, one.key, one.value);		// (an object row's marks)
+			}
+			for (std::set<IDataBase*>::const_iterator db = followed.begin(); db != followed.end(); ++db)
+				KFCUndoFollow::MarkWrite(*db);	// in this step, so its Undo / Redo is heard
+		}
+		EndWriteStep(step, ok);
+	}
+	if (!ok)
+	{
+		KFCResultModel::RollBackRows();
+		outWhy.Append("InDesign would not write a label - nothing was changed.");
+		return false;
 	}
 	recorder.Keep();
 	for (size_t d = 0; d < docs.size(); ++d)

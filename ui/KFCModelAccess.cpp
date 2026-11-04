@@ -226,6 +226,7 @@ namespace
 			SayWhy(outWords);
 			return false;
 		}
+		virtual PMString ScriptLabelNow(const KFCScriptLabelFound&) { PMString none; none.SetTranslatable(kFalse); return none; }
 	};
 
 	class KFCChaptersStandInImpl : public IKFCChapters

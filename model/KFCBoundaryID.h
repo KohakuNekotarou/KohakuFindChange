@@ -88,7 +88,9 @@ DECLARE_PMID(kInterfaceIDSpace, IID_IKFCUIBOUNDARY, kKFCPrefix + 14)
 // never pass for one. What each revision changed is this file's history (git log -p -- model/KFCBoundaryID.h).
 // (47, 2026-11-04: the Script Label kind - IKFCUIServices::ScriptLabelTabConditions, IKFCRuns::ScriptLabelConditions / Next / ChangeFound / ChangeAll
 //  and IKFCResults::ListIsScriptLabels appended; KFCKohakuQueryData gained its label conditions.)
-#define kKFCBoundaryRevision	"47"
+// (48, 2026-11-04: KFCScriptLabelConditions gained grep, and its empty key now means every key; KFCScriptLabelLook gained lastKey, KFCScriptLabelFound key;
+//  IKFCRuns::ScriptLabelNow appended - the face's box of the found item's label.)
+#define kKFCBoundaryRevision	"48"
 #define kKFCBoundaryStamp		kKFCVersion "/" kKFCBoundaryRevision
 
 #endif // __KFCBoundaryID_h__

@@ -3871,7 +3871,9 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 					kTrue, kTrue,
 					kEVEAlignLeft | kEVELargeSpaceAfter | kEVEArrangeChildrenInColumn | kEVENoMargin,
 					{
-						// Find: over [QR Code]. (Its word is the column's width, the lists being narrower: what keeps the buttons' column at the right.)
+						// Find: over [Script Label]. (Its word is the column's width, the lists being narrower: what keeps the buttons' column at the right.) Its entries are every language's three, in the
+						// author's order of 11-04 - Script Label, QR Code, Table; KFCKohakuTab.cpp's ShowKindEntries writes the list afresh when it reads otherwise (a Japanese InDesign's Kenten, Ruby and
+						// Warichu after them).
 						KFCQueryFixedTextWidget
 						(
 							kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone,
@@ -3888,6 +3890,7 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 							Frame(0, 0, 170, 21)
 							kTrue, kTrue,
 							{{
+								kKFCKohakuTabScriptLabelKey,
 								kKFCKohakuTabQRCodeKey,
 								kKFCKohakuTabTableKey,
 							}}
@@ -4390,6 +4393,183 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 													kEVENoSpaceAfter,
 												),
 											}
+										),
+									}
+								),
+								// SCRIPT LABEL (docs/superpowers/specs/2026-11-04-kfc-script-label-design.md S2), every language's - its words translated as the Table part's: Key: (empty: the Script Label
+								// panel's labels - the default key), Match: (Text (Contains), Text (Whole Label) or GREP), Find Label: (empty: every label of the key), Change Label:, each label right-aligned against
+								// its field (the Kenten part's shape - 100 for its English words: an English word wider than its label makes EVE widen the label and push the field right), and the label Find Next found. The fields
+								// notify at every key stroke, as the Kenten part's (Find in KFC may be pressed with one still focused - KFCKohakuTab.h).
+								EVEGenericPanelWidget
+								(
+									kKFCKohakuLabelSectionWidgetID, kPMRsrcID_None,
+									kBindNone,
+									Frame(0, 0, 330, 0)
+									kTrue, kTrue,
+									kEVEAlignLeft | kEVENoSpaceAfter | kEVEArrangeChildrenInColumn | kEVENoMargin,
+									{
+										// Key: [ ]
+										EVEGenericPanelWidget
+										(
+											kInvalidWidgetID, kPMRsrcID_None,
+											kBindNone,
+											Frame(0, 0, 330, 21)
+											kTrue, kTrue,
+											kEVEAlignLeft | kEVERegularSpaceAfter | kEVEArrangeChildrenInRow | kEVENoMargin,
+											{
+												EVEStaticTextWidget
+												(
+													kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone,
+													Frame(0, 0, 100, 21)
+													kTrue, kTrue, kAlignRight,
+													kDontEllipsize, kTrue,
+													kKFCLabelTabKeyKey,
+													0,
+													kEVERegularSpaceAfter,
+												),
+												EVETextEditBoxWidget
+												(
+													kKFCLabelTabKeyWidgetID, kSysEditBoxPMRsrcId, kBindNone,
+													Frame(0, 0, 220, 0)
+													kTrue, kTrue,
+													kInvalidWidgetID,
+													1.0, 10.0,
+													0,
+													kFalse,
+													kTrue,
+													kFalse,
+													kTrue,
+													0, 0,
+													"",
+													kEVENoSpaceAfter,
+												),
+											}
+										),
+										// MATCH: [ ] over Find Label: (the author, 11-04: "GREP's place above Find", then "these three chosen in a list?", "that list above Find", "Text (Contains) reads
+										// well?") - how Find Label: is read: Text (Contains) (the default - Find Label: in the label, as plain text), Text (Whole Label) (the label all of it) or GREP (a
+										// regular expression; Change Label: may take $1, $& - KFCScriptLabelSearch) - the Find/Change tabs' own two words. The entries in KFCKohakuTab.cpp's kLabelMatch*
+										// order. Always case by case (the same evening: no Case Sensitive box).
+										EVEGenericPanelWidget
+										(
+											kInvalidWidgetID, kPMRsrcID_None,
+											kBindNone,
+											Frame(0, 0, 330, 21)
+											kTrue, kTrue,
+											kEVEAlignLeft | kEVERegularSpaceAfter | kEVEArrangeChildrenInRow | kEVENoMargin,
+											{
+												EVEStaticTextWidget
+												(
+													kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone,
+													Frame(0, 0, 100, 21)
+													kTrue, kTrue, kAlignRight,
+													kDontEllipsize, kTrue,
+													kKFCLabelTabMatchKey,
+													0,
+													kEVERegularSpaceAfter,
+												),
+												EVEDropDownListWidget
+												(
+													kKFCLabelTabMatchWidgetID, kSysDropDownPMRsrcId, kBindNone,
+													Frame(0, 0, 220, 21)
+													kTrue, kTrue,
+													{{
+														kKFCLabelTabContainsKey,
+														kKFCLabelTabWholeKey,
+														kKFCLabelTabGrepKey,
+													}}
+													kEVENoSpaceAfter,
+												),
+											}
+										),
+										// Find Label: [ ]
+										EVEGenericPanelWidget
+										(
+											kInvalidWidgetID, kPMRsrcID_None,
+											kBindNone,
+											Frame(0, 0, 330, 21)
+											kTrue, kTrue,
+											kEVEAlignLeft | kEVERegularSpaceAfter | kEVEArrangeChildrenInRow | kEVENoMargin,
+											{
+												EVEStaticTextWidget
+												(
+													kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone,
+													Frame(0, 0, 100, 21)
+													kTrue, kTrue, kAlignRight,
+													kDontEllipsize, kTrue,
+													kKFCLabelTabFindKey,
+													0,
+													kEVERegularSpaceAfter,
+												),
+												EVETextEditBoxWidget
+												(
+													kKFCLabelTabFindWidgetID, kSysEditBoxPMRsrcId, kBindNone,
+													Frame(0, 0, 220, 0)
+													kTrue, kTrue,
+													kInvalidWidgetID,
+													1.0, 10.0,
+													0,
+													kFalse,
+													kTrue,
+													kFalse,
+													kTrue,
+													0, 0,
+													"",
+													kEVENoSpaceAfter,
+												),
+											}
+										),
+										// Change Label: [ ]
+										EVEGenericPanelWidget
+										(
+											kInvalidWidgetID, kPMRsrcID_None,
+											kBindNone,
+											Frame(0, 0, 330, 21)
+											kTrue, kTrue,
+											kEVEAlignLeft | kEVELargeSpaceAfter | kEVEArrangeChildrenInRow | kEVENoMargin,
+											{
+												EVEStaticTextWidget
+												(
+													kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone,
+													Frame(0, 0, 100, 21)
+													kTrue, kTrue, kAlignRight,
+													kDontEllipsize, kTrue,
+													kKFCLabelTabChangeKey,
+													0,
+													kEVERegularSpaceAfter,
+												),
+												EVETextEditBoxWidget
+												(
+													kKFCLabelTabChangeWidgetID, kSysEditBoxPMRsrcId, kBindNone,
+													Frame(0, 0, 220, 0)
+													kTrue, kTrue,
+													kInvalidWidgetID,
+													1.0, 10.0,
+													0,
+													kFalse,
+													kTrue,
+													kFalse,
+													kTrue,
+													0, 0,
+													"",
+													kEVENoSpaceAfter,
+												),
+											}
+										),
+										// (No Case Sensitive box since 11-04 - the author: "drop the case box, always case by case"; Whole Label and GREP are Match:'s.)
+										// THE LABEL FIND NEXT FOUND, on several lines (the author, 11-04: "the label shown in the dialog's lower part, on several lines"): as it reads now
+										// (IKFCRuns::ScriptLabelNow) - its line breaks kept, a long one wrapped; empty until Find Next finds. KFCKohakuTab.cpp's ShowFoundLabel writes it.
+										EVEStaticMultiLineTextWidget
+										(
+											kKFCLabelTabShownWidgetID, kPMRsrcID_None, kBindNone,
+											Frame(0, 0, 330, 60)
+											kTrue, kTrue,
+											kAlignLeft, kDontEllipsize, kFalse,
+											kInvalidWidgetID,
+											kDialogWindowFontId,
+											2,
+											2, 0,
+											"",
+											kEVENoSpaceAfter,
 										),
 									}
 								),

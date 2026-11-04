@@ -336,6 +336,11 @@ int32 KFCChangeAll::Run(const PMString& listWords, PMString& outSummary)
 		outSummary.Append("Change All: the Find/Change dialog is on Kenten on the Kohaku+ tab. List the text and Replace its rows.");
 		return 0;
 	}
+	if (KFCSearchEngine::CurrentSearchMode() == kKFCScriptLabelSearchMode)	// (the Script Label kind's the same - its spec's S10, Table's T12 words)
+	{
+		outSummary.Append("Change All: the Find/Change dialog is on Script Label on the Kohaku+ tab. List the labels and Replace their rows.");
+		return 0;
+	}
 	if (KFCSearchEngine::CurrentSearchMode() == kKFCRubySearchMode)		// (the Ruby tab's the same - its spec's R10)
 	{
 		outSummary.Append("Change All: the Find/Change dialog is on Ruby on the Kohaku+ tab. List the ruby and Replace its rows.");

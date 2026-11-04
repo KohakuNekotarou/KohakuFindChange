@@ -200,6 +200,7 @@ namespace KFCResultModel
 		PMString	runChain;	// a row of a query run's list (KFCRunList - RowDisplay::runChain): what its place has been, in the
 								// row's words, cut for the row
 		PMString	runNames;	// ...and the queries that wrote it, in the run's order (RowDisplay::runNames)
+		PMString	labelKey;	// a script label row's: the key of the label it stands for (KFCScriptLabelSearch - an item holds one per key; its Replace writes this one)
 		KFCRowUpper	upper;		// a ruby or kenten row's upper line (RowDisplay::upper): what stands above its match as its walk or its Replace left it
 		// AN INCONSISTENT RUBY ROW'S HEADING (2026-11-03 - the author: "a heading per reading, the places found with it under it"): groupKey = its word and its reading as the search compares
 		// them, U+001F between - what its rows are put together by (BuildFontGroups; empty: by their story); groupLabel = the heading's words as the page has them ("<base><<reading>>");
@@ -763,6 +764,13 @@ namespace KFCResultModel
 	/** The page item an OBJECT row stands for (Hit::itemUID); kInvalidUID for a text row or an index out of range. */
 	UID GetHitItem(int32 chapterIdx, int32 hitIdx);
 
+	/** The special operation KFC last wrote the row with (Hit::special - a KFCSpecialOp, 0 for none, or an index out of range): a script label row's Replace
+	    asks whether its own write is what the row reads now (KFCReplaceEngine's label rows). */
+	int32 GetHitSpecial(int32 chapterIdx, int32 hitIdx);
+
+	/** A script label row's key (Hit::labelKey) - empty for any other row, or an index out of range. */
+	PMString GetHitLabelKey(int32 chapterIdx, int32 hitIdx);
+
 	/** An object row whose item its document came back without (Hit::itemGone) - false for any other row or an
 	    index out of range. */
 	bool IsHitItemGone(int32 chapterIdx, int32 hitIdx);
@@ -793,6 +801,11 @@ namespace KFCResultModel
 	    as the write left it. place = nil: the write took the item away (Delete) - replaced too, its Replace greyed. Backed up
 	    like every change a write makes (BeginRowBackup), so an Undo puts the row back. */
 	void MarkItemSpecial(int32 chapterIdx, int32 hitIdx, int32 op, uint64 newPrint, uint32 newLength, const Hit* place);
+
+	/** AN OBJECT ROW KFC'S OWN WRITE CHANGED (a script label row's - KFCScriptLabelSearch::MarkRowWritten): MarkItemSpecial's marks - its word (op), its eye, its place and
+	    print as the write left them, backed up for an Undo - and its words, what it reads now (runChain, as an own tab's text row reads its after-text: MarkHitOwnChange,
+	    which leaves an object row alone). place = nil: the place could not be read - the row keeps its own (never MarkItemSpecial's "taken away"). */
+	void MarkItemOwnChange(int32 chapterIdx, int32 hitIdx, int32 op, const PMString& words, uint64 newPrint, uint32 newLength, const Hit* place);
 
 	/** An object row a write of KFC's own did NOT replace, but whose item's fingerprint the write moved - the text frame of
 	    the story an inline written hangs in, the group holding an item written (KFCObjectSearch::WriteReach): its fingerprint

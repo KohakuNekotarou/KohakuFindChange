@@ -235,6 +235,7 @@ public:
 	virtual bool ScriptLabelNext(const KFCScriptLabelLook& look, KFCScriptLabelFound& out) { return KFCScriptLabelSearch::Next(look, out); }
 	virtual bool ScriptLabelChangeFound(const KFCScriptLabelFound& found, PMString& outWords) { return KFCScriptLabelSearch::ChangeFound(found, outWords); }
 	virtual bool ScriptLabelChangeAll(int32& outChanged, int32& outMatched, PMString& outWords) { return KFCScriptLabelSearch::ChangeAll(outChanged, outMatched, outWords); }
+	virtual PMString ScriptLabelNow(const KFCScriptLabelFound& found) { return KFCScriptLabelSearch::LabelNow(found); }
 };
 
 CREATE_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)

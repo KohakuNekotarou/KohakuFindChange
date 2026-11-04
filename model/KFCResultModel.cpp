@@ -105,7 +105,8 @@ namespace
 	// counted). A special operation's mark is not a Replace's, and is not counted (Clear Overrides, Tate-chu-yoko, an object's).
 	bool CountedAsWritten(const KFCResultModel::Hit& h)
 	{
-		return h.replaced || h.special == kKFCSpecialTableStyle || h.special == kKFCSpecialRubyChange || h.special == kKFCSpecialKentenChange;
+		return h.replaced || h.special == kKFCSpecialTableStyle || h.special == kKFCSpecialRubyChange || h.special == kKFCSpecialKentenChange
+			|| h.special == kKFCSpecialScriptLabel;		// (a script label row's - S8)
 	}
 
 	// ...and how many of them a write of ours has written (CountedAsWritten): what every replaced count counts.
@@ -1683,7 +1684,7 @@ int32 KFCResultModel::MergeKeptRows(std::vector<Hit>& found, std::vector<Hit>& k
 			found.erase(std::remove_if(found.begin(), found.end(), [&row, objectRow](const Hit& h)
 				{
 					if (objectRow)
-						return h.itemUID == row.itemUID;
+						return h.itemUID == row.itemUID && h.labelKey == row.labelKey;		// (a script label row is its item's label of its key - Hit::labelKey; empty for any other)
 					return h.storyUID == row.storyUID && h.textStart < row.textEnd && row.textStart < h.textEnd;
 				}), found.end());
 		}
@@ -1694,7 +1695,7 @@ int32 KFCResultModel::MergeKeptRows(std::vector<Hit>& found, std::vector<Hit>& k
 			for (size_t f = 0; f < found.size() && !again; ++f)
 			{
 				Hit& h = found[f];
-				if (objectRow ? (h.itemUID == row.itemUID)
+				if (objectRow ? (h.itemUID == row.itemUID && h.labelKey == row.labelKey)		// (an item's label of one key - MergeKeptRows' (7))
 					: (h.storyUID == row.storyUID && h.textStart == row.textStart && h.textEnd == row.textEnd))
 				{
 					h.kept = true;
@@ -2019,6 +2020,22 @@ UID KFCResultModel::GetHitItem(int32 chapterIdx, int32 hitIdx)
 	return (h != nil) ? h->itemUID : kInvalidUID;
 }
 
+int32 KFCResultModel::GetHitSpecial(int32 chapterIdx, int32 hitIdx)
+{
+	const Hit* h = HitAt(chapterIdx, hitIdx);
+	return (h != nil) ? h->special : 0;
+}
+
+PMString KFCResultModel::GetHitLabelKey(int32 chapterIdx, int32 hitIdx)
+{
+	const Hit* h = HitAt(chapterIdx, hitIdx);
+	PMString key;
+	if (h != nil)
+		key = h->labelKey;
+	key.SetTranslatable(kFalse);
+	return key;
+}
+
 bool KFCResultModel::IsHitItemGone(int32 chapterIdx, int32 hitIdx)
 {
 	const Hit* h = HitAt(chapterIdx, hitIdx);
@@ -2105,6 +2122,22 @@ void KFCResultModel::MarkItemSpecial(int32 chapterIdx, int32 hitIdx, int32 op, u
 	h->isHidden = place->isHidden;
 	h->isLocked = place->isLocked;
 	BuildHitLocator(*h);
+}
+
+void KFCResultModel::MarkItemOwnChange(int32 chapterIdx, int32 hitIdx, int32 op, const PMString& words, uint64 newPrint, uint32 newLength, const Hit* place)
+{
+	Hit* h = HitAt(chapterIdx, hitIdx);
+	if (h == nil || h->itemUID == kInvalidUID)
+		return;		// (a text row's own change is MarkHitOwnChange's)
+	const Hit asItStands(*h);		// (no place read: the row's own - nil would read as the item taken away)
+	MarkItemSpecial(chapterIdx, hitIdx, op, newPrint, newLength, (place != nil) ? place : &asItStands);		// (its backup taken there - before the words too)
+	h->runChain = words;
+	h->runChain.SetTranslatable(kFalse);
+	// THE WORDS ARE ITS WHOLE LINE NOW (a script label row's: what it reads after the write, no match in it to darken) - drawn where the match stands, nothing faint around them.
+	h->preText.Clear();
+	h->preText.SetTranslatable(kFalse);
+	h->postText.Clear();
+	h->postText.SetTranslatable(kFalse);
 }
 
 void KFCResultModel::SetHitItemPrint(int32 chapterIdx, int32 hitIdx, uint64 newPrint, uint32 newLength)

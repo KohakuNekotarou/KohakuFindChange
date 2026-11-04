@@ -668,20 +668,28 @@ namespace
 			label.Append("\"");
 			return label;
 		}
-		// THE SCRIPT LABEL KIND'S WORDS ARE ITS OWN FACE'S (docs/superpowers/specs/2026-11-04-kfc-script-label-design.md S2): Key:"<key>" when the face names
-		// one, then Find:"<its words>" - [Any Label] when it asks none (every label of the key).
+		// THE SCRIPT LABEL KIND'S WORDS ARE ITS OWN FACE'S (docs/superpowers/specs/2026-11-04-kfc-script-label-design.md S2): Script Key:"<key>" when the face names
+		// one, then Find:"<its words>" - [Any Label] when it asks none (every label of the key) - and Change:"<its Change Label:>" as the Text tab's tier says its
+		// Change to (the author, 11-04: "the heading has Find alone"): what the face asked as the list was made - a row's Replace writes the Change side as it stands then.
 		if (mode == kKFCScriptLabelSearchMode)
 		{
 			KFCScriptLabelConditions asked;
 			(void)KFCRuns()->ScriptLabelConditions(asked);
+			// (Match: - the author, 11-04: Contains, Whole Label and GREP chosen in a list: the heading names the entry, Contains being none - GREP first, as the list reads both on.)
+			if (asked.grep)
+				label.Append(" GREP");		// (Find Label: a regular expression - the author, 11-04)
+			else if (asked.whole)
+				label.Append(" Whole Label");
 			if (!asked.key.IsEmpty())
 			{
-				label.Append(" Key:\"");
+				label.Append(" Script Key:\"");		// (the face's word since 11-04 - the author: "Key alone is hard to follow")
 				label.Append(asked.key);
 				label.Append("\"");
 			}
 			label.Append(" Find:\"");
 			label.Append(asked.find.IsEmpty() ? PMString("[Any Label]") : asked.find);
+			label.Append("\" Change:\"");
+			label.Append(asked.change);
 			label.Append("\"");
 			return label;
 		}

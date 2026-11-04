@@ -763,7 +763,8 @@ bool KFCObjectSpecial::CanSpecialHit(int32 op, int32 chapterIdx, int32 hitIdx)
 	const OpInfo* const info = FindOp(op);
 	if (info == nil)
 		return false;
-	// A QR CODE LIST'S ROWS ARE NOT CHANGED (QR-18): greyed - SpecialRows names it.
+	// A QR CODE LIST'S ROWS ARE NOT CHANGED (QR-18): greyed - SpecialRows names it. A script label list's ARE (the author, 11-04: "label them in InDesign, search them, then change them
+	// together with Special Operations"): object rows, their items written as any object row's.
 	if (KFCResultModel::ListIsQRCodes())
 		return false;
 	UIDRef docRef;
@@ -785,7 +786,7 @@ bool KFCObjectSpecial::SpecialRows(int32 op, const KFCRowsByChapter& rows, const
 		outStatus.Append(KFCRunGuard::BusyMessage());
 		return false;
 	}
-	// A QR CODE LIST'S ROWS (CanSpecialHit's note): none of them, before anything is reached.
+	// A QR CODE LIST'S ROWS (CanSpecialHit's note): none of them, before anything is reached. (A script label list's are changed - the author, 11-04.)
 	if (KFCResultModel::ListIsQRCodes())
 	{
 		Refuse(outStatus, info, PMString(KFCQRSearch::NotChangedWords()));

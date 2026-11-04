@@ -14,8 +14,8 @@
 - **KOHAKU-02** ★面は**2列**（作者 11-02 夕「他のタブと同じように」＝本体の面と同じ＝486×356・余白15）。**左の列（幅330）**＝Find:・Search:（どちらも語の下に一覧＝KOHAKU-20）・その下の行（Table は `Find Table Style:` の語、Ruby・Kenten はアイコン）・選んだ種類の部品。**右の列（左から355・幅116・どれも116×26）**＝上から Find Next・Change・Change All・Change/Find（15／46／77／108＝TBL-60）、10空けて **Find in KFC**（144＝KOHAKU-36）、さらに10空けてその種類のもの＝Ruby は Choose List...・Save List...・How to Use...（180／211／242＝RUBY-03）、Kenten は How to Use...（180＝KENTEN-03）。QR Code は Find Next と Find in KFC だけ（変えるものが無い）。どの種類も両方の列の下に共通の2行（KOHAKU-37）。（窓を別の種類で開いてから変えても押せる）（K2・L1〜L7）回帰 `kh-part-shown`・`kh-findnext-after-another-kind`・`tb-btn-after-another-kind`・`rb-face-columns`・`kt-face-columns`・`kh-face-qr`
   - 訂正: 11-01＝Table にもボタン（作者の試用）。11-02＝Ruby と Kenten にも同じボタン（作者「FindNextなどのぼたん Ruby、圏点の方にもつけれるかな？」）・本体の枠の行（完了の隣）に差し込んでいたボタンを右の列へ（作者「今完了ボタンのところにあるボタンを Choose Save Howto の並びで縦に並べる。他のタブと同じように」）。
 
-- **KOHAKU-03** ★**Ruby・Kenten・Warichu は日本語で起動しているときだけ** Find: に出る（他の言語では QR Code・Table の2つ・Warichu は 2026-11-02＝WARI-01）。（K11）回帰 `kh-japanese`・`kh-not-japanese`・`kh-not-japanese-on-ruby`
-  - 訂正:
+- **KOHAKU-03** ★**Ruby・Kenten・Warichu は日本語で起動しているときだけ** Find: に出る（他の言語では Script Label・QR Code・Table の3つ・Warichu は 2026-11-02＝WARI-01・Script Label は 11-04＝SL-01）。★**並びは作者 11-04**＝Script Label／QR Code／Table／Kenten／Ruby／Warichu。（K11）回帰 `kh-japanese`・`kh-not-japanese`・`kh-not-japanese-on-ruby`
+  - 訂正: 2026-11-04 作者「Find の並びを Label QR Table にしておいてください。そのあと Kenten Ruby Wari に」＝それまでは QR Code／Table／Ruby／Kenten／Warichu（他の言語は QR Code・Table の2つ）。
 
 - **KOHAKU-04** Find: の値に応じて、パネルのタイトル（`Kohaku Find/Change - Table - Document`）と Find の名前、Find in … の動きが**その場で**変わる。本体のタブへ移れば本体のタブに戻り、戻れば前の種類のまま。閉じても開き直しても同じ。（K3・K4）回帰 `kh-kinds-title`・`kh-kinds-find`・`kh-closed-kind`・`kh-leave-back`
   - 訂正:

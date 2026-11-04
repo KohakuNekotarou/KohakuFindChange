@@ -1202,8 +1202,11 @@ bool KFCResultTree::ReplaceRows(const KFCRowsByChapter& rows, PMString* outStatu
 		}
 	// OBJECT ROWS are replaced through the jump's machinery - their document fronted around the write (KFCJump);
 	// text rows go straight to the model. One row takes each side's one-row door (ReplaceObjectRows hands it to
-	// ReplaceObjectRow, the model's ReplaceRows to ReplaceHit).
-	const bool wrote = (KFCResults()->GetHitItem(shownChapter, shownHit) != kInvalidUID)
+	// ReplaceObjectRow, the model's ReplaceRows to ReplaceHit). A SCRIPT LABEL LIST'S rows are object rows whose Replace is the
+	// model's alone - their labels written where they stand (KFCReplaceEngine's label rows): no document fronted, never
+	// InDesign's object replace, which turns them away (the re-inspection of 11-04 - sl-replace-locked-since met it).
+	const bool objectReplace = KFCResults()->GetHitItem(shownChapter, shownHit) != kInvalidUID && !KFCResults()->ListIsScriptLabels();
+	const bool wrote = objectReplace
 		? KFCJump::ReplaceObjectRows(rows, shownChapter, shownHit, status)
 		: (unifyTo != nil) ? KFCRuns()->UnifyRubyRows(rows, *unifyTo, status)		// (an Inconsistent Ruby row's "unify" - 11-03)
 		: KFCRuns()->ReplaceRows(rows, status);	// no prompt (the author's call)
@@ -1486,6 +1489,7 @@ const char* KFCResultTree::SpecialRowWord(int32 op)
 		case kKFCSpecialRubyChange:				return "Changed";	// a ruby row's Replace (the ruby tab spec's R8)
 		case kKFCSpecialKentenChange:			return "Changed";	// a kenten row's Replace
 		case kKFCSpecialTextTcy:				return "Tate-chu-yoko";	// a text row's Special Operations > Tate-chu-yoko (the warichu-tcy spec's B4)
+		case kKFCSpecialScriptLabel:			return "Labeled";	// a script label row's Replace (the script label spec's S8)
 		case kKFCSpecialDelete:					return "Deleted";
 		default:								return "";
 	}

@@ -181,7 +181,7 @@ bool KFCObjectOutline::CanOutlineHit(int32 chapterIdx, int32 hitIdx)
 	const UID item = KFCResultModel::GetHitItem(chapterIdx, hitIdx);
 	if (item == kInvalidUID)
 		return false;
-	// A QR CODE LIST'S ROWS ARE NOT OUTLINED (QR-18): greyed - OutlineRows names it.
+	// A QR CODE LIST'S ROWS ARE NOT OUTLINED (QR-18): greyed - OutlineRows names it. A script label list's are (object rows - the author, 11-04, of Special Operations).
 	if (KFCResultModel::ListIsQRCodes())
 		return false;
 	KFCResultModel::RowDisplay row;
@@ -212,7 +212,7 @@ bool KFCObjectOutline::OutlineRows(const KFCRowsByChapter& rows, PMString& outSt
 		outStatus.Append(KFCRunGuard::BusyMessage());
 		return false;
 	}
-	// A QR CODE LIST'S ROWS (CanOutlineHit's note): none of them, before anything is reached.
+	// A QR CODE LIST'S ROWS (CanOutlineHit's note): none of them, before anything is reached. (A script label list's are outlined - the author, 11-04.)
 	if (KFCResultModel::ListIsQRCodes())
 	{
 		Refuse(outStatus, KFCQRSearch::NotChangedWords());

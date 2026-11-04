@@ -23,6 +23,7 @@
 // Project includes:
 #include "KFCKohakuQuery.h"
 #include "KFCKentenSearch.h"
+#include "KFCScriptLabelSearch.h"	// WriteDocument - a Script Label query's run
 #include "KFCRubySearch.h"
 #include "KFCSavedQueries.h"	// KindName - a kind's word, the one table of them
 #include "KFCTableSearch.h"
@@ -237,7 +238,7 @@ bool KFCKohakuQuery::Read(const IDFile& file, KFCKohakuQueryData& out)
 		const int32 number = std::atoi(value.c_str());
 		if (key == "kind")
 		{
-			const int32 modes[] = { kKFCQRCodeSearchMode, kKFCTableSearchMode, kKFCRubySearchMode, kKFCKentenSearchMode, kKFCWarichuSearchMode };
+			const int32 modes[] = { kKFCQRCodeSearchMode, kKFCTableSearchMode, kKFCRubySearchMode, kKFCKentenSearchMode, kKFCWarichuSearchMode, kKFCScriptLabelSearchMode };
 			for (size_t m = 0; m < sizeof(modes) / sizeof(modes[0]); ++m)
 				if (value == KFCSavedQueries::KindName(modes[m]))
 					out.mode = modes[m];
@@ -293,8 +294,24 @@ bool KFCKohakuQuery::Read(const IDFile& file, KFCKohakuQueryData& out)
 			out.kenten.changeChar = FirstCodePoint(value);
 		else if (key == "kentenRemove")
 			out.kenten.removeKenten = (number != 0);
+		// THE SCRIPT LABEL KIND'S (docs/superpowers/specs/2026-11-04-kfc-script-label-design.md S2, S10) - words of its own ("find" is Table's).
+		else if (key == "labelKey")
+			out.label.key = Words(value);
+		else if (key == "labelFind")
+			out.label.find = Words(value);
+		else if (key == "labelChange")
+			out.label.change = Words(value);
+		// (labelCase - the face's Case Sensitive - went 11-04: always case by case (the author). A file of that day's earlier builds may still say it: not read.)
+		else if (key == "labelWhole")
+			out.label.whole = (number != 0);
+		else if (key == "labelGrep")
+			out.label.grep = (number != 0);		// (Find Label: as GREP - the author, 11-04)
 		at = close + 1;
 	}
+	// (Match: holds one of Contains, Whole Label and GREP since 11-04 - the author: "these three chosen in a list": a file saved with both boxes on, as that day's earlier builds
+	// let it, reads as GREP - the list's entry -, so the face says what is searched.)
+	if (out.label.grep)
+		out.label.whole = false;
 	if (!(rubyReadings.empty() && rubyBases.empty() && rubyFinds.empty()))
 	{
 		const std::vector<std::string> readings(SplitAtTabs(rubyReadings)), bases(SplitAtTabs(rubyBases)), finds(SplitAtTabs(rubyFinds));
@@ -371,6 +388,14 @@ std::string KFCKohakuQuery::FileText(const KFCKohakuQueryData& query)
 	}
 	else if (query.mode == kKFCWarichuSearchMode)
 		Attribute(element, "switches", query.warichu.switches.Bits());		// (its icons alone - docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md A6)
+	else if (query.mode == kKFCScriptLabelSearchMode)
+	{
+		Attribute(element, "labelKey", query.label.key);
+		Attribute(element, "labelFind", query.label.find);
+		Attribute(element, "labelChange", query.label.change);
+		Attribute(element, "labelWhole", query.label.whole ? 1 : 0);
+		Attribute(element, "labelGrep", query.label.grep ? 1 : 0);
+	}
 	element.append(">\n</KohakuFindChange>\n");
 	// A QUERY OF THE COLOR TAB ASKING NOTHING, as InDesign writes one (measured - app.saveFindChangeQuery), for InDesign to load where KFC is not there.
 	std::string text("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<Query>\n<Header>\n<Version major=\"5\" minor=\"1\">\n</Version>\n"
@@ -424,6 +449,8 @@ bool KFCKohakuQuery::HasChangeSide(const KFCKohakuQueryData& query)
 		return !query.ruby.FindsOnly() && query.ruby.kind != kKFCRubyFindVaries;		// (Find Only writes nothing - 11-03; nor Inconsistent Ruby, which has no Change side since 11-03 - a word is unified by hand; else ruby from marks: the reading is in the mark; any other: boxes reading nothing take the ruby off - the author, as an empty Change To deletes)
 	if (query.mode == kKFCKentenSearchMode)
 		return query.kenten.ChangeSideAsks();		// (custom with no character asks nothing - C5)
+	if (query.mode == kKFCScriptLabelSearchMode)
+		return !query.label.change.IsEmpty();		// (an empty Change Label: lists only - a run never takes every label off unasked; the face's Change All can)
 	return false;		// (a QR code's list writes nothing)
 }
 
@@ -436,6 +463,8 @@ bool KFCKohakuQuery::WriteDocument(const UIDRef& docRef, const KFCKohakuQueryDat
 		return KFCRubySearch::WriteDocument(docRef, query.ruby, part, outCount, ioBookSeen);
 	if (query.mode == kKFCKentenSearchMode)
 		return KFCKentenSearch::WriteDocument(docRef, query.kenten, part, outCount);
+	if (query.mode == kKFCScriptLabelSearchMode)
+		return KFCScriptLabelSearch::WriteDocument(docRef, query.label, outCount);		// (no part: a label is no story's text - Search: is Document or All Documents)
 	return false;
 }
 

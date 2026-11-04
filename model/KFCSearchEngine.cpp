@@ -3679,6 +3679,19 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 		AppendNothingToFind(outSummary, tab);
 		return 0;
 	}
+	// THE SCRIPT LABEL KIND'S GREP THAT IS NO REGULAR EXPRESSION (the author, 11-04 - GREP): said, before anything is walked or set aside, as nothing to find is. A search
+	// again asks its list's own words, which were searched with.
+	if (labelTab && (again == nil || again->freshQuery))
+	{
+		KFCScriptLabelConditions grepAsked;
+		(void)KFCScriptLabelSearch::IsTabCurrent(&grepAsked);
+		PMString why;
+		if (!KFCScriptLabelSearch::GrepIsValid(grepAsked, why))
+		{
+			outSummary.Append(why);
+			return 0;
+		}
+	}
 	// THE RUBY TAB'S QUERIES THAT NEED WORDS: the text with no ruby on it (the ruby tab spec's R3), and a ruby list's file, read now - a list with a wrong line looks for nothing (KFCRubyListFile.h). What a search again asks is its
 	// list's - that list had them.
 	std::shared_ptr<const KFCRubyList::Words> rubyListWords;

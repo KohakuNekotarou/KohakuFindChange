@@ -8,7 +8,8 @@
 
 ## 1. 面
 
-- **WARI-01** ★**日本語で起動しているときだけ** Find: の5つ目に出る（作者 11-02「たてなかよこ、割り注の検索タブも欲しい。qrタブと同じ感じ、日本語限定」＝KOHAKU-03）。回帰 `wr-not-japanese`
+- **WARI-01** ★**日本語で起動しているときだけ** Find: の最後（6つ目）に出る（作者 11-02「たてなかよこ、割り注の検索タブも欲しい。qrタブと同じ感じ、日本語限定」＝KOHAKU-03）。回帰 `wr-not-japanese`
+  - 訂正: 2026-11-04 作者「Find の並びを Label QR Table にしておいてください。そのあと Kenten Ruby Wari に」＝Find: は Script Label／QR Code／Table／Kenten／Ruby／Warichu（それまでは QR Code／Table／Ruby／Kenten／Warichu の5つ目）。
   - 訂正:
 
 - **WARI-02** ★**探すだけで書かない**（QR Code と同じ）＝面に Change／Change All／Change/Find は出ない。右の列は Find Next と Find in KFC だけで、Change 系のあった場所は空く（どの種類でもボタンの位置をそろえる＝KOHAKU-02）。欄は無い。回帰 `wr-face-columns`

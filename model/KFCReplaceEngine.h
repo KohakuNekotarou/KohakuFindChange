@@ -310,6 +310,23 @@ namespace KFCReplaceEngine
 	    what it draws now) and goes back with the step's Ctrl+Z, so the list and the page do not disagree (F8). False = InDesign would not write one: nothing was changed, outWhy says so. */
 	bool WriteFaceTables(const std::vector<FaceTable>& tables, bool clearOverrides, PMString& outWhy);
 
+	/** A LABEL THE KOHAKU+ FACE'S SCRIPT LABEL BUTTONS WRITE (Change, Change/Find, Change All - docs/superpowers/specs/2026-11-04-kfc-script-label-design.md S7): an open document's item and the
+	    label it is given. */
+	struct FaceLabel
+	{
+		UIDRef		doc;
+		UID			item;
+		PMString	key;		// the label's key (an item holds one per key - an empty Script Key: finds each)
+		PMString	value;
+
+		FaceLabel() : item(kInvalidUID) {}
+	};
+
+	/** THESE ITEMS' LABELS (each under its key) GIVEN THEIR VALUES - no row asked for it - in one undoable step, across documents too. A row of the script label list that stands for one of
+	    them (its item and its key) reads as its own Replace would leave it (Labeled) and goes back with the step's Ctrl+Z (WriteFaceTables' rule). False = InDesign would not write one:
+	    nothing was changed, outWhy says so. */
+	bool WriteFaceLabels(const std::vector<FaceLabel>& labels, PMString& outWhy);
+
 	/** A PLACE THE KOHAKU+ FACE'S RUBY AND KENTEN BUTTONS WRITE (KFCFaceText): an open document's text. */
 	struct FacePlace
 	{

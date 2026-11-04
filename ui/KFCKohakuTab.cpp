@@ -70,6 +70,7 @@
 #include "KFCBookPanelLookup.h"		// QueryPanelManager - Find in KFC shows the panel first
 #include "KFCResultHistory.h"			// Find - Find in KFC is the panel's own Find
 #include "KFCModelAccess.h"				// KFCRuns()->QRCodeNext - the QR code after the one found last (the model's)
+#include "IKFCUIServices.h"				// GetSelectedPageItems - the Script Label part's Change is for what its landing left selected
 #include "KFCKohakuQueryMenu.h"			// the face shown and hidden, and what it asks changed: Find/Change's own Query menu
 #include "KFCResultTree.h"				// RefreshRows - a list's row of a table the Table part's Change wrote
 #include "KFCRubyChangePlan.h"			// IsSpace - what the base boxes leave out, as the row's text is compared
@@ -85,6 +86,7 @@ const int32 kKindTable = 1;
 const int32 kKindRuby = 2;
 const int32 kKindKenten = 3;
 const int32 kKindWarichu = 4;		// (docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md A1 - a Japanese InDesign's, as Ruby and Kenten)
+const int32 kKindScriptLabel = 5;	// (docs/superpowers/specs/2026-11-04-kfc-script-label-design.md S1 - every language's. A kind's number is not its entry on Find: - Find:'s order is the author's of 11-04, kKindsInOrder: EntryOfKind)
 
 // Search:'s entries: the .fr's two for every kind, the three after them for what stands in a story's text (ShowScopeEntries).
 const IWalkerScopeFactoryUtils::WalkScopeType kScopeOfEntry[] =
@@ -107,13 +109,31 @@ IPMUnknown* gShownFace = nil;	// the face, while shown - from its AutoAttach to 
 int32 gKind = kKindQRCode;	// its Find: - QR Code at launch, the tab InDesign's dialog first had
 // WHAT EACH KIND LAST SAID ON THE FACE'S TWO LINES (docs/superpowers/specs/2026-11-02-kfc-kohaku-face-buttons-design.md L4 - the author, 11-02: "the same place as the other messages"): the first line, what a button or the list
 // said; the second, why what was found could not be selected. One pair of lines for every kind - shown again as its kind is.
-const int32 kKindCount = 5;
+const int32 kKindCount = 6;
 PMString gSaid[kKindCount][2];
 int32 gScope = IWalkerScopeFactoryUtils::kDocumentScope;	// its Search: - Document at launch
 KFCTableConditions gTable;	// what the Table part asks, kept from its widgets (its scope is gScope)
 KFCRubyConditions gRuby;	// what the Ruby part asks
 KFCKentenConditions gKenten;	// what the Kenten part asks
 KFCWarichuConditions gWarichu;	// what the Warichu kind asks: its icons alone
+KFCScriptLabelConditions gLabel;	// what the Script Label part asks, kept from its widgets (its scope is gScope - All Documents or Document)
+// MATCH:'S ENTRIES, in KFCUI.fr's order (the author, 11-04: "these three chosen in a list?", "that list above Find"): how Find Label: is read. gLabel keeps the entry as whole
+// and grep, as a query saves them (KFCKohakuQuery - one of the two at most).
+const int32 kLabelMatchContains = 0;
+const int32 kLabelMatchWhole = 1;
+const int32 kLabelMatchGrep = 2;
+
+int32 LabelMatchEntry()
+{
+	return gLabel.grep ? kLabelMatchGrep : gLabel.whole ? kLabelMatchWhole : kLabelMatchContains;
+}
+// THE SCRIPT LABEL PART'S FIND NEXT (S9): the item it found last - where its next press goes on from - and whether Change or Change All has written since. Let go with gLastFound, and for gLastFound's reason.
+KFCScriptLabelFound gFoundLabel;
+bool gFoundLabelWritten = false;
+// ...and the page items selected right after it landed (Table's gLeftStory for an item: the item found, or what stood selected when it could not be selected - locked, hidden). Change and
+// Change/Find are for it while the selection still reads so (LabelSelectionAsLeft - S7, "as Table's"). Only compared: a closed document's database address is never read through.
+IDataBase* gLeftLabelDB = nil;
+std::vector<UID> gLeftLabelItems;
 
 // THE RUBY PART'S BOXES (docs/superpowers/specs/2026-11-01-kfc-kohaku-trial-fixes-design.md F14 - F16): what each holds, as gRuby holds it (KeepFromBoxes). The widgets' own text is the same - the face can be hidden and written (a saved query) with
 // none to read. Find's Ruby: and Base Text: a column each, the Change side's reading over the same columns; its base text is Find's.
@@ -151,6 +171,10 @@ void ForgetFound()
 	gLeftStory = UIDRef::gNull;
 	gLeftStart = kInvalidTextIndex;
 	gLeftEnd = kInvalidTextIndex;
+	gFoundLabel = KFCScriptLabelFound();
+	gFoundLabelWritten = false;
+	gLeftLabelDB = nil;
+	gLeftLabelItems.clear();
 }
 
 // TEST BUILDS: the one-shot fault switch kohaku-tab-reset (KFCDiag.h) - what the tab keeps as at launch: a case's saved query left its conditions, as it should, and the next case's Find would ask them.
@@ -165,6 +189,7 @@ void TakeTestReset()
 		gRuby = KFCRubyConditions();
 		gKenten = KFCKentenConditions();
 		gWarichu = KFCWarichuConditions();
+		gLabel = KFCScriptLabelConditions();
 		BoxesFromKept();
 		for (int32 k = 0; k < kKindCount; ++k)
 		{
@@ -246,6 +271,37 @@ void ShowSaid(IPanelControlData* panel)
 	SetFaceLine(panel, kKFCQRTabNoteWidgetID, gSaid[gKind][1]);
 }
 
+// THE SCRIPT LABEL PART'S BOX OF THE LABEL FIND NEXT FOUND (the author, 11-04: "the label shown in the dialog's lower part, on several lines"): the found item's label as it reads
+// now (IKFCRuns::ScriptLabelNow - after a Change, the label it was given), its line breaks the box's (a label's CR, CR LF or LF - the box breaks a line at LF, as KESCL's summary
+// is fed); empty when nothing is found, or its item or document is gone.
+void ShowFoundLabel(IPanelControlData* panel)
+{
+	PMString label;
+	label.SetTranslatable(kFalse);
+	if (gFoundLabel.item != kInvalidUID)
+		label = KFCRuns()->ScriptLabelNow(gFoundLabel);
+	PMString shown;
+	shown.SetTranslatable(kFalse);
+	int32 n = 0;
+	const UTF16TextChar* buf = label.GrabUTF16Buffer(&n);
+	int32 runStart = 0;		// (whole runs copied between the breaks - a surrogate pair is never split: KFCResultModel::MarkUpBreaksForDisplay's way)
+	for (int32 i = 0; buf != nil && i < n; ++i)
+	{
+		if (buf[i] != kTextChar_CR)
+			continue;
+		if (i > runStart)
+			shown.AppendW(buf + runStart, i - runStart);
+		shown.AppendW(static_cast<UTF32TextChar>(kTextChar_LF));
+		if (i + 1 < n && buf[i + 1] == kTextChar_LF)
+			++i;		// (CR LF is one break)
+		runStart = i + 1;
+	}
+	if (buf != nil && n > runStart)
+		shown.AppendW(buf + runStart, n - runStart);
+	shown.SetTranslatable(kFalse);
+	SetFaceLine(panel, kKFCLabelTabShownWidgetID, shown);
+}
+
 // ----- the QR Code part
 
 // FIND NEXT (the QR design's Q10 / D5): the QR code after the one found last, in the list's own order over the face's Search: (the model's KFCQRSearch::Next - read only), landed on as an object
@@ -287,6 +343,29 @@ bool SelectionAsLeft()
 	return story == gLeftStory && start == gLeftStart && end == gLeftEnd;
 }
 
+// THE PAGE ITEMS SELECTED NOW - their document and UIDs, through IKFCUIServices::GetSelectedPageItems (the UI half's one reading of a selection's items). None: nothing selected, or no page item.
+void ReadSelectedItems(IDataBase*& outDB, std::vector<UID>& outItems)
+{
+	outDB = nil;
+	outItems.clear();
+	InterfacePtr<IKFCUIServices> ui(KFCQueryUIServices());
+	UIDList items;
+	if (ui == nil || !ui->GetSelectedPageItems(items))
+		return;
+	outDB = items.GetDataBase();
+	for (int32 i = 0; i < items.Length(); ++i)
+		outItems.push_back(items[i]);
+}
+
+// IS THE SELECTION AS THE SCRIPT LABEL PART'S LAST LANDING LEFT IT? (SelectionAsLeft's for page items - a place, read now.)
+bool LabelSelectionAsLeft()
+{
+	IDataBase* db = nil;
+	std::vector<UID> items;
+	ReadSelectedItems(db, items);
+	return db == gLeftLabelDB && items == gLeftLabelItems;
+}
+
 // The model's mode for the text kinds' buttons (IKFCRuns::FaceTextNext and the rest).
 int32 TextModeOfKind()
 {
@@ -312,6 +391,8 @@ bool ChangeSideAsks()
 			return false;
 		case kKindKenten:
 			return gKenten.ChangeSideAsks();
+		case kKindScriptLabel:
+			return true;		// (an empty Change Label: asks too: the label taken off - S7)
 		default:
 			return false;
 	}
@@ -322,8 +403,11 @@ void ShowFaceButtons(IPanelControlData* panel)
 {
 	if (panel == nil || gKind == kKindQRCode || gKind == kKindWarichu)		// (no Change buttons on them: they change nothing)
 		return;
+	if (gKind == kKindScriptLabel)
+		ShowFoundLabel(panel);		// (the box of the found label - every press and every field's change comes here, and a selection's move: the label as it reads now)
 	const bool asks = ChangeSideAsks();
-	const bool onFound = asks && gFoundTable.doc != UIDRef::gNull && gFoundSelected && !gFoundWritten && SelectionAsLeft();
+	const bool onFound = (gKind == kKindScriptLabel) ? (gFoundLabel.item != kInvalidUID && !gFoundLabelWritten && LabelSelectionAsLeft())		// (the item Find Next found, as it left the selection, not written since)
+		: (asks && gFoundTable.doc != UIDRef::gNull && gFoundSelected && !gFoundWritten && SelectionAsLeft());
 	IControlView* const change = panel->FindWidget(kKFCTableTabChangeWidgetID);
 	if (change != nil)
 		change->Enable(onFound ? kTrue : kFalse);
@@ -491,6 +575,112 @@ void FindInKFC()
 	(void)KFCResultHistory::Find(KFCResultHistory::QueryLabel(), summary);
 	KFC_DIAG_LOG("%s findinkfc opened=%d %s", KindWord(), opened ? 1 : 0, summary.GetUTF8String().c_str());
 	SayFor(gKind, summary, none);
+}
+
+// ----- the Script Label part's buttons (docs/superpowers/specs/2026-11-04-kfc-script-label-design.md S7, S9): the model's KFCScriptLabelSearch through IKFCRuns - what the part asks it reads itself
+// (IKFCUIServices::ScriptLabelTabConditions, the face's own answer)
+
+// FIND NEXT ON SCRIPT LABEL (S9): the next item whose label matches, over Search:, in page order, after the one found last (read only); landed on as its row's click lands (KFCJump::LandOnQRCode -
+// an object row's landing: the item selected, its page shown). One it cannot select is named on the second line; none at all is InDesign's own alert.
+void LabelFindNext()
+{
+	InterfacePtr<IPanelControlData> panel(gShownFace, UseDefaultIID());
+	PMString words, note;
+	words.SetTranslatable(kFalse);
+	note.SetTranslatable(kFalse);
+	if (KFCRuns()->IsAnyRunning())
+	{
+		words.Append(KFCRuns()->BusyMessage());
+		SayFor(kKindScriptLabel, words, note);
+		return;
+	}
+	KFCScriptLabelLook look;
+	look.lastDoc = gFoundLabel.doc;
+	look.lastItem = gFoundLabel.item;
+	look.lastKey = gFoundLabel.key;		// (an item can be found once for each of its keys - an empty Script Key:)
+	KFCScriptLabelFound found;
+	if (!KFCRuns()->ScriptLabelNext(look, found))
+	{
+		gFoundLabel = KFCScriptLabelFound();
+		gFoundLabelWritten = false;
+		gLeftLabelDB = nil;
+		gLeftLabelItems.clear();
+		SayFor(kKindScriptLabel, found.words, note);
+		KFC_DIAG_LOG("LABELTAB findnext none %s", found.words.GetUTF8String().c_str());
+		ShowFaceButtons(panel);
+		if (found.words.IsEmpty())
+			InformationAlertOf("Cannot find a match.", -1, "");
+		return;
+	}
+	(void)KFCJump::LandOnQRCode(UIDRef(found.doc.GetDataBase(), found.item), found.reach, note);
+	gFoundLabel = found;
+	gFoundLabelWritten = false;
+	ReadSelectedItems(gLeftLabelDB, gLeftLabelItems);		// (what the landing left selected - LabelSelectionAsLeft)
+	KFC_DIAG_LOG("LABELTAB findnext %s%s%s", found.words.GetUTF8String().c_str(), note.IsEmpty() ? "" : "  ", note.GetUTF8String().c_str());
+	SayFor(kKindScriptLabel, found.words, note);
+	ShowFaceButtons(panel);
+}
+
+// CHANGE ON SCRIPT LABEL (S7): the Change side on the item Find Next found - one Ctrl+Z. thenNext (Change/Find): on to the next, written or not - the reason it was not on the second line.
+void LabelChange(bool thenNext)
+{
+	InterfacePtr<IPanelControlData> panel(gShownFace, UseDefaultIID());
+	PMString words, none;
+	words.SetTranslatable(kFalse);
+	none.SetTranslatable(kFalse);
+	if (KFCRuns()->IsAnyRunning())
+	{
+		words.Append(KFCRuns()->BusyMessage());
+		SayFor(kKindScriptLabel, words, none);
+		return;
+	}
+	const bool wrote = KFCRuns()->ScriptLabelChangeFound(gFoundLabel, words);
+	KFC_DIAG_LOG("LABELTAB change wrote=%d %s", wrote ? 1 : 0, words.GetUTF8String().c_str());
+	if (wrote)
+	{
+		gFoundLabelWritten = true;
+		KFCResultTree::RefreshRows();		// (a row of the list that stands for it reads as written)
+	}
+	if (thenNext)
+	{
+		LabelFindNext();
+		if (!wrote)
+			SayFor(kKindScriptLabel, gSaid[kKindScriptLabel][0], words);
+		return;
+	}
+	SayFor(kKindScriptLabel, words, none);
+	ShowFaceButtons(panel);
+}
+
+// CHANGE ALL ON SCRIPT LABEL (S7): every matching label of Search: given the Change side, one Ctrl+Z, said as InDesign says it.
+void LabelChangeAll()
+{
+	InterfacePtr<IPanelControlData> panel(gShownFace, UseDefaultIID());
+	PMString words, none;
+	words.SetTranslatable(kFalse);
+	none.SetTranslatable(kFalse);
+	if (KFCRuns()->IsAnyRunning())
+	{
+		words.Append(KFCRuns()->BusyMessage());
+		SayFor(kKindScriptLabel, words, none);
+		return;
+	}
+	int32 changed = 0, matched = 0;
+	const bool ran = KFCRuns()->ScriptLabelChangeAll(changed, matched, words);
+	KFC_DIAG_LOG("LABELTAB changeall ran=%d changed=%d matched=%d %s", ran ? 1 : 0, static_cast<int>(changed), static_cast<int>(matched), words.GetUTF8String().c_str());
+	if (ran && changed > 0)
+	{
+		gFoundLabelWritten = true;
+		KFCResultTree::RefreshRows();
+	}
+	SayFor(kKindScriptLabel, words, none);
+	ShowFaceButtons(panel);
+	if (!ran)
+		return;
+	if (matched == 0)
+		InformationAlertOf("Cannot find a match.", -1, "");
+	else
+		InformationAlertOf("Search is completed. ", changed, " label(s) changed.");
 }
 // ----- the Table part
 
@@ -1482,6 +1672,7 @@ void ShowJapaneseLabels(IPanelControlData* panel)
 	SetEntry(panel, kKFCRubyListFirstWidgetID, kKFCRubyListFirstInDocument, KFCJa::FirstInDocument());
 	SetEntry(panel, kKFCRubyListFirstWidgetID, kKFCRubyListFirstInBook, KFCJa::FirstInBook());
 	SetField(panel, kKFCRubyListOtherRubyWidgetID, KFCJa::OtherRuby());
+	// (The Script Label part's words stay English in every language - the author, 11-04, after asking what Case Sensitive and Whole Label do: "then, English as it is".)
 }
 
 // THE BOXES (C1): each takes a character while its list says custom - grey otherwise, what it holds kept.
@@ -1515,7 +1706,47 @@ bool JapaneseKinds()
 	return !asAnother && LocaleSetting::GetLocale().GetUserInterfaceId() == k_jaJP;
 }
 
-// FIND:'S ENTRIES: the .fr's two for every language, Ruby, Kenten and Warichu after them in a Japanese InDesign - and the kind selected. Not heard (notifyOfChange kFalse).
+// FIND:'S ENTRIES IN ORDER (the author, 11-04: "Find in the order Label, QR, Table - then Kenten, Ruby, Wari"): Script Label, QR Code and Table - every language's -
+// then Kenten, Ruby and Warichu, a Japanese InDesign's alone. An entry is its place here; a kind keeps its number (kKind* - the face's own arrays are counted by it): EntryOfKind and
+// KindOfEntry go between them. -1 = none (a kind the list there does not hold, or an entry past it).
+const int32 kKindsInOrder[kKindCount] = { kKindScriptLabel, kKindQRCode, kKindTable, kKindKenten, kKindRuby, kKindWarichu };
+const int32 kEntriesForEveryLanguage = 3;
+
+int32 EntriesHere()
+{
+	return JapaneseKinds() ? kKindCount : kEntriesForEveryLanguage;
+}
+
+int32 EntryOfKind(int32 kind)
+{
+	const int32 count = EntriesHere();
+	for (int32 entry = 0; entry < count; ++entry)
+		if (kKindsInOrder[entry] == kind)
+			return entry;
+	return -1;
+}
+
+int32 KindOfEntry(int32 entry)
+{
+	return (entry >= 0 && entry < EntriesHere()) ? kKindsInOrder[entry] : -1;
+}
+
+// A kind's words on Find: (KFCUI_enUS.fr's keys).
+const char* KindKey(int32 kind)
+{
+	switch (kind)
+	{
+		case kKindScriptLabel:	return kKFCKohakuTabScriptLabelKey;
+		case kKindQRCode:		return kKFCKohakuTabQRCodeKey;
+		case kKindTable:		return kKFCKohakuTabTableKey;
+		case kKindKenten:		return kKFCKohakuTabKentenKey;
+		case kKindRuby:			return kKFCKohakuTabRubyKey;
+		default:				return kKFCKohakuTabWarichuKindKey;
+	}
+}
+
+// FIND:'S ENTRIES, in kKindsInOrder's order, and the kind selected. Written afresh whenever the list does not read so, entry by entry - a widget's saved data keeps the list an older build
+// wrote (in a Japanese InDesign QR Code first, six entries as now: its count cannot tell), and a test build's not-japanese switches between six and three. Not heard (notifyOfChange kFalse).
 void ShowKindEntries(IPMUnknown* face)
 {
 	InterfacePtr<IPanelControlData> panel(face, UseDefaultIID());
@@ -1524,37 +1755,33 @@ void ShowKindEntries(IPMUnknown* face)
 	InterfacePtr<IDropDownListController> list(dropDown, UseDefaultIID());
 	if (strings == nil || list == nil)
 		return;
-	if (JapaneseKinds())
+	const int32 count = EntriesHere();
+	bool asWanted = (strings->Length() == count);
+	for (int32 entry = 0; entry < count && asWanted; ++entry)
+		asWanted = (strings->GetString(entry) == PMString(KindKey(kKindsInOrder[entry]), PMString::kTranslateDuringCall));
+	if (!asWanted)
 	{
-		if (strings->Length() <= kKindRuby)
-		{
-			strings->AddString(PMString(kKFCKohakuTabRubyKey, PMString::kTranslateDuringCall), IStringListControlData::kEnd, kFalse, kFalse);
-			strings->AddString(PMString(kKFCKohakuTabKentenKey, PMString::kTranslateDuringCall), IStringListControlData::kEnd, kFalse, kFalse);
-		}
-		if (strings->Length() <= kKindWarichu)
-			strings->AddString(PMString(kKFCKohakuTabWarichuKindKey, PMString::kTranslateDuringCall), IStringListControlData::kEnd, kFalse, kFalse);
+		strings->Clear(kFalse, kFalse);
+		for (int32 entry = 0; entry < count; ++entry)
+			strings->AddString(PMString(KindKey(kKindsInOrder[entry]), PMString::kTranslateDuringCall), IStringListControlData::kEnd, kFalse, kFalse);
 	}
-	else
-	{
-		while (strings->Length() > kKindRuby)
-			strings->RemoveString(strings->Length() - 1, kFalse, kFalse);
-		if (gKind >= kKindRuby)
-			gKind = kKindQRCode;
-	}
-	list->Select(gKind, kTrue, kFalse);
+	if (EntryOfKind(gKind) < 0)
+		gKind = kKindQRCode;		// (Ruby, Kenten or Warichu kept from a Japanese InDesign's face: a test build's not-japanese)
+	list->Select(EntryOfKind(gKind), kTrue, kFalse);
 }
 
 // A test build's trace names the kind (run.ps1's cases read them).
 const char* KindWord()
 {
-	return (gKind == kKindTable) ? "TBLTAB" : (gKind == kKindRuby) ? "RUBYTAB" : (gKind == kKindKenten) ? "KENTAB" : (gKind == kKindWarichu) ? "WARITAB" : "QRTAB";
+	return (gKind == kKindTable) ? "TBLTAB" : (gKind == kKindRuby) ? "RUBYTAB" : (gKind == kKindKenten) ? "KENTAB" : (gKind == kKindWarichu) ? "WARITAB"
+		: (gKind == kKindScriptLabel) ? "LABELTAB" : "QRTAB";
 }
 
 // WHAT SEARCH: IS FOR THE KIND NOW: a QR code's frame stands in no story's text, so a part of a story picked for the others reads as Document on QR Code - and is there again when they come back
-// (nothing is written here).
+// (nothing is written here). Script Label's the same: a label is no story's text either (S2).
 int32 ScopeForKind()
 {
-	if (gKind == kKindQRCode && gScope != IWalkerScopeFactoryUtils::kAllDocumentScope)
+	if ((gKind == kKindQRCode || gKind == kKindScriptLabel) && gScope != IWalkerScopeFactoryUtils::kAllDocumentScope)
 		return IWalkerScopeFactoryUtils::kDocumentScope;
 	return gScope;
 }
@@ -1568,7 +1795,7 @@ void ShowScopeEntries(IPMUnknown* face)
 	InterfacePtr<IDropDownListController> list(dropDown, UseDefaultIID());
 	if (strings == nil || list == nil)
 		return;
-	if (gKind == kKindQRCode)
+	if (gKind == kKindQRCode || gKind == kKindScriptLabel)
 	{
 		while (strings->Length() > kEntriesForAnyKind)
 			strings->RemoveString(strings->Length() - 1, kFalse, kFalse);
@@ -1677,8 +1904,8 @@ void ShowSwitches(IPanelControlData* panel)
 	}
 }
 
-// THE CHOSEN KIND'S PART, the others away, its buttons, its lines, and Search: for it. Every kind has Find Next and Find in KFC; Table, Ruby and Kenten Change, Change All and Change/Find (QR Code and
-// Warichu write nothing).
+// THE CHOSEN KIND'S PART, the others away, its buttons, its lines, and Search: for it. Every kind has Find Next and Find in KFC; Table, Ruby, Kenten and Script Label Change, Change All and Change/Find
+// (QR Code and Warichu write nothing).
 void ShowKind(IPMUnknown* face)
 {
 	InterfacePtr<IPanelControlData> panel(face, UseDefaultIID());
@@ -1693,6 +1920,7 @@ void ShowKind(IPMUnknown* face)
 	ShowPart(panel, kKFCKohakuTableSectionWidgetID, gKind == kKindTable);
 	ShowPart(panel, kKFCKohakuRubySectionWidgetID, gKind == kKindRuby);
 	ShowPart(panel, kKFCKohakuKentenSectionWidgetID, gKind == kKindKenten);
+	ShowPart(panel, kKFCKohakuLabelSectionWidgetID, gKind == kKindScriptLabel);
 	ShowRubyKind(panel);		// (their own greys stand whatever their panels were told; Ruby's buttons with them)
 	ShowRubyButtons(panel);
 	ShowKentenBoxes(panel);
@@ -1727,6 +1955,12 @@ void FillKept(IPMUnknown* face)
 	SetField(panel, kKFCKentenChangeCharWidgetID, CharWords(gKenten.changeChar));
 	SetBox(panel, kKFCRubyListOtherRubyWidgetID, gRuby.listOtherRuby);
 	SetBox(panel, kKFCRubyFindOnlyWidgetID, gRuby.findOnly);
+	SetField(panel, kKFCLabelTabKeyWidgetID, gLabel.key);
+	SetField(panel, kKFCLabelTabFindWidgetID, gLabel.find);
+	SetField(panel, kKFCLabelTabChangeWidgetID, gLabel.change);
+	InterfacePtr<IDropDownListController> labelMatch(QueryList(face, kKFCLabelTabMatchWidgetID));
+	if (labelMatch != nil)
+		labelMatch->Select(LabelMatchEntry(), kTrue, kFalse);
 	ShowKind(face);
 }
 
@@ -1774,8 +2008,11 @@ bool KFCKohakuTab::IsWarichuCurrent(KFCWarichuConditions& outConditions)
 
 bool KFCKohakuTab::IsScriptLabelCurrent(KFCScriptLabelConditions& outConditions)
 {
-	outConditions = KFCScriptLabelConditions();
-	return false;
+	// Search: as QR Code's - All Documents or Document; a part of a story picked for another kind reads as Document (S2, KOHAKU-10).
+	outConditions = gLabel;
+	outConditions.scope = (ScopeAsked() == IWalkerScopeFactoryUtils::kAllDocumentScope) ? static_cast<int32>(IWalkerScopeFactoryUtils::kAllDocumentScope)
+		: static_cast<int32>(IWalkerScopeFactoryUtils::kDocumentScope);
+	return FaceIsCurrent() && gKind == kKindScriptLabel;
 }
 
 void KFCKohakuTab::YieldToSavedQuery()
@@ -1813,6 +2050,11 @@ void KFCKohakuTab::StateQuery(const KFCKohakuQueryData& query, bool forItsFind, 
 		gKind = kKindWarichu;
 		gWarichu = query.warichu;
 	}
+	else if (query.mode == kKFCScriptLabelSearchMode)
+	{
+		gKind = kKindScriptLabel;
+		gLabel = query.label;
+	}
 	else
 		gKind = kKindQRCode;
 	gYield = false;
@@ -1841,11 +2083,13 @@ void KFCKohakuTab::QueryOfFace(KFCKohakuQueryData& out)
 {
 	out = KFCKohakuQueryData();
 	out.mode = (gKind == kKindTable) ? static_cast<int32>(kKFCTableSearchMode) : (gKind == kKindRuby) ? static_cast<int32>(kKFCRubySearchMode)
-		: (gKind == kKindKenten) ? static_cast<int32>(kKFCKentenSearchMode) : (gKind == kKindWarichu) ? static_cast<int32>(kKFCWarichuSearchMode) : static_cast<int32>(kKFCQRCodeSearchMode);
+		: (gKind == kKindKenten) ? static_cast<int32>(kKFCKentenSearchMode) : (gKind == kKindWarichu) ? static_cast<int32>(kKFCWarichuSearchMode)
+		: (gKind == kKindScriptLabel) ? static_cast<int32>(kKFCScriptLabelSearchMode) : static_cast<int32>(kKFCQRCodeSearchMode);
 	out.table = gTable;
 	out.ruby = gRuby;
 	out.kenten = gKenten;
 	out.warichu = gWarichu;
+	out.label = gLabel;
 }
 
 void KFCKohakuTab::ShutdownCleanup()
@@ -1864,6 +2108,10 @@ void KFCKohakuTab::ShutdownCleanup()
 	gRuby = KFCRubyConditions();
 	gKenten = KFCKentenConditions();
 	gWarichu = KFCWarichuConditions();
+	gLabel = KFCScriptLabelConditions();
+	gFoundLabel = KFCScriptLabelFound();
+	gLeftLabelDB = nil;
+	gLeftLabelItems = std::vector<UID>();
 	gFindPaths = std::vector<PMString>();
 	gChangePaths = std::vector<PMString>();
 	gFoundTable = KFCTableFound();
@@ -1977,6 +2225,10 @@ public:
 			AttachToWidget(kKFCKentenMarkCharWidgetID, IID_ITEXTCONTROLDATA, panel);
 			AttachToWidget(kKFCKentenTabChangeWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
 			AttachToWidget(kKFCKentenChangeCharWidgetID, IID_ITEXTCONTROLDATA, panel);
+			AttachToWidget(kKFCLabelTabKeyWidgetID, IID_ITEXTCONTROLDATA, panel);
+			AttachToWidget(kKFCLabelTabFindWidgetID, IID_ITEXTCONTROLDATA, panel);
+			AttachToWidget(kKFCLabelTabChangeWidgetID, IID_ITEXTCONTROLDATA, panel);
+			AttachToWidget(kKFCLabelTabMatchWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
 		}
 		// The front document, followed while shown (Update): its workspace's styles fill the lists, now and as they change.
 		ISession* const session = GetExecutionContextSession();
@@ -2052,6 +2304,10 @@ public:
 		DetachFromWidget(kKFCKentenMarkCharWidgetID, IID_ITEXTCONTROLDATA, panel);
 		DetachFromWidget(kKFCKentenTabChangeWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
 		DetachFromWidget(kKFCKentenChangeCharWidgetID, IID_ITEXTCONTROLDATA, panel);
+		DetachFromWidget(kKFCLabelTabKeyWidgetID, IID_ITEXTCONTROLDATA, panel);
+		DetachFromWidget(kKFCLabelTabFindWidgetID, IID_ITEXTCONTROLDATA, panel);
+		DetachFromWidget(kKFCLabelTabChangeWidgetID, IID_ITEXTCONTROLDATA, panel);
+		DetachFromWidget(kKFCLabelTabMatchWidgetID, IID_ISTRINGLISTCONTROLDATA, panel);
 	}
 
 	virtual void Update(const ClassID& theChange, ISubject* theSubject, const PMIID& protocol, void* /*changedBy*/)
@@ -2069,9 +2325,9 @@ public:
 		{
 			// FIND: CHANGED - another part, and KFC's Find looks for it, whatever a saved query had stated: said in the panel's title and the Application Bar's field, as a switch of tab is.
 			InterfacePtr<IDropDownListController> list(view, UseDefaultIID());
-			const int32 entry = (list != nil) ? list->GetSelected() : -1;
-			if (entry >= kKindQRCode && entry <= kKindWarichu)
-				gKind = entry;
+			const int32 kind = KindOfEntry((list != nil) ? list->GetSelected() : -1);		// (Script Label's entry is not its number in another language - S1)
+			if (kind >= 0)
+				gKind = kind;
 			gYield = false;
 			ForgetFound();		// (Find Next starts from the first again)
 			ShowKind(this);
@@ -2093,6 +2349,8 @@ public:
 		{
 			if (gKind == kKindQRCode)
 				QRFindNext();
+			else if (gKind == kKindScriptLabel)
+				LabelFindNext();
 			else
 				FaceFindNext();
 		}
@@ -2115,11 +2373,26 @@ public:
 				KFCKohakuQueryMenu::FaceChanged();		// (the list is what a query holds; its press alone is nothing - below)
 		}
 		else if (widget == kKFCTableTabChangeWidgetID && theChange == kTrueStateMessage)
-			FaceChange(false);
+		{
+			if (gKind == kKindScriptLabel)
+				LabelChange(false);
+			else
+				FaceChange(false);
+		}
 		else if (widget == kKFCTableTabChangeFindWidgetID && theChange == kTrueStateMessage)
-			FaceChange(true);
+		{
+			if (gKind == kKindScriptLabel)
+				LabelChange(true);
+			else
+				FaceChange(true);
+		}
 		else if (widget == kKFCTableTabChangeAllWidgetID && theChange == kTrueStateMessage)
-			FaceChangeAll();
+		{
+			if (gKind == kKindScriptLabel)
+				LabelChangeAll();
+			else
+				FaceChangeAll();
+		}
 		else if (widget == kKFCTableTabFindStyleWidgetID)
 		{
 			InterfacePtr<IDropDownListController> list(view, UseDefaultIID());
@@ -2292,6 +2565,37 @@ public:
 		{
 			// A BOX OF A CUSTOM MARK'S CHARACTER (C2): settled at the next idle - an input method hands a box what it confirms a character at a time.
 			NoteKentenBox((widget == kKFCKentenMarkCharWidgetID) ? 1u : 2u);
+		}
+		else if (widget == kKFCLabelTabKeyWidgetID || widget == kKFCLabelTabFindWidgetID)
+		{
+			// KEY: OR FIND LABEL: (S2) - as typed (no trim: a key or words with spaces is the person's). Another key or other words: what Find Next found was the old ones' - it starts from the first again.
+			PMString& kept = (widget == kKFCLabelTabKeyWidgetID) ? gLabel.key : gLabel.find;
+			kept = WordsOf(view);
+			ForgetFound();
+			InterfacePtr<IPanelControlData> panel(this, UseDefaultIID());
+			ShowFaceButtons(panel);
+			KFC_DIAG_LOG("LABELTAB %s=%s", (widget == kKFCLabelTabKeyWidgetID) ? "key" : "find", kept.GetUTF8String().c_str());
+		}
+		else if (widget == kKFCLabelTabChangeWidgetID)
+		{
+			gLabel.change = WordsOf(view);
+			KFC_DIAG_LOG("LABELTAB change=%s", gLabel.change.GetUTF8String().c_str());
+		}
+		else if (widget == kKFCLabelTabMatchWidgetID)
+		{
+			// MATCH: - Text (Contains), Text (Whole Label) or GREP (the author, 11-04: GREP, then the three in a list above Find Label:; always case by case since the same
+			// evening - no Case Sensitive box): other matches - Find Next starts from the first again.
+			InterfacePtr<IDropDownListController> list(view, UseDefaultIID());
+			const int32 entry = (list != nil) ? list->GetSelected() : -1;
+			if (entry >= kLabelMatchContains && entry <= kLabelMatchGrep)
+			{
+				gLabel.whole = (entry == kLabelMatchWhole);
+				gLabel.grep = (entry == kLabelMatchGrep);
+			}
+			ForgetFound();
+			InterfacePtr<IPanelControlData> panel(this, UseDefaultIID());
+			ShowFaceButtons(panel);
+			KFC_DIAG_LOG("LABELTAB match=%d whole=%d grep=%d", static_cast<int>(LabelMatchEntry()), gLabel.whole ? 1 : 0, gLabel.grep ? 1 : 0);
 		}
 		// WHAT A QUERY HOLDS WAS CHANGED BY HAND: Find/Change's Query menu says [Custom], as a change on InDesign's own tabs does. (Search: is no part of a query, as InDesign's own Search: is none of its menu's; no button
 		// changes it - Find Next, Find in KFC and How to Use... change nothing, what Change and its kind write is the document, Save List... writes a file; Choose List... changes what a query holds, and says so itself.)

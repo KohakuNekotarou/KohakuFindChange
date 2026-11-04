@@ -33,6 +33,7 @@
 #include "KFCQueryCopy.h"		// a Frames list's Replace: the Object tab read, stated for the write, put back
 #include "KFCQueryScope.h"		// KFCFindChangeNotPutBack - the sentence every failed put-back says
 #include "KFCQRSearch.h"		// NotChangedWords - a QR code list's rows are never replaced
+#include "KFCScriptLabelSearch.h"	// OnlyReplaceWords - a script label list's rows: their own Replace
 #include "KFCReplaceEngine.h"	// RefuseChangedQuery, CanReplaceHit, WhyGreyed; the write's undo step (WriteStep) and
 								// what its documents are left as (DocsAfterWrite)
 #include "KFCResultModel.h"
@@ -144,10 +145,11 @@ void SayNoneReplaceable(PMString& out, size_t total, const int32 (&counts)[kRefu
 // reads that tab whichever one Find/Change shows), which the write uses (FramesObjectQuery).
 bool CheckSettings(PMString& outStatus)
 {
-	// A QR CODE LIST'S ROWS ARE NEVER REPLACED (KFCReplaceEngine::CanReplaceHit's note) - before any setting is asked.
-	if (KFCResultModel::ListIsQRCodes())
+	// A QR CODE LIST'S ROWS ARE NEVER REPLACED (KFCReplaceEngine::CanReplaceHit's note) - before any setting is asked. A script label list's rows are not InDesign's object replace's: their
+	// own Replace writes their labels (KFCReplaceEngine's label rows) - a door for a press that never went through it.
+	if (KFCResultModel::ListIsQRCodes() || KFCResultModel::ListIsScriptLabels())
 	{
-		Refuse(outStatus, KFCQRSearch::NotChangedWords());
+		Refuse(outStatus, KFCResultModel::ListIsQRCodes() ? KFCQRSearch::NotChangedWords() : KFCScriptLabelSearch::OnlyReplaceWords());
 		return false;
 	}
 	if (KFCResultModel::ListIsFrames())
@@ -238,10 +240,10 @@ Refusal GreyedRefusal(int32 chapterIdx, int32 hitIdx)
 bool CheckRow(int32 chapterIdx, int32 hitIdx, PMString& outStatus, UIDRef& outDoc, UID& outItem)
 {
 	outItem = kInvalidUID;
-	// A QR CODE LIST'S ROW in CheckSettings' words, not a greyed row's (RowIsReplaceable answers no for it too).
-	if (KFCResultModel::ListIsQRCodes())
+	// A QR CODE LIST'S ROW in CheckSettings' words, not a greyed row's (RowIsReplaceable answers no for it too). A script label list's the same (CheckSettings' note).
+	if (KFCResultModel::ListIsQRCodes() || KFCResultModel::ListIsScriptLabels())
 	{
-		Refuse(outStatus, KFCQRSearch::NotChangedWords());
+		Refuse(outStatus, KFCResultModel::ListIsQRCodes() ? KFCQRSearch::NotChangedWords() : KFCScriptLabelSearch::OnlyReplaceWords());
 		return false;
 	}
 	if (!RowIsReplaceable(chapterIdx, hitIdx))
