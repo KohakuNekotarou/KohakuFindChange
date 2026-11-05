@@ -471,6 +471,9 @@ namespace KFCResultModel
 	    docs/superpowers/specs/2026-11-04-kfc-script-label-design.md)? Object rows, one for each page item whose label the kind found; their
 	    Replace writes the label (S7). */
 	bool ListIsScriptLabels();
+	/** Is the list A STORY LIST - the Story kind's (KFCStorySearch: its search mode kKFCStorySearchMode - docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md)? Text rows, one a story
+	    (Hit::holderKind kKFCHolderStory or kKFCHolderInternalStory) - nothing writes them (ST8, ST9). */
+	bool ListIsStory();
 	/** Is the list A TABLE ROW LIST - a Table list's List Rows of These Tables' (KFCTableRows: its search mode kKFCTableRowsSearchMode -
 	    docs/superpowers/specs/2026-11-05-kfc-table-rows-cell-style-design.md)? Text rows, one a table row: the text of its cells whose top-left is in it. No
 	    search made it - a query run's list's way: not searched again, not narrowed, its rows not replaced; a row is written by its Special Operations > Apply

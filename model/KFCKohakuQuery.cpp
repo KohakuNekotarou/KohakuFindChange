@@ -238,7 +238,8 @@ bool KFCKohakuQuery::Read(const IDFile& file, KFCKohakuQueryData& out)
 		const int32 number = std::atoi(value.c_str());
 		if (key == "kind")
 		{
-			const int32 modes[] = { kKFCQRCodeSearchMode, kKFCTableSearchMode, kKFCRubySearchMode, kKFCKentenSearchMode, kKFCWarichuSearchMode, kKFCScriptLabelSearchMode };
+			const int32 modes[] = { kKFCQRCodeSearchMode, kKFCTableSearchMode, kKFCRubySearchMode, kKFCKentenSearchMode, kKFCWarichuSearchMode, kKFCScriptLabelSearchMode,
+				kKFCStorySearchMode };		// (a Story query holds its kind alone - docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md ST11)
 			for (size_t m = 0; m < sizeof(modes) / sizeof(modes[0]); ++m)
 				if (value == KFCSavedQueries::KindName(modes[m]))
 					out.mode = modes[m];

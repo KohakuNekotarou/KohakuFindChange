@@ -1341,12 +1341,15 @@ static bool RefuseTableRowsRow(const char* what, PMString& outStatus)
 }
 
 // A WARICHU LIST'S ROWS ARE NOT REPLACED (docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md A4 - the Warichu kind changes nothing, as QR Code's): CanReplaceHit greys them; this door is for
-// a press that never went through the menu.
+// a press that never went through the menu. A STORY LIST'S the same (docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md ST8).
 static bool RefuseWarichuRow(PMString& outStatus)
 {
-	if (!KFCResultModel::ListIsWarichu())
+	if (KFCResultModel::ListIsStory())
+		outStatus = "Replace: Find: Story lists the stories and changes nothing - a row is not replaced.";
+	else if (KFCResultModel::ListIsWarichu())
+		outStatus = "Replace: Find: Warichu lists the warichu and changes nothing - a row is not replaced.";
+	else
 		return false;
-	outStatus = "Replace: Find: Warichu lists the warichu and changes nothing - a row is not replaced.";
 	outStatus.SetTranslatable(kFalse);
 	return true;
 }
@@ -1374,8 +1377,8 @@ bool KFCReplaceEngine::CanReplaceHit(int32 chapterIdx, int32 hitIdx)
 	// A QR CODE LIST'S ROWS ARE NEVER REPLACED (QR-18 - the author: "no replace"): greyed whatever the row says
 	// - the doors that turn a press away name it (ReplaceHit, ReplaceHits, KFCObjectReplace). Nor a query run's (RefuseRunListRow). Nor a warichu list's: the Warichu kind changes nothing
 	// (docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md A4 - as QR Code's). Nor a table row list's (RefuseTableRowsRow).
-	if (KFCResultModel::ListIsQRCodes() || KFCResultModel::ListIsRunList() || KFCResultModel::ListIsWarichu() || KFCResultModel::ListIsTableRows())
-		return false;
+	if (KFCResultModel::ListIsQRCodes() || KFCResultModel::ListIsRunList() || KFCResultModel::ListIsWarichu() || KFCResultModel::ListIsStory() || KFCResultModel::ListIsTableRows())
+		return false;		// (a story list's too - ST8: the Story kind changes nothing)
 	return WhyGreyed(chapterIdx, hitIdx) == kGreyedNot;
 }
 
@@ -3451,8 +3454,8 @@ bool OutlineInChapter(OutlineChapter& chapter, int32 (&counts)[kOutlineRefusalCo
 
 bool KFCReplaceEngine::CanOutlineHit(int32 chapterIdx, int32 hitIdx)
 {
-	if (KFCResultModel::ListIsRunList() || KFCResultModel::ListHasOwnChangeTab() || KFCResultModel::ListIsTableRows() || KFCResultModel::ListIsScriptLabels())
-		return false;		// (RefuseRunListRow's, RefuseOwnTabRow's and RefuseTableRowsRow's notes; a script label list's text rows are a table's or a cell's label - OutlineHits)
+	if (KFCResultModel::ListIsRunList() || KFCResultModel::ListHasOwnChangeTab() || KFCResultModel::ListIsTableRows() || KFCResultModel::ListIsScriptLabels() || KFCResultModel::ListIsStory())
+		return false;		// (RefuseRunListRow's, RefuseOwnTabRow's and RefuseTableRowsRow's notes; a script label list's text rows are a table's or a cell's label, a story list's a story whole - OutlineHits)
 	return OutlineRowRefusal(chapterIdx, hitIdx) == kOutlineOk;
 }
 
@@ -3467,6 +3470,12 @@ bool KFCReplaceEngine::OutlineHits(const KFCRowsByChapter& rowsByChapter, PMStri
 	{
 		// A SCRIPT LABEL LIST'S TEXT ROWS stand for a table's or a cell's label (the script-label-tables-cells spec's L7 - Create Outlines grey), not for text to outline.
 		outStatus.Append("Create Outlines: these rows are script labels of tables and cells - their text is not outlined from here.");
+		return false;
+	}
+	if (KFCResultModel::ListIsStory())
+	{
+		// A STORY LIST'S ROWS stand for a story whole (docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md ST9 - Create Outlines grey), not for a match to outline.
+		outStatus.Append("Create Outlines: these rows are stories - a story is not outlined from here.");
 		return false;
 	}
 	if (KFCRunGuard::IsAnyRunning())

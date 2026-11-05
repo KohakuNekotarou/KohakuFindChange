@@ -16,6 +16,7 @@
 
 - **KOHAKU-03** ★**Ruby・Kenten・Warichu は日本語で起動しているときだけ** Find: に出る（他の言語では Script Label・QR Code・Table の3つ・Warichu は 2026-11-02＝WARI-01・Script Label は 11-04＝SL-01）。★**並びは作者 11-04**＝Script Label／QR Code／Table／Kenten／Ruby／Warichu。（K11）回帰 `kh-japanese`・`kh-not-japanese`・`kh-not-japanese-on-ruby`
   - 訂正: 2026-11-04 作者「Find の並びを Label QR Table にしておいてください。そのあと Kenten Ruby Wari に」＝それまでは QR Code／Table／Ruby／Kenten／Warichu（他の言語は QR Code・Table の2つ）。
+  - 訂正: 2026-11-06＝**Story** をどの言語でも最後に足した（日本語は7つ目・他の言語は4つ目＝ST-01）。それまでの並びと位置はそのまま。
 
 - **KOHAKU-04** Find: の値に応じて、パネルのタイトル（`Kohaku Find/Change - Table - Document`）と Find の名前、Find in … の動きが**その場で**変わる。本体のタブへ移れば本体のタブに戻り、戻れば前の種類のまま。閉じても開き直しても同じ。（K3・K4）回帰 `kh-kinds-title`・`kh-kinds-find`・`kh-closed-kind`・`kh-leave-back`
   - 訂正:

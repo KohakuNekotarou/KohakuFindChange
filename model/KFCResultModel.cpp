@@ -552,6 +552,11 @@ bool KFCResultModel::ListIsScriptLabels()
 	return gHeader.searchMode == static_cast<int32>(kKFCScriptLabelSearchMode);
 }
 
+bool KFCResultModel::ListIsStory()
+{
+	return gHeader.searchMode == static_cast<int32>(kKFCStorySearchMode);
+}
+
 bool KFCResultModel::ListIsTableRows()
 {
 	return gHeader.searchMode == static_cast<int32>(kKFCTableRowsSearchMode);
@@ -564,7 +569,7 @@ bool KFCResultModel::ListHasOwnChangeTab()
 
 bool KFCResultModel::ListIsOwnKind()
 {
-	return ListHasOwnChangeTab() || ListIsWarichu() || ListIsScriptLabels();
+	return ListHasOwnChangeTab() || ListIsWarichu() || ListIsScriptLabels() || ListIsStory();
 }
 
 bool KFCResultModel::ListDrawsTwoLines()
@@ -1551,6 +1556,11 @@ void KFCResultModel::BuildHitLocator(Hit& hit)
 			hit.locator.Append(" inline");
 		if (hit.isAnchored)
 			hit.locator.Append(" anchored");
+	}
+	else if (hit.holderKind == kKFCHolderInternalStory)
+	{
+		// AN INTERNAL STORY'S ROW (a Story list's - docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md ST5): no frame to be set in, which is no overset - it is InDesign's own.
+		hit.locator.Append("internal");
 	}
 	else if (hit.pageString.IsEmpty())
 	{

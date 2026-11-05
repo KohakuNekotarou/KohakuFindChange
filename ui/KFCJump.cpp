@@ -55,6 +55,7 @@
 #include "IWaxLine.h"
 #include "IWaxRun.h"
 #include "IWaxGlyphs.h"
+#include "IXMLUtils.h"				// GetBackingStore - a Story list's internal row: the XML structure's, said so (InternalStoryWhy)
 
 // General includes:
 #include "RangeData.h"				// the range handed to SetTextSelection
@@ -997,7 +998,9 @@ enum NotSelected
 	kNotSelectedQuietly,
 	kSelectedOverset,		// selected - nothing of it on a page (the view went to the frame's "+")
 	kSelectedHidden,		// selected - on a hidden layer, nothing of it on screen
-	kNotShownHiddenSpread	// neither shown nor selected - on a hidden spread (the view and the selection stayed)
+	kNotShownHiddenSpread,	// neither shown nor selected - on a hidden spread (the view and the selection stayed)
+	kNotShownInternal,		// neither shown nor selected - an INTERNAL story's row (a Story list's - docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md ST6): on no page, its document in front
+	kNotShownInternalXML	// ...the XML structure's (IXMLUtils::GetBackingStore - the words of the XML elements not placed)
 };
 
 // Did the landing leave the row's match selected (a caret, for a zero-width one)? The selection is then the pointer and
@@ -1018,11 +1021,21 @@ PMString NotSelectedSentence(NotSelected why)
 		case kSelectedOverset:		text = "(Overset Text) The match is selected, past the end of its frames - nothing of it shows on the page."; break;
 		case kSelectedHidden:		text = "The match is selected, on a hidden layer - nothing of it shows."; break;
 		case kNotShownHiddenSpread:	text = "That match is on a hidden spread - it cannot be shown or selected."; break;
+		case kNotShownInternal:		text = "That story is InDesign's own: it is on no page."; break;
+		case kNotShownInternalXML:	text = "That story is InDesign's own - the XML structure's: it is on no page."; break;
 		default:					break;
 	}
 	PMString sentence(text);
 	sentence.SetTranslatable(kFalse);
 	return sentence;
+}
+
+// AN INTERNAL STORY'S REASON (docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md ST6): the XML structure's backing store (IXMLUtils::GetBackingStore - every document holds one from
+// its making, measured 2026-11-05), or another of InDesign's own.
+NotSelected InternalStoryWhy(IDataBase* db, UID story)
+{
+	Utils<IXMLUtils> xml;
+	return (xml && db != nil && xml->GetBackingStore(db).GetUID() == story) ? kNotShownInternalXML : kNotShownInternal;
 }
 
 // The same in a few words - inside the brackets of a GREP row's preview heading ("Preview Text (Overset Text):"). nil for
@@ -1035,6 +1048,8 @@ const char* NotSelectedWords(NotSelected why)
 		case kSelectedOverset:		return "Overset Text";
 		case kSelectedHidden:		return "hidden layer";
 		case kNotShownHiddenSpread:	return "not shown - hidden spread";
+		case kNotShownInternal:
+		case kNotShownInternalXML:	return "not shown - internal story";
 		default:					return nil;
 	}
 }
@@ -1258,6 +1273,24 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx, NotSelected& outWhy)
 	if (db == nil)
 		return false;
 	const UIDRef storyRef(db, storyUID);
+
+	// AN INTERNAL STORY'S ROW (a Story list's - docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md ST6): on no page - its document in front, and nothing selected, scrolled or
+	// marked (a story with no frame list: no text selection is made in it - what one would do there is not measured); the row says why (ActivateNode). One whose story is gone
+	// says so, as any row whose text has gone.
+	if (KFCResults()->GetHitHolderKind(chapterIdx, hitIdx) == kKFCHolderInternalStory)
+	{
+		IDataBase::SaveRestoreModifiedState dirtyGuard(db);
+		if (!RowFoundOrFoundAgain(chapterIdx, hitIdx, docRef, start, end))
+		{
+			SayRowTextGone(chapterIdx, hitIdx);
+			return false;
+		}
+		if (!FrontChapter(docRef))
+			return false;
+		ClearSelection();		// (a click leaves its row's match selected, or nothing - below)
+		outWhy = InternalStoryWhy(db, storyUID);
+		return true;
+	}
 
 	// Everything from here on happens inside the dirty guard. Recomposing text dirties a document,
 	// and so - harmlessly but visibly - can opening a window on it or changing which spread it
@@ -1700,6 +1733,15 @@ void KFCJump::LandOnPlace(const UIDRef& storyRef, TextIndex start, TextIndex end
 	// Search: of InDesign's own tab as it is BEFORE this landing fronts a document or selects (ScopeKeep, above JumpToHit).
 	ArmNativeScopeKeep();
 	IDataBase::SaveRestoreModifiedState dirtyGuard(db);
+	// AN INTERNAL STORY (a Story list's Find Next - docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md ST7): its document in front, nothing selected - JumpToHit's rule for its row.
+	if ((reach & kKFCQRReachInternal) != 0)
+	{
+		if (!FrontChapter(UIDRef(db, db->GetRootUID()), false))
+			return;
+		ClearSelection();
+		outNote = NotSelectedSentence(InternalStoryWhy(db, storyRef.GetUID()));
+		return;
+	}
 	RecomposeIfDamaged(storyRef);
 	// Its document in front - no previous chapter hidden: Find Next walks open documents, not a book's list.
 	if (!FrontChapter(UIDRef(db, db->GetRootUID()), false))

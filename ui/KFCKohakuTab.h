@@ -28,6 +28,8 @@
 //    Script Label  every language's, Find:'s first (docs/superpowers/specs/2026-11-04-kfc-script-label-design.md S1, S2 - first since the author's order of 11-04): Key: (empty: every key - 11-04), Match: (Text (Contains), Text (Whole
 //             Label) or GREP - always case by case, 11-04), Find Label: (empty: every label of the key), Change Label: - Search: All Documents or Document, as QR Code's. Its Find Next lands on an item as an object row's click lands
 //             (KFCJump::LandOnQRCode); its Change, Change All and Change/Find write labels (the model's KFCScriptLabelSearch).
+//    Story    every language's, Find:'s last (docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md ST1 - ST3): no part at all - every story is listed, the internal ones too. Search: All Documents or Document, as QR Code's. Its
+//             Find Next lands on a story's text as its row's click lands (KFCFaceText, KFCJump::LandOnPlace - an internal story selected nothing); it writes nothing.
 //  TABLE, RUBY AND KENTEN'S FIND NEXT, CHANGE, CHANGE ALL, CHANGE/FIND (2026-11-01-kfc-kohaku-trial-fixes-design.md F1 - F9; 2026-11-02-kfc-kohaku-face-buttons-design.md B1 - B5): the model's (KFCTableSearch, KFCFaceText), landed on as a
 //  row's click lands (KFCJump::LandOnPlace); Change and Change/Find grey until Find Next has found something, and once the selection leaves it or it is written, as the Text tab's.
 //  While the face is the dialog's tab - or was when the dialog closed, the face it opens on again - KFC's Find looks for what its Find: says (KFCQRSearch, KFCTableSearch, KFCRubySearch in the model
@@ -67,6 +69,10 @@ namespace KFCKohakuTab
 	/** IS THE SCRIPT LABEL KIND FIND/CHANGE'S NOW (docs/superpowers/specs/2026-11-04-kfc-script-label-design.md S1 - asked by the model through IKFCUIServices::ScriptLabelTabConditions), and
 	    what it asks as it stands, either way: its Key:, Match:, Find Label:, Change Label: and Search: - a row's Replace reads its Change side whatever is shown. */
 	bool IsScriptLabelCurrent(KFCScriptLabelConditions& outConditions);
+
+	/** IS THE STORY KIND FIND/CHANGE'S NOW (docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md ST1 - asked by the model through IKFCUIServices::StoryTabConditions), and its Search: -
+	    All Documents or Document, as QR Code's (ST2). */
+	bool IsStoryCurrent(KFCStoryConditions& outConditions);
 
 	/** A SAVED QUERY STATES ITS OWN TAB (the query dialog's Find - KFCQueryDialog, once the query is loaded): the Kohaku tab steps aside until the person shows its face again or picks in its Find:, so
 	    the Find searches what the query says. */

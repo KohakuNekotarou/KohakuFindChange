@@ -241,7 +241,9 @@ enum KFCHolderKind
 	kKFCHolderNone = 0,		// a match, or an object row (a page item's label row among them)
 	kKFCHolderTableRow,		// a table row list's row (KFCTableRows) - its cells take Apply Cell Style, a click selects them
 	kKFCHolderTable,		// a script label list's row of a TABLE's label - the table takes Apply Table Style
-	kKFCHolderCell			// a script label list's row of a CELL's label - the cell takes Apply Cell Style, a click selects it
+	kKFCHolderCell,			// a script label list's row of a CELL's label - the cell takes Apply Cell Style, a click selects it
+	kKFCHolderStory,		// a Story list's row (KFCStorySearch - docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md ST5): the story whole - a click selects its text as it is now
+	kKFCHolderInternalStory	// ...of an INTERNAL story (IStoryList's kNotUserAccessible - the XML structure's backing store): on no page - a click selects nothing (ST6)
 };
 
 /** WHAT A SPECIAL OPERATION IS GIVEN besides its rows (IKFCRuns::SpecialRows). x, y: Move - the horizontal and vertical
@@ -449,6 +451,18 @@ enum { kKFCScriptLabelSearchMode = 106 };
     (kKFCRunListSearchMode): KFC'S ALONE, never handed to InDesign, and not a Kohaku+ kind (KFCIsKohakuQueryMode). */
 enum { kKFCTableRowsSearchMode = 107 };
 
+/** THE STORY KIND'S "SEARCH MODE" (the author, 11-05: "a story tab on the search - internal stories too" - docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md ST1;
+    KFCStorySearch.h): every story of a document, the internal ones among them, a row each. KFC'S ALONE - never handed to InDesign. */
+enum { kKFCStorySearchMode = 108 };
+
+/** WHAT THE STORY KIND ASKS (the face's - KFCKohakuTab, read by IKFCUIServices::StoryTabConditions): its Search: alone - no condition (ST3): every story is listed. */
+struct KFCStoryConditions
+{
+	int32	scope;		// its Search: - IWalkerScopeFactoryUtils::kDocumentScope (at launch) or kAllDocumentScope (the QR Code kind's two - ST2)
+
+	KFCStoryConditions() : scope(0) {}
+};
+
 /** WHAT THE SCRIPT LABEL KIND ASKS (the face's - KFCKohakuTab, read by IKFCUIServices::ScriptLabelTabConditions; a label list keeps its find side in its
     query copy, so its searches again ask what its search asked) - the design's S2, S4 and S7. */
 struct KFCScriptLabelConditions
@@ -551,7 +565,7 @@ struct KFCTableConditions
 inline bool KFCIsKohakuQueryMode(int32 mode)
 {
 	return mode == kKFCQRCodeSearchMode || mode == kKFCTableSearchMode || mode == kKFCRubySearchMode || mode == kKFCKentenSearchMode || mode == kKFCWarichuSearchMode
-		|| mode == kKFCScriptLabelSearchMode;
+		|| mode == kKFCScriptLabelSearchMode || mode == kKFCStorySearchMode;
 }
 
 /** WHAT A SAVED QUERY OF THE KOHAKU+ TAB HOLDS: its kind (kKFCTableSearchMode ...) and what that kind asks. A query's scope is no part of it: it runs on what Search: says when it runs. */
@@ -563,6 +577,7 @@ struct KFCKohakuQueryData
 	KFCKentenConditions	kenten;
 	KFCWarichuConditions	warichu;
 	KFCScriptLabelConditions	label;
+	KFCStoryConditions	story;		// (nothing but its Search:, which no query holds - its kind alone is saved: ST11)
 
 	KFCKohakuQueryData() : mode(-1) {}
 };
@@ -574,7 +589,8 @@ enum
 	kKFCQRReachLocked		= 1,	// locked (Object > Lock, or a locked layer) - shown, not selected
 	kKFCQRReachHidden		= 2,	// hidden (Object > Hide, or a hidden layer) - shown, not selected
 	kKFCQRReachHiddenSpread	= 4,	// on a hidden spread - nothing moves
-	kKFCQRReachOverset		= 8		// in overset text - the view on its "+", not selected
+	kKFCQRReachOverset		= 8,	// in overset text - the view on its "+", not selected
+	kKFCQRReachInternal		= 16	// an INTERNAL story (a Story list's - docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md ST6, ST7): on no page - its document in front, nothing selected
 };
 
 /** WHERE THE TABLE PART'S BUTTONS GO ON FROM (IKFCRuns::TableNext, TableChangeAll - KFCTableSearch; docs/superpowers/specs/2026-11-01-kfc-kohaku-trial-fixes-design.md F3, F4). The face reads the selection, the model walks. */

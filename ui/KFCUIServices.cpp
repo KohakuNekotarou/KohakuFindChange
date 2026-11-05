@@ -608,6 +608,11 @@ public:
 	{
 		return KFCKohakuTab::IsScriptLabelCurrent(outConditions);
 	}
+
+	virtual bool StoryTabConditions(KFCStoryConditions& outConditions)
+	{
+		return KFCKohakuTab::IsStoryCurrent(outConditions);
+	}
 };
 
 CREATE_PMINTERFACE(KFCUIServices, kKFCUIServicesImpl)

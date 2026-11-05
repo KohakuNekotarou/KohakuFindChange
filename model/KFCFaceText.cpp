@@ -29,6 +29,7 @@
 #include "KFCRubyListFile.h"			// a ruby list's words, read for every press
 #include "KFCRubySearch.h"
 #include "KFCSearchEngine.h"			// the part of Search:, ReadText, the frame's lock
+#include "KFCStorySearch.h"
 #include "KFCWarichuSearch.h"
 #include "KFCTextCut.h"					// KFCSafeCut
 
@@ -37,8 +38,9 @@ namespace
 // What a row's words hold of its text when it draws no ruby of its own, at most (a QR code row's line's length).
 const int32 kFaceWordsMost = 40;
 
-// The Warichu kind lists and changes nothing (docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md A2).
+// The Warichu kind lists and changes nothing (docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md A2). The Story kind the same (docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md ST8).
 const char* const kWarichuChangesNothing = "Find: Warichu lists the warichu and changes nothing.";
+const char* const kStoryChangesNothing = "Find: Story lists the stories and changes nothing.";
 
 // WHAT THE BUTTONS ASK NOW: the kind's conditions - the face's - with what its search reads first: a ruby list's words. False = refused, outWhy says why (the panel's Find's doors, in the face's words).
 struct Asked
@@ -47,9 +49,13 @@ struct Asked
 	KFCRubyConditions		ruby;
 	KFCKentenConditions		kenten;
 	KFCWarichuConditions	warichu;
+	KFCStoryConditions		story;
 
 	Asked() : mode(kKFCRubySearchMode) {}
-	int32 Scope() const { return (mode == kKFCKentenSearchMode) ? kenten.scope : (mode == kKFCWarichuSearchMode) ? warichu.scope : ruby.scope; }
+	int32 Scope() const
+	{
+		return (mode == kKFCKentenSearchMode) ? kenten.scope : (mode == kKFCWarichuSearchMode) ? warichu.scope : (mode == kKFCStorySearchMode) ? story.scope : ruby.scope;
+	}
 };
 
 bool ReadAsked(int32 mode, Asked& out, PMString& outWhy)
@@ -58,6 +64,11 @@ bool ReadAsked(int32 mode, Asked& out, PMString& outWhy)
 	if (mode == kKFCWarichuSearchMode)		// (the Warichu kind asks nothing a Find Next could refuse - docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md A5)
 	{
 		(void)KFCWarichuSearch::IsTabCurrent(&out.warichu);
+		return true;
+	}
+	if (mode == kKFCStorySearchMode)		// (nor the Story kind - its Search: alone: ST7)
+	{
+		(void)KFCStorySearch::IsTabCurrent(&out.story);
 		return true;
 	}
 	if (mode == kKFCKentenSearchMode)
@@ -167,6 +178,7 @@ bool WalkRange(const KFCTableLook& look, Asked& asked, std::vector<KFCBookScope:
 		std::vector<KFCResultModel::Hit> hits;
 		const bool walked = (asked.mode == kKFCKentenSearchMode) ? KFCKentenSearch::WalkForFace(outDocs[d].docRef, asked.kenten, part, hits)
 			: (asked.mode == kKFCWarichuSearchMode) ? KFCWarichuSearch::WalkForFace(outDocs[d].docRef, asked.warichu, part, hits)
+			: (asked.mode == kKFCStorySearchMode) ? KFCStorySearch::WalkForFace(outDocs[d].docRef, asked.story, hits)
 			: KFCRubySearch::WalkForFace(outDocs[d].docRef, asked.ruby, part, hits);
 		if (!walked)
 			continue;
@@ -276,9 +288,23 @@ bool KFCFaceText::Next(int32 mode, const KFCTableLook& look, KFCTableFound& out)
 		out.reach |= kKFCQRReachHiddenSpread;
 	if (one.hit.isOverset)
 		out.reach |= kKFCQRReachOverset;
-	// THE LINE: what its row draws, then where it stands, and its document over All Documents (KFCTableSearch::Next's).
-	out.words.Append(RowSays(docRef, one.hit));
-	if (one.hit.isOverset)
+	const bool internal = (one.hit.holderKind == kKFCHolderInternalStory);		// (a Story list's internal story: on no page - ST7)
+	if (internal)
+		out.reach |= kKFCQRReachInternal;
+	// THE LINE: what its row draws, then where it stands, and its document over All Documents (KFCTableSearch::Next's). A STORY'S - its row draws its facts alone - is named by its first
+	// words first, as its branch is (docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md ST7): "<first words> (1 frame, 6 characters) - page 1".
+	if (mode == kKFCStorySearchMode && !one.hit.storyLead.IsEmpty())
+	{
+		out.words.Append(one.hit.storyLead);
+		out.words.Append(" (");
+		out.words.Append(RowSays(docRef, one.hit));
+		out.words.Append(")");
+	}
+	else
+		out.words.Append(RowSays(docRef, one.hit));
+	if (internal)
+		out.words.Append(" - internal");
+	else if (one.hit.isOverset)
 		out.words.Append(" - overset text");
 	else if (one.hit.frameOnPasteboard)
 		out.words.Append(" - pasteboard");
@@ -303,9 +329,9 @@ bool KFCFaceText::ChangeFound(int32 mode, const KFCTableFound& found, PMString& 
 {
 	outWords.Clear();
 	outWords.SetTranslatable(kFalse);
-	if (mode == kKFCWarichuSearchMode)		// (the face shows no Change for it; a caller that never went through the face)
+	if (mode == kKFCWarichuSearchMode || mode == kKFCStorySearchMode)		// (the face shows no Change for them; a caller that never went through the face)
 	{
-		outWords.Append(kWarichuChangesNothing);
+		outWords.Append((mode == kKFCStorySearchMode) ? kStoryChangesNothing : kWarichuChangesNothing);
 		return false;
 	}
 	Asked asked;
@@ -357,9 +383,9 @@ bool KFCFaceText::ChangeAll(int32 mode, const KFCTableLook& look, int32& outChan
 	outMatched = 0;
 	outWords.Clear();
 	outWords.SetTranslatable(kFalse);
-	if (mode == kKFCWarichuSearchMode)		// (ChangeFound's door)
+	if (mode == kKFCWarichuSearchMode || mode == kKFCStorySearchMode)		// (ChangeFound's door)
 	{
-		outWords.Append(kWarichuChangesNothing);
+		outWords.Append((mode == kKFCStorySearchMode) ? kStoryChangesNothing : kWarichuChangesNothing);
 		return false;
 	}
 	Asked asked;

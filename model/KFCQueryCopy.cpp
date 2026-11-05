@@ -305,6 +305,13 @@ void KFCQueryCopier::CaptureWarichu(KFCQueryCopy& out)
 	out.valid = true;
 }
 
+void KFCQueryCopier::CaptureStories(KFCQueryCopy& out)
+{
+	out = KFCQueryCopy();
+	out.mode = static_cast<int32>(kKFCStorySearchMode);
+	out.valid = true;
+}
+
 void KFCQueryCopier::CaptureScriptLabels(KFCQueryCopy& out, const KFCScriptLabelConditions& asked)
 {
 	out = KFCQueryCopy();

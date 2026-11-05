@@ -266,6 +266,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCRubySearch.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCFaceText.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCWarichuSearch.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCStorySearch.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCScriptLabelSearch.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCOwnScope.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCRubyListFile.cpp"/>

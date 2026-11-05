@@ -1023,6 +1023,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCKentenChangeLabelWidgetID, kKFCPrefix + 92)
 // The Script Label kind (docs/superpowers/specs/2026-11-04-kfc-script-label-design.md S1, S2): Find:'s first entry in every language (the author's order, 11-04), and its part's words (key_collisions.py: no other key of the
 // length and sum of any of the six - 11-04).
 #define kKFCKohakuTabScriptLabelKey		kKFCStringPrefix "kKFCKohakuTabScriptLabelKey"
+// The Story kind (docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md ST1): Find:'s entry after Table in every language (Search:'s own Story entry is kKFCKohakuStoryEntryKey).
+#define kKFCKohakuTabStoryKindKey		kKFCStringPrefix "kKFCKohakuTabStoryKindKey"
 #define kKFCLabelTabKeyKey				kKFCStringPrefix "kKFCLabelTabKeyKey"
 #define kKFCLabelTabFindKey				kKFCStringPrefix "kKFCLabelTabFindKey"
 #define kKFCLabelTabChangeKey			kKFCStringPrefix "kKFCLabelTabChangeKey"

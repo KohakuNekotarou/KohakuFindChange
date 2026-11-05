@@ -63,6 +63,7 @@ namespace
 		{ "Kenten",			kKFCKentenSearchMode },
 		{ "Warichu",		kKFCWarichuSearchMode },
 		{ "Script Label",	kKFCScriptLabelSearchMode },	// (docs/superpowers/specs/2026-11-04-kfc-script-label-design.md S10 - every language's, as QR Code's and Table's)
+		{ "Story",			kKFCStorySearchMode },			// (docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md ST11 - every language's)
 	};
 	const int32 kKindCount = static_cast<int32>(sizeof(kKinds) / sizeof(kKinds[0]));
 	const int32 kFolderKinds = 5;	// the first five: the kinds with a folder
@@ -130,7 +131,7 @@ namespace
 	}
 
 	/** THE KOHAKU+ TAB'S QUERIES, of the files in the queries' folder itself: Ruby, Kenten and Warichu in a Japanese InDesign alone, as the tab offers them (KFCKohakuTab.cpp's JapaneseKinds, and its test switch);
-	    QR Code, Table and Script Label in every language. */
+	    QR Code, Table, Script Label and Story in every language. */
 	void CollectKohakuQueries(std::vector<KFCSavedQuery>& out)
 	{
 		IDFile folder;
@@ -140,7 +141,7 @@ namespace
 		CollectFolder(folder, found);
 		const bool japanese = !KFC_DIAG_FAULT("not-japanese") && LocaleSetting::GetLocale().GetUserInterfaceId() == k_jaJP;
 		for (size_t k = 0; k < found.size(); ++k)
-			if (found[k].mode == kKFCQRCodeSearchMode || found[k].mode == kKFCTableSearchMode || found[k].mode == kKFCScriptLabelSearchMode
+			if (found[k].mode == kKFCQRCodeSearchMode || found[k].mode == kKFCTableSearchMode || found[k].mode == kKFCScriptLabelSearchMode || found[k].mode == kKFCStorySearchMode
 				|| (japanese && (found[k].mode == kKFCRubySearchMode || found[k].mode == kKFCKentenSearchMode || found[k].mode == kKFCWarichuSearchMode)))
 				out.push_back(found[k]);
 	}

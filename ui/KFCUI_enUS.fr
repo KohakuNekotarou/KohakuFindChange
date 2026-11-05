@@ -217,6 +217,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCKohakuTabWarichuKindKey,	"Warichu",
                 kKFCKentenTabAnyMarkKey,		"[Any Kenten]",
                 kKFCKohakuTabScriptLabelKey,	"Script Label",
+                kKFCKohakuTabStoryKindKey,		"Story",			// (Find:'s Story kind - docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md ST1)
                 kKFCLabelTabKeyKey,				"Script Key:",		// (the author, 11-04: "Key alone is hard to follow - Script Key or the like")
                 kKFCLabelTabFindKey,			"Find Label:",
                 kKFCLabelTabChangeKey,			"Change Label:",

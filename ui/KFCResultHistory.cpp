@@ -748,6 +748,12 @@ namespace
 			label.Append(" Find:\"[Warichu]\"");
 			return label;
 		}
+		// THE STORY KIND ASKS NOTHING (docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md ST10): Find:"[All Stories]".
+		if (mode == kKFCStorySearchMode)
+		{
+			label.Append(" Find:\"[All Stories]\"");
+			return label;
+		}
 		// THE KENTEN KIND'S THE SAME: Find:"base<mark>" as its rows draw it; Find:"base(kenten nashi)" for its none; [subete no kenten] with nothing asked - in Japanese since 2026-11-03 (the author: "the
 		// Find"" on the panel in Japanese"; KFCJapanese.h - the part's own words: its list's first entry, its none).
 		if (mode == kKFCKentenSearchMode)

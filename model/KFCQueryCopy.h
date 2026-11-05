@@ -139,6 +139,9 @@ namespace KFCQueryCopier
 	    of Find/Change's, nothing stated back. */
 	void CaptureScriptLabels(KFCQueryCopy& out, const KFCScriptLabelConditions& asked);
 
+	/** A STORY LIST'S (KFCStorySearch - docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md): the mode, kKFCStorySearchMode - it asks nothing (ST3). */
+	void CaptureStories(KFCQueryCopy& out);
+
 	/** State `copy` back into Find/Change: the tab, then every field that differs from what the dialog holds now, with the
 	    dialog's own commands (KFCFindChangeCmds; the formats with kClearFindFormatCmdBoss / kClearChangeFormatCmdBoss and
 	    kFindChangeFormatCmdBoss). False = a command failed - outWhat names the field; the ones before it went through
