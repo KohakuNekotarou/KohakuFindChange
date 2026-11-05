@@ -113,6 +113,7 @@ namespace
 		virtual bool GetUnifyFacts(int32, int32, int32, PMString& outWord, PMString& outReadings) { outWord.Clear(); outReadings.Clear(); return false; }
 		virtual bool IsChangeAllList() { return false; }
 		virtual bool ListIsScriptLabels() { return false; }
+		virtual bool ListIsTableRows() { return false; }
 	};
 
 	class KFCRunsStandInImpl : public IKFCRuns
@@ -227,6 +228,9 @@ namespace
 			return false;
 		}
 		virtual PMString ScriptLabelNow(const KFCScriptLabelFound&) { PMString none; none.SetTranslatable(kFalse); return none; }
+		virtual bool ListRowsOfTables(PMString& outStatus) { SayWhy(outStatus); return false; }
+		virtual bool CellStyleRows(const KFCRowsByChapter&, const KFCSpecialParams&, PMString& outStatus) { SayWhy(outStatus); return false; }
+		virtual bool CanCellStyleHit(int32, int32) { return false; }
 	};
 
 	class KFCChaptersStandInImpl : public IKFCChapters

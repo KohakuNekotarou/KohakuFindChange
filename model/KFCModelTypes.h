@@ -219,6 +219,11 @@ enum KFCSpecialOp
 	// (KFCSpecialParams::text - Move to Active Layer's rule), its overrides kept as a plain apply in the Object Styles panel. The row
 	// reads "Styled".
 	kKFCSpecialApplyObjectStyle,
+	// A table row's Special Operations > Apply Cell Style > <style> (docs/superpowers/specs/2026-11-05-kfc-table-rows-cell-style-design.md T6): the front
+	// document's cell style chosen in the submenu, given BY NAME to each row's cells in its own document (KFCSpecialParams::text - Apply Object Style's
+	// rule), their overrides kept as a plain apply in the Cell Styles panel. A row of a table row list alone (KFCTableRows). The row reads "Styled".
+	// Written by KFCReplaceEngine::CellStyleHits, never by SpecialRows.
+	kKFCSpecialApplyCellStyle,
 	kKFCSpecialOpCount
 };
 
@@ -226,10 +231,10 @@ enum KFCSpecialOp
     distances in points (right and down positive); Scale - the horizontal and vertical percentages; Rotate, Shear - the
     angle in degrees in x (counter-clockwise positive, as InDesign's dialogs have it); Shear - its axis in y, 0 Horizontal
     and 1 Vertical (the Shear dialog's Axis, as InDesign's own). text: Move to Active Layer - the layer's name; Apply Object
-    Style - the style's full path, untranslated (IStyleGroupHierarchy::GetFullPath(kFalse): a group's separator in it - each
-    row's document's style of that path is given). words: Apply Object Style - the style as a person reads it (the submenu's
-    words: translated, a group joined with ":" - KFCStylePathWords) - the status line's 'to "<words>"' and its refusals;
-    empty for the others. */
+    Style and Apply Cell Style (KFCReplaceEngine::CellStyleHits) - the style's full path, untranslated
+    (IStyleGroupHierarchy::GetFullPath(kFalse): a group's separator in it - each row's document's style of that path is given).
+    words: the two - the style as a person reads it (the submenu's words: translated, a group joined with ":" -
+    KFCStylePathWords) - the status line's '"<words>"' and its refusals; empty for the others. */
 struct KFCSpecialParams
 {
 	double		x;
@@ -420,6 +425,12 @@ struct KFCWarichuConditions
     docs/superpowers/specs/2026-11-04-kfc-script-label-design.md S1; KFCScriptLabelSearch.h): every page item that carries a script label. KFC'S ALONE -
     never handed to InDesign. */
 enum { kKFCScriptLabelSearchMode = 106 };
+
+/** A TABLE ROW LIST'S "SEARCH MODE" (the author, 11-05: "after searching tables, a list of their ROWs - then give those rows a cell style by Special
+    Operations" - docs/superpowers/specs/2026-11-05-kfc-table-rows-cell-style-design.md; KFCTableRows.h): what the header of the list a Table list's List
+    Rows of These Tables makes holds (KFCResultModel::ListIsTableRows). No tab is on it and no search made it - a query run's list's way
+    (kKFCRunListSearchMode): KFC'S ALONE, never handed to InDesign, and not a Kohaku+ kind (KFCIsKohakuQueryMode). */
+enum { kKFCTableRowsSearchMode = 107 };
 
 /** WHAT THE SCRIPT LABEL KIND ASKS (the face's - KFCKohakuTab, read by IKFCUIServices::ScriptLabelTabConditions; a label list keeps its find side in its
     query copy, so its searches again ask what its search asked) - the design's S2, S4 and S7. */

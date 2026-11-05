@@ -66,7 +66,7 @@
 #include "KFCResultTree.h"		// TakeKeyboard - the hand-off after a click; DiagKeyFocus - who holds the keyboard, for that trace
 #include "KFCResultHistory.h"	// SwitchToKeptRowLater - a grey row's click
 #include "KFCKohakuTab.h"		// IsJapaneseUI - a text row's Tate-chu-yoko, a Japanese InDesign's alone
-#include "KFCStyleMenu.h"		// PutOnMenu - an object row's Apply Object Style > the front document's object styles
+#include "KFCStyleMenu.h"		// PutOnMenu - an object row's Apply Object Style > the front document's object styles; a table row's Apply Cell Style >, its cell styles
 
 #include <cstring>				// strcmp - which menu pops
 #include <vector>				// a row's word's other readings (KFCResultTree::UnifyReadingsOf)
@@ -129,6 +129,26 @@ void PopRowMenu(const char* menuName, IEvent* e, IPMUnknown* widget)
 		PMString path(kKFCApplyObjStyleSubmenuPath);
 		path.SetTranslatable(kFalse);
 		KFCStyleMenu::PutOnMenu(menuMgr, path, KFCStyleMenu::kObjectStyles);
+	}
+	// APPLY CELL STYLE (docs/superpowers/specs/2026-11-05-kfc-table-rows-cell-style-design.md T6): a text row's Special Operations > Apply Cell Style > - over
+	// a row of a table row list alone: the submenu's entry put first (IMenuManager.h: kInvalidActionID and the path with a delimiter - a node in the MenuDef
+	// stood empty on every text row's menu, measured 11-05), then the front document's cell styles the same way as the object styles. Over any other list's
+	// text row the submenu goes, entry and items (RemoveSubmenuAndChildren - taken off first every time, so it is never put twice).
+	if (std::strcmp(menuName, kKFCResultHitMenuName) == 0)
+	{
+		PMString path(kKFCApplyCellStyleSubmenuPath);
+		path.SetTranslatable(kFalse);
+		// (The entry TRANSLATABLE, as a MenuDef node's path is: put untranslatable, the submenu drew its key - "0x1EA600kKFCApplyCellStyleSubmenuKey", measured
+		// 11-05. The items' path stays as the object styles' is - untranslatable, found by its keys.)
+		PMString entry(kKFCApplyCellStyleSubmenuEntry);
+		menuMgr->RemoveSubmenuAndChildren(entry);
+		if (KFCResults()->ListIsTableRows())
+		{
+			menuMgr->AddMenuItem(kInvalidActionID, entry, PMReal(kKFCApplyCellStyleSubmenuPosition), kFalse);
+			KFCStyleMenu::PutOnMenu(menuMgr, path, KFCStyleMenu::kCellStyles);
+		}
+		else
+			KFCStyleMenu::PutOnMenu(menuMgr, path, KFCStyleMenu::kNone);
 	}
 	menuMgr->HandlePopupMenu(menuName, e->GlobalWhere(), e->GlobalWhere(), removeDisabledItems, widget);
 }

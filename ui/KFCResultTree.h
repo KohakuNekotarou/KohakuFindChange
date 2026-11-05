@@ -305,6 +305,13 @@ namespace KFCResultTree
 	/** Can Tate-chu-yoko be offered on these rows (KFCRuns()->CanTcyHit - read only)? The menu's grey (B7). */
 	bool CanTcyAny(const KFCRowsByChapter& rows);
 
+	/** A TABLE ROW'S SPECIAL OPERATIONS > APPLY CELL STYLE > <style> (docs/superpowers/specs/2026-11-05-kfc-table-rows-cell-style-design.md T6): the rows' cells given the
+	    style params names, by the model (KFCRuns()->CellStyleRows), Tate-chu-yoko's way - each one written reads "Styled". True = written. */
+	bool CellStyleRows(const KFCRowsByChapter& rows, const KFCSpecialParams& params);
+
+	/** Can Apply Cell Style be offered on these rows (KFCRuns()->CanCellStyleHit - read only)? The menu's grey. */
+	bool CanCellStyleAny(const KFCRowsByChapter& rows);
+
 	/** AN OBJECT ROW'S OTHER SPECIAL OPERATIONS (docs/superpowers/specs/2026-10-17-kfc-object-special-operations-design.md):
 	    the rows' objects written where they stand - across spreads and documents - by InDesign's own Object menu commands
 	    (op, a KFCSpecialOp, with params - Move to Active Layer's layer name), by the model (KFCRuns()->SpecialRows,

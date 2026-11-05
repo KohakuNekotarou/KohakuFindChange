@@ -177,6 +177,15 @@ namespace KFCReplaceEngine
 	/** Can Tate-chu-yoko be offered on a row (CanClearOverridesHit's rule, a Kohaku+ list's text rows let in) - the menu's grey (B7). */
 	bool CanTcyHit(int32 chapterIdx, int32 hitIdx);
 
+	/** SPECIAL OPERATIONS > APPLY CELL STYLE > <style> (docs/superpowers/specs/2026-11-05-kfc-table-rows-cell-style-design.md T6, T7): a table row list's rows (KFCTableRows) - each the
+	    row its text stands in now - given the cell style params.text names (its full path, untranslated) in the row's own document, cell by cell, their overrides kept and the style's
+	    paragraph style given, as a plain click in the Cell Styles panel. Clear Overrides' doors, step and marks (one undo step "Apply Cell Style", rows marked "Styled"); a document with
+	    no style of that name refuses its rows (counted - params.words what the message says). Refused on any other list. True = something written; outStatus says what. */
+	bool CellStyleHits(const KFCRowsByChapter& rows, const KFCSpecialParams& params, PMString& outStatus);
+
+	/** Can Apply Cell Style be offered on a row - a table row list's, not locked (CanClearOverridesHit's rule; the style is asked when pressed) - the menu's grey. */
+	bool CanCellStyleHit(int32 chapterIdx, int32 hitIdx);
+
 	/** ONE UNDO STEP FOR A WRITE FROM THE LIST, the one rule for every such write - its callers are the list (a row's
 	    Replace of text or object rows, Restore from Copy, Create Outlines, the Special Operations), each naming its
 	    step by stepKey ("Replace" - kKFCReplaceStepKey - by default):

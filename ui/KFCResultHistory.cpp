@@ -84,8 +84,9 @@ namespace
 		bool					holdsTables;	// ...a Table kind's list (IKFCResults::ListIsTables when it was kept) - its heading's Search Text in These Tables (TierHoldsTables)
 		bool					holdsRunList;	// ...a query run's list (IKFCResults::ListIsRunList when it was kept) - its heading's
 												// Narrow Down and Search These Results Again grey (TierHoldsRunList)
+		bool					holdsTableRows;	// ...a table row list (IKFCResults::ListIsTableRows when it was kept) - the same greys (TierHoldsTableRows)
 
-		KeptTier() : set(0), open(false), holdsObjects(false), holdsQRCodes(false), holdsOwnChangeTab(false), holdsTables(false), holdsRunList(false) {}
+		KeptTier() : set(0), open(false), holdsObjects(false), holdsQRCodes(false), holdsOwnChangeTab(false), holdsTables(false), holdsRunList(false), holdsTableRows(false) {}
 	};
 
 	/** THE LIVE TIER'S NAME and the list it names: the model's result set it was given to (0 = none - the model counts its
@@ -230,6 +231,7 @@ namespace
 		out.holdsOwnChangeTab = KFCResults()->ListIsOwnKind();		// (a warichu list's too: its conditions are its tab's)
 		out.holdsTables = KFCResults()->ListIsTables();
 		out.holdsRunList = KFCResults()->ListIsRunList();
+		out.holdsTableRows = KFCResults()->ListIsTableRows();
 		CopyRows(treeMgr, KFCResultNodeID::CreateLiveTier(), -1, out);
 		return true;
 	}
@@ -545,6 +547,39 @@ bool KFCResultHistory::SearchTextInObjects(PMString& outSummary)
 	return committed;
 }
 
+bool KFCResultHistory::ListRowsOfTables(PMString& outSummary)
+{
+	outSummary.Clear();
+	outSummary.SetTranslatable(kFalse);
+	KFCPanelTitle::Update();
+	// The list of tables: its copy taken before the model can park it (Find's rule). The new list is named after it - "[Table Rows] Find:..." for
+	// "[Table] Find:..." (the table-rows spec's T1: what tables it holds the rows of; its heading draws the Search: in the bracket - WithScope).
+	const uint32 setBefore = KFCResults()->GetResultSetId();
+	PMString label("[Table Rows]");
+	label.SetTranslatable(kFalse);
+	if (gLive.set != 0 && gLive.set == setBefore)
+	{
+		const std::string all(gLive.label.GetUTF8String());
+		const std::string::size_type close = all.find("] ");
+		if (!all.empty() && all[0] == '[' && close != std::string::npos)
+			label.SetUTF8String("[Table Rows] " + all.substr(close + 2));
+		label.SetTranslatable(kFalse);
+	}
+	KeptTier pending;
+	const bool havePending = TakeSnapshot(pending);
+	(void)KFCRuns()->ListRowsOfTables(outSummary);
+	// A NEW LIST = listed (a new result set - the model's commit point, as a search's); refused, nothing has changed.
+	const bool committed = KFCResults()->GetResultSetId() != setBefore;
+	bool keptPending = false;
+	const int32 letGo = FollowNewList(committed, havePending, pending, setBefore, label, keptPending);
+	KFC_DIAG_LOG("STACK tablerows went=%d kept=%d letgo=%d tiers=%d", committed ? 1 : 0, keptPending ? 1 : 0,
+		static_cast<int>(letGo), static_cast<int>(gKept.size()));
+	if (committed)
+		KFCResultTree::Rebuild();
+	SayFound(outSummary, letGo);
+	return committed;
+}
+
 bool KFCResultHistory::TierHoldsObjects(int32 tier)
 {
 	if (tier < 0)
@@ -578,6 +613,13 @@ bool KFCResultHistory::TierHoldsRunList(int32 tier)
 	if (tier < 0)
 		return KFCResults()->ListIsRunList();
 	return tier < static_cast<int32>(gKept.size()) && gKept[static_cast<size_t>(tier)].holdsRunList;
+}
+
+bool KFCResultHistory::TierHoldsTableRows(int32 tier)
+{
+	if (tier < 0)
+		return KFCResults()->ListIsTableRows();
+	return tier < static_cast<int32>(gKept.size()) && gKept[static_cast<size_t>(tier)].holdsTableRows;
 }
 
 namespace

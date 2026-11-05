@@ -65,6 +65,11 @@ namespace KFCResultHistory
 	    heading draws "Objects" in the scope's place, WithScope). The list drawn again, the status line set. True = a new list. */
 	bool SearchTextInObjects(PMString& outSummary);
 
+	/** LIST ROWS OF THESE TABLES (a Table list's tier heading - docs/superpowers/specs/2026-11-05-kfc-table-rows-cell-style-design.md T1): the live list's tables'
+	    rows (KFCRuns()->ListRowsOfTables) into a NEW list, carried as SearchTextInObjects carries its own: the list of tables kept as a tier when the model
+	    kept it, the new list named after it ("[Table Rows] Find:..." for "[Table] Find:..."). The list drawn again, the status line set. True = a new list. */
+	bool ListRowsOfTables(PMString& outSummary);
+
 	/** Is tier `tier` a Table kind's list (-1 = the live list; a grey one as its copy noted it)? Its heading's Search Text in These Tables is grey over any other. */
 	bool TierHoldsTables(int32 tier);
 
@@ -82,6 +87,10 @@ namespace KFCResultHistory
 	/** Is tier `tier` a query run's list (-1 = the live list, asked of the model; a grey one as its copy noted it)? Its heading's
 	    Narrow Down and Search These Results Again are grey over it: no search made it (the run list spec's R12). */
 	bool TierHoldsRunList(int32 tier);
+
+	/** Is tier `tier` a table row list (-1 = the live list, asked of the model; a grey one as its copy noted it - docs/superpowers/specs/2026-11-05-kfc-table-rows-cell-style-design.md
+	    T8)? Its heading's Narrow Down and Search These Results Again are grey over it, as over a query run's: no search made it. */
+	bool TierHoldsTableRows(int32 tier);
 
 	/** Does the tier (-1 = the live list) hold a list of a tab of KFC's with a Change side (IKFCResults::ListHasOwnChangeTab when it was kept)? Its heading's Narrow Down greys. */
 	bool TierHoldsOwnChangeTab(int32 tier);

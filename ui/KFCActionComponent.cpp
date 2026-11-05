@@ -791,6 +791,19 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			break;
 		}
 
+		case kKFCListTableRowsActionID:
+		{
+			// A Table list's tier heading's List Rows of These Tables (docs/superpowers/specs/2026-11-05-kfc-table-rows-cell-style-design.md T1): its tables' rows into a
+			// new tier - Search Text in These Tables' way (a grey tier switched to first; the tiers carried as a search carries them - KFCResultHistory::ListRowsOfTables).
+			int32 tier = -1;
+			if (KFCJump::IsLanding() || KFCResultTree::RefusedWhileRunning() || !RightClickedTier(widget, tier)
+				|| !MakeTierLive(tier))
+				break;
+			PMString summary;
+			(void)KFCResultHistory::ListRowsOfTables(summary);
+			break;
+		}
+
 		case kKFCCreateOutlinesActionID:
 		{
 			// A row's Special Operations > Create Outlines - an OBJECT row's item outlined whole (the author's call), a
@@ -903,7 +916,9 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 		default:
 		{
 			// An object row's Special Operations > Apply Object Style > <style> (2026-11-05): an item of the style list the menu
-			// popped with (KFCStyleMenu) - its style given by the Special Operations' door.
+			// popped with (KFCStyleMenu) - its style given by the Special Operations' door. A table row's Apply Cell Style > <style>
+			// (the table-rows spec's T6): the rows' cells given it - the row it was popped over, or the rows selected together when it is
+			// one of them (KFCResultTree::CellStyleRows). No hit row (pressed by its ActionID): nothing.
 			int32 styleItem = -1;
 			if (KFCStyleMenu::IsStyleItem(actionID, styleItem))
 			{
@@ -911,6 +926,17 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 				PMString path, words;
 				if (KFCStyleMenu::ItemStyle(styleItem, kind, path, words) && kind == KFCStyleMenu::kObjectStyles)
 					DoSpecial(ac, kKFCSpecialApplyObjectStyle, widget, &path, &words);
+				else if (kind == KFCStyleMenu::kCellStyles)
+				{
+					int32 chapter = -1, hit = -1;
+					if (RightClickedHit(widget, chapter, hit))
+					{
+						KFCSpecialParams params;
+						params.text = path;
+						params.words = words;
+						(void)KFCResultTree::CellStyleRows(KFCResultTree::RowsOfRightClick(chapter, hit), params);
+					}
+				}
 				break;
 			}
 			// An object row's other Special Operations - one door for them all (SpecialOpOf's table, DoSpecial).
@@ -1175,7 +1201,8 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 				// rather than greying the item, so the user learns why (KFCSearchEngine::SearchStoryAgain).
 				// (Grey over a query run's list: no search made it - the run list spec's R12.)
 				int32 chapter = -1, group = -1;
-				const bool enable = RightClickedStory(widget, chapter, group) && !KFCResults()->ListIsRunList() && !KFCResults()->ListIsOwnKind();
+				const bool enable = RightClickedStory(widget, chapter, group) && !KFCResults()->ListIsRunList() && !KFCResults()->ListIsOwnKind()
+					&& !KFCResults()->ListIsTableRows();		// (nor a table row list's: no search made it - the table-rows spec's T8)
 				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 				break;
 			}
@@ -1191,7 +1218,7 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 				const KFCResultModel::SearchScopeKind scope = KFCResults()->GetSearchScope();
 				const bool overPart = (scope == KFCResultModel::kScopeStory || scope == KFCResultModel::kScopeToEndOfStory
 					|| scope == KFCResultModel::kScopeSelection || scope == KFCResultModel::kScopeInObjects || scope == KFCResultModel::kScopeInTables);
-				const bool enable = !overPart && !KFCResults()->ListIsRunList() && RightClickedDocument(widget, chapter);
+				const bool enable = !overPart && !KFCResults()->ListIsRunList() && !KFCResults()->ListIsTableRows() && RightClickedDocument(widget, chapter);
 				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 				break;
 			}
@@ -1230,7 +1257,7 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 				// document or book not open, a list no search made) said on the status line, as Search This Document Again's.
 				// (Grey over a query run's list: no search made it - the run list spec's R12.)
 				int32 tier = -1;
-				const bool enable = RightClickedTier(widget, tier) && !KFCResultHistory::TierHoldsRunList(tier);
+				const bool enable = RightClickedTier(widget, tier) && !KFCResultHistory::TierHoldsRunList(tier) && !KFCResultHistory::TierHoldsTableRows(tier);
 				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 				break;
 			}
@@ -1249,6 +1276,7 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 				break;
 			}
 			case kKFCSearchTextInTablesActionID:
+			case kKFCListTableRowsActionID:		// (List Rows of These Tables: the same - the table-rows spec's T1)
 			{
 				// ...and over a tier of the Table kind alone (TierHoldsTables): its other refusals said when pressed, as the objects' are.
 				int32 tier = -1;
@@ -1345,7 +1373,7 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 			case kKFCStyleNoteActionID:
 			{
 				// APPLY OBJECT STYLE'S NOTE (2026-11-05): "No Object Styles" / "<N> more - use the Object Styles panel" - named,
-				// never pressed.
+				// never pressed (Apply Cell Style's: "No Cell Styles" / "... Cell Styles panel").
 				PMString note;
 				if (KFCStyleMenu::NoteName(note))
 					listToUpdate->SetNthActionName(i, note);
@@ -1365,10 +1393,19 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 					const bool named = KFCStyleMenu::ItemName(styleItem, name);
 					if (named)
 						listToUpdate->SetNthActionName(i, name);
+					// (Which list the items are now - the menu popped last: an object row's object styles, a table row's cell styles -
+					// CanCellStyleAny read only, the style asked when pressed, as the object styles'.)
+					KFCStyleMenu::Kind kind = KFCStyleMenu::kNone;
+					PMString path, words;
+					(void)KFCStyleMenu::ItemStyle(styleItem, kind, path, words);
 					int32 chapter = -1, hit = -1;
-					const bool enable = named && RightClickedHit(widget, chapter, hit)
-						&& KFCResults()->GetHitItem(chapter, hit) != kInvalidUID
-						&& KFCResultTree::CanSpecialAny(kKFCSpecialApplyObjectStyle, KFCResultTree::RowsOfRightClick(chapter, hit));
+					bool enable = named && RightClickedHit(widget, chapter, hit);
+					if (enable && kind == KFCStyleMenu::kCellStyles)
+						enable = KFCResults()->GetHitItem(chapter, hit) == kInvalidUID
+							&& KFCResultTree::CanCellStyleAny(KFCResultTree::RowsOfRightClick(chapter, hit));
+					else if (enable)
+						enable = KFCResults()->GetHitItem(chapter, hit) != kInvalidUID
+							&& KFCResultTree::CanSpecialAny(kKFCSpecialApplyObjectStyle, KFCResultTree::RowsOfRightClick(chapter, hit));
 					listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 					break;
 				}
@@ -1387,6 +1424,7 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 					const bool enable = RightClickedTier(widget, tier)
 						&& !KFCResultHistory::TierHoldsQRCodes(tier)
 						&& !KFCResultHistory::TierHoldsRunList(tier)
+						&& !KFCResultHistory::TierHoldsTableRows(tier)		// (nor a table row list: no search made it - the table-rows spec's T8)
 						&& !KFCResultHistory::TierHoldsOwnChangeTab(tier)		// (its conditions are its tab's - the table tab spec's T11)
 						&& !(NarrowIsTextOnly(narrow) && KFCResultHistory::TierHoldsObjects(tier))
 						&& (narrow != kKFCNarrowOnLayer || ActiveLayerName(ac, layer));

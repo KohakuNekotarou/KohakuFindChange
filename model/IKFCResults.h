@@ -159,6 +159,10 @@ public:
 	/** = KFCResultModel::ListIsScriptLabels (appended - docs/superpowers/specs/2026-11-04-kfc-script-label-design.md) - the live list is the Script Label kind's:
 	    object rows, a page item's label each, written by their Replace (S5, S7). */
 	virtual bool ListIsScriptLabels() = 0;
+	/** = KFCResultModel::ListIsTableRows (appended - revision 50, docs/superpowers/specs/2026-11-05-kfc-table-rows-cell-style-design.md) - the live list is a
+	    table row list: text rows, one a table row; no search made it (its heading's Narrow Down and searches again grey, its rows' Replace grey), its
+	    rows' Special Operations > Apply Cell Style writes them. */
+	virtual bool ListIsTableRows() = 0;
 };
 
 #endif // __IKFCResults_h__

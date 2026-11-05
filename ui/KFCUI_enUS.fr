@@ -65,6 +65,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCSearchTierAgainMenuKey,	"Search These Results Again",
                 kKFCSearchTextInObjectsMenuKey,	"Search Text in These Objects",
                 kKFCSearchTextInTablesMenuKey,	"Search Text in These Tables",
+                kKFCListTableRowsMenuKey,	"List Rows of These Tables",
                 kKFCCreateOutlinesMenuKey,	"Create Outlines",
                 kKFCRestoreOriginalMenuKey,	"Restore from Copy",
                 kKFCClearRowsMenuKey,			"Clear from Results",
@@ -112,6 +113,8 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCApplyObjStyleSubmenuKey,		"Apply Object Style",
                 kKFCStyleItemMenuKey,				"Style",
                 kKFCStyleNoteMenuKey,				"No Styles",
+                // Apply Cell Style > (2026-11-05): a table row's Special Operations submenu.
+                kKFCApplyCellStyleSubmenuKey,		"Apply Cell Style",
                 kKFCDeleteMenuKey,					"Delete",
                 kKFCMoveMenuKey,					"Move...",
                 kKFCScaleMenuKey,					"Scale...",

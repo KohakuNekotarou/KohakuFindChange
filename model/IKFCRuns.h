@@ -243,6 +243,17 @@ public:
 	/** = KFCScriptLabelSearch::LabelNow (appended - revision 48, the author 11-04: "the label shown in the dialog's lower part, on several lines") - the label of the item the face's
 	    Find Next found (found.key's), as it reads now; empty when none, or the item or its document is gone. Read only. */
 	virtual PMString ScriptLabelNow(const KFCScriptLabelFound& found) = 0;
+	/** = KFCTableRows::ListRows (appended - revision 50, the author 11-05: "after searching tables, a list of their ROWs" -
+	    docs/superpowers/specs/2026-11-05-kfc-table-rows-cell-style-design.md T1) - a Table list's tier heading > List Rows of These Tables: the live
+	    list's tables' rows as a new list (a table row list). True = a new list; outStatus says what. */
+	virtual bool ListRowsOfTables(PMString& outStatus) = 0;
+	/** = KFCReplaceEngine::CellStyleHits (appended - T6) - a table row's Special Operations > Apply Cell Style > <style>: the rows' cells given the cell
+	    style params.text names (its full path, untranslated - params.words what a person reads) in each row's document, their overrides kept, in one
+	    undoable step. True = something written; outStatus says what. */
+	virtual bool CellStyleRows(const KFCRowsByChapter& rows, const KFCSpecialParams& params, PMString& outStatus) = 0;
+	/** = KFCReplaceEngine::CanCellStyleHit (appended) - can Apply Cell Style be offered on the row (the menu's grey): a row of a table row list, not
+	    locked. Read only. */
+	virtual bool CanCellStyleHit(int32 chapterIdx, int32 hitIdx) = 0;
 };
 
 #endif // __IKFCRuns_h__

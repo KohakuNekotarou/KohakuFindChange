@@ -102,4 +102,12 @@
   - 訂正:
 
 - **TBL-67** 別の種類で窓を開いてから Table にしても押せる（列の大きさを支柱で持つ＝KOHAKU-02 と同じ守り）。走っている最中は断り、面の1行目で言う。（Review Focus）回帰 `tb-btn-after-another-kind`
+
+## 8. 表の行の一覧と Apply Cell Style（作者 11-05「テーブルを検索した後、ROWの一覧を作るのが欲しい。そのあとそのROWにSPオペレーションでセルスタイルを当てたい」＝設計書 `docs/superpowers/specs/2026-11-05-kfc-table-rows-cell-style-design.md` T1〜T11・コード＝`model/KFCTableRows.*`・`model/KFCReplaceEngine.cpp` の `kCellStyleOp`／`ApplyCellStyleRow`・`ui/KFCResultHistory.cpp` の `ListRowsOfTables`・`ui/KFCJump.cpp` の `TableOfRowAt`・`ui/KFCStyleMenu.*` の `kCellStyles`・回帰の表＝`work/kbs-regress/trw-cases.tsv`）
+
+- **TBL-70** ★Table の一覧の見出しの右クリック **List Rows of These Tables**＝一覧の表（Clear で外した行の表を除く）の行を、表ごとに上から1行ずつ新しい段に出す（`[Table Rows/Document]`・元の表の一覧は段として残る）。Table の一覧以外では灰色。行の語＝`Row <n>[ (header)| (footer)]: <セル> | <セル>`（n は1から・セルは24字・行は100字で切る）。上限 1000 行。ブックの閉じた章は開いて読んで閉じる・ほかの一覧の閉じた文書は名前を言って飛ばす。（T1〜T4）回帰 `trw-list`・`trw-list-grey`
+- **TBL-71** ★行は**文字の行**＝その行に左上のあるセルの文字の範囲（`GetTextChunk`・11-05 実測で1行1続き・縦の結合は上の行だけ・表の中の表の文字は外の表の範囲の外）＋`Hit::tableUID`。左上のセルが1つも無い行は載せずに数えて言う。（T3）回帰 `trw-merged`
+- **TBL-72** ★行のクリック＝**その行のセルを選ぶ**（`ITableSelectionSuite::SelectRows`＝11-05 実測で文字の選択は最初のセルに縮むため・結合で覆われた行は覆うセルを除く＝本体と同じ）。（T5）回帰 `trw-click`
+- **TBL-73** ★行の Special Operations の一番上 **Apply Cell Style ▸**＝前面の文書のセルスタイル（パネルの並び・`[なし]` も・グループは `G:S`）。当てると選んだ行のセルに**名前で**当てる（その名前の無い文書の行は断って数える）・上書きは残り・スタイルの段落スタイルも当たる（DOM の `appliedCellStyle =` と同じ＝11-05 実測）・取り消し1段 `Apply Cell Style`・行の語 `Styled`。当てる行は書く時に範囲の頭の文字のセルの行を読み直す（後から行を足しても元の行に当たる）。ロックの行は灰色。編集した行は「cells edited since」で断る（一覧を作り直す）。文字の一覧の行のこの子メニューは空。（T6・T7）回帰 `trw-style`・`trw-style-all`・`trw-style-undo`・`trw-style-group`・`trw-style-twin`・`trw-style-twodocs`・`trw-style-after-insert`・`trw-style-nested`・`trw-style-locked`・`trw-menu-text-list`
+- **TBL-74** 表の行の一覧は検索が作らない（Run の一覧と同じ）＝Replace・Narrow Down・Search These Results Again・Search This Story／Document Again・List Rows of These Tables は灰色・Special Operations の Clear Overrides／Create Outlines／Tate-chu-yoko も灰色（行は一致ではない）。Copy Rows・Clear from Results・目玉は使える。（T8）回帰 `trw-list-again-grey`・`trw-replace-grey`・`trw-textops-grey`
   - 訂正:

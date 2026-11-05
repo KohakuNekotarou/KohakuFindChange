@@ -83,6 +83,14 @@
 #include "KFCQueryCopy.h"		// rubyKind - a list of ruby marks
 #include "ITableModel.h"
 #include "KFCTextOverrides.h"	// ClearOverrides - a text row's Special Operations > Clear Overrides
+#include "KFCTableRows.h"		// TableRowAt - the row a table row list's row stands in, for Apply Cell Style
+#include "ICellStylesFacade.h"	// ApplyCellStyle, GetSelectedCellStyles - Apply Cell Style's write and its read-back
+#include "IDocument.h"			// GetDocWorkSpace - the cell styles of a row's own document
+#include "IStyleGroupManager.h"	// FindByName - the style of the name chosen
+#include "IWorkspace.h"
+#include "TablesID.h"			// IID_ICELLSTYLEGROUPMANAGER
+#include "TableTypes.h"
+#include "UIDList.h"
 #ifdef KFC_DIAG
 #include "ITextFocusManager.h"	// how many foci a story carries while it is written (WALKSTEP) - test builds only
 #include "IFrameList.h"			// whether its frames stand damaged around a find (WALKSTEP) - test builds only
@@ -1167,8 +1175,8 @@ QueryCompared CompareQueryWithSearch()
 	// steers its walk - so nothing is asked of Find/Change and nothing is stated. Its searches again list its QR codes again
 	// whatever tab the dialog is on, and its rows are never replaced (CanReplaceHit). A query run's list has none either: no
 	// search made it, and its rows are not written again (RefuseRunListRow). Nor a table list: what it asks is the Table tab's, and
-	// its Replace reads that tab as it stands (WriteOwnTabRows).
-	if (KFCResultModel::ListIsQRCodes() || KFCResultModel::ListIsRunList() || KFCResultModel::ListIsOwnKind())
+	// its Replace reads that tab as it stands (WriteOwnTabRows). Nor a table row list: no search made it (KFCTableRows).
+	if (KFCResultModel::ListIsQRCodes() || KFCResultModel::ListIsRunList() || KFCResultModel::ListIsOwnKind() || KFCResultModel::ListIsTableRows())
 		return kQueryUnchanged;
 
 	// ----- (1) the TAB the results were searched with -----
@@ -1320,6 +1328,18 @@ static bool RefuseRunListRow(const char* what, PMString& outStatus)
 	return true;
 }
 
+// A TABLE ROW LIST'S ROWS ARE WRITTEN BY APPLY CELL STYLE ALONE (docs/superpowers/specs/2026-11-05-kfc-table-rows-cell-style-design.md T8): a row is not a match of any query -
+// no Change side to replace it with, no match to restore, outline, clear or set. The menu greys what it offers; these doors are for a press that never went through it.
+static bool RefuseTableRowsRow(const char* what, PMString& outStatus)
+{
+	if (!KFCResultModel::ListIsTableRows())
+		return false;
+	outStatus = what;
+	outStatus.Append(": a list of table rows is written by Special Operations > Apply Cell Style alone.");
+	outStatus.SetTranslatable(kFalse);
+	return true;
+}
+
 // A WARICHU LIST'S ROWS ARE NOT REPLACED (docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md A4 - the Warichu kind changes nothing, as QR Code's): CanReplaceHit greys them; this door is for
 // a press that never went through the menu.
 static bool RefuseWarichuRow(PMString& outStatus)
@@ -1353,8 +1373,8 @@ bool KFCReplaceEngine::CanReplaceHit(int32 chapterIdx, int32 hitIdx)
 	// rows selected together leaves are the same question).
 	// A QR CODE LIST'S ROWS ARE NEVER REPLACED (QR-18 - the author: "no replace"): greyed whatever the row says
 	// - the doors that turn a press away name it (ReplaceHit, ReplaceHits, KFCObjectReplace). Nor a query run's (RefuseRunListRow). Nor a warichu list's: the Warichu kind changes nothing
-	// (docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md A4 - as QR Code's).
-	if (KFCResultModel::ListIsQRCodes() || KFCResultModel::ListIsRunList() || KFCResultModel::ListIsWarichu())
+	// (docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md A4 - as QR Code's). Nor a table row list's (RefuseTableRowsRow).
+	if (KFCResultModel::ListIsQRCodes() || KFCResultModel::ListIsRunList() || KFCResultModel::ListIsWarichu() || KFCResultModel::ListIsTableRows())
 		return false;
 	return WhyGreyed(chapterIdx, hitIdx) == kGreyedNot;
 }
@@ -2244,7 +2264,7 @@ bool KFCReplaceEngine::ReplaceHit(int32 chapterIdx, int32 hitIdx, PMString& outS
 		outStatus.SetTranslatable(kFalse);
 		return false;
 	}
-	if (RefuseWarichuRow(outStatus) || RefuseRunListRow("Replace", outStatus))
+	if (RefuseWarichuRow(outStatus) || RefuseRunListRow("Replace", outStatus) || RefuseTableRowsRow("Replace", outStatus))
 		return false;
 	// A SCRIPT LABEL LIST'S ROW: its item's label (ReplaceLabelRows) - an object row, but never InDesign's object replace.
 	if (KFCResultModel::ListHasOwnChangeTab() || KFCResultModel::ListIsScriptLabels())
@@ -2288,7 +2308,7 @@ bool KFCReplaceEngine::ReplaceHits(const KFCRowsByChapter& rowsByChapter, PMStri
 		outStatus.SetTranslatable(kFalse);
 		return false;
 	}
-	if (RefuseWarichuRow(outStatus) || RefuseRunListRow("Replace", outStatus))
+	if (RefuseWarichuRow(outStatus) || RefuseRunListRow("Replace", outStatus) || RefuseTableRowsRow("Replace", outStatus))
 		return false;
 	if (KFCResultModel::ListIsScriptLabels())
 		return ReplaceLabelRows(rowsByChapter, outStatus);		// (ReplaceHit's note)
@@ -2966,7 +2986,7 @@ bool KFCReplaceEngine::RestoreHits(const KFCRowsByChapter& rowsByChapter, PMStri
 	KFC_DIAG_WRITTEN_DOCS_CHECK("restore-rows");	// (test builds: after DocsAfterWrite, below - KFCDiagWrittenDocs.h)
 	outStatus.Clear();
 	outStatus.SetTranslatable(kFalse);
-	if (RefuseRunListRow("Restore from Copy", outStatus) || RefuseOwnTabRow("Restore from Copy", outStatus))
+	if (RefuseRunListRow("Restore from Copy", outStatus) || RefuseOwnTabRow("Restore from Copy", outStatus) || RefuseTableRowsRow("Restore from Copy", outStatus))
 		return false;
 	if (KFCRunGuard::IsAnyRunning())
 	{
@@ -3431,8 +3451,8 @@ bool OutlineInChapter(OutlineChapter& chapter, int32 (&counts)[kOutlineRefusalCo
 
 bool KFCReplaceEngine::CanOutlineHit(int32 chapterIdx, int32 hitIdx)
 {
-	if (KFCResultModel::ListIsRunList() || KFCResultModel::ListHasOwnChangeTab())
-		return false;		// (RefuseRunListRow's and RefuseOwnTabRow's notes)
+	if (KFCResultModel::ListIsRunList() || KFCResultModel::ListHasOwnChangeTab() || KFCResultModel::ListIsTableRows())
+		return false;		// (RefuseRunListRow's, RefuseOwnTabRow's and RefuseTableRowsRow's notes)
 	return OutlineRowRefusal(chapterIdx, hitIdx) == kOutlineOk;
 }
 
@@ -3441,7 +3461,7 @@ bool KFCReplaceEngine::OutlineHits(const KFCRowsByChapter& rowsByChapter, PMStri
 	KFC_DIAG_WRITTEN_DOCS_CHECK("outline-text-rows");	// (test builds: after DocsAfterWrite, below - KFCDiagWrittenDocs.h)
 	outStatus.Clear();
 	outStatus.SetTranslatable(kFalse);
-	if (RefuseRunListRow("Create Outlines", outStatus) || RefuseOwnTabRow("Create Outlines", outStatus))
+	if (RefuseRunListRow("Create Outlines", outStatus) || RefuseOwnTabRow("Create Outlines", outStatus) || RefuseTableRowsRow("Create Outlines", outStatus))
 		return false;
 	if (KFCRunGuard::IsAnyRunning())
 	{
@@ -3668,6 +3688,9 @@ enum ClearRefusal
 	kClearEdited,		// its text has been edited since
 	kClearLocked,		// locked
 	kClearNone,			// InDesign calls its text not overridden: counted, not written (the spec's B3)
+	kClearNotTableRow,	// Apply Cell Style's: a row of no table row list (KFCTableRows)
+	kClearNoCellStyle,	// ...its document has no cell style of the name chosen (the front document's - Apply Object Style's rule)
+	kClearNotInTable,	// ...its text stands in no table's cell now (KFCTableRows::TableRowAt)
 	kClearRefusalCount
 };
 
@@ -3684,6 +3707,9 @@ const char* ClearWords(ClearRefusal why)
 		case kClearEdited:		return "edited since";
 		case kClearLocked:		return "locked";
 		case kClearNone:		return "had no overrides";
+		case kClearNotTableRow:	return "not a table row";
+		case kClearNoCellStyle:	return "in a document without that cell style";
+		case kClearNotInTable:	return "in no table now";
 		default:				return "";
 	}
 }
@@ -3702,6 +3728,9 @@ const char* ClearSentence(ClearRefusal why)
 		case kClearEdited:		return "the text of this row has been edited since - left as it is.";
 		case kClearLocked:		return "the text is locked (a locked layer or story) - left as it is.";
 		case kClearNone:		return "the match has no overrides to clear - left as it is.";
+		case kClearNotTableRow:	return "this row is not a row of a list of table rows.";
+		case kClearNoCellStyle:	return "the document of this row has no cell style of that name - left as it is.";
+		case kClearNotInTable:	return "this row's text stands in no table's cell now - left as it is.";
 		default:				return "";
 	}
 }
@@ -3765,8 +3794,93 @@ ErrorCode SetTcy(const UIDRef& story, TextIndex start, TextIndex end, bool& outW
 	return kSuccess;
 }
 
-// WHAT IS A TEXT ROW'S SPECIAL OPERATION'S OWN - Clear Overrides (the next-overrides-restore spec's B2 - B7) and Tate-chu-yoko (the warichu-tcy spec's B2 - B7). The rest is one: the doors row by row,
-// the chapters reached, one undoable step across documents, the rows marked, the message (WriteTextRows).
+// APPLY CELL STYLE'S WORDS (docs/superpowers/specs/2026-11-05-kfc-table-rows-cell-style-design.md T6): Clear Overrides', a table row's own where they differ.
+const char* CellStyleWords(ClearRefusal why)
+{
+	return (why == kClearEdited) ? "cells edited since" : ClearWords(why);
+}
+
+const char* CellStyleSentence(ClearRefusal why)
+{
+	return (why == kClearEdited) ? "the cells of this row have been edited since - list the rows again." : ClearSentence(why);
+}
+
+// A CELL STYLE GIVEN TO A TABLE ROW (T6, T7): the row [start, end) stands in now - the table and row of its first character's cell (KFCTableRows::TableRowAt: a row
+// added or taken away above it since the list was made is followed) - each of the row's own cells, the cells whose top-left is in it (what InDesign's own row
+// selection holds - measured 11-05), given the style of params.text in the row's document, as a plain click in the Cell Styles panel gives it:
+// Facade::ICellStylesFacade::ApplyCellStyle(style, table, the cell's area, removeOverrides kFalse, applyParaStyle kTrue) - measured 11-05 the same as the DOM's
+// cell.appliedCellStyle = (work/cpp-probe/examples/table-row-style.cpp): the style, the overrides kept, the style's paragraph style given. Read back after
+// (GetSelectedCellStyles): a write InDesign took and did not do is a failure (SetTcy's rule). outLeft: kClearOk = written; kClearNotInTable, kClearNoCellStyle.
+ErrorCode ApplyCellStyleRow(const UIDRef& story, TextIndex start, TextIndex /*end*/, const KFCSpecialParams& params, ClearRefusal& outLeft)
+{
+	outLeft = kClearOk;
+	UIDRef tableRef;
+	int32 row = -1;
+	if (!KFCTableRows::TableRowAt(story, start, tableRef, row))
+	{
+		outLeft = kClearNotInTable;
+		return kSuccess;
+	}
+	IDataBase* const db = tableRef.GetDataBase();
+	InterfacePtr<IDocument> doc(db, db->GetRootUID(), UseDefaultIID());
+	InterfacePtr<IWorkspace> workspace(db, (doc != nil) ? doc->GetDocWorkSpace().GetUID() : kInvalidUID, UseDefaultIID());
+	InterfacePtr<IStyleGroupManager> styles(workspace, IID_ICELLSTYLEGROUPMANAGER);
+	const UID style = (styles != nil && !params.text.IsEmpty()) ? styles->FindByName(params.text) : kInvalidUID;
+	if (style == kInvalidUID)
+	{
+		outLeft = kClearNoCellStyle;
+		return kSuccess;
+	}
+	InterfacePtr<ITableModel> table(tableRef, UseDefaultIID());
+	Utils<Facade::ICellStylesFacade> facade;
+	if (table == nil || !facade)
+		return kFailure;
+	const ColRange cols(table->GetTotalCols());
+	std::vector<GridArea> cells;
+	for (int32 c = cols.start; c < cols.start + cols.count; ++c)
+	{
+		const GridAddress anchor(table->FindCellAnchor(GridAddress(row, c)));
+		if (anchor.row == row && anchor.col == c)
+			cells.push_back(table->GetCellArea(anchor));
+	}
+	if (cells.empty())
+	{
+		outLeft = kClearNotInTable;
+		return kSuccess;
+	}
+	for (size_t k = 0; k < cells.size(); ++k)
+		if (facade->ApplyCellStyle(UIDRef(db, style), tableRef, cells[k], kFalse, kTrue) != kSuccess)
+			return kFailure;
+	for (size_t k = 0; k < cells.size(); ++k)
+	{
+		UIDList used(db);
+		if (facade->GetSelectedCellStyles(tableRef, cells[k], used) != kSuccess || used.Length() != 1 || used[0] != style)
+			return kFailure;
+	}
+	KFC_DIAG_LOG("CELLSTYLE table=%u row=%d cells=%d style=%u", tableRef.GetUID().Get(), static_cast<int>(row), static_cast<int>(cells.size()), style.Get());
+	return kSuccess;
+}
+
+// The two writes of before (nothing to write = kClearNone, counted), in the shape every op's write takes.
+ErrorCode ClearOverridesWrite(const UIDRef& story, TextIndex start, TextIndex end, const KFCSpecialParams&, ClearRefusal& outLeft)
+{
+	bool wrote = false;
+	const ErrorCode err = KFCTextOverrides::ClearOverrides(story, start, end, wrote);
+	outLeft = wrote ? kClearOk : kClearNone;
+	return err;
+}
+
+ErrorCode TcyWrite(const UIDRef& story, TextIndex start, TextIndex end, const KFCSpecialParams&, ClearRefusal& outLeft)
+{
+	bool wrote = false;
+	const ErrorCode err = SetTcy(story, start, end, wrote);
+	outLeft = wrote ? kClearOk : kClearNone;
+	return err;
+}
+
+// WHAT IS A TEXT ROW'S SPECIAL OPERATION'S OWN - Clear Overrides (the next-overrides-restore spec's B2 - B7), Tate-chu-yoko (the warichu-tcy spec's B2 - B7) and a table row's
+// Apply Cell Style (the table-rows spec's T6). The rest is one: the doors row by row, the chapters reached, one undoable step across documents, the rows marked, the message
+// (WriteTextRows).
 struct TextRowOp
 {
 	const char*		name;							// its menu item's: the refusals' head ("Clear Overrides: ...") and the step Undo is followed by
@@ -3779,18 +3893,30 @@ struct TextRowOp
 	const char*		stepName;						// ...before its key is translated
 	int32			mark;							// a written row's (MarkHitSpecial)
 	bool			kohakuText;						// the text rows of a Kohaku+ list take it - Ruby's, Kenten's; no table's. False: no row of a Kohaku+ list with a Change side (Clear Overrides)
-	ErrorCode		(*write)(const UIDRef& story, TextIndex start, TextIndex end, bool& outWrote);		// outWrote false = nothing to write there (kClearNone, counted)
+	bool			tableRows;						// a table row list's rows ALONE take it (Apply Cell Style); false: no row of one (RefuseTableRowsRow)
+	const char*		noun;							// what the message counts: "matches", "rows"
+	bool			namesStyle;						// the message names params.words after done: 'Applied cell style "CS1" to'
+	ErrorCode		(*write)(const UIDRef& story, TextIndex start, TextIndex end, const KFCSpecialParams& params, ClearRefusal& outLeft);	// outLeft kClearOk = written; else why not (kClearNone = nothing to write there, counted)
 };
 
 const TextRowOp kClearOverridesOp = { "Clear Overrides", "Cleared overrides on", "cleared", "clear a match's overrides", ClearWords, ClearSentence,
-	kKFCClearOverridesStepKey, "KFC Clear Overrides", kKFCSpecialClearTextOverrides, false, KFCTextOverrides::ClearOverrides };
+	kKFCClearOverridesStepKey, "KFC Clear Overrides", kKFCSpecialClearTextOverrides, false, false, "matches", false, ClearOverridesWrite };
 const TextRowOp kTcyOp = { "Tate-chu-yoko", "Set tate-chu-yoko on", "set tate-chu-yoko", "make a match tate-chu-yoko", TcyWords, TcySentence,
-	kKFCTcyStepKey, "KFC Tate-chu-yoko", kKFCSpecialTextTcy, true, SetTcy };
+	kKFCTcyStepKey, "KFC Tate-chu-yoko", kKFCSpecialTextTcy, true, false, "matches", false, TcyWrite };
+const TextRowOp kCellStyleOp = { "Apply Cell Style", "Applied cell style", "given a cell style", "apply a cell style to a row", CellStyleWords, CellStyleSentence,
+	kKFCApplyCellStyleStepKey, "KFC Apply Cell Style", kKFCSpecialApplyCellStyle, false, true, "rows", true, ApplyCellStyleRow };
 
-// A WRITE THAT WROTE NOTHING: one row's reason in full, several rows' counted by reason.
-void SayNoneWritten(const TextRowOp& op, PMString& out, size_t total, ClearRefusal oneWhy, const int32 (&counts)[kClearRefusalCount])
+// A WRITE THAT WROTE NOTHING: one row's reason in full, several rows' counted by reason - after the op's name, and the style it was to give (op.namesStyle:
+// 'Apply Cell Style "CS1": ...').
+void SayNoneWritten(const TextRowOp& op, const KFCSpecialParams& params, PMString& out, size_t total, ClearRefusal oneWhy, const int32 (&counts)[kClearRefusalCount])
 {
 	out = op.name;
+	if (op.namesStyle)
+	{
+		out.Append(" \"");
+		out.Append(params.words);
+		out.Append("\"");
+	}
 	out.Append(": ");
 	if (total == 1)
 		out.Append(op.sentence(oneWhy));
@@ -3818,6 +3944,9 @@ ClearRefusal TextRowRefusal(const TextRowOp& op, int32 chapterIdx, int32 hitIdx)
 	uint64 hash = 0;
 	if (KFCResultModel::GetHitItem(chapterIdx, hitIdx) != kInvalidUID || (op.kohakuText && KFCResultModel::ListIsTables()))
 		return kClearNotText;
+	// A TABLE ROW LIST'S ROWS TAKE APPLY CELL STYLE ALONE, AND IT TAKES NOTHING ELSE (the table-rows spec's T6, T8): a row is no match.
+	if (op.tableRows != KFCResultModel::ListIsTableRows())
+		return op.tableRows ? kClearNotTableRow : kClearNotText;
 	if (!KFCResultModel::GetHitRow(chapterIdx, hitIdx, look) || look.outlined)
 		return kClearOutlined;
 	if (!KFCResultModel::GetHitFlags(chapterIdx, hitIdx, replaced, locked) || locked)
@@ -3852,9 +3981,9 @@ struct ClearChapter
 };
 
 // ONE DOCUMENT'S ROWS, inside the write's step: each row checked again just before its command - its characters where the doors read them (nothing these writes do moves text) - then written
-// (op.write, which writes nothing where there is nothing to: kClearNone, counted - no overrides, already tate-chu-yoko). The written rows marked (MarkHitSpecial - "Cleared", "Tate-chu-yoko").
-// False = InDesign would not write a match: the caller takes the step back.
-bool WriteInChapter(const TextRowOp& op, ClearChapter& chapter, int32 (&counts)[kClearRefusalCount])
+// (op.write, which writes nothing where there is nothing to: kClearNone, counted - no overrides, already tate-chu-yoko - or where it cannot: no cell style of that name, a row in no table). The
+// written rows marked (MarkHitSpecial - "Cleared", "Tate-chu-yoko", "Styled"). False = InDesign would not write a match: the caller takes the step back.
+bool WriteInChapter(const TextRowOp& op, ClearChapter& chapter, const KFCSpecialParams& params, int32 (&counts)[kClearRefusalCount])
 {
 	IDataBase* const db = chapter.docRef.GetDataBase();
 	if (db == nil)
@@ -3868,14 +3997,14 @@ bool WriteInChapter(const TextRowOp& op, ClearChapter& chapter, int32 (&counts)[
 			row.why = kClearEdited;
 			continue;
 		}
-		bool wrote = false;
-		if (op.write(storyRef, row.start, row.end, wrote) != kSuccess)
+		ClearRefusal left = kClearOk;
+		if (op.write(storyRef, row.start, row.end, params, left) != kSuccess)
 			return false;
-		KFC_DIAG_LOG("TEXTROWOP %s chapter=%d row=%d story=%u at=%d..%d wrote=%d", op.name, chapter.chapterIdx, row.hit,
-			row.story.Get(), (int)row.start, (int)row.end, wrote ? 1 : 0);
-		if (!wrote)
+		KFC_DIAG_LOG("TEXTROWOP %s chapter=%d row=%d story=%u at=%d..%d left=%d", op.name, chapter.chapterIdx, row.hit,
+			row.story.Get(), (int)row.start, (int)row.end, static_cast<int>(left));
+		if (left != kClearOk)
 		{
-			row.why = kClearNone;
+			row.why = left;
 			continue;
 		}
 		row.done = true;
@@ -3899,7 +4028,7 @@ bool CanWriteTextRow(const TextRowOp& op, int32 chapterIdx, int32 hitIdx)
 	return TextRowRefusal(op, chapterIdx, hitIdx) == kClearOk;
 }
 
-bool WriteTextRows(const TextRowOp& op, const KFCRowsByChapter& rowsByChapter, PMString& outStatus);
+bool WriteTextRows(const TextRowOp& op, const KFCRowsByChapter& rowsByChapter, const KFCSpecialParams& params, PMString& outStatus);
 
 }	// anonymous namespace
 
@@ -3911,7 +4040,7 @@ bool KFCReplaceEngine::CanClearOverridesHit(int32 chapterIdx, int32 hitIdx)
 bool KFCReplaceEngine::ClearOverridesHits(const KFCRowsByChapter& rowsByChapter, PMString& outStatus)
 {
 	KFC_DIAG_WRITTEN_DOCS_CHECK("clear-overrides-rows");	// (test builds: after DocsAfterWrite, inside - KFCDiagWrittenDocs.h)
-	return WriteTextRows(kClearOverridesOp, rowsByChapter, outStatus);
+	return WriteTextRows(kClearOverridesOp, rowsByChapter, KFCSpecialParams(), outStatus);
 }
 
 bool KFCReplaceEngine::CanTcyHit(int32 chapterIdx, int32 hitIdx)
@@ -3922,18 +4051,30 @@ bool KFCReplaceEngine::CanTcyHit(int32 chapterIdx, int32 hitIdx)
 bool KFCReplaceEngine::TcyHits(const KFCRowsByChapter& rowsByChapter, PMString& outStatus)
 {
 	KFC_DIAG_WRITTEN_DOCS_CHECK("tate-chu-yoko-rows");
-	return WriteTextRows(kTcyOp, rowsByChapter, outStatus);
+	return WriteTextRows(kTcyOp, rowsByChapter, KFCSpecialParams(), outStatus);
+}
+
+bool KFCReplaceEngine::CanCellStyleHit(int32 chapterIdx, int32 hitIdx)
+{
+	return CanWriteTextRow(kCellStyleOp, chapterIdx, hitIdx);
+}
+
+bool KFCReplaceEngine::CellStyleHits(const KFCRowsByChapter& rowsByChapter, const KFCSpecialParams& params, PMString& outStatus)
+{
+	KFC_DIAG_WRITTEN_DOCS_CHECK("cell-style-rows");
+	return WriteTextRows(kCellStyleOp, rowsByChapter, params, outStatus);
 }
 
 namespace
 {
 
-// A TEXT ROW'S SPECIAL OPERATION WRITTEN WHERE THE MATCHES STAND (Clear Overrides, Tate-chu-yoko): Create Outlines' doors and step (OutlineHits, above). Only attributes change: no row moves.
-bool WriteTextRows(const TextRowOp& op, const KFCRowsByChapter& rowsByChapter, PMString& outStatus)
+// A TEXT ROW'S SPECIAL OPERATION WRITTEN WHERE THE MATCHES STAND (Clear Overrides, Tate-chu-yoko - and a table row's Apply Cell Style, its cells' style): Create Outlines' doors and step
+// (OutlineHits, above). Only attributes change: no row moves.
+bool WriteTextRows(const TextRowOp& op, const KFCRowsByChapter& rowsByChapter, const KFCSpecialParams& params, PMString& outStatus)
 {
 	outStatus.Clear();
 	outStatus.SetTranslatable(kFalse);
-	if (RefuseRunListRow(op.name, outStatus) || (!op.kohakuText && RefuseOwnTabRow(op.name, outStatus)))
+	if (RefuseRunListRow(op.name, outStatus) || (!op.kohakuText && RefuseOwnTabRow(op.name, outStatus)) || (!op.tableRows && RefuseTableRowsRow(op.name, outStatus)))
 		return false;
 	if (KFCRunGuard::IsAnyRunning())
 	{
@@ -4041,7 +4182,7 @@ bool WriteTextRows(const TextRowOp& op, const KFCRowsByChapter& rowsByChapter, P
 	}
 	if (toWrite == 0)
 	{
-		SayNoneWritten(op, outStatus, total, lastWhy, counts);
+		SayNoneWritten(op, params, outStatus, total, lastWhy, counts);
 		return false;
 	}
 	// EVERY DOCUMENT TO WRITE STILL OPEN once the last is reached (a Replace's rule).
@@ -4078,7 +4219,7 @@ bool WriteTextRows(const TextRowOp& op, const KFCRowsByChapter& rowsByChapter, P
 		}
 		for (size_t c = 0; c < chapters.size() && !failed; ++c)
 		{
-			if (!WriteInChapter(op, chapters[c], counts))
+			if (!WriteInChapter(op, chapters[c], params, counts))
 				failed = true;
 			clearedRows += chapters[c].cleared;
 		}
@@ -4116,7 +4257,7 @@ bool WriteTextRows(const TextRowOp& op, const KFCRowsByChapter& rowsByChapter, P
 			for (size_t k = 0; k < chapters[c].rows.size(); ++k)
 				if (chapters[c].rows[k].why != kClearOk)
 					why = chapters[c].rows[k].why;
-		SayNoneWritten(op, outStatus, total, why, counts);
+		SayNoneWritten(op, params, outStatus, total, why, counts);
 		return false;
 	}
 	for (size_t c = 0; c < chapters.size(); ++c)
@@ -4131,10 +4272,23 @@ bool WriteTextRows(const TextRowOp& op, const KFCRowsByChapter& rowsByChapter, P
 	}
 
 	// WHAT IT DID (the spec's B7 - SayRowsWritten): "Cleared overrides on ID:262 #3." /
-	// "Cleared overrides on 2 of 3 matches: ID:262 #1, ID:262 #3. Left as they were: 1 had no overrides."
+	// "Cleared overrides on 2 of 3 matches: ID:262 #1, ID:262 #3. Left as they were: 1 had no overrides." - the style it gave after the verb (op.namesStyle):
+	// 'Applied cell style "CS1" to 7 rows: ...'.
 	PMString leftWords;
 	AppendCountsByWhy(leftWords, counts, op.words);
-	SayRowsWritten(outStatus, op.done, "matches", RowsDone(chapters), total, leftWords);
+	if (op.namesStyle)
+	{
+		PMString rest;
+		SayRowsWritten(rest, "", op.noun, RowsDone(chapters), total, leftWords);
+		outStatus = op.done;
+		outStatus.Append(" \"");
+		outStatus.Append(params.words);
+		outStatus.Append("\" to");
+		outStatus.Append(rest);
+		outStatus.SetTranslatable(kFalse);
+	}
+	else
+		SayRowsWritten(outStatus, op.done, op.noun, RowsDone(chapters), total, leftWords);
 	return true;
 }
 

@@ -21,6 +21,8 @@
 
 // General includes:
 #include "GenericID.h"			// IID_IOBJECTSTYLEGROUPMANAGER, IID_IOBJECTSTYLEINFO - an object style (not its groups)
+#include "TablesID.h"			// IID_ICELLSTYLEGROUPMANAGER - the cell styles
+#include "TextID.h"				// IID_ISTYLEINFO - a cell style (not its groups)
 #include "UIDList.h"
 #include "Utils.h"
 
@@ -43,26 +45,28 @@ struct Entry
 KFCStyleMenu::Kind gKind = KFCStyleMenu::kNone;
 std::vector<Entry> gItems;		// the items on the menu now (at most kKFCStyleItems), in their order
 PMString gNote;					// the note's words; empty = no note on the menu
+PMString gPath;					// the path the last menu put them on (taken off it when the next one pops)
 
 // THE STYLES OF A KIND the active context holds - the front document's workspace, or the session's with no document (the
 // Table part's style lists' source: KFCKohakuTab's FillStyles) - in the order of their hierarchy, the panel's.
 void ReadList(KFCStyleMenu::Kind kind, std::vector<Entry>& out)
 {
 	out.clear();
-	if (kind != KFCStyleMenu::kObjectStyles)
+	if (kind != KFCStyleMenu::kObjectStyles && kind != KFCStyleMenu::kCellStyles)
 		return;
 	ISession* const session = GetExecutionContextSession();
 	IActiveContext* const context = (session != nil) ? session->GetActiveContext() : nil;
 	IWorkspace* const workspace = (context != nil) ? context->GetContextWorkspace() : nil;
-	InterfacePtr<IStyleGroupManager> styles(workspace, IID_IOBJECTSTYLEGROUPMANAGER);
+	InterfacePtr<IStyleGroupManager> styles(workspace, (kind == KFCStyleMenu::kObjectStyles) ? IID_IOBJECTSTYLEGROUPMANAGER : IID_ICELLSTYLEGROUPMANAGER);
 	if (styles == nil || styles->GetRootHierarchy() == nil)
 		return;
 	IDataBase* const db = ::GetDataBase(styles);
 	UIDList found(db);
 	// AN OBJECT STYLE IS FOUND BY IID_IOBJECTSTYLEINFO (kObjectStyleBoss's), not by the text and table styles' IID_ISTYLEINFO:
 	// asked with that, the Object Styles' hierarchy gave none (2026-11-05, the first GREEN run - KT's KTScrapStore StyleNames
-	// asks object styles so).
-	styles->GetRootHierarchy()->GetDescendents(&found, IID_IOBJECTSTYLEINFO);
+	// asks object styles so). A CELL STYLE BY IID_ISTYLEINFO - kCellStyleBoss's (iid-boss-dictionary; the SDK's
+	// SnpManipulateTableStyle.cpp ChooseStyle asks the cell styles' hierarchy so; IID_ICELLSTYLEINFO is on no boss).
+	styles->GetRootHierarchy()->GetDescendents(&found, (kind == KFCStyleMenu::kObjectStyles) ? IID_IOBJECTSTYLEINFO : IID_ISTYLEINFO);
 	for (int32 k = 0; k < found.Length(); ++k)
 	{
 		InterfacePtr<IStyleGroupHierarchy> style(db, found[k], UseDefaultIID());
@@ -93,12 +97,21 @@ PMString MenuWords(const PMString& words)
 
 const char* NoneWords(KFCStyleMenu::Kind kind)
 {
-	return (kind == KFCStyleMenu::kObjectStyles) ? "No Object Styles" : "No Styles";
+	return (kind == KFCStyleMenu::kObjectStyles) ? "No Object Styles" : (kind == KFCStyleMenu::kCellStyles) ? "No Cell Styles" : "No Styles";
 }
 
 const char* PanelWords(KFCStyleMenu::Kind kind)
 {
-	return (kind == KFCStyleMenu::kObjectStyles) ? " more - use the Object Styles panel" : " more";
+	return (kind == KFCStyleMenu::kObjectStyles) ? " more - use the Object Styles panel"
+		: (kind == KFCStyleMenu::kCellStyles) ? " more - use the Cell Styles panel" : " more";
+}
+
+// The items and the note taken off `path`.
+void TakeOff(IMenuManager* menuMgr, const PMString& path)
+{
+	for (int32 k = 0; k < kKFCStyleItems; ++k)
+		menuMgr->RemoveMenuItem(path, ActionID(kKFCStyleItem0ActionID + k));
+	menuMgr->RemoveMenuItem(path, kKFCStyleNoteActionID);
 }
 }
 
@@ -106,10 +119,13 @@ void KFCStyleMenu::PutOnMenu(IMenuManager* menuMgr, const PMString& path, Kind k
 {
 	if (menuMgr == nil)
 		return;
-	// Taken off first, then put (Tate-chu-yoko's and Unify Reading's way - never twice on the menu).
-	for (int32 k = 0; k < kKFCStyleItems; ++k)
-		menuMgr->RemoveMenuItem(path, ActionID(kKFCStyleItem0ActionID + k));
-	menuMgr->RemoveMenuItem(path, kKFCStyleNoteActionID);
+	// Taken off first, then put (Tate-chu-yoko's and Unify Reading's way - never twice on the menu): off this path, and off the one
+	// the last menu put them on (an object row's Apply Object Style, a table row's Apply Cell Style - one action on one path).
+	TakeOff(menuMgr, path);
+	if (!gPath.IsEmpty() && gPath != path)
+		TakeOff(menuMgr, gPath);
+	gPath = path;
+	gPath.SetTranslatable(kFalse);
 	std::vector<Entry> all;
 	ReadList(kind, all);
 	gKind = kind;
@@ -118,6 +134,8 @@ void KFCStyleMenu::PutOnMenu(IMenuManager* menuMgr, const PMString& path, Kind k
 		gItems.push_back(all[k]);
 	gNote.Clear();
 	gNote.SetTranslatable(kFalse);
+	if (kind == kNone)
+		return;		// (a menu that offers no style list: taken off alone)
 	if (all.empty())
 		gNote.Append(NoneWords(kind));
 	else if (all.size() > static_cast<size_t>(kKFCStyleItems))
@@ -175,6 +193,7 @@ void KFCStyleMenu::ShutdownCleanup()
 {
 	std::vector<Entry>().swap(gItems);
 	gNote = PMString();
+	gPath = PMString();
 	gKind = kNone;
 }
 

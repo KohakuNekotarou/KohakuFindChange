@@ -40,6 +40,7 @@
 #include "KFCSavedQueries.h"
 #include "KFCSearchEngine.h"
 #include "KFCTableSearch.h"			// IsTabCurrent - the Table tab, and what it asks
+#include "KFCTableRows.h"			// ListRows - a Table list's List Rows of These Tables
 #include "KFCFaceText.h"				// the Kohaku+ face's Ruby and Kenten buttons
 #include "KFCRubySearch.h"			// IsTabCurrent - the Ruby tab, and what it asks
 #include "KFCRubyListFile.h"		// Load - what the Ruby part says of a ruby list
@@ -106,6 +107,7 @@ public:
 	virtual bool ListIsOwnKind() { return KFCResultModel::ListIsOwnKind(); }
 	virtual bool GetUnifyFacts(int32 chapterIdx, int32 groupIdx, int32 hitIdx, PMString& outWord, PMString& outReadings) { return KFCResultModel::GetUnifyFacts(chapterIdx, groupIdx, hitIdx, outWord, outReadings); }
 	virtual bool ListIsScriptLabels() { return KFCResultModel::ListIsScriptLabels(); }
+	virtual bool ListIsTableRows() { return KFCResultModel::ListIsTableRows(); }
 };
 
 CREATE_PMINTERFACE(KFCResultsSession, kKFCResultsImpl)
@@ -236,6 +238,9 @@ public:
 	virtual bool ScriptLabelChangeFound(const KFCScriptLabelFound& found, PMString& outWords) { return KFCScriptLabelSearch::ChangeFound(found, outWords); }
 	virtual bool ScriptLabelChangeAll(int32& outChanged, int32& outMatched, PMString& outWords) { return KFCScriptLabelSearch::ChangeAll(outChanged, outMatched, outWords); }
 	virtual PMString ScriptLabelNow(const KFCScriptLabelFound& found) { return KFCScriptLabelSearch::LabelNow(found); }
+	virtual bool ListRowsOfTables(PMString& outStatus) { return KFCTableRows::ListRows(outStatus); }
+	virtual bool CellStyleRows(const KFCRowsByChapter& rows, const KFCSpecialParams& params, PMString& outStatus) { return KFCReplaceEngine::CellStyleHits(rows, params, outStatus); }
+	virtual bool CanCellStyleHit(int32 chapterIdx, int32 hitIdx) { return KFCReplaceEngine::CanCellStyleHit(chapterIdx, hitIdx); }
 };
 
 CREATE_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)

@@ -5082,6 +5082,8 @@ namespace
 // false = changed, and the sentence said.
 // What a search again says of a query run's list (SearchStoryAgain, SearchDocumentAgain, SearchListOnceMore).
 const char* const kRunListHasNoSearch = "this list records a query run - no search made it.";
+// ...and of a table row list (KFCTableRows - docs/superpowers/specs/2026-11-05-kfc-table-rows-cell-style-design.md T8): no search made it either.
+const char* const kTableRowsHaveNoSearch = "this list lists the rows of tables - no search made it; list them again from the tables' tier.";
 
 bool QueryUnchangedForAgain(PMString& outStatus)
 {
@@ -5500,6 +5502,11 @@ bool KFCSearchEngine::SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMStrin
 		outStatus.Append(kRunListHasNoSearch);
 		return false;
 	}
+	if (KFCResultModel::ListIsTableRows())
+	{
+		outStatus.Append(kTableRowsHaveNoSearch);
+		return false;
+	}
 	// A LIST OF A TAB OF KFC'S IS SEARCHED AGAIN WHOLE OR BY DOCUMENT (the table tab spec's T11, the ruby tab spec's R9 - the menu greys this one too; a warichu list's the same).
 	if (KFCResultModel::ListIsOwnKind())
 	{
@@ -5671,6 +5678,11 @@ bool KFCSearchEngine::SearchDocumentAgain(int32 chapterIdx, PMString& outStatus)
 	if (KFCResultModel::ListIsRunList())
 	{
 		outStatus.Append(kRunListHasNoSearch);
+		return false;
+	}
+	if (KFCResultModel::ListIsTableRows())
+	{
+		outStatus.Append(kTableRowsHaveNoSearch);
 		return false;
 	}
 	UIDRef docRef;
@@ -5971,6 +5983,12 @@ bool SearchListOnceMore(const KFCNarrowStep* step, PMString& outStatus)
 	{
 		outStatus.Append(lead);
 		outStatus.Append(kRunListHasNoSearch);
+		return false;
+	}
+	if (KFCResultModel::ListIsTableRows())
+	{
+		outStatus.Append(lead);
+		outStatus.Append(kTableRowsHaveNoSearch);
 		return false;
 	}
 	// A NARROW DOWN'S CONDITION: one this build knows; one only a text row can meet, refused over a list of object rows

@@ -41,6 +41,11 @@
 #include "ISelectionUtils.h"		// GetActiveSelection - the active context's selection (the document the jump fronted)
 #include "ITextModel.h"
 #include "ITextSelectionSuite.h"	// SetTextSelection - a click selects its row's match (SelectMatchOnClick)
+#include "ITableModel.h"			// a table row list's row: its table and row (TableOfRowAt)
+#include "ITableSelectionSuite.h"	// SelectRows - ...its cells selected
+#include "ITextStoryThread.h"		// GetDictUID / GetDictKey - the cell a position stands in
+#include "TablesID.h"				// kTableModelBoss
+#include "TableTypes.h"
 #include "IConcreteSelection.h"		// ReadTextSelection - the text selection's concrete boss
 #include "ITextTarget.h"			// ...its story and range
 #include "ITool.h"					// IsToolOfType(kTextSelectionTool) - is a text tool already active?
@@ -1059,7 +1064,30 @@ NotSelected SelectMatchOnClick(int32 chapterIdx, int32 hitIdx, const UIDRef& sto
 	return SelectRangeNow(storyRef, start, end, hidden);
 }
 
-// [start, end) OF THE STORY SELECTED, THE TYPE TOOL ON (SelectMatchOnClick's, the Table part's Find Next's). Asks no lock.
+// THE TABLE AND ROW A TEXT POSITION STANDS IN (a table row list's row - its first character's cell: the model's KFCTableRows::TableRowAt, read here in the UI
+// half): the table AddRef'd, or nil - outRow its row.
+ITableModel* TableOfRowAt(const UIDRef& storyRef, TextIndex at, int32& outRow)
+{
+	outRow = -1;
+	InterfacePtr<ITextModel> model(storyRef, UseDefaultIID());
+	if (model == nil || at < 0 || at >= model->TotalLength())
+		return nil;
+	InterfacePtr<ITextStoryThread> thread(model->QueryStoryThread(at, nil, nil));
+	IDataBase* const db = storyRef.GetDataBase();
+	const UID dict = (thread != nil) ? thread->GetDictUID() : kInvalidUID;
+	if (db == nil || dict == kInvalidUID || !db->IsValidUID(dict) || db->GetClass(dict) != kTableModelBoss)
+		return nil;
+	InterfacePtr<ITableModel> table(db, dict, UseDefaultIID());
+	if (table == nil)
+		return nil;
+	const GridAddress cell(table->GetGridAddress(GridID(thread->GetDictKey())));
+	if (cell.row < 0 || cell.row >= table->GetTotalRows().count)
+		return nil;
+	outRow = cell.row;
+	return table.forget();
+}
+
+// [start, end) OF THE STORY SELECTED, THE TYPE TOOL ON (SelectMatchOnClick's, the Table part's Find Next's) - a table row list's row: its cells. Asks no lock.
 NotSelected SelectRangeNow(const UIDRef& storyRef, TextIndex start, TextIndex end, bool hidden)
 {
 	InterfacePtr<ITextModel> textModel(storyRef, UseDefaultIID());
@@ -1082,6 +1110,20 @@ NotSelected SelectRangeNow(const UIDRef& storyRef, TextIndex start, TextIndex en
 	// selection it will convert, only for the next line to throw the result away.
 	if (!PutTypeToolOn())
 		return kNotSelectedQuietly;
+	// A TABLE ROW LIST'S ROW (docs/superpowers/specs/2026-11-05-kfc-table-rows-cell-style-design.md T5): its CELLS selected - the row its text stands in now, as
+	// InDesign's own row selection selects it (ITableSelectionSuite::SelectRows). Measured 11-05 (work/cpp-probe/examples/table-row-select.cpp): the row's text
+	// selected as text is shrunk to its first cell's words; SelectRows selects the row from any selection, a row a merged cell from above covers without that
+	// cell (InDesign's shrink - the cells the row's text holds). No scroll: the jump has already shown it.
+	if (KFCResults()->ListIsTableRows())
+	{
+		int32 row = -1;
+		InterfacePtr<ITableModel> table(TableOfRowAt(storyRef, start, row));
+		InterfacePtr<ITableSelectionSuite> tableSelection(selectionManager, UseDefaultIID());
+		if (table == nil || tableSelection == nil)
+			return kNotSelectedQuietly;
+		tableSelection->SelectRows(row, 1, table, kTrue, kFalse);
+		return hidden ? kSelectedHidden : kSelected;
+	}
 	// ! RangeData is (start, END) - not (start, length). Getting that wrong selects from the match to a point measured
 	//   from the start of the STORY. A zero-width match (start == end) is a caret there, and a caret is given its lean:
 	//   RangeData.h asks for one whenever start == end - "RangeData( 34, 34); //incorrect", the two-index form, which

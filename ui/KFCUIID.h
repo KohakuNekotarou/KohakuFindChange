@@ -519,8 +519,8 @@ DECLARE_PMID(kActionIDSpace, kKFCReplaceAllRowsActionID, kKFCUIPrefix + 120)
 // KFCResultNodeEH's PopRowMenu - no MenuDef for the items), named as it is drawn (UpdateActionStates). THE STYLE ITEMS ARE ANY
 // STYLE LIST'S (KFCStyleMenu::Kind - the cell styles of a table row list are to share them, the author's ask of 11-05): the
 // list the last menu popped with says what an item gives. Consecutive: an item's place is its ActionID less the first's. In
-// THE MODEL HALF'S BAND of the action space (kKFCPrefix + n): the model declares no action, the UI band's last free IDs are
-// + 121 ... + 127, and the widget space's model band is spent the same way (the Ruby face's boxes - kKFCPrefix + 40 up, below);
+// THE MODEL HALF'S BAND of the action space (kKFCPrefix + n): the model declares no action, the UI band's last free IDs were
+// + 121 ... + 127 (+ 123 ... + 127 since + 121 and + 122 went to the note and List Rows of These Tables), and the widget space's model band is spent the same way (the Ruby face's boxes - kKFCPrefix + 40 up, below);
 // + 64 up, clear of the low numbers the one plug-in of before the model/UI split gave its actions (its retired ones are
 // marked above).
 DECLARE_PMID(kActionIDSpace, kKFCStyleItem0ActionID, kKFCPrefix + 64)
@@ -566,6 +566,10 @@ DECLARE_PMID(kActionIDSpace, kKFCStyleItem39ActionID, kKFCPrefix + 103)
 #define kKFCStyleItems	40		// (the items above: a list of more shows its first 40 and the note below says how many more)
 // ...and the submenu's note, greyed: "No Object Styles", or "<N> more - use the Object Styles panel". + 121.
 DECLARE_PMID(kActionIDSpace, kKFCStyleNoteActionID, kKFCUIPrefix + 121)
+// LIST ROWS OF THESE TABLES on a tier heading's menu (the author, 11-05: "after searching tables, a list of their ROWs" -
+// docs/superpowers/specs/2026-11-05-kfc-table-rows-cell-style-design.md T1): a Table list's tables' rows as a new tier
+// (KFCResultHistory::ListRowsOfTables - KFCTableRows), Search Text in These Tables' way. + 122.
+DECLARE_PMID(kActionIDSpace, kKFCListTableRowsActionID, kKFCUIPrefix + 122)
 
 
 // WidgetIDs:
@@ -845,6 +849,10 @@ DECLARE_PMID(kWidgetIDSpace, kKFCKentenChangeLabelWidgetID, kKFCPrefix + 92)
 #define kKFCApplyObjStyleSubmenuKey		kKFCStringPrefix "kKFCApplyObjStyleSubmenuKey"	// "Apply Object Style"
 #define kKFCStyleItemMenuKey			kKFCStringPrefix "kKFCStyleItemMenuKey"			// "Style"
 #define kKFCStyleNoteMenuKey			kKFCStringPrefix "kKFCStyleNoteMenuKey"			// "No Styles"
+// ...and the table row list (2026-11-05): a tier heading's List Rows of These Tables, a table row's Special Operations > Apply Cell Style
+// submenu (measured against every other key - key_collisions.py).
+#define kKFCListTableRowsMenuKey		kKFCStringPrefix "kKFCListTableRowsMenuKey"		// "List Rows of These Tables"
+#define kKFCApplyCellStyleSubmenuKey	kKFCStringPrefix "kKFCApplyCellStyleSubmenuKey"	// "Apply Cell Style"
 // ...and Copy Results: the panel menu's, a row's Copy Rows, a tier heading's Copy These Results (measured against every
 // other key - key_collisions.py).
 #define kKFCCopyResultsMenuKey			kKFCStringPrefix "kKFCCopyResultsMenuKey"
@@ -1076,6 +1084,10 @@ DECLARE_PMID(kWidgetIDSpace, kKFCKentenChangeLabelWidgetID, kKFCPrefix + 92)
 #define kKFCTransformSubmenuPath			kKFCSpecialOpsSubmenuPath kSDKDefDelimitMenuPath kKFCTransformSubmenuKey
 // ...and Apply Object Style's (2026-11-05): its parent node in the MenuDef, its items put as the menu pops (KFCStyleMenu).
 #define kKFCApplyObjStyleSubmenuPath		kKFCSpecialOpsSubmenuPath kSDKDefDelimitMenuPath kKFCApplyObjStyleSubmenuKey
+// ...and a TEXT row's Special Operations > Apply Cell Style (2026-11-05 - a table row list's rows': the submenu ENTRY and its items put as the menu pops,
+// only over such a row - KFCResultNodeEH's PopRowMenu, KFCStyleMenu's kCellStyles; no MenuDef node, which would stand empty on every other text row).
+#define kKFCApplyCellStyleSubmenuPath		kKFCHitSpecialOpsSubmenuPath kSDKDefDelimitMenuPath kKFCApplyCellStyleSubmenuKey
+#define kKFCApplyCellStyleSubmenuEntry		kKFCApplyCellStyleSubmenuPath kSDKDefDelimitMenuPath		// (IMenuManager's form of a submenu entry: its path and a delimiter)
 // A tier heading's Narrow Down submenu (the narrow-down spec's N1) - named by KFC's own key, as Fitting is.
 #define kKFCNarrowDownSubmenuPath			kKFCResultTierMenuName kSDKDefDelimitMenuPath kKFCNarrowDownSubmenuKey
 
@@ -1161,6 +1173,7 @@ DECLARE_PMID(kWidgetIDSpace, kKFCKentenChangeLabelWidgetID, kKFCPrefix + 92)
 #define kKFCRestoreOriginalMenuItemPosition		7.0		// Restore from Copy
 #define kKFCSearchTextInObjectsMenuItemPosition	7.5		// Search Text in These Objects
 #define kKFCSearchTextInTablesMenuItemPosition	7.6		// Search Text in These Tables
+#define kKFCListTableRowsMenuItemPosition		4.5		// List Rows of These Tables (2026-11-05 - the abc order, ROW-32: after Copy These Results, before Narrow Down)
 #define kKFCSearchTierAgainMenuItemPosition		8.0		// Search These Results Again
 #define kKFCSearchDocumentAgainMenuItemPosition	9.0		// Search This Document Again
 #define kKFCSearchStoryAgainMenuItemPosition	10.0	// Search This Story Again
@@ -1180,6 +1193,7 @@ DECLARE_PMID(kWidgetIDSpace, kKFCKentenChangeLabelWidgetID, kKFCPrefix + 92)
 // Special Operations, in abc order (an object row's whole; a text row's holds Clear Overrides, Create Outlines and - in a Japanese InDesign - Tate-chu-yoko).
 #define kKFCTcyTextMenuItemPosition				9.0		// Tate-chu-yoko (a text row's menu - its own path; after Create Outlines' 3.0)
 #define kKFCApplyObjStyleSubmenuPosition		0.5		// Apply Object Style > (2026-11-05 - first in abc order)
+#define kKFCApplyCellStyleSubmenuPosition		0.5		// Apply Cell Style > (a text row's menu - its own path; first in abc order)
 #define kKFCArrangeSubmenuPosition				1.0		// Arrange >
 #define kKFCClearStyleOverridesMenuItemPosition	2.0		// Clear Object Style Overrides
 #define kKFCClearTextOverridesMenuItemPosition	2.0		// Clear Overrides (a text row's menu - its own path, so no clash with the 2.0 above)

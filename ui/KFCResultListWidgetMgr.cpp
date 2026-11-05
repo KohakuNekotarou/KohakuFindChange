@@ -1441,6 +1441,17 @@ bool KFCResultTree::CanTcyAny(const KFCRowsByChapter& rows)
 	return AnyRowCan(rows, [](int32 chapter, int32 hit) { return KFCRuns()->CanTcyHit(chapter, hit); });
 }
 
+bool KFCResultTree::CellStyleRows(const KFCRowsByChapter& rows, const KFCSpecialParams& params)
+{
+	// (Tate-chu-yoko's way: each written row reads Styled - SpecialRowWord.)
+	return WriteRowsInPlace(rows, [&](PMString& status) { return KFCRuns()->CellStyleRows(rows, params, status); });
+}
+
+bool KFCResultTree::CanCellStyleAny(const KFCRowsByChapter& rows)
+{
+	return AnyRowCan(rows, [](int32 chapter, int32 hit) { return KFCRuns()->CanCellStyleHit(chapter, hit); });
+}
+
 bool KFCResultTree::SpecialRows(int32 op, const KFCRowsByChapter& rows, const KFCSpecialParams& params)
 {
 	// Drawn again after it (WriteRowsInPlace): each written row reads the operation's word, its place read again,
@@ -1485,6 +1496,7 @@ const char* KFCResultTree::SpecialRowWord(int32 op)
 		case kKFCSpecialShear:					return "Sheared";
 		case kKFCSpecialClearStyleOverrides:	return "Cleared";
 		case kKFCSpecialApplyObjectStyle:		return "Styled";	// an object row's Special Operations > Apply Object Style (its spec's A8)
+		case kKFCSpecialApplyCellStyle:			return "Styled";	// a table row's Special Operations > Apply Cell Style (the table-rows spec's T6)
 		case kKFCSpecialClearTextOverrides:		return "Cleared";	// a text row's Clear Overrides - the same word
 		case kKFCSpecialTableStyle:				return "Styled";	// a table row's Replace (the table tab spec's T9)
 		case kKFCSpecialRubyChange:				return "Changed";	// a ruby row's Replace (the ruby tab spec's R8)

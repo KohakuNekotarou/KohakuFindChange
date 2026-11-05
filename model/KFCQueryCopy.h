@@ -121,6 +121,9 @@ namespace KFCQueryCopier
 	/** A QUERY RUN'S LIST'S (KFCRunList): the mode alone, kKFCRunListSearchMode, for the same reasons - it has no query of its
 	    own to state or compare, and a tier without a copy could not be switched back to. */
 	void CaptureRunList(KFCQueryCopy& out);
+	/** A TABLE ROW LIST'S (KFCTableRows - docs/superpowers/specs/2026-11-05-kfc-table-rows-cell-style-design.md): the mode alone, kKFCTableRowsSearchMode -
+	    a query run's list's reasons (no search made it). */
+	void CaptureTableRows(KFCQueryCopy& out);
 	/** A TABLE LIST'S (KFCTableSearch): the mode, kKFCTableSearchMode, and its find side - nothing of Find/Change's, nothing stated back. */
 	void CaptureTables(KFCQueryCopy& out, const PMString& findStyle, bool overridesOnly);
 	/** A RUBY LIST'S (KFCRubySearch): the mode, kKFCRubySearchMode, and its find side - the same. */

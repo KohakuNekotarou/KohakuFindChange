@@ -883,6 +883,10 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCClearTextOverridesMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// (Apply Cell Style - 2026-11-05, docs/superpowers/specs/2026-11-05-kfc-table-rows-cell-style-design.md T6 - has NO node here: a parent node stands
+		// on every text row's menu, empty over a text list's row (measured 11-05 - trw-menu-text-list). KFCResultNodeEH's PopRowMenu adds the submenu entry
+		// and its items over a row of a table row list alone - IMenuManager::AddMenuItem(kInvalidActionID, "<path>:") - and takes it off over any other.)
+
 		// ----- A story row's right-click menu -----
 		// Popped by KFCResultNodeEH::RButtonDn over a story row: Search This Story Again walks that story alone with
 		// the search's query and puts its rows back (KFCSearchEngine::SearchStoryAgain).
@@ -970,6 +974,13 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCSearchTextInTablesActionID,
 		kKFCResultTierMenuName
 		kKFCSearchTextInTablesMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		// ...and List Rows of These Tables (the author, 11-05 - docs/superpowers/specs/2026-11-05-kfc-table-rows-cell-style-design.md T1): the tables' rows
+		// into a new tier (KFCResultHistory::ListRowsOfTables); grey over a tier of any other kind.
+		kKFCListTableRowsActionID,
+		kKFCResultTierMenuName
+		kKFCListTableRowsMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// ...and Narrow Down (docs/superpowers/specs/2026-10-18-kfc-narrow-down-design.md N1, N2): that tier's search run once more
@@ -1578,6 +1589,16 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKFCActionComponentBoss,
 		kKFCSearchTextInTablesActionID,
 		kKFCSearchTextInTablesMenuKey,	// "Search Text in These Tables"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// List Rows of These Tables (2026-11-05): a Table list's tier heading's - grey over any other tier (TierHoldsTables).
+		kKFCActionComponentBoss,
+		kKFCListTableRowsActionID,
+		kKFCListTableRowsMenuKey,	// "List Rows of These Tables"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,

@@ -92,7 +92,9 @@ DECLARE_PMID(kInterfaceIDSpace, IID_IKFCUIBOUNDARY, kKFCPrefix + 14)
 //  IKFCRuns::ScriptLabelNow appended - the face's box of the found item's label.)
 // (49, 2026-11-05: KFCSpecialOp gained kKFCSpecialApplyObjectStyle and KFCSpecialParams gained words - Special Operations >
 //  Apply Object Style.)
-#define kKFCBoundaryRevision	"49"
+// (50, 2026-11-05: a table row list - IKFCRuns::ListRowsOfTables / CellStyleRows / CanCellStyleHit and IKFCResults::ListIsTableRows appended,
+//  KFCSpecialOp gained kKFCSpecialApplyCellStyle - List Rows of These Tables and Special Operations > Apply Cell Style.)
+#define kKFCBoundaryRevision	"50"
 #define kKFCBoundaryStamp		kKFCVersion "/" kKFCBoundaryRevision
 
 #endif // __KFCBoundaryID_h__
