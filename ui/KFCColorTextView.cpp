@@ -210,13 +210,36 @@ void KFCColorTextView::DV_Draw(dvaui::drawbot::Drawbot* drawbotP) const
 	PMString locator, flag, pre, match, post;
 	data->GetSegments(locator, flag, pre, match, post);
 
-	// A TWO-LINE ROW: the lower line draws the match's text alone (the label a reader walks keeps base<<reading>>), what stands over it on the upper line. Offsets over the text, one
-	// character to one: MarkUpBreaksForDisplay below puts a mark where a break is.
+	// A TWO-LINE ROW: the lower line draws the match's text alone (the label a reader walks keeps base<<reading>>), what stands over it on the upper line.
 	PMString twoLineMatch;
 	KFCRowUpper upper;
 	const bool twoLines = data->GetTwoLines(twoLineMatch, upper);
 	if (twoLines)
+	{
+		// THE UPPER RUNS' OFFSETS COUNTED AS THE LINE DRAWS THEM: the model counts them in the document's characters, and MarkUpBreaksForDisplay below puts a mark where a break is but
+		// DROPS what an object stands on - an index marker can stand inside a ruby (measured 11-06: InDesign kept U+FEFF in the run of the ruby over it). Counted in the document's,
+		// a reading after such a marker stood a character past the drawn match and was not drawn (the since-2.1.0 re-inspection's D7-a - rb-two-marker). Each offset becomes what
+		// the match's characters before it come to once marked up - one rule with the line's.
+		const auto drawnCount = [&twoLineMatch](int32 n) -> int32
+		{
+			if (n <= 0)
+				return 0;
+			PMString head(twoLineMatch);
+			head.SetTranslatable(kFalse);
+			if (n < head.CharCount())
+				head.Remove(n, head.CharCount() - n);
+			KFCResults()->MarkUpBreaksForDisplay(head);
+			return head.CharCount();
+		};
+		for (size_t r = 0; r < upper.runs.size(); ++r)
+		{
+			KFCRowUpperRun& run = upper.runs[r];
+			const int32 drawnEnd = drawnCount(run.offset + run.length);
+			run.offset = drawnCount(run.offset);
+			run.length = drawnEnd - run.offset;
+		}
 		match = twoLineMatch;
+	}
 
 	// Break characters become visible marks BEFORE anything is measured or ellipsized below: every
 	// width taken from here on has to be the width of what is actually drawn.
