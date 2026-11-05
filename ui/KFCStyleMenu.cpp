@@ -171,4 +171,11 @@ bool KFCStyleMenu::IsStyleItem(const ActionID& action, int32& outK)
 	return true;
 }
 
+void KFCStyleMenu::ShutdownCleanup()
+{
+	std::vector<Entry>().swap(gItems);
+	gNote = PMString();
+	gKind = kNone;
+}
+
 // End, KFCStyleMenu.cpp.

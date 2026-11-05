@@ -51,6 +51,10 @@ namespace KFCStyleMenu
 
 	/** Is `action` one of the style items? outK = its place (its ActionID less kKFCStyleItem0ActionID). */
 	bool IsStyleItem(const ActionID& action, int32& outK);
+
+	/** The list let go, its storage too (swapped with empty ones - KFCQueryOrder's way): its PMStrings destroyed while
+	    InDesign stands, not by the unload. The UI half's Shutdown (KFCUIStartupShutdown). */
+	void ShutdownCleanup();
 }
 
 #endif // __KFCStyleMenu_h__

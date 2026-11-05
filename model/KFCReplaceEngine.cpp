@@ -4892,7 +4892,7 @@ static bool ReplaceLabelRows(const KFCRowsByChapter& rowsByChapter, PMString& ou
 			{
 				const PMString label(KFCScriptLabelSearch::LabelOf(db, row.item, row.key));
 				if (!KFCScriptLabelSearch::Matches(label, asked))
-					why = (KFCResultModel::GetHitSpecial(chapter.chapterIdx, row.hit) == kKFCSpecialScriptLabel) ? kOwnTabAsAsked : kOwnTabEdited;	// (KFC's own write is what it reads)
+					why = KFCResultModel::GetHitTabWritten(chapter.chapterIdx, row.hit) ? kOwnTabAsAsked : kOwnTabEdited;	// (KFC's own write is what it reads - a Special Operation since leaves it so)
 				else
 				{
 					row.value = KFCScriptLabelSearch::NewValue(label, asked);

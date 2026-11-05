@@ -105,8 +105,9 @@ namespace
 	// counted). A special operation's mark is not a Replace's, and is not counted (Clear Overrides, Tate-chu-yoko, an object's).
 	bool CountedAsWritten(const KFCResultModel::Hit& h)
 	{
-		return h.replaced || h.special == kKFCSpecialTableStyle || h.special == kKFCSpecialRubyChange || h.special == kKFCSpecialKentenChange
-			|| h.special == kKFCSpecialScriptLabel;		// (a script label row's - S8)
+		// (A Kohaku+ kind's own write by its own mark - Hit::tabWritten - not by special's word, which a Special Operation over the row since writes: it
+		// stayed written - the re-inspection of 2026-11-05.)
+		return h.replaced || h.tabWritten;
 	}
 
 	// ...and how many of them a write of ours has written (CountedAsWritten): what every replaced count counts.
@@ -1442,6 +1443,7 @@ void KFCResultModel::MarkHitRestored(int32 chapterIdx, int32 hitIdx, UID storyUI
 	h.replaced = false;
 	h.outlined = false;
 	h.special = 0;		// (a special operation's word too - the row is as the search found it)
+	h.tabWritten = false;
 	h.kept = false;
 	h.replacedText.Clear();
 	h.copy = HitCopy();
@@ -1470,6 +1472,7 @@ void KFCResultModel::MarkHitOwnChange(int32 chapterIdx, int32 hitIdx, int32 op, 
 	if (hp == nil)
 		return;
 	MarkHitSpecial(chapterIdx, hitIdx, op);		// (its backup taken there - before this change too)
+	hp->tabWritten = true;		// (counted as written, whatever Special Operation writes special over it later - Hit::tabWritten)
 	hp->runChain = words;
 	hp->runChain.SetTranslatable(kFalse);
 	hp->upper = upper;
@@ -1700,6 +1703,7 @@ int32 KFCResultModel::MergeKeptRows(std::vector<Hit>& found, std::vector<Hit>& k
 				{
 					h.kept = true;
 					h.special = row.special;	// ...and what KFC last wrote it with (an object row's special operation)
+					h.tabWritten = row.tabWritten;	// ...and whether a Kohaku+ kind's own Replace wrote it
 					again = true;
 				}
 			}
@@ -2020,10 +2024,10 @@ UID KFCResultModel::GetHitItem(int32 chapterIdx, int32 hitIdx)
 	return (h != nil) ? h->itemUID : kInvalidUID;
 }
 
-int32 KFCResultModel::GetHitSpecial(int32 chapterIdx, int32 hitIdx)
+bool KFCResultModel::GetHitTabWritten(int32 chapterIdx, int32 hitIdx)
 {
 	const Hit* h = HitAt(chapterIdx, hitIdx);
-	return (h != nil) ? h->special : 0;
+	return h != nil && h->tabWritten;
 }
 
 PMString KFCResultModel::GetHitLabelKey(int32 chapterIdx, int32 hitIdx)
@@ -2131,6 +2135,7 @@ void KFCResultModel::MarkItemOwnChange(int32 chapterIdx, int32 hitIdx, int32 op,
 		return;		// (a text row's own change is MarkHitOwnChange's)
 	const Hit asItStands(*h);		// (no place read: the row's own - nil would read as the item taken away)
 	MarkItemSpecial(chapterIdx, hitIdx, op, newPrint, newLength, (place != nil) ? place : &asItStands);		// (its backup taken there - before the words too)
+	h->tabWritten = true;		// (counted as written, whatever Special Operation writes special over it later - Hit::tabWritten)
 	h->runChain = words;
 	h->runChain.SetTranslatable(kFalse);
 	// THE WORDS ARE ITS WHOLE LINE NOW (a script label row's: what it reads after the write, no match in it to darken) - drawn where the match stands, nothing faint around them.

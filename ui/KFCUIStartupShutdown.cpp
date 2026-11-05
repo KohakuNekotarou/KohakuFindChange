@@ -35,6 +35,7 @@
 #include "KFCKohakuQueryMenu.h"
 #include "KFCKohakuTab.h"		// what the Kohaku tab's face keeps - static strings
 #include "KFCResultHistory.h"	// the results kept in tiers - static vectors of copied rows
+#include "KFCStyleMenu.h"		// the style list a row's menu popped with - static strings
 #include "KFCModelObserver.h"	// the UI half's ear on the model half
 
 /** Implements IStartupShutdownService for the UI half. */
@@ -108,6 +109,8 @@ public:
 		KFCQueryOrder::ShutdownCleanup();
 		KFCKohakuQueryMenu::Shutdown();
 		KFCKohakuTab::ShutdownCleanup();
+		// ...and the style list a row's menu popped with last (Apply Object Style > - KFCStyleMenu): PMStrings in static storage.
+		KFCStyleMenu::ShutdownCleanup();
 		// ...and the results kept in tiers: their copies of the rows are PMStrings in static vectors, and the tier
 		// switch's booking timer (KFCResultHistory).
 		KFCResultHistory::ShutdownCleanup();

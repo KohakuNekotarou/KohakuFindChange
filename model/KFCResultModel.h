@@ -177,6 +177,10 @@ namespace KFCResultModel
 								// and keeps its eye on. The item is still the row's (its Replace stays offered) - but for Delete,
 								// which takes it away and greys the row's Replace (replaced too). A Replace and Create Outlines
 								// put their own word there (MarkItemReplaced, MarkItemOutlined clear it). MarkItemSpecial.
+		bool		tabWritten;	// WRITTEN BY A KOHAKU+ KIND'S OWN REPLACE (a table, ruby, kenten or script label row's - MarkHitOwnChange,
+								// MarkItemOwnChange): counted as written (CountedAsWritten - the author's "(R/N) counts the tab's writes").
+								// Its own mark, not special's word: a Special Operation over the row since (Lock, Apply Object Style,
+								// Tate-chu-yoko) writes special, and the row stays written (re-inspection of 2026-11-05).
 		bool		kept;		// THE ROW EYE (docs/superpowers/specs/2026-10-17-kfc-row-eye-keep-design.md): on = the row
 								// stays when its story or document is searched again, found or not (MergeKeptRows). A
 								// replace turns it on (MarkHitReplaced, MarkItemReplaced); the eye's click turns it either
@@ -276,7 +280,7 @@ namespace KFCResultModel
 		Hit() : pageIndex(-1), isOverset(false), isLocked(false), isHidden(false), onHiddenSpread(false),
 				fontGroup(-1), fontGroupPos(-1), storyUID(kInvalidUID),
 				textStart(kInvalidTextIndex), textEnd(kInvalidTextIndex), matchHash(0),
-				replaced(false), outlined(false), special(0), kept(false), cleared(false),
+				replaced(false), outlined(false), special(0), tabWritten(false), kept(false), cleared(false),
 				inFootnote(false), inEndnote(false), frameOnPasteboard(false), matchFrame(kInvalidUID), pageUID(kInvalidUID),
 				frameLayer(kInvalidUID), outcome(kOutcomeNone),
 				pageOrdinal(0), storyOrdinal(-1),
@@ -764,9 +768,9 @@ namespace KFCResultModel
 	/** The page item an OBJECT row stands for (Hit::itemUID); kInvalidUID for a text row or an index out of range. */
 	UID GetHitItem(int32 chapterIdx, int32 hitIdx);
 
-	/** The special operation KFC last wrote the row with (Hit::special - a KFCSpecialOp, 0 for none, or an index out of range): a script label row's Replace
-	    asks whether its own write is what the row reads now (KFCReplaceEngine's label rows). */
-	int32 GetHitSpecial(int32 chapterIdx, int32 hitIdx);
+	/** Has a Kohaku+ kind's own Replace written the row (Hit::tabWritten - false for an index out of range): a script label row's Replace asks whether its own
+	    write is what the row reads now (KFCReplaceEngine's label rows) - a Special Operation over the row since leaves it so. */
+	bool GetHitTabWritten(int32 chapterIdx, int32 hitIdx);
 
 	/** A script label row's key (Hit::labelKey) - empty for any other row, or an index out of range. */
 	PMString GetHitLabelKey(int32 chapterIdx, int32 hitIdx);
