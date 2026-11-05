@@ -66,6 +66,7 @@
 #include "KFCResultTree.h"
 #include "KFCResultHistory.h"	// the tiers kept above the live list - their rows' copies, and whether there are any
 #include "KFCJump.h"			// ReplaceObjectRows - object rows' Replace
+#include "KFCRowScript.h"		// Run - Special Operations > Run Script... (RunScriptRows)
 #include "KFCResultEye.h"		// Draw - the row eye, drawn as its click and its trace draw it
 #include "KFCColorTextView.h"	// IKFCRowData (the hit cell)
 #include "IKFCStatusTextData.h"	// the message area's pieces
@@ -1472,6 +1473,12 @@ bool KFCResultTree::RemoveLabelRows(const KFCRowsByChapter& rows)
 bool KFCResultTree::CanRemoveLabelAny(const KFCRowsByChapter& rows)
 {
 	return AnyRowCan(rows, [](int32 chapter, int32 hit) { return KFCRuns()->CanRemoveLabelHit(chapter, hit); });
+}
+
+bool KFCResultTree::RunScriptRows(const KFCRowsByChapter& rows)
+{
+	// (The steps around every write from the list - WriteRowsInPlace: not under a landing or a run; the rows drawn again after it, no word on them - RS7.)
+	return WriteRowsInPlace(rows, [&](PMString& status) { return KFCRowScript::Run(rows, status); });
 }
 
 bool KFCResultTree::SpecialRows(int32 op, const KFCRowsByChapter& rows, const KFCSpecialParams& params)

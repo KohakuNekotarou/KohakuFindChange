@@ -883,6 +883,13 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCClearTextOverridesMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// ...and Run Script... (docs/superpowers/specs/2026-11-06-kfc-run-script-on-rows-design.md RS1): the person's script run once on each row's object - its match's
+		// text, or what the row stands for (KFCRowScript). The object row's submenu has it too (below).
+		kKFCRunScriptActionID,
+		kKFCHitSpecialOpsSubmenuPath
+		kKFCRunScriptMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 		// (Apply Cell Style - 2026-11-05, docs/superpowers/specs/2026-11-05-kfc-table-rows-cell-style-design.md T6 - has NO node here: a parent node stands
 		// on every text row's menu, empty over a text list's row (measured 11-05 - trw-menu-text-list). KFCResultNodeEH's PopRowMenu adds the submenu entry
 		// and its items over a row of a table row list alone - IMenuManager::AddMenuItem(kInvalidActionID, "<path>:") - and takes it off over any other.)
@@ -1095,6 +1102,12 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCCreateOutlinesActionID,
 		kKFCSpecialOpsSubmenuPath
 		kKFCCreateOutlinesMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		// Run Script... (docs/superpowers/specs/2026-11-06-kfc-run-script-on-rows-design.md RS1): the person's script run once on each row's page item (KFCRowScript).
+		kKFCRunScriptActionID,
+		kKFCSpecialOpsSubmenuPath
+		kKFCRunScriptMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// ----- The other Special Operations (docs/superpowers/specs/2026-10-17-kfc-object-special-operations-design.md E2) -----
@@ -2441,6 +2454,17 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKFCActionComponentBoss,
 		kKFCRemoveLabelActionID,
 		kKFCRemoveLabelMenuKey,			// "Remove Label"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// Run Script... - every row's Special Operations, a text row's and an object row's (docs/superpowers/specs/2026-11-06-kfc-run-script-on-rows-design.md RS1 - KFCRowScript):
+		// the person's script run once on each row's object (kfcResult). kCustomEnabling: grey under a run or a landing, and with no row.
+		kKFCActionComponentBoss,
+		kKFCRunScriptActionID,
+		kKFCRunScriptMenuKey,			// "Run Script..."
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,

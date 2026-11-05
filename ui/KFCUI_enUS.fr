@@ -118,6 +118,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 // Apply Table Style > and Remove Label (2026-11-05): a script label list's table row's submenu, and its rows' Remove Label.
                 kKFCApplyTableStyleSubmenuKey,		"Apply Table Style",
                 kKFCRemoveLabelMenuKey,				"Remove Label",
+                kKFCRunScriptMenuKey,				"Run Script...",
                 kKFCDeleteMenuKey,					"Delete",
                 kKFCMoveMenuKey,					"Move...",
                 kKFCScaleMenuKey,					"Scale...",

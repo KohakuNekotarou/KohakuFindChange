@@ -850,6 +850,17 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			break;
 		}
 
+		case kKFCRunScriptActionID:
+		{
+			// Any row's Special Operations > Run Script... (docs/superpowers/specs/2026-11-06-kfc-run-script-on-rows-design.md RS1 - RS6): Remove Label's way - the row it was
+			// popped over, or the rows selected together when it is one of them - the person's script run once on each one's object (KFCResultTree::RunScriptRows). No
+			// hit row: nothing.
+			int32 chapter = -1, hit = -1;
+			if (RightClickedHit(widget, chapter, hit))
+				(void)KFCResultTree::RunScriptRows(KFCResultTree::RowsOfRightClick(chapter, hit));
+			break;
+		}
+
 		case kKFCRestoreOriginalActionID:
 		{
 			// A TEXT row's Restore from Copy (docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md): the
@@ -1336,6 +1347,15 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 				int32 chapter = -1, hit = -1;
 				const bool enable = RightClickedHit(widget, chapter, hit)
 					&& KFCResultTree::CanRemoveLabelAny(KFCResultTree::RowsOfRightClick(chapter, hit));
+				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
+				break;
+			}
+			case kKFCRunScriptActionID:
+			{
+				// Any row's menu: Run Script... while there is a row (a run standing greys everything, above). What a row's object is, and whether its document is open, is
+				// read when it is pressed - a row that cannot be run is counted then (RS5), not greyed now.
+				int32 chapter = -1, hit = -1;
+				const bool enable = RightClickedHit(widget, chapter, hit) && KFCRowCount(KFCResultTree::RowsOfRightClick(chapter, hit)) > 0;
 				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 				break;
 			}

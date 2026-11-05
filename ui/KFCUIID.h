@@ -574,6 +574,9 @@ DECLARE_PMID(kActionIDSpace, kKFCListTableRowsActionID, kKFCUIPrefix + 122)
 // row's label of its key taken away - an object row's and a text row's (a cell's) Special Operations, put on the menu as it pops over such a list
 // alone (KFCResultNodeEH's PopRowMenu - one action, on the path of the row popping). + 123.
 DECLARE_PMID(kActionIDSpace, kKFCRemoveLabelActionID, kKFCUIPrefix + 123)
+// SPECIAL OPERATIONS > RUN SCRIPT... on a text row's and an object row's menu (the author, 2026-11-06: "run a script on the row - a variable kfcResult" -
+// docs/superpowers/specs/2026-11-06-kfc-run-script-on-rows-design.md RS1 - KFCRowScript): the person's script run once on each row's object. + 124.
+DECLARE_PMID(kActionIDSpace, kKFCRunScriptActionID, kKFCUIPrefix + 124)
 
 
 // WidgetIDs:
@@ -861,6 +864,7 @@ DECLARE_PMID(kWidgetIDSpace, kKFCKentenChangeLabelWidgetID, kKFCPrefix + 92)
 // (measured against every other key - key_collisions.py).
 #define kKFCApplyTableStyleSubmenuKey	kKFCStringPrefix "kKFCApplyTableStyleSubmenuKey"	// "Apply Table Style"
 #define kKFCRemoveLabelMenuKey			kKFCStringPrefix "kKFCRemoveLabelMenuKey"			// "Remove Label"
+#define kKFCRunScriptMenuKey			kKFCStringPrefix "kKFCRunScriptMenuKey"				// "Run Script..." (2026-11-06 - KFCRowScript)
 // ...and Copy Results: the panel menu's, a row's Copy Rows, a tier heading's Copy These Results (measured against every
 // other key - key_collisions.py).
 #define kKFCCopyResultsMenuKey			kKFCStringPrefix "kKFCCopyResultsMenuKey"
@@ -1209,6 +1213,7 @@ DECLARE_PMID(kWidgetIDSpace, kKFCKentenChangeLabelWidgetID, kKFCPrefix + 92)
 #define kKFCApplyCellStyleSubmenuPosition		0.5		// Apply Cell Style > (a text row's menu - its own path; first in abc order)
 #define kKFCApplyTableStyleSubmenuPosition		0.6		// Apply Table Style > (a script label list's table row's - after Apply Cell Style, were both there)
 #define kKFCRemoveLabelMenuItemPosition			8.5		// Remove Label (a script label list's rows - an object row's after Move to Active Layer, before Show; a text row's after Create Outlines, before Tate-chu-yoko)
+#define kKFCRunScriptMenuItemPosition			8.7		// Run Script... (2026-11-06 - every row's: after Remove Label, before Show / Tate-chu-yoko)
 #define kKFCArrangeSubmenuPosition				1.0		// Arrange >
 #define kKFCClearStyleOverridesMenuItemPosition	2.0		// Clear Object Style Overrides
 #define kKFCClearTextOverridesMenuItemPosition	2.0		// Clear Overrides (a text row's menu - its own path, so no clash with the 2.0 above)

@@ -326,6 +326,10 @@ namespace KFCResultTree
 	/** Can Remove Label be offered on these rows (KFCRuns()->CanRemoveLabelHit - read only)? The menu's grey. */
 	bool CanRemoveLabelAny(const KFCRowsByChapter& rows);
 
+	/** SPECIAL OPERATIONS > RUN SCRIPT... ON THE ROWS (docs/superpowers/specs/2026-11-06-kfc-run-script-on-rows-design.md - KFCRowScript): the person's script run once on each
+	    row's object (kfcResult), one Ctrl+Z; the rows drawn again, no word on them. True = it ran on one row at least. */
+	bool RunScriptRows(const KFCRowsByChapter& rows);
+
 	/** AN OBJECT ROW'S OTHER SPECIAL OPERATIONS (docs/superpowers/specs/2026-10-17-kfc-object-special-operations-design.md):
 	    the rows' objects written where they stand - across spreads and documents - by InDesign's own Object menu commands
 	    (op, a KFCSpecialOp, with params - Move to Active Layer's layer name), by the model (KFCRuns()->SpecialRows,
