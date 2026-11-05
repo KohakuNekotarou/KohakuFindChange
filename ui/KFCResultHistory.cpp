@@ -698,7 +698,10 @@ namespace
 		// are another tab's, the one InDesign's mode still is.
 		if (mode == kKFCQRCodeSearchMode)
 			return label;
-		// THE TABLE TAB'S WORDS ARE ITS OWN FACE'S (KFCKohakuTab): Find:"TS1", with a + for With Overrides Only - as its rows mark an override.
+		// THE TABLE TAB'S WORDS ARE ITS OWN FACE'S (KFCKohakuTab): Find:"TS1", with a + for With Overrides Only - as its rows mark an override - and
+		// Change:"<Change to Table Style:>", [Leave As It Is] when it keeps each table's own, then Clear Overrides when that is on (the author, 11-05: "the Table
+		// tab's heading has no Change" - the Script Label kind's heading says its Change the same way since 11-04): what the face asked as the list was made -
+		// a row's Replace writes the Change side as it stands then (KFCReplaceEngine's TableWrite).
 		if (mode == kKFCTableSearchMode)
 		{
 			KFCTableConditions asked;
@@ -707,7 +710,11 @@ namespace
 			label.Append(asked.findStyle.IsEmpty() ? PMString("[Any Table Style]") : KFCStylePathWords(asked.findStyle));
 			if (asked.overridesOnly)
 				label.Append(" +");
+			label.Append("\" Change:\"");
+			label.Append(asked.changeStyle.IsEmpty() ? PMString("[Leave As It Is]") : KFCStylePathWords(asked.changeStyle));
 			label.Append("\"");
+			if (asked.clearOverrides)
+				label.Append(" Clear Overrides");
 			return label;
 		}
 		// THE SCRIPT LABEL KIND'S WORDS ARE ITS OWN FACE'S (docs/superpowers/specs/2026-11-04-kfc-script-label-design.md S2): Script Key:"<key>" when the face names

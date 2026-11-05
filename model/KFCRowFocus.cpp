@@ -188,10 +188,23 @@ void KFCRowFocusImpl::NotifyChanged(bool16 /*excludeCacheEnd*/)
 
 void KFCRowFocusImpl::DeRegisterFromModel(void)
 {
-	// Forgotten, not released: this can come while the model is being taken down, and a Release into it then would be
-	// the very crash the hold is there to prevent - a count left unreleased is the lesser harm.
+	// ***** OFF ITS MANAGER'S LIST, BY ITSELF - the caller counts on it. The manager's DeRegisterTextFoci (InDesign's own, when a
+	// story is let go - an Undo of the step that made it, among others) is "while my list is not empty, call the first one's
+	// DeRegisterFromModel" and nothing else: a focus that stays listed keeps InDesign's main thread spinning for good. That was
+	// the author's hang of 2026-11-05 (a Table search, then an Undo); TEXT.RPLN of 21.0 disassembled the same day - memory
+	// text-focus-deregister-must-remove-itself. RemoveFocus only takes the pointer out of the list (no Release, no call back into
+	// this focus - read in the same disassembly), so this focus is whole after it.
+	// The model is forgotten first, so a second call finds nothing to do.
+	ITextModel* const model = fModel;
 	fModel = nil;
 	fHeld = false;
+	if (model == nil)
+		return;
+	InterfacePtr<ITextFocusManager> manager(model, UseDefaultIID());
+	if (manager != nil)
+		manager->RemoveFocus(this);
+	// Forgotten, not released: this can come while the model is being taken down, and a Release into it then would be
+	// the very crash the hold is there to prevent - a count left unreleased is the lesser harm.
 }
 
 void KFCRowFocusImpl::SnapshotReadWrite(IPMStream* s, ImplementationID /*prop*/)

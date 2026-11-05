@@ -37,7 +37,7 @@
 - **TBL-13** 上限＝行 1000（物の一覧と同じ）。超えたら `Stopped at the 1000 limit.`。（T7）回帰 `tb-cap`
   - 訂正:
 
-- **TBL-14** Book Scope で Search: が All Documents なら本体のタブと同じ文で断る（FIND-13 の形）。段の名前＝`[Table/Document] Find:"TS1"`（With Overrides Only は ` +`・無条件は `[Any Table Style]`）。保存したクエリにはならない。クエリのダイアログの Find・Run は自分のタブを言う（タブは譲る＝Search: も本体のタブのもの）。回帰 `tb-yield-open`・`tb-yield-closed`・`tb-query-run-scope`・`tb-text-replace-name`
+- **TBL-14** Book Scope で Search: が All Documents なら本体のタブと同じ文で断る（FIND-13 の形）。段の名前＝`[Table/Document] Find:"TS1" Change:"TS2"`（With Overrides Only は Find の ` +`・無条件は `[Any Table Style]`。★2026-11-05 から **Change も**＝作者「テーブルタブで検索、結果の題名のところにChangeがない」・Script Label の見出しと同じ形＝Change to Table Style が空なら `[Leave As It Is]`・Clear Overrides にチェックがあれば後ろに ` Clear Overrides`＝`Find:"TS1" Change:"TS2" Clear Overrides`）。保存したクエリにはならない。クエリのダイアログの Find・Run は自分のタブを言う（タブは譲る＝Search: も本体のタブのもの）。回帰 `tb-yield-open`・`tb-yield-closed`・`tb-query-run-scope`・`tb-text-replace-name`・`tb-tier-change`・`tb-tier-leave`
   - 訂正:
 
 - **TBL-15** アプリケーションバーの欄は空になり、Return で一覧を作る（QR-22 と同じ）。回帰 `tb-appbar-enter`
