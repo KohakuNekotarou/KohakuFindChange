@@ -1230,6 +1230,16 @@ bool ChooseRubyList(IPanelControlData* panel)
 // and what it came to said. Through the Save dialog of KFCChooseOrderFileToSave, whose reasons hold: the name always ends in .txt. TEST BUILDS - the fault switch ruby-list-save's first line is the file.
 void SaveRubyList()
 {
+	// NOT WHILE A RUN OF THE MODEL'S IS UNDER WAY (the face's other buttons' door - FaceFindNext; the model's SaveListText asks it too): its read reaches a book's chapters. Until 2026-11-06 this button
+	// alone of the face's did not ask (the since-2.1.0 re-inspection's D22-b).
+	if (KFCRuns()->IsAnyRunning())
+	{
+		PMString busy(KFCRuns()->BusyMessage()), none;
+		busy.SetTranslatable(kFalse);
+		none.SetTranslatable(kFalse);
+		SayFor(kKindRuby, busy, none);
+		return;
+	}
 	PMString text, name, said;
 	if (!KFCRuns()->RubyListText(text, name, said))
 	{

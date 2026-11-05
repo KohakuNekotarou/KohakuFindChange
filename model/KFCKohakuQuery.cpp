@@ -27,6 +27,7 @@
 #include "KFCRubySearch.h"
 #include "KFCSavedQueries.h"	// KindName - a kind's word, the one table of them
 #include "KFCTableSearch.h"
+#include "KFCUtf8.h"			// KFCIsWellFormedUtf8 - a file asked whole before its words are read (Read)
 
 namespace
 {
@@ -211,6 +212,11 @@ bool KFCKohakuQuery::Read(const IDFile& file, KFCKohakuQueryData& out)
 	out = KFCKohakuQueryData();
 	std::string text;
 	if (!ReadWhole(file, text))
+		return false;
+	// THE WHOLE FILE IS UTF-8, OR IT IS NO QUERY OF THE KOHAKU+ TAB (KFCUtf8.h - a run order's rule): its words go to SetUTF8String, which throws on
+	// broken UTF-8 - out of the query dialog's list (KFCSavedQueries::Describe reads every file of the folder) and out of a query run. A file saved again
+	// in another encoding (Notepad's "ANSI" on a Japanese PC) is then no query of the Kohaku+ tab: false, as for any other file.
+	if (!KFCIsWellFormedUtf8(text))
 		return false;
 	size_t at = text.find(kElement);
 	if (at == std::string::npos)

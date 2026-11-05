@@ -52,6 +52,8 @@
 #include "KFCRubyListFile.h"			// ...read from its file
 #include "KFCRubyMarkText.h"			// the marks a manuscript writes
 #include "KFCTextCut.h"					// KFCSafeCut
+#include "KFCRunGuard.h"				// IsAnyRunning - Save List...'s door
+#include "KFCReplaceEngine.h"			// WriteUnderWay - Save List... counted as a run while it reaches the book's chapters
 
 namespace
 {
@@ -1045,6 +1047,16 @@ bool KFCRubySearch::SaveListText(PMString& outText, PMString& outName, PMString&
 	outName.SetTranslatable(kFalse);
 	outSaid.Clear();
 	outSaid.SetTranslatable(kFalse);
+	// NOT UNDER A RUN OF OURS, AND COUNTED AS ONE FROM HERE TO THE HAND-BACK (KFCRunGuard.h - block 11's D11-1 rule): over a book it opens each closed chapter
+	// windowless under its bar, and both run the message loop - what that dispatches must not start inside it, nor this inside another run. Until 2026-11-06
+	// neither was asked (the since-2.1.0 re-inspection's D22-b - a test build's REOPEN lines read running=0). WriteUnderWay is the count of an operation that
+	// reaches the chapters (IsReplacing - KFCRunGuard's one reader), a read as this one too.
+	if (KFCRunGuard::IsAnyRunning())
+	{
+		outSaid.Append(KFCRunGuard::BusyMessage());
+		return false;
+	}
+	const KFCReplaceEngine::WriteUnderWay counted;
 	KFCRubyConditions asked;
 	(void)IsTabCurrent(&asked);
 	KFCSearchEngine::RunScope scope;

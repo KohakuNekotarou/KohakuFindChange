@@ -335,6 +335,7 @@
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCObjectReplace.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCDiagWrittenDocs.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCTextCut.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCUtf8.h"/>
    </ItemGroup>
    <ItemGroup>
       <CustomBuild Include="..\..\..\source\sdksamples\KFC\model\KFC.fr">
