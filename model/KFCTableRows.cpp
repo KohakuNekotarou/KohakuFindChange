@@ -38,6 +38,7 @@
 #include "KFCResultModel.h"
 #include "KFCRowFoci.h"				// AttachOpenChapters - the rows follow the text, as a search's do
 #include "KFCRunGuard.h"
+#include "KFCReplaceEngine.h"		// WriteUnderWay - counted as a run while it reaches a book's chapters (ListRows)
 #include "KFCSearchEngine.h"		// ChapterDocNow, ReadText, BuildListedHits, FileChapter, ForgetSearchedFindFormat
 #include "KFCTextCut.h"				// KFCSafeCut - no cut in front of a mark that belongs to the character before it
 #include "KFCTierStore.h"			// ParkCurrent - the list of tables kept as a tier
@@ -207,6 +208,10 @@ bool KFCTableRows::ListRows(PMString& outStatus)
 		outStatus.Append(KFCRunGuard::BusyMessage());
 		return false;
 	}
+	// COUNTED AS A RUN OF OURS FROM HERE TO THE HAND-BACK (KFCRunGuard.h - block 11's D11-1 rule): a book's closed chapter is reached windowless below, and the open runs the
+	// message loop - what that dispatches must not start inside it. Until 2026-11-06 the door was asked and nothing counted (the since-2.1.0 re-inspection's D23-a - a test
+	// build's REOPEN lines read running=0: trw-book-closed). WriteUnderWay is the count of an operation that reaches the chapters (KFCRunGuard its one reader).
+	const KFCReplaceEngine::WriteUnderWay counted;
 	// A TABLE LIST'S ALONE (T1 - the menu greys it over any other; this stays for a caller that never opened the menu).
 	if (!KFCResultModel::ListIsTables())
 	{
