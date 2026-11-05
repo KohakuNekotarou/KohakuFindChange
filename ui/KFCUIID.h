@@ -570,6 +570,10 @@ DECLARE_PMID(kActionIDSpace, kKFCStyleNoteActionID, kKFCUIPrefix + 121)
 // docs/superpowers/specs/2026-11-05-kfc-table-rows-cell-style-design.md T1): a Table list's tables' rows as a new tier
 // (KFCResultHistory::ListRowsOfTables - KFCTableRows), Search Text in These Tables' way. + 122.
 DECLARE_PMID(kActionIDSpace, kKFCListTableRowsActionID, kKFCUIPrefix + 122)
+// SPECIAL OPERATIONS > REMOVE LABEL on a script label list's row (docs/superpowers/specs/2026-11-05-kfc-script-label-tables-cells-design.md L8b): the
+// row's label of its key taken away - an object row's and a text row's (a cell's) Special Operations, put on the menu as it pops over such a list
+// alone (KFCResultNodeEH's PopRowMenu - one action, on the path of the row popping). + 123.
+DECLARE_PMID(kActionIDSpace, kKFCRemoveLabelActionID, kKFCUIPrefix + 123)
 
 
 // WidgetIDs:
@@ -853,6 +857,10 @@ DECLARE_PMID(kWidgetIDSpace, kKFCKentenChangeLabelWidgetID, kKFCPrefix + 92)
 // submenu (measured against every other key - key_collisions.py).
 #define kKFCListTableRowsMenuKey		kKFCStringPrefix "kKFCListTableRowsMenuKey"		// "List Rows of These Tables"
 #define kKFCApplyCellStyleSubmenuKey	kKFCStringPrefix "kKFCApplyCellStyleSubmenuKey"	// "Apply Cell Style"
+// ...and a script label list's table and cell rows (2026-11-05): a table row's Special Operations > Apply Table Style submenu, a row's Remove Label
+// (measured against every other key - key_collisions.py).
+#define kKFCApplyTableStyleSubmenuKey	kKFCStringPrefix "kKFCApplyTableStyleSubmenuKey"	// "Apply Table Style"
+#define kKFCRemoveLabelMenuKey			kKFCStringPrefix "kKFCRemoveLabelMenuKey"			// "Remove Label"
 // ...and Copy Results: the panel menu's, a row's Copy Rows, a tier heading's Copy These Results (measured against every
 // other key - key_collisions.py).
 #define kKFCCopyResultsMenuKey			kKFCStringPrefix "kKFCCopyResultsMenuKey"
@@ -1088,6 +1096,9 @@ DECLARE_PMID(kWidgetIDSpace, kKFCKentenChangeLabelWidgetID, kKFCPrefix + 92)
 // only over such a row - KFCResultNodeEH's PopRowMenu, KFCStyleMenu's kCellStyles; no MenuDef node, which would stand empty on every other text row).
 #define kKFCApplyCellStyleSubmenuPath		kKFCHitSpecialOpsSubmenuPath kSDKDefDelimitMenuPath kKFCApplyCellStyleSubmenuKey
 #define kKFCApplyCellStyleSubmenuEntry		kKFCApplyCellStyleSubmenuPath kSDKDefDelimitMenuPath		// (IMenuManager's form of a submenu entry: its path and a delimiter)
+// ...and a script label list's TABLE row's Special Operations > Apply Table Style (the script-label-tables-cells spec's L7): Apply Cell Style's shape, over such a row alone.
+#define kKFCApplyTableStyleSubmenuPath		kKFCHitSpecialOpsSubmenuPath kSDKDefDelimitMenuPath kKFCApplyTableStyleSubmenuKey
+#define kKFCApplyTableStyleSubmenuEntry		kKFCApplyTableStyleSubmenuPath kSDKDefDelimitMenuPath
 // A tier heading's Narrow Down submenu (the narrow-down spec's N1) - named by KFC's own key, as Fitting is.
 #define kKFCNarrowDownSubmenuPath			kKFCResultTierMenuName kSDKDefDelimitMenuPath kKFCNarrowDownSubmenuKey
 
@@ -1194,6 +1205,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCKentenChangeLabelWidgetID, kKFCPrefix + 92)
 #define kKFCTcyTextMenuItemPosition				9.0		// Tate-chu-yoko (a text row's menu - its own path; after Create Outlines' 3.0)
 #define kKFCApplyObjStyleSubmenuPosition		0.5		// Apply Object Style > (2026-11-05 - first in abc order)
 #define kKFCApplyCellStyleSubmenuPosition		0.5		// Apply Cell Style > (a text row's menu - its own path; first in abc order)
+#define kKFCApplyTableStyleSubmenuPosition		0.6		// Apply Table Style > (a script label list's table row's - after Apply Cell Style, were both there)
+#define kKFCRemoveLabelMenuItemPosition			8.5		// Remove Label (a script label list's rows - an object row's after Move to Active Layer, before Show; a text row's after Create Outlines, before Tate-chu-yoko)
 #define kKFCArrangeSubmenuPosition				1.0		// Arrange >
 #define kKFCClearStyleOverridesMenuItemPosition	2.0		// Clear Object Style Overrides
 #define kKFCClearTextOverridesMenuItemPosition	2.0		// Clear Overrides (a text row's menu - its own path, so no clash with the 2.0 above)

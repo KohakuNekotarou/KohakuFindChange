@@ -165,8 +165,18 @@ PMString KFCTableRows::RowWords(ITableModel* table, int32 row)
 
 bool KFCTableRows::TableRowAt(const UIDRef& story, TextIndex at, UIDRef& outTable, int32& outRow)
 {
-	outTable = UIDRef::gNull;
 	outRow = -1;
+	GridAddress cell;
+	if (!TableCellAt(story, at, outTable, cell))
+		return false;
+	outRow = cell.row;
+	return true;
+}
+
+bool KFCTableRows::TableCellAt(const UIDRef& story, TextIndex at, UIDRef& outTable, GridAddress& outCell)
+{
+	outTable = UIDRef::gNull;
+	outCell = GridAddress();
 	InterfacePtr<ITextModel> model(story, UseDefaultIID());
 	if (model == nil || at < 0 || at >= model->TotalLength())
 		return false;
@@ -182,7 +192,7 @@ bool KFCTableRows::TableRowAt(const UIDRef& story, TextIndex at, UIDRef& outTabl
 	if (cell.row < 0 || cell.row >= table->GetTotalRows().count)
 		return false;
 	outTable = UIDRef(db, dict);
-	outRow = cell.row;
+	outCell = table->FindCellAnchor(cell);
 	return true;
 }
 
@@ -312,6 +322,7 @@ bool KFCTableRows::ListRows(PMString& outStatus)
 			one.hits[h].runChain = one.words[h];
 			one.hits[h].runChain.SetTranslatable(kFalse);
 			one.hits[h].tableUID = one.rowTables[h];
+			one.hits[h].holderKind = kKFCHolderTableRow;		// (its cells take Apply Cell Style, a click selects them - the UI half asks GetHitHolderKind)
 		}
 	}
 	if (listed == 0)

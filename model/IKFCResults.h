@@ -163,6 +163,10 @@ public:
 	    table row list: text rows, one a table row; no search made it (its heading's Narrow Down and searches again grey, its rows' Replace grey), its
 	    rows' Special Operations > Apply Cell Style writes them. */
 	virtual bool ListIsTableRows() = 0;
+	/** = KFCResultModel::GetHitHolderKind (appended - revision 51, docs/superpowers/specs/2026-11-05-kfc-script-label-tables-cells-design.md L3) - what a
+	    text row stands for beyond its text (KFCHolderKind: a table row list's row, a script label list's table or cell label row; kKFCHolderNone
+	    otherwise) - the row's menu offers by it (Apply Table Style on a table's, Apply Cell Style on a cell's). */
+	virtual int32 GetHitHolderKind(int32 chapterIdx, int32 hitIdx) = 0;
 };
 
 #endif // __IKFCResults_h__

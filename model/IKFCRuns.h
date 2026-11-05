@@ -254,6 +254,18 @@ public:
 	/** = KFCReplaceEngine::CanCellStyleHit (appended) - can Apply Cell Style be offered on the row (the menu's grey): a row of a table row list, not
 	    locked. Read only. */
 	virtual bool CanCellStyleHit(int32 chapterIdx, int32 hitIdx) = 0;
+	/** = KFCReplaceEngine::TableStyleHits (appended - revision 51, docs/superpowers/specs/2026-11-05-kfc-script-label-tables-cells-design.md L7) - a
+	    script label list's table row's Special Operations > Apply Table Style > <style>: each row's table given the table style params.text names
+	    (its full path, untranslated) in its document, its overrides kept, in one undoable step. True = something written; outStatus says what. */
+	virtual bool TableStyleRows(const KFCRowsByChapter& rows, const KFCSpecialParams& params, PMString& outStatus) = 0;
+	/** = KFCReplaceEngine::CanTableStyleHit (appended) - can Apply Table Style be offered on the row (the menu's grey). Read only. */
+	virtual bool CanTableStyleHit(int32 chapterIdx, int32 hitIdx) = 0;
+	/** = KFCReplaceEngine::RemoveLabelHits (appended - revision 51, L8b) - a script label list's row's Special Operations > Remove Label: each row's
+	    label of its key taken away (an item's, a table's, a cell's), in one undoable step; rows read "Removed". True = something
+	    written; outStatus says what. */
+	virtual bool RemoveLabelRows(const KFCRowsByChapter& rows, PMString& outStatus) = 0;
+	/** = KFCReplaceEngine::CanRemoveLabelHit (appended) - can Remove Label be offered on the row (the menu's grey). Read only. */
+	virtual bool CanRemoveLabelHit(int32 chapterIdx, int32 hitIdx) = 0;
 };
 
 #endif // __IKFCRuns_h__

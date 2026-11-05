@@ -115,6 +115,9 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCStyleNoteMenuKey,				"No Styles",
                 // Apply Cell Style > (2026-11-05): a table row's Special Operations submenu.
                 kKFCApplyCellStyleSubmenuKey,		"Apply Cell Style",
+                // Apply Table Style > and Remove Label (2026-11-05): a script label list's table row's submenu, and its rows' Remove Label.
+                kKFCApplyTableStyleSubmenuKey,		"Apply Table Style",
+                kKFCRemoveLabelMenuKey,				"Remove Label",
                 kKFCDeleteMenuKey,					"Delete",
                 kKFCMoveMenuKey,					"Move...",
                 kKFCScaleMenuKey,					"Scale...",

@@ -839,6 +839,17 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			break;
 		}
 
+		case kKFCRemoveLabelActionID:
+		{
+			// A script label list's row's Special Operations > Remove Label (docs/superpowers/specs/2026-11-05-kfc-script-label-tables-cells-design.md L8b) - an object
+			// row's or a text row's: Tate-chu-yoko's way - the row it was popped over, or the rows selected together when it is one of them - each one's label of
+			// its key taken away (KFCResultTree::RemoveLabelRows). No hit row: nothing.
+			int32 chapter = -1, hit = -1;
+			if (RightClickedHit(widget, chapter, hit))
+				(void)KFCResultTree::RemoveLabelRows(KFCResultTree::RowsOfRightClick(chapter, hit));
+			break;
+		}
+
 		case kKFCRestoreOriginalActionID:
 		{
 			// A TEXT row's Restore from Copy (docs/superpowers/specs/2026-10-17-kfc-row-copy-restore-design.md): the
@@ -926,15 +937,17 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 				PMString path, words;
 				if (KFCStyleMenu::ItemStyle(styleItem, kind, path, words) && kind == KFCStyleMenu::kObjectStyles)
 					DoSpecial(ac, kKFCSpecialApplyObjectStyle, widget, &path, &words);
-				else if (kind == KFCStyleMenu::kCellStyles)
+				else if (kind == KFCStyleMenu::kCellStyles || kind == KFCStyleMenu::kTableStyles)
 				{
+					// (A script label list's table row's Apply Table Style > <style> - the script-label-tables-cells spec's L7 - the cell styles' way.)
 					int32 chapter = -1, hit = -1;
 					if (RightClickedHit(widget, chapter, hit))
 					{
 						KFCSpecialParams params;
 						params.text = path;
 						params.words = words;
-						(void)KFCResultTree::CellStyleRows(KFCResultTree::RowsOfRightClick(chapter, hit), params);
+						const KFCRowsByChapter rows(KFCResultTree::RowsOfRightClick(chapter, hit));
+						(void)((kind == KFCStyleMenu::kCellStyles) ? KFCResultTree::CellStyleRows(rows, params) : KFCResultTree::TableStyleRows(rows, params));
 					}
 				}
 				break;
@@ -1316,6 +1329,16 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 				break;
 			}
+			case kKFCRemoveLabelActionID:
+			{
+				// A script label list's row's menu: Remove Label while the row - or one selected together with it - can take it (CanRemoveLabelAny, read only - L8b:
+				// not missing or locked, not removed already).
+				int32 chapter = -1, hit = -1;
+				const bool enable = RightClickedHit(widget, chapter, hit)
+					&& KFCResultTree::CanRemoveLabelAny(KFCResultTree::RowsOfRightClick(chapter, hit));
+				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
+				break;
+			}
 			case kKFCRestoreOriginalActionID:
 			{
 				// A text row's menu: Restore from Copy while the row - or one of the rows selected together with it -
@@ -1403,6 +1426,9 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 					if (enable && kind == KFCStyleMenu::kCellStyles)
 						enable = KFCResults()->GetHitItem(chapter, hit) == kInvalidUID
 							&& KFCResultTree::CanCellStyleAny(KFCResultTree::RowsOfRightClick(chapter, hit));
+					else if (enable && kind == KFCStyleMenu::kTableStyles)
+						enable = KFCResults()->GetHitItem(chapter, hit) == kInvalidUID
+							&& KFCResultTree::CanTableStyleAny(KFCResultTree::RowsOfRightClick(chapter, hit));
 					else if (enable)
 						enable = KFCResults()->GetHitItem(chapter, hit) != kInvalidUID
 							&& KFCResultTree::CanSpecialAny(kKFCSpecialApplyObjectStyle, KFCResultTree::RowsOfRightClick(chapter, hit));

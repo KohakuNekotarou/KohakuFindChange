@@ -47,6 +47,25 @@
 #include "KFCReplaceEngine.h"			// WriteFaceLabels - the face's Change and Change All write in its step
 #include "KFCProgressBar.h"				// KFCSetCountedTask too - the bar's line
 #include "KFCTextCut.h"					// KFCSafeCut
+// (A table's and a cell's labels - docs/superpowers/specs/2026-11-05-kfc-script-label-tables-cells-design.md L1, L2:)
+#include "AttributeBossList.h"			// a cell's label attribute handed to ApplyCellOverrides
+#include "IStoryList.h"
+#include "ITableAttrAccessor.h"			// QueryCellAttribute - a cell's labels are a cell attribute (KIDMCP's KIDMCPLabels.cpp TagsOf)
+#include "IScriptCellRef.h"				// SetTableModel - a table's labels read and written through the scripting object the DOM makes for one (TableScript)
+#include "ScriptingDefs.h"				// c_Table - that object's kind (IScriptUtils::CreateProxyScriptObject)
+#include "ITableCommands.h"				// ApplyCellOverrides - SnpSetTableFill.cpp's shape
+#include "ITableModel.h"
+#include "ITableModelList.h"
+#include "ITableTextContainer.h"
+#include "ITextModel.h"
+#include "ITextStoryThread.h"
+#include "ITextStoryThreadDict.h"
+#include "ConditionalTextID.h"			// kHiddenTextBoss - a table in text set aside
+#include "InCopySharedID.h"				// kDeletedTextBoss, kNoteDataBoss
+#include "TableTypes.h"
+#include "TablesID.h"					// kCellAttrScriptLabelBoss, IID_ISCRIPTLABEL
+#include "KFCTableRows.h"				// TableCellAt - the cell a cell row's text stands in
+#include "KFCTableSearch.h"				// QueryTableAt - the table whose character a table row stands on
 
 namespace
 {
@@ -371,12 +390,10 @@ bool CollectItems(const UIDRef& docRef, std::vector<UID>& outItems)
 // AN ITEM'S LABELS THE CONDITIONS LOOK AT, (key, label) - its labels that are not empty: the key asked's alone, or with no key asked EVERY key's (the author, 11-04:
 // "a blank ScriptKey finds them all?") - the Script Label panel's first, then each one a script put under a key of its own (IScriptLabel::GetTags; the panel's key
 // is not taken twice should the list hold it too).
-void LabelsOf(IDataBase* db, UID item, const KFCScriptLabelConditions& asked, std::vector<std::pair<PMString, PMString> >& out)
+// (Any holder's - an item's IScript, a table's model's, a cell's label attribute: each an IScriptLabel.)
+void PickLabels(const IScriptLabel* script, const KFCScriptLabelConditions& asked, std::vector<std::pair<PMString, PMString> >& out)
 {
 	out.clear();
-	if (db == nil || item == kInvalidUID || !db->IsValidUID(item))
-		return;
-	InterfacePtr<IScript> script(db, item, UseDefaultIID());
 	if (script == nil)
 		return;
 	if (!asked.key.IsEmpty())
@@ -405,6 +422,204 @@ void LabelsOf(IDataBase* db, UID item, const KFCScriptLabelConditions& asked, st
 		if (key.IsEmpty() || label.IsEmpty() || IsPanelKey(key))
 			continue;
 		out.push_back(std::make_pair(key, label));
+	}
+}
+
+void LabelsOf(IDataBase* db, UID item, const KFCScriptLabelConditions& asked, std::vector<std::pair<PMString, PMString> >& out)
+{
+	out.clear();
+	if (db == nil || item == kInvalidUID || !db->IsValidUID(item))
+		return;
+	InterfacePtr<IScript> script(db, item, UseDefaultIID());
+	PickLabels(script, asked, out);
+}
+
+// A TABLE'S SCRIPTING OBJECT - what holds a table's labels (kTableModelBoss holds no IScript of its own - measured 11-05): kScriptTableRefBoss, made as the SDK
+// samples make a proxy (IScriptUtils::CreateProxyScriptObject - basicme, candlechart) with the table's story for its PARENT, then its table set
+// (IScriptCellRef::SetTableModel). The parent is what gives it the document's database (IScriptObjectParent.h:53-60 - IScript::GetDataBase answers the
+// parent's): one made without a parent answered nil, and a label written through it took InDesign down in Command::SetTarget (11-05 13:09, memory
+// table-label-write-crash-and-cell-label-write). nil = none, or one not in the table's database - never written through.
+IScript* TableScript(ITableModel* table)
+{
+	InterfacePtr<ITableTextContainer> container(table, UseDefaultIID());
+	InterfacePtr<ITextModel> story((container != nil) ? container->QueryTextModel() : nil);
+	InterfacePtr<IScript> parent(story, UseDefaultIID());
+	Utils<IScriptUtils> scriptUtils;
+	if (parent == nil || !scriptUtils)
+		return nil;
+	InterfacePtr<IScript> script(scriptUtils->CreateProxyScriptObject(EngineContext(), kScriptTableRefBoss, c_Table, parent));
+	InterfacePtr<IScriptCellRef> ref(script, UseDefaultIID());
+	if (script == nil || ref == nil)
+		return nil;
+	ref->SetTableModel(table, kFalse);		// (no text focus registered: it lives for this read or write)
+	if (script->GetDataBase(EngineContext()) != ::GetDataBase(table))
+		return nil;
+	return script.forget();
+}
+
+// THE LABELS OF A TABLE OR A CELL (docs/superpowers/specs/2026-11-05-kfc-script-label-tables-cells-design.md L1, L2 - KIDMCP measured both, KIDMCPLabels.cpp TagsOf): a cell's on
+// the cell attribute kCellAttrScriptLabelBoss (IScriptLabel - the cell's own, or the default the table hands a cell with none); a table's on its scripting object
+// (TableScript). nil = none.
+IScriptLabel* QueryHolderLabels(IDataBase* db, const KFCScriptLabelSearch::Holder& holder)
+{
+	if (db == nil)
+		return nil;
+	if (holder.kind == kKFCHolderNone)
+	{
+		if (holder.item == kInvalidUID || !db->IsValidUID(holder.item))
+			return nil;
+		InterfacePtr<IScript> script(db, holder.item, UseDefaultIID());
+		return script.forget();
+	}
+	if (holder.table == kInvalidUID || !db->IsValidUID(holder.table) || db->GetClass(holder.table) != kTableModelBoss)
+		return nil;
+	InterfacePtr<ITableModel> table(db, holder.table, UseDefaultIID());
+	if (table == nil)
+		return nil;
+	if (holder.kind == kKFCHolderTable)
+		return TableScript(table);
+	InterfacePtr<ITableAttrAccessor> attrs(table, UseDefaultIID());
+	if (attrs == nil)
+		return nil;
+	return static_cast<IScriptLabel*>(const_cast<IPMUnknown*>(attrs->QueryCellAttribute(holder.cell, kCellAttrScriptLabelBoss, IID_ISCRIPTLABEL)));
+}
+
+// A TABLE IN TEXT THE PAGE DOES NOT SET (hidden by a condition, deleted under Track Changes, in a note) - KFCTableSearch's StandsInSetAsideText: not walked, as the Table kind
+// does not list it.
+bool SetAside(ITextModel* model, TextIndex at)
+{
+	InterfacePtr<ITextStoryThread> thread(model->QueryStoryThread(at, nil, nil));
+	const ClassID kind = (thread != nil) ? ::GetClass(thread) : kInvalidClass;
+	return kind == kHiddenTextBoss || kind == kDeletedTextBoss || kind == kNoteDataBoss;
+}
+
+// EVERY TABLE'S AND EVERY CELL'S LABEL THE CONDITIONS FIND, AS TEXT ROWS (L1, L2): each story's tables - a table in a cell among them (ITableModelList holds every table its
+// text anchors) - the table's labels, then each of its cells' whose top-left it is, top to bottom, left to right; a table's row on its character (the Table kind's row), a
+// cell's on its text, its end-of-cell character in it (a row of empty text still has one character). At most `limit` rows in ioHits (ioCapped when there were more).
+void WalkTablesAndCells(const UIDRef& docRef, size_t limit, const KFCScriptLabelConditions& asked, std::vector<KFCResultModel::Hit>& ioHits, bool& ioCapped,
+	std::map<UID, uint32>& outVersions)
+{
+	IDataBase* const db = docRef.GetDataBase();
+	InterfacePtr<IStoryList> stories(db, (db != nil) ? db->GetRootUID() : kInvalidUID, UseDefaultIID());
+	if (stories == nil)
+		return;
+	struct Found
+	{
+		KFCSearchEngine::ListedPlace	place;
+		PMString						words;
+		UID								table;
+		PMString						key;
+		int32							kind;
+	};
+	std::vector<Found> found;
+	std::vector<std::pair<PMString, PMString> > labels;
+	// Composing to read a row's page dirties nothing the person made (a search's walk's rule - BuildListedHits composes).
+	IDataBase::SaveRestoreModifiedState dirtyGuard(db);
+	const int32 count = stories->GetAllTextModelCount();
+	for (int32 s = 0; s < count && !ioCapped; ++s)
+	{
+		const UIDRef storyRef(stories->GetNthTextModelUID(s));
+		InterfacePtr<ITableModelList> tables(storyRef, UseDefaultIID());
+		InterfacePtr<ITextModel> model(storyRef, UseDefaultIID());
+		if (tables == nil || model == nil)
+			continue;
+		for (int32 t = 0; t < tables->GetModelCount() && !ioCapped; ++t)
+		{
+			InterfacePtr<ITableModel> table(tables->QueryNthModel(t));
+			InterfacePtr<ITableTextContainer> text(table, UseDefaultIID());
+			InterfacePtr<ITextStoryThreadDict> threads(table, UseDefaultIID());
+			if (table == nil || text == nil || SetAside(model, text->GetAnchorTextIndex()))
+				continue;
+			KFCScriptLabelSearch::Holder holder;
+			holder.kind = kKFCHolderTable;
+			holder.table = ::GetUID(table);
+			// THE TABLE'S OWN, on its character.
+			{
+				InterfacePtr<IScriptLabel> tags(QueryHolderLabels(db, holder));
+				PickLabels(tags, asked, labels);
+			}
+			for (size_t l = 0; l < labels.size() && !ioCapped; ++l)
+			{
+				if (!KFCScriptLabelSearch::Matches(labels[l].second, asked))
+					continue;
+				if (ioHits.size() + found.size() >= limit)
+				{
+					ioCapped = true;
+					break;
+				}
+				Found one;
+				one.place.story = storyRef.GetUID();
+				one.place.start = text->GetAnchorTextIndex();
+				one.place.end = one.place.start + text->GetAnchorSpan();
+				one.words = KFCScriptLabelSearch::HolderRowWords(db, holder, labels[l].first, labels[l].second);
+				one.table = holder.table;
+				one.key = labels[l].first;
+				one.kind = kKFCHolderTable;
+				found.push_back(one);
+			}
+			// ITS CELLS', each on its text - the cells whose top-left they are (a merged cell once).
+			const RowRange rows(table->GetTotalRows());
+			const ColRange cols(table->GetTotalCols());
+			for (int32 r = rows.start; r < rows.start + rows.count && !ioCapped; ++r)
+				for (int32 c = cols.start; c < cols.start + cols.count && !ioCapped; ++c)
+				{
+					const GridAddress anchor(table->FindCellAnchor(GridAddress(r, c)));
+					if (anchor.row != r || anchor.col != c)
+						continue;
+					KFCScriptLabelSearch::Holder cell;
+					cell.kind = kKFCHolderCell;
+					cell.table = holder.table;
+					cell.cell = anchor;
+					{
+						InterfacePtr<IScriptLabel> tags(QueryHolderLabels(db, cell));
+						PickLabels(tags, asked, labels);
+					}
+					if (labels.empty())
+						continue;
+					InterfacePtr<ITextStoryThread> thread((threads != nil) ? threads->QueryThread(table->GetGridID(anchor)) : nil);
+					if (thread == nil)
+						continue;
+					int32 span = 0;
+					const TextIndex start = thread->GetTextStart(&span);
+					for (size_t l = 0; l < labels.size() && !ioCapped; ++l)
+					{
+						if (!KFCScriptLabelSearch::Matches(labels[l].second, asked))
+							continue;
+						if (ioHits.size() + found.size() >= limit)
+						{
+							ioCapped = true;
+							break;
+						}
+						Found one;
+						one.place.story = storyRef.GetUID();
+						one.place.start = start;
+						one.place.end = start + ((span > 0) ? span : 1);
+						one.words = KFCScriptLabelSearch::HolderRowWords(db, cell, labels[l].first, labels[l].second);
+						one.table = holder.table;
+						one.key = labels[l].first;
+						one.kind = kKFCHolderCell;
+						found.push_back(one);
+					}
+				}
+		}
+	}
+	if (found.empty())
+		return;
+	// What a search's row holds, for each - its line and hash, its page and flags (KFCSearchEngine::BuildListedHits, as a table row list's rows).
+	std::vector<KFCSearchEngine::ListedPlace> places;
+	for (size_t f = 0; f < found.size(); ++f)
+		places.push_back(found[f].place);
+	std::vector<KFCResultModel::Hit> hits;
+	KFCSearchEngine::BuildListedHits(docRef, places, hits, outVersions);
+	for (size_t h = 0; h < hits.size() && h < found.size(); ++h)
+	{
+		hits[h].runChain = found[h].words;
+		hits[h].runChain.SetTranslatable(kFalse);
+		hits[h].tableUID = found[h].table;
+		hits[h].labelKey = found[h].key;
+		hits[h].labelKey.SetTranslatable(kFalse);
+		hits[h].holderKind = found[h].kind;
+		ioHits.push_back(hits[h]);
 	}
 }
 
@@ -457,8 +672,11 @@ void BuildRow(const UIDRef& docRef, UID item, const PMString& key, const PMStrin
 // ONE DOCUMENT'S LABELS AS ROWS, in the walk's order - an item's keys in LabelsOf's: at most `limit` (outCapped when there were more). false = no walker. `place`
 // with `placeKey` (Find Next's last found - an empty placeKey: any of the item's): its row too, where the walk meets it, whether its label matches or not - a place to
 // go on from (Next); *outPlaceMatches says whether it matched (left as it was when it is not met).
+// WITH TABLES (the list's walk - CollectTargets, WalkOneDocument: docs/superpowers/specs/2026-11-05-kfc-script-label-tables-cells-design.md L1, L2): after the items, every table's and
+// cell's label as text rows (WalkTablesAndCells), their stories' versions in *outVersions. Without (the face's Find Next, Change, Change All and a query's run - the design's 3.): the
+// items alone, as before.
 bool WalkDoc(const UIDRef& docRef, size_t limit, const KFCScriptLabelConditions& asked, std::vector<KFCResultModel::Hit>& outHits, bool& outCapped,
-	UID place = kInvalidUID, const PMString& placeKey = PMString(), bool* outPlaceMatches = nil)
+	UID place = kInvalidUID, const PMString& placeKey = PMString(), bool* outPlaceMatches = nil, bool withTables = false, std::map<UID, uint32>* outVersions = nil)
 {
 	outCapped = false;
 	std::vector<UID> items;
@@ -490,6 +708,8 @@ bool WalkDoc(const UIDRef& docRef, size_t limit, const KFCScriptLabelConditions&
 			outHits.push_back(hit);
 		}
 	}
+	if (withTables && outVersions != nil && !outCapped)
+		WalkTablesAndCells(docRef, limit, asked, outHits, outCapped, *outVersions);
 	return true;
 }
 
@@ -694,8 +914,9 @@ void KFCScriptLabelSearch::CollectTargets(std::vector<KFCBookScope::ChapterDoc>&
 			continue;
 		const UIDRef docRef = targets[i].docRef;
 		std::vector<KFCResultModel::Hit> hits;
+		std::map<UID, uint32> versions;		// (the table and cell rows' stories - text rows)
 		bool capped = false;
-		const bool walked = WalkDoc(docRef, limit - static_cast<size_t>(out.total), asked, hits, capped);
+		const bool walked = WalkDoc(docRef, limit - static_cast<size_t>(out.total), asked, hits, capped, kInvalidUID, PMString(), nil, true, &versions);
 		// A book's chapter goes back now, closed on the spot (one chapter of ours at a time - the other walks' rule).
 		if (fromBook && !KFCBookScope::HandBackHeldDocNow(docRef))
 			out.unclosed.push_back(targets[i].shortName);
@@ -710,7 +931,7 @@ void KFCScriptLabelSearch::CollectTargets(std::vector<KFCBookScope::ChapterDoc>&
 		if (capped)
 			out.truncated = true;
 		if (!hits.empty())
-			KFCSearchEngine::FileChapter(targets[i], hits, out);		// every walk's filing: page order, the tally
+			KFCSearchEngine::FileChapter(targets[i], hits, out, &versions);		// every walk's filing: page order, the tally
 		if (capped)
 			break;
 	}
@@ -720,7 +941,7 @@ void KFCScriptLabelSearch::CollectTargets(std::vector<KFCBookScope::ChapterDoc>&
 }
 
 bool KFCScriptLabelSearch::WalkOneDocument(const UIDRef& docRef, const PMString& name, size_t limit, const KFCScriptLabelConditions& asked,
-	std::vector<KFCResultModel::Hit>& outHits, bool& outCapped, bool& outCancelled)
+	std::vector<KFCResultModel::Hit>& outHits, std::map<UID, uint32>& outVersions, bool& outCapped, bool& outCancelled)
 {
 	outHits.clear();
 	outCapped = false;
@@ -731,7 +952,7 @@ bool KFCScriptLabelSearch::WalkOneDocument(const UIDRef& docRef, const PMString&
 	bar.DisableChildProgressBars(kTrue);
 	KFCSetCountedTask(bar, "Document", 0, 1, name);
 	bar.SetPosition(0);
-	const bool walked = WalkDoc(docRef, limit, asked, outHits, outCapped);
+	const bool walked = WalkDoc(docRef, limit, asked, outHits, outCapped, kInvalidUID, PMString(), nil, true, &outVersions);
 	outCancelled = walked && bar.WasCancelled(kFalse);
 	bar.SetPosition(kLabelDocSpan);
 	return walked && !outCancelled;
@@ -1031,6 +1252,24 @@ void KFCScriptLabelSearch::MarkRowWritten(int32 chapterIdx, int32 hitIdx, const 
 	KFCResultModel::MarkItemOwnChange(chapterIdx, hitIdx, kKFCSpecialScriptLabel, RowWords(db, item, key, value), print, length, read ? &place : nil);
 }
 
+void KFCScriptLabelSearch::MarkRowRemoved(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, const Holder& holder, const PMString& key)
+{
+	IDataBase* const db = docRef.GetDataBase();
+	PMString none;
+	none.SetTranslatable(kFalse);
+	if (holder.kind != kKFCHolderNone)
+	{
+		KFCResultModel::MarkHitOwnChange(chapterIdx, hitIdx, kKFCSpecialRemoveLabel, HolderRowWords(db, holder, key, none), KFCRowUpper(), false);
+		return;
+	}
+	uint64 print = 0;
+	uint32 length = 0;
+	(void)KFCObjectSearch::Fingerprint(UIDRef(db, holder.item), print, length);
+	KFCResultModel::Hit place;
+	const bool read = KFCObjectSearch::ReadItemPlace(docRef, holder.item, place);
+	KFCResultModel::MarkItemOwnChange(chapterIdx, hitIdx, kKFCSpecialRemoveLabel, RowWords(db, holder.item, key, none), print, length, read ? &place : nil, false);
+}
+
 PMString KFCScriptLabelSearch::LabelNow(const KFCScriptLabelFound& found)
 {
 	PMString none;
@@ -1057,6 +1296,206 @@ bool KFCScriptLabelSearch::IsLockedNow(IDataBase* db, UID item)
 const char* KFCScriptLabelSearch::OnlyReplaceWords()
 {
 	return "these rows are script labels - only a row's Replace writes them (the Kohaku+ tab's Change Label:).";
+}
+
+bool KFCScriptLabelSearch::HolderAt(IDataBase* db, int32 kind, UID story, TextIndex start, Holder& out)
+{
+	out = Holder();
+	out.kind = kind;
+	if (db == nil || story == kInvalidUID || !db->IsValidUID(story))
+		return false;
+	const UIDRef storyRef(db, story);
+	if (kind == kKFCHolderTable)
+	{
+		InterfacePtr<ITableModel> table(KFCTableSearch::QueryTableAt(storyRef, start));
+		if (table == nil)
+			return false;
+		out.table = ::GetUID(table);
+		return true;
+	}
+	if (kind == kKFCHolderCell)
+	{
+		UIDRef tableRef;
+		GridAddress cell;
+		if (!KFCTableRows::TableCellAt(storyRef, start, tableRef, cell))
+			return false;
+		out.table = tableRef.GetUID();
+		out.cell = cell;
+		return true;
+	}
+	return false;
+}
+
+PMString KFCScriptLabelSearch::TableLabelsWords(IDataBase* db, UID table)
+{
+	PMString words;
+	words.SetTranslatable(kFalse);
+	if (db == nil || table == kInvalidUID || !db->IsValidUID(table) || db->GetClass(table) != kTableModelBoss)
+		return words;
+	InterfacePtr<ITableModel> model(db, table, UseDefaultIID());
+	if (model == nil)
+		return words;
+	const auto append = [&words](const IScriptLabel* labels) {
+		if (labels == nil)
+			return;
+		const IScriptLabel::ScriptLabelKeyValueList tags(labels->GetTags());
+		for (size_t t = 0; t < tags.size(); ++t)
+		{
+			words.Append(tags[t].Key());
+			words.Append("=");
+			words.Append(tags[t].Value());
+			words.Append(";");
+		}
+	};
+	Holder holder;
+	holder.table = table;
+	holder.kind = kKFCHolderTable;
+	{
+		InterfacePtr<IScriptLabel> labels(QueryHolderLabels(db, holder));
+		append(labels);
+	}
+	holder.kind = kKFCHolderCell;
+	const RowRange rows(model->GetTotalRows());
+	const ColRange cols(model->GetTotalCols());
+	for (int32 r = rows.start; r < rows.start + rows.count; ++r)
+		for (int32 c = cols.start; c < cols.start + cols.count; ++c)
+		{
+			const GridAddress anchor(model->FindCellAnchor(GridAddress(r, c)));
+			if (anchor.row != r || anchor.col != c)
+				continue;		// (a merged cell's, once - at its anchor)
+			holder.cell = anchor;
+			InterfacePtr<IScriptLabel> labels(QueryHolderLabels(db, holder));
+			if (labels == nil)
+				continue;
+			words.Append("@");
+			words.AppendNumber(r);
+			words.Append(",");
+			words.AppendNumber(c);
+			words.Append(":");
+			append(labels);
+		}
+	words.SetTranslatable(kFalse);
+	return words;
+}
+
+PMString KFCScriptLabelSearch::HolderLabel(IDataBase* db, const Holder& holder, const PMString& key)
+{
+	PMString label;
+	InterfacePtr<IScriptLabel> tags(QueryHolderLabels(db, holder));
+	if (tags != nil)
+		label = tags->GetTag(key);
+	label.SetTranslatable(kFalse);
+	return label;
+}
+
+ErrorCode KFCScriptLabelSearch::WriteHolder(IDataBase* db, const Holder& holder, const PMString& key, const PMString& value)
+{
+	if (db == nil)
+		return kFailure;
+	if (holder.kind == kKFCHolderNone)
+		return Write(db, holder.item, key, value);
+	if (holder.table == kInvalidUID || !db->IsValidUID(holder.table) || db->GetClass(holder.table) != kTableModelBoss)
+		return kFailure;
+	InterfacePtr<ITableModel> table(db, holder.table, UseDefaultIID());
+	if (table == nil)
+		return kFailure;
+	if (holder.kind == kKFCHolderTable)
+	{
+		// A TABLE'S, THROUGH ITS SCRIPTING OBJECT (TableScript - with its parent, so in the document's database: measured 11-05, the key written, an empty value
+		// taking it away, the other keys kept, Undo putting it back, "Set Scripting Tag"): IScriptUtils::SetScriptingTag, an item's door (Write). Read back after.
+		InterfacePtr<IScript> script(TableScript(table));
+		Utils<IScriptUtils> scriptUtils;
+		if (script == nil || !scriptUtils)
+			return kFailure;
+		ScriptList list;
+		list.push_back(script);
+		if (scriptUtils->SetScriptingTag(list, EngineContext(), value, key) != kSuccess)
+			return kFailure;
+		return (HolderLabel(db, holder, key) == value) ? kSuccess : kFailure;
+	}
+	// A CELL'S, ITS LABEL ATTRIBUTE: its tags now, `key` given `value` (an empty value takes the key away - insertLabel(key, "")'s rule, CScript.cpp), as a fresh
+	// kCellAttrScriptLabelBoss handed to ITableCommands::ApplyCellOverrides over the cell (SnpSetTableFill.cpp's way to give a cell an attribute). Read back after: a write
+	// InDesign took and did not do is a failure.
+	IScriptLabel::ScriptLabelKeyValueList tags;
+	{
+		InterfacePtr<IScriptLabel> now(QueryHolderLabels(db, holder));
+		if (now != nil)
+			tags = now->GetTags();
+	}
+	IScriptLabel::ScriptLabelKeyValueList kept;
+	bool placed = false;
+	for (size_t i = 0; i < tags.size(); ++i)
+	{
+		if (tags[i].Key() == key)
+		{
+			placed = true;
+			if (!value.IsEmpty())
+				kept.push_back(IScriptLabel::ScriptLabelKeyValuePair(key, value));
+		}
+		else
+			kept.push_back(tags[i]);
+	}
+	if (!placed && !value.IsEmpty())
+		kept.push_back(IScriptLabel::ScriptLabelKeyValuePair(key, value));
+	InterfacePtr<IScriptLabel> attr(::CreateObject2<IScriptLabel>(kCellAttrScriptLabelBoss));
+	InterfacePtr<ITableCommands> commands(table, UseDefaultIID());
+	if (attr == nil || commands == nil)
+		return kFailure;
+	attr->SetTags(kept);
+	AttributeBossList attrs;
+	attrs.ApplyAttribute(attr);
+	if (commands->ApplyCellOverrides(table->GetCellArea(holder.cell), &attrs) != kSuccess)
+		return kFailure;
+	return (HolderLabel(db, holder, key) == value) ? kSuccess : kFailure;
+}
+
+PMString KFCScriptLabelSearch::HolderRowWords(IDataBase* db, const Holder& holder, const PMString& key, const PMString& label)
+{
+	// "Table 5x2  <key>: <label>" / "Cell r2 c1  <key>: <label>" - the panel's key not written (an item's row's rule), the label cut where an item's row cuts it (CutParts).
+	PMString words;
+	words.SetTranslatable(kFalse);
+	if (holder.kind == kKFCHolderTable)
+	{
+		words.Append("Table ");
+		if (db != nil && holder.table != kInvalidUID && db->IsValidUID(holder.table))
+		{
+			InterfacePtr<ITableModel> table(db, holder.table, UseDefaultIID());
+			if (table != nil)
+			{
+				words.AppendNumber(table->GetTotalRows().count);
+				words.Append("x");
+				words.AppendNumber(table->GetTotalCols().count);
+			}
+		}
+	}
+	else
+	{
+		words.Append("Cell r");
+		words.AppendNumber(holder.cell.row + 1);
+		words.Append(" c");
+		words.AppendNumber(holder.cell.col + 1);
+	}
+	words.Append("  ");
+	if (!IsPanelKey(key))
+	{
+		words.Append(key);
+		words.Append(": ");
+	}
+	LabelParts parts;
+	parts.match = label;
+	CutParts(parts);
+	words.Append(parts.match);
+	words.SetTranslatable(kFalse);
+	return words;
+}
+
+bool KFCScriptLabelSearch::HolderLockedNow(IDataBase* db, UID story, TextIndex start)
+{
+	// A text row's lock, read at the write (the story's insert lock, the frame's, its layer's - KFCSearchEngine::IsFrameEditable through the parcel the place is composed in).
+	if (db == nil || story == kInvalidUID || !db->IsValidUID(story))
+		return true;
+	const UIDRef storyRef(db, story);
+	return !KFCSearchEngine::IsFrameEditable(storyRef, KFCSearchEngine::EditableFrameForMatch(storyRef, start));
 }
 
 // End, KFCScriptLabelSearch.cpp.

@@ -108,6 +108,7 @@ public:
 	virtual bool GetUnifyFacts(int32 chapterIdx, int32 groupIdx, int32 hitIdx, PMString& outWord, PMString& outReadings) { return KFCResultModel::GetUnifyFacts(chapterIdx, groupIdx, hitIdx, outWord, outReadings); }
 	virtual bool ListIsScriptLabels() { return KFCResultModel::ListIsScriptLabels(); }
 	virtual bool ListIsTableRows() { return KFCResultModel::ListIsTableRows(); }
+	virtual int32 GetHitHolderKind(int32 chapterIdx, int32 hitIdx) { return KFCResultModel::GetHitHolderKind(chapterIdx, hitIdx); }
 };
 
 CREATE_PMINTERFACE(KFCResultsSession, kKFCResultsImpl)
@@ -241,6 +242,10 @@ public:
 	virtual bool ListRowsOfTables(PMString& outStatus) { return KFCTableRows::ListRows(outStatus); }
 	virtual bool CellStyleRows(const KFCRowsByChapter& rows, const KFCSpecialParams& params, PMString& outStatus) { return KFCReplaceEngine::CellStyleHits(rows, params, outStatus); }
 	virtual bool CanCellStyleHit(int32 chapterIdx, int32 hitIdx) { return KFCReplaceEngine::CanCellStyleHit(chapterIdx, hitIdx); }
+	virtual bool TableStyleRows(const KFCRowsByChapter& rows, const KFCSpecialParams& params, PMString& outStatus) { return KFCReplaceEngine::TableStyleHits(rows, params, outStatus); }
+	virtual bool CanTableStyleHit(int32 chapterIdx, int32 hitIdx) { return KFCReplaceEngine::CanTableStyleHit(chapterIdx, hitIdx); }
+	virtual bool RemoveLabelRows(const KFCRowsByChapter& rows, PMString& outStatus) { return KFCReplaceEngine::RemoveLabelHits(rows, outStatus); }
+	virtual bool CanRemoveLabelHit(int32 chapterIdx, int32 hitIdx) { return KFCReplaceEngine::CanRemoveLabelHit(chapterIdx, hitIdx); }
 };
 
 CREATE_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)

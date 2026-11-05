@@ -183,8 +183,26 @@ namespace KFCReplaceEngine
 	    no style of that name refuses its rows (counted - params.words what the message says). Refused on any other list. True = something written; outStatus says what. */
 	bool CellStyleHits(const KFCRowsByChapter& rows, const KFCSpecialParams& params, PMString& outStatus);
 
-	/** Can Apply Cell Style be offered on a row - a table row list's, not locked (CanClearOverridesHit's rule; the style is asked when pressed) - the menu's grey. */
+	/** Can Apply Cell Style be offered on a row - a table row list's, or a script label list's cell row (the script-label-tables-cells spec's L7: that cell alone), not locked
+	    (CanClearOverridesHit's rule; the style is asked when pressed) - the menu's grey. */
 	bool CanCellStyleHit(int32 chapterIdx, int32 hitIdx);
+
+	/** SPECIAL OPERATIONS > APPLY TABLE STYLE > <style> on a script label list's table rows (docs/superpowers/specs/2026-11-05-kfc-script-label-tables-cells-design.md L7): the
+	    table each row's character stands at now given the table style params.text names (its full path, untranslated) in the row's own document, its overrides kept (the
+	    Kohaku+ Table tab's write - KFCTableSearch::Write). Clear Overrides' doors, step and marks (one undo step "Apply Table Style", rows marked "Styled"); a document with no
+	    style of that name refuses its rows. Refused on any other row. True = something written; outStatus says what. */
+	bool TableStyleHits(const KFCRowsByChapter& rows, const KFCSpecialParams& params, PMString& outStatus);
+
+	/** Can Apply Table Style be offered on a row - a script label list's table row, not locked - the menu's grey. */
+	bool CanTableStyleHit(int32 chapterIdx, int32 hitIdx);
+
+	/** SPECIAL OPERATIONS > REMOVE LABEL on a script label list's rows (the spec's L8b - the author: "what is common to every thing, in your choice"): each row's label of its
+	    key taken away - an item's, a table's, a cell's (KFCScriptLabelSearch::WriteHolder) - in one undo step "Remove Script Label",
+	    rows marked "Removed" (not counted as written). A row with no label of its key now is counted, not written. True = something written; outStatus says what. */
+	bool RemoveLabelHits(const KFCRowsByChapter& rows, PMString& outStatus);
+
+	/** Can Remove Label be offered on a row - a script label list's row, not missing, not locked, not removed already - the menu's grey. */
+	bool CanRemoveLabelHit(int32 chapterIdx, int32 hitIdx);
 
 	/** ONE UNDO STEP FOR A WRITE FROM THE LIST, the one rule for every such write - its callers are the list (a row's
 	    Replace of text or object rows, Restore from Copy, Create Outlines, the Special Operations), each naming its

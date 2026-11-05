@@ -224,7 +224,24 @@ enum KFCSpecialOp
 	// rule), their overrides kept as a plain apply in the Cell Styles panel. A row of a table row list alone (KFCTableRows). The row reads "Styled".
 	// Written by KFCReplaceEngine::CellStyleHits, never by SpecialRows.
 	kKFCSpecialApplyCellStyle,
+	// A script label list's TABLE label row's Special Operations > Apply Table Style > <style> (docs/superpowers/specs/2026-11-05-kfc-script-label-tables-cells-design.md
+	// L7 - the author: "rather, let a table style or a cell style be given"): the front document's table style, given BY NAME to the row's table in its own
+	// document, its overrides kept. The row reads "Styled". Written by KFCReplaceEngine::TableStyleHits, never by SpecialRows.
+	kKFCSpecialApplyTableStyle,
+	// A script label list's row's Special Operations > Remove Label (the table-cells spec's L8b - the author: "what is common to every thing, in your choice"): the row's
+	// label of its key taken away - an item's, a cell's. The row reads "Removed", not counted as written. Written by KFCReplaceEngine::RemoveLabelHits, never by SpecialRows.
+	kKFCSpecialRemoveLabel,
 	kKFCSpecialOpCount
+};
+
+/** WHAT A TEXT ROW STANDS FOR BEYOND ITS TEXT (docs/superpowers/specs/2026-11-05-kfc-script-label-tables-cells-design.md L3): the UI half's question for a text
+    row's Special Operations and its click (IKFCResults::GetHitHolderKind). The number crosses the boundary - FIXED: a new kind is appended. */
+enum KFCHolderKind
+{
+	kKFCHolderNone = 0,		// a match, or an object row (a page item's label row among them)
+	kKFCHolderTableRow,		// a table row list's row (KFCTableRows) - its cells take Apply Cell Style, a click selects them
+	kKFCHolderTable,		// a script label list's row of a TABLE's label - the table takes Apply Table Style
+	kKFCHolderCell			// a script label list's row of a CELL's label - the cell takes Apply Cell Style, a click selects it
 };
 
 /** WHAT A SPECIAL OPERATION IS GIVEN besides its rows (IKFCRuns::SpecialRows). x, y: Move - the horizontal and vertical

@@ -114,6 +114,7 @@ namespace
 		virtual bool IsChangeAllList() { return false; }
 		virtual bool ListIsScriptLabels() { return false; }
 		virtual bool ListIsTableRows() { return false; }
+		virtual int32 GetHitHolderKind(int32, int32) { return kKFCHolderNone; }
 	};
 
 	class KFCRunsStandInImpl : public IKFCRuns
@@ -231,6 +232,10 @@ namespace
 		virtual bool ListRowsOfTables(PMString& outStatus) { SayWhy(outStatus); return false; }
 		virtual bool CellStyleRows(const KFCRowsByChapter&, const KFCSpecialParams&, PMString& outStatus) { SayWhy(outStatus); return false; }
 		virtual bool CanCellStyleHit(int32, int32) { return false; }
+		virtual bool TableStyleRows(const KFCRowsByChapter&, const KFCSpecialParams&, PMString& outStatus) { SayWhy(outStatus); return false; }
+		virtual bool CanTableStyleHit(int32, int32) { return false; }
+		virtual bool RemoveLabelRows(const KFCRowsByChapter&, PMString& outStatus) { SayWhy(outStatus); return false; }
+		virtual bool CanRemoveLabelHit(int32, int32) { return false; }
 	};
 
 	class KFCChaptersStandInImpl : public IKFCChapters

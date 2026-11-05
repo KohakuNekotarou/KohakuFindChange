@@ -21,7 +21,7 @@
 
 // General includes:
 #include "GenericID.h"			// IID_IOBJECTSTYLEGROUPMANAGER, IID_IOBJECTSTYLEINFO - an object style (not its groups)
-#include "TablesID.h"			// IID_ICELLSTYLEGROUPMANAGER - the cell styles
+#include "TablesID.h"			// IID_ICELLSTYLEGROUPMANAGER, IID_ITABLESTYLEGROUPMANAGER - the cell and table styles
 #include "TextID.h"				// IID_ISTYLEINFO - a cell style (not its groups)
 #include "UIDList.h"
 #include "Utils.h"
@@ -52,12 +52,13 @@ PMString gPath;					// the path the last menu put them on (taken off it when the
 void ReadList(KFCStyleMenu::Kind kind, std::vector<Entry>& out)
 {
 	out.clear();
-	if (kind != KFCStyleMenu::kObjectStyles && kind != KFCStyleMenu::kCellStyles)
+	if (kind != KFCStyleMenu::kObjectStyles && kind != KFCStyleMenu::kCellStyles && kind != KFCStyleMenu::kTableStyles)
 		return;
 	ISession* const session = GetExecutionContextSession();
 	IActiveContext* const context = (session != nil) ? session->GetActiveContext() : nil;
 	IWorkspace* const workspace = (context != nil) ? context->GetContextWorkspace() : nil;
-	InterfacePtr<IStyleGroupManager> styles(workspace, (kind == KFCStyleMenu::kObjectStyles) ? IID_IOBJECTSTYLEGROUPMANAGER : IID_ICELLSTYLEGROUPMANAGER);
+	InterfacePtr<IStyleGroupManager> styles(workspace, (kind == KFCStyleMenu::kObjectStyles) ? IID_IOBJECTSTYLEGROUPMANAGER
+		: (kind == KFCStyleMenu::kCellStyles) ? IID_ICELLSTYLEGROUPMANAGER : IID_ITABLESTYLEGROUPMANAGER);
 	if (styles == nil || styles->GetRootHierarchy() == nil)
 		return;
 	IDataBase* const db = ::GetDataBase(styles);
@@ -65,7 +66,8 @@ void ReadList(KFCStyleMenu::Kind kind, std::vector<Entry>& out)
 	// AN OBJECT STYLE IS FOUND BY IID_IOBJECTSTYLEINFO (kObjectStyleBoss's), not by the text and table styles' IID_ISTYLEINFO:
 	// asked with that, the Object Styles' hierarchy gave none (2026-11-05, the first GREEN run - KT's KTScrapStore StyleNames
 	// asks object styles so). A CELL STYLE BY IID_ISTYLEINFO - kCellStyleBoss's (iid-boss-dictionary; the SDK's
-	// SnpManipulateTableStyle.cpp ChooseStyle asks the cell styles' hierarchy so; IID_ICELLSTYLEINFO is on no boss).
+	// SnpManipulateTableStyle.cpp ChooseStyle asks the cell styles' hierarchy so; IID_ICELLSTYLEINFO is on no boss). A TABLE STYLE
+	// BY IID_ISTYLEINFO too - the Kohaku+ Table part's style lists ask the table styles so (KFCKohakuTab's FillStyles).
 	styles->GetRootHierarchy()->GetDescendents(&found, (kind == KFCStyleMenu::kObjectStyles) ? IID_IOBJECTSTYLEINFO : IID_ISTYLEINFO);
 	for (int32 k = 0; k < found.Length(); ++k)
 	{
@@ -97,13 +99,15 @@ PMString MenuWords(const PMString& words)
 
 const char* NoneWords(KFCStyleMenu::Kind kind)
 {
-	return (kind == KFCStyleMenu::kObjectStyles) ? "No Object Styles" : (kind == KFCStyleMenu::kCellStyles) ? "No Cell Styles" : "No Styles";
+	return (kind == KFCStyleMenu::kObjectStyles) ? "No Object Styles" : (kind == KFCStyleMenu::kCellStyles) ? "No Cell Styles"
+		: (kind == KFCStyleMenu::kTableStyles) ? "No Table Styles" : "No Styles";
 }
 
 const char* PanelWords(KFCStyleMenu::Kind kind)
 {
 	return (kind == KFCStyleMenu::kObjectStyles) ? " more - use the Object Styles panel"
-		: (kind == KFCStyleMenu::kCellStyles) ? " more - use the Cell Styles panel" : " more";
+		: (kind == KFCStyleMenu::kCellStyles) ? " more - use the Cell Styles panel"
+		: (kind == KFCStyleMenu::kTableStyles) ? " more - use the Table Styles panel" : " more";
 }
 
 // The items and the note taken off `path`.

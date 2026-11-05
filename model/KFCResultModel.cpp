@@ -1471,13 +1471,14 @@ void KFCResultModel::MarkHitSpecial(int32 chapterIdx, int32 hitIdx, int32 op)
 	h.outcome = kOutcomeNone;	// the write has just found its text there
 }
 
-void KFCResultModel::MarkHitOwnChange(int32 chapterIdx, int32 hitIdx, int32 op, const PMString& words, const KFCRowUpper& upper)
+void KFCResultModel::MarkHitOwnChange(int32 chapterIdx, int32 hitIdx, int32 op, const PMString& words, const KFCRowUpper& upper, bool counted)
 {
 	Hit* hp = HitAt(chapterIdx, hitIdx);
 	if (hp == nil)
 		return;
 	MarkHitSpecial(chapterIdx, hitIdx, op);		// (its backup taken there - before this change too)
-	hp->tabWritten = true;		// (counted as written, whatever Special Operation writes special over it later - Hit::tabWritten)
+	if (counted)
+		hp->tabWritten = true;		// (counted as written, whatever Special Operation writes special over it later - Hit::tabWritten)
 	hp->runChain = words;
 	hp->runChain.SetTranslatable(kFalse);
 	hp->upper = upper;
@@ -2023,6 +2024,12 @@ UID KFCResultModel::GetHitTable(int32 chapterIdx, int32 hitIdx)
 	return (h != nil) ? h->tableUID : kInvalidUID;
 }
 
+int32 KFCResultModel::GetHitHolderKind(int32 chapterIdx, int32 hitIdx)
+{
+	const Hit* h = HitAt(chapterIdx, hitIdx);
+	return (h != nil) ? h->holderKind : static_cast<int32>(kKFCHolderNone);
+}
+
 UID KFCResultModel::GetHitItem(int32 chapterIdx, int32 hitIdx)
 {
 	const Hit* h = HitAt(chapterIdx, hitIdx);
@@ -2133,14 +2140,15 @@ void KFCResultModel::MarkItemSpecial(int32 chapterIdx, int32 hitIdx, int32 op, u
 	BuildHitLocator(*h);
 }
 
-void KFCResultModel::MarkItemOwnChange(int32 chapterIdx, int32 hitIdx, int32 op, const PMString& words, uint64 newPrint, uint32 newLength, const Hit* place)
+void KFCResultModel::MarkItemOwnChange(int32 chapterIdx, int32 hitIdx, int32 op, const PMString& words, uint64 newPrint, uint32 newLength, const Hit* place, bool counted)
 {
 	Hit* h = HitAt(chapterIdx, hitIdx);
 	if (h == nil || h->itemUID == kInvalidUID)
 		return;		// (a text row's own change is MarkHitOwnChange's)
 	const Hit asItStands(*h);		// (no place read: the row's own - nil would read as the item taken away)
 	MarkItemSpecial(chapterIdx, hitIdx, op, newPrint, newLength, (place != nil) ? place : &asItStands);		// (its backup taken there - before the words too)
-	h->tabWritten = true;		// (counted as written, whatever Special Operation writes special over it later - Hit::tabWritten)
+	if (counted)
+		h->tabWritten = true;		// (counted as written, whatever Special Operation writes special over it later - Hit::tabWritten)
 	h->runChain = words;
 	h->runChain.SetTranslatable(kFalse);
 	// THE WORDS ARE ITS WHOLE LINE NOW (a script label row's: what it reads after the write, no match in it to darken) - drawn where the match stands, nothing faint around them.

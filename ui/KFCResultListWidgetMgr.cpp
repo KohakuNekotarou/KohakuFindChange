@@ -1452,6 +1452,28 @@ bool KFCResultTree::CanCellStyleAny(const KFCRowsByChapter& rows)
 	return AnyRowCan(rows, [](int32 chapter, int32 hit) { return KFCRuns()->CanCellStyleHit(chapter, hit); });
 }
 
+bool KFCResultTree::TableStyleRows(const KFCRowsByChapter& rows, const KFCSpecialParams& params)
+{
+	// (Apply Cell Style's way: each written row reads Styled - SpecialRowWord.)
+	return WriteRowsInPlace(rows, [&](PMString& status) { return KFCRuns()->TableStyleRows(rows, params, status); });
+}
+
+bool KFCResultTree::CanTableStyleAny(const KFCRowsByChapter& rows)
+{
+	return AnyRowCan(rows, [](int32 chapter, int32 hit) { return KFCRuns()->CanTableStyleHit(chapter, hit); });
+}
+
+bool KFCResultTree::RemoveLabelRows(const KFCRowsByChapter& rows)
+{
+	// (Tate-chu-yoko's way: each written row reads Removed - SpecialRowWord.)
+	return WriteRowsInPlace(rows, [&](PMString& status) { return KFCRuns()->RemoveLabelRows(rows, status); });
+}
+
+bool KFCResultTree::CanRemoveLabelAny(const KFCRowsByChapter& rows)
+{
+	return AnyRowCan(rows, [](int32 chapter, int32 hit) { return KFCRuns()->CanRemoveLabelHit(chapter, hit); });
+}
+
 bool KFCResultTree::SpecialRows(int32 op, const KFCRowsByChapter& rows, const KFCSpecialParams& params)
 {
 	// Drawn again after it (WriteRowsInPlace): each written row reads the operation's word, its place read again,
@@ -1497,6 +1519,8 @@ const char* KFCResultTree::SpecialRowWord(int32 op)
 		case kKFCSpecialClearStyleOverrides:	return "Cleared";
 		case kKFCSpecialApplyObjectStyle:		return "Styled";	// an object row's Special Operations > Apply Object Style (its spec's A8)
 		case kKFCSpecialApplyCellStyle:			return "Styled";	// a table row's Special Operations > Apply Cell Style (the table-rows spec's T6)
+		case kKFCSpecialApplyTableStyle:		return "Styled";	// a script label list's table row's Apply Table Style (the script-label-tables-cells spec's L7)
+		case kKFCSpecialRemoveLabel:			return "Removed";	// a script label list's row's Remove Label (L8b)
 		case kKFCSpecialClearTextOverrides:		return "Cleared";	// a text row's Clear Overrides - the same word
 		case kKFCSpecialTableStyle:				return "Styled";	// a table row's Replace (the table tab spec's T9)
 		case kKFCSpecialRubyChange:				return "Changed";	// a ruby row's Replace (the ruby tab spec's R8)

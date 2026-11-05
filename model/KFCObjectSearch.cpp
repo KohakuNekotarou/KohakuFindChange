@@ -64,6 +64,7 @@
 #include "KFCObjectSearch.h"
 #include "KFCPageItemFacts.h"
 #include "KFCProgressBar.h"
+#include "KFCScriptLabelSearch.h"	// TableLabelsWords - a table's print holds its and its cells' labels
 #include "KFCTextCut.h"				// KFCSafeCut - where a long item name is cut
 
 namespace
@@ -716,6 +717,10 @@ bool KFCObjectSearch::Fingerprint(const UIDRef& item, uint64& outHash, uint32& o
 			return false;
 		print.AddNumber(style.Get());
 		print.AddNumber(tableStyles->HasLocalOverrides(item) != kFalse ? 1 : 0);
+		// ...AND ITS LABELS AND ITS CELLS' (a script label list's table and cell rows - KFCReplaceEngine's ReplaceLabelRows): a label written on a table or a
+		// cell moves no story, so its Undo is told by this print (11-05: a cell's Remove Label went unfollowed by Undo).
+		const std::string labels(KFCScriptLabelSearch::TableLabelsWords(db, item.GetUID()).GetUTF8String());
+		print.Add(labels.data(), static_cast<uint32>(labels.size()));
 		outHash = print.Hash();
 		outLength = print.Length();
 		return true;

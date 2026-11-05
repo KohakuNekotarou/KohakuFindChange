@@ -2435,6 +2435,18 @@ resource ActionDef (kSDKDefActionResourceID)
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
 
+		// Remove Label - a script label list's row's Special Operations (docs/superpowers/specs/2026-11-05-kfc-script-label-tables-cells-design.md L8b): no MenuDef - put
+		// on an object row's or a text row's Special Operations as the menu pops over such a list (KFCResultNodeEH's PopRowMenu). kCustomEnabling: grey when none of the
+		// rows can take it (CanRemoveLabelAny - a locked or missing one, one removed already).
+		kKFCActionComponentBoss,
+		kKFCRemoveLabelActionID,
+		kKFCRemoveLabelMenuKey,			// "Remove Label"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
 		// Restore from Copy - a text row's right-click menu, under Replace (the copy-restore spec).
 		// kCustomEnabling: a text row a Replace wrote (CanRestoreAny); why a copy cannot go back it says on the status line.
 		kKFCActionComponentBoss,

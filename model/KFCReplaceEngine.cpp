@@ -1365,7 +1365,7 @@ static bool RefuseOwnTabRow(const char* what, PMString& outStatus)
 
 // The own tabs' Replace (below - ClearOverridesHits' neighbour).
 static bool ReplaceOwnTabRows(const KFCRowsByChapter& rowsByChapter, PMString& outStatus);
-static bool ReplaceLabelRows(const KFCRowsByChapter& rowsByChapter, PMString& outStatus);		// (a script label list's - below, with the own tabs')
+static bool ReplaceLabelRows(const KFCRowsByChapter& rowsByChapter, PMString& outStatus, bool remove);		// (a script label list's - below, with the own tabs')
 
 bool KFCReplaceEngine::CanReplaceHit(int32 chapterIdx, int32 hitIdx)
 {
@@ -2272,7 +2272,7 @@ bool KFCReplaceEngine::ReplaceHit(int32 chapterIdx, int32 hitIdx, PMString& outS
 		KFCRowsByChapter one(1);
 		one[0].chapter = chapterIdx;
 		one[0].hits.push_back(hitIdx);
-		return KFCResultModel::ListIsScriptLabels() ? ReplaceLabelRows(one, outStatus) : ReplaceOwnTabRows(one, outStatus);
+		return KFCResultModel::ListIsScriptLabels() ? ReplaceLabelRows(one, outStatus, false) : ReplaceOwnTabRows(one, outStatus);
 	}
 	if (!CanReplaceHit(chapterIdx, hitIdx))
 	{
@@ -2311,7 +2311,7 @@ bool KFCReplaceEngine::ReplaceHits(const KFCRowsByChapter& rowsByChapter, PMStri
 	if (RefuseWarichuRow(outStatus) || RefuseRunListRow("Replace", outStatus) || RefuseTableRowsRow("Replace", outStatus))
 		return false;
 	if (KFCResultModel::ListIsScriptLabels())
-		return ReplaceLabelRows(rowsByChapter, outStatus);		// (ReplaceHit's note)
+		return ReplaceLabelRows(rowsByChapter, outStatus, false);		// (ReplaceHit's note)
 	if (KFCResultModel::ListHasOwnChangeTab())
 		return ReplaceOwnTabRows(rowsByChapter, outStatus);
 	// OBJECT ROWS: InDesign's object replace, row by row (KFCObjectReplace::ReplaceRows - it asks each row).
@@ -3451,8 +3451,8 @@ bool OutlineInChapter(OutlineChapter& chapter, int32 (&counts)[kOutlineRefusalCo
 
 bool KFCReplaceEngine::CanOutlineHit(int32 chapterIdx, int32 hitIdx)
 {
-	if (KFCResultModel::ListIsRunList() || KFCResultModel::ListHasOwnChangeTab() || KFCResultModel::ListIsTableRows())
-		return false;		// (RefuseRunListRow's, RefuseOwnTabRow's and RefuseTableRowsRow's notes)
+	if (KFCResultModel::ListIsRunList() || KFCResultModel::ListHasOwnChangeTab() || KFCResultModel::ListIsTableRows() || KFCResultModel::ListIsScriptLabels())
+		return false;		// (RefuseRunListRow's, RefuseOwnTabRow's and RefuseTableRowsRow's notes; a script label list's text rows are a table's or a cell's label - OutlineHits)
 	return OutlineRowRefusal(chapterIdx, hitIdx) == kOutlineOk;
 }
 
@@ -3463,6 +3463,12 @@ bool KFCReplaceEngine::OutlineHits(const KFCRowsByChapter& rowsByChapter, PMStri
 	outStatus.SetTranslatable(kFalse);
 	if (RefuseRunListRow("Create Outlines", outStatus) || RefuseOwnTabRow("Create Outlines", outStatus) || RefuseTableRowsRow("Create Outlines", outStatus))
 		return false;
+	if (KFCResultModel::ListIsScriptLabels())
+	{
+		// A SCRIPT LABEL LIST'S TEXT ROWS stand for a table's or a cell's label (the script-label-tables-cells spec's L7 - Create Outlines grey), not for text to outline.
+		outStatus.Append("Create Outlines: these rows are script labels of tables and cells - their text is not outlined from here.");
+		return false;
+	}
 	if (KFCRunGuard::IsAnyRunning())
 	{
 		outStatus.Append(KFCRunGuard::BusyMessage());
@@ -3688,9 +3694,12 @@ enum ClearRefusal
 	kClearEdited,		// its text has been edited since
 	kClearLocked,		// locked
 	kClearNone,			// InDesign calls its text not overridden: counted, not written (the spec's B3)
-	kClearNotTableRow,	// Apply Cell Style's: a row of no table row list (KFCTableRows)
+	kClearNotTableRow,	// Apply Cell Style's: neither a table row list's row (KFCTableRows) nor a cell's label row (KFCScriptLabelSearch)
 	kClearNoCellStyle,	// ...its document has no cell style of the name chosen (the front document's - Apply Object Style's rule)
 	kClearNotInTable,	// ...its text stands in no table's cell now (KFCTableRows::TableRowAt)
+	kClearNotTableLabel,	// Apply Table Style's: not a table's label row (a script label list's - KFCScriptLabelSearch)
+	kClearNoTableStyle,	// ...its document has no table style of the name chosen
+	kClearNoTable,		// ...no table stands on its character now
 	kClearRefusalCount
 };
 
@@ -3707,9 +3716,12 @@ const char* ClearWords(ClearRefusal why)
 		case kClearEdited:		return "edited since";
 		case kClearLocked:		return "locked";
 		case kClearNone:		return "had no overrides";
-		case kClearNotTableRow:	return "not a table row";
+		case kClearNotTableRow:	return "not a table row or a cell";
 		case kClearNoCellStyle:	return "in a document without that cell style";
 		case kClearNotInTable:	return "in no table now";
+		case kClearNotTableLabel:	return "not a table";
+		case kClearNoTableStyle:	return "in a document without that table style";
+		case kClearNoTable:	return "no table there now";
 		default:				return "";
 	}
 }
@@ -3728,9 +3740,12 @@ const char* ClearSentence(ClearRefusal why)
 		case kClearEdited:		return "the text of this row has been edited since - left as it is.";
 		case kClearLocked:		return "the text is locked (a locked layer or story) - left as it is.";
 		case kClearNone:		return "the match has no overrides to clear - left as it is.";
-		case kClearNotTableRow:	return "this row is not a row of a list of table rows.";
+		case kClearNotTableRow:	return "this row is neither a row of a list of table rows nor a cell's label.";
 		case kClearNoCellStyle:	return "the document of this row has no cell style of that name - left as it is.";
 		case kClearNotInTable:	return "this row's text stands in no table's cell now - left as it is.";
+		case kClearNotTableLabel:	return "this row is not a table's label.";
+		case kClearNoTableStyle:	return "the document of this row has no table style of that name - left as it is.";
+		case kClearNoTable:	return "no table stands on this row's character now - left as it is.";
 		default:				return "";
 	}
 }
@@ -3811,16 +3826,19 @@ const char* CellStyleSentence(ClearRefusal why)
 // Facade::ICellStylesFacade::ApplyCellStyle(style, table, the cell's area, removeOverrides kFalse, applyParaStyle kTrue) - measured 11-05 the same as the DOM's
 // cell.appliedCellStyle = (work/cpp-probe/examples/table-row-style.cpp): the style, the overrides kept, the style's paragraph style given. Read back after
 // (GetSelectedCellStyles): a write InDesign took and did not do is a failure (SetTcy's rule). outLeft: kClearOk = written; kClearNotInTable, kClearNoCellStyle.
+// A SCRIPT LABEL LIST'S CELL ROW (docs/superpowers/specs/2026-11-05-kfc-script-label-tables-cells-design.md L7): that cell alone - the cell its first character is in.
 ErrorCode ApplyCellStyleRow(const UIDRef& story, TextIndex start, TextIndex /*end*/, const KFCSpecialParams& params, ClearRefusal& outLeft)
 {
 	outLeft = kClearOk;
 	UIDRef tableRef;
-	int32 row = -1;
-	if (!KFCTableRows::TableRowAt(story, start, tableRef, row))
+	GridAddress at;
+	if (!KFCTableRows::TableCellAt(story, start, tableRef, at))
 	{
 		outLeft = kClearNotInTable;
 		return kSuccess;
 	}
+	const bool wholeRow = KFCResultModel::ListIsTableRows();		// (a table row list's row; otherwise a cell's label row - TextRowRefusal let no other in)
+	const int32 row = at.row;
 	IDataBase* const db = tableRef.GetDataBase();
 	InterfacePtr<IDocument> doc(db, db->GetRootUID(), UseDefaultIID());
 	InterfacePtr<IWorkspace> workspace(db, (doc != nil) ? doc->GetDocWorkSpace().GetUID() : kInvalidUID, UseDefaultIID());
@@ -3837,7 +3855,9 @@ ErrorCode ApplyCellStyleRow(const UIDRef& story, TextIndex start, TextIndex /*en
 		return kFailure;
 	const ColRange cols(table->GetTotalCols());
 	std::vector<GridArea> cells;
-	for (int32 c = cols.start; c < cols.start + cols.count; ++c)
+	if (!wholeRow)
+		cells.push_back(table->GetCellArea(at));
+	for (int32 c = cols.start; wholeRow && c < cols.start + cols.count; ++c)
 	{
 		const GridAddress anchor(table->FindCellAnchor(GridAddress(row, c)));
 		if (anchor.row == row && anchor.col == c)
@@ -3861,6 +3881,42 @@ ErrorCode ApplyCellStyleRow(const UIDRef& story, TextIndex start, TextIndex /*en
 	return kSuccess;
 }
 
+// APPLY TABLE STYLE'S WORDS (the script-label-tables-cells spec's L7): Clear Overrides', a table's own where they differ.
+const char* TableStyleWords(ClearRefusal why)
+{
+	return (why == kClearEdited) ? "table moved since" : ClearWords(why);
+}
+
+const char* TableStyleSentence(ClearRefusal why)
+{
+	return (why == kClearEdited) ? "the table of this row has moved or changed since - search again." : ClearSentence(why);
+}
+
+// A TABLE STYLE GIVEN TO A SCRIPT LABEL LIST'S TABLE ROW (L7): the table whose character [start, end) is now (KFCTableSearch::QueryTableAt), given the table style of params.text
+// in the row's document - KFCTableSearch::StyleNamed / Write, the Table kind's own write, its overrides kept (clearOverrides false: a plain click in the Table Styles panel),
+// read back there. outLeft: kClearOk = written; kClearNoTable, kClearNoTableStyle.
+ErrorCode ApplyTableStyleAt(const UIDRef& story, TextIndex start, TextIndex /*end*/, const KFCSpecialParams& params, ClearRefusal& outLeft)
+{
+	outLeft = kClearOk;
+	InterfacePtr<ITableModel> table(KFCTableSearch::QueryTableAt(story, start));
+	if (table == nil)
+	{
+		outLeft = kClearNoTable;
+		return kSuccess;
+	}
+	IDataBase* const db = story.GetDataBase();
+	const UID style = params.text.IsEmpty() ? kInvalidUID : KFCTableSearch::StyleNamed(db, params.text);
+	if (style == kInvalidUID)
+	{
+		outLeft = kClearNoTableStyle;
+		return kSuccess;
+	}
+	if (KFCTableSearch::Write(table, style, false) != kSuccess)
+		return kFailure;
+	KFC_DIAG_LOG("TABLESTYLE table=%u style=%u", ::GetUID(table).Get(), style.Get());
+	return kSuccess;
+}
+
 // The two writes of before (nothing to write = kClearNone, counted), in the shape every op's write takes.
 ErrorCode ClearOverridesWrite(const UIDRef& story, TextIndex start, TextIndex end, const KFCSpecialParams&, ClearRefusal& outLeft)
 {
@@ -3879,8 +3935,12 @@ ErrorCode TcyWrite(const UIDRef& story, TextIndex start, TextIndex end, const KF
 }
 
 // WHAT IS A TEXT ROW'S SPECIAL OPERATION'S OWN - Clear Overrides (the next-overrides-restore spec's B2 - B7), Tate-chu-yoko (the warichu-tcy spec's B2 - B7) and a table row's
-// Apply Cell Style (the table-rows spec's T6). The rest is one: the doors row by row, the chapters reached, one undoable step across documents, the rows marked, the message
-// (WriteTextRows).
+// Apply Cell Style (the table-rows spec's T6) and a table label row's Apply Table Style (the script-label-tables-cells spec's L7). The rest is one: the doors row by row, the chapters
+// reached, one undoable step across documents, the rows marked, the message (WriteTextRows).
+// WHICH ROWS AN OP TAKES (TextRowOp::takes - TextRowRefusal asks it of a row's KFCHolderKind): a match (a text row that stands for its text alone), a table row list's row or a
+// script label list's cell row (their cells), a script label list's table row (its table).
+enum { kTakesMatches = 0, kTakesCells, kTakesTables };
+
 struct TextRowOp
 {
 	const char*		name;							// its menu item's: the refusals' head ("Clear Overrides: ...") and the step Undo is followed by
@@ -3893,18 +3953,20 @@ struct TextRowOp
 	const char*		stepName;						// ...before its key is translated
 	int32			mark;							// a written row's (MarkHitSpecial)
 	bool			kohakuText;						// the text rows of a Kohaku+ list take it - Ruby's, Kenten's; no table's. False: no row of a Kohaku+ list with a Change side (Clear Overrides)
-	bool			tableRows;						// a table row list's rows ALONE take it (Apply Cell Style); false: no row of one (RefuseTableRowsRow)
+	int32			takes;							// which rows it takes (OpTakes): a match's (kTakesMatches), a table row list's row or a cell's label row (kTakesCells), a table's label row (kTakesTables)
 	const char*		noun;							// what the message counts: "matches", "rows"
 	bool			namesStyle;						// the message names params.words after done: 'Applied cell style "CS1" to'
 	ErrorCode		(*write)(const UIDRef& story, TextIndex start, TextIndex end, const KFCSpecialParams& params, ClearRefusal& outLeft);	// outLeft kClearOk = written; else why not (kClearNone = nothing to write there, counted)
 };
 
 const TextRowOp kClearOverridesOp = { "Clear Overrides", "Cleared overrides on", "cleared", "clear a match's overrides", ClearWords, ClearSentence,
-	kKFCClearOverridesStepKey, "KFC Clear Overrides", kKFCSpecialClearTextOverrides, false, false, "matches", false, ClearOverridesWrite };
+	kKFCClearOverridesStepKey, "KFC Clear Overrides", kKFCSpecialClearTextOverrides, false, kTakesMatches, "matches", false, ClearOverridesWrite };
 const TextRowOp kTcyOp = { "Tate-chu-yoko", "Set tate-chu-yoko on", "set tate-chu-yoko", "make a match tate-chu-yoko", TcyWords, TcySentence,
-	kKFCTcyStepKey, "KFC Tate-chu-yoko", kKFCSpecialTextTcy, true, false, "matches", false, TcyWrite };
+	kKFCTcyStepKey, "KFC Tate-chu-yoko", kKFCSpecialTextTcy, true, kTakesMatches, "matches", false, TcyWrite };
 const TextRowOp kCellStyleOp = { "Apply Cell Style", "Applied cell style", "given a cell style", "apply a cell style to a row", CellStyleWords, CellStyleSentence,
-	kKFCApplyCellStyleStepKey, "KFC Apply Cell Style", kKFCSpecialApplyCellStyle, false, true, "rows", true, ApplyCellStyleRow };
+	kKFCApplyCellStyleStepKey, "KFC Apply Cell Style", kKFCSpecialApplyCellStyle, false, kTakesCells, "rows", true, ApplyCellStyleRow };
+const TextRowOp kTableStyleOp = { "Apply Table Style", "Applied table style", "given a table style", "apply a table style to a table", TableStyleWords, TableStyleSentence,
+	kKFCTableStyleStepKey, "KFC Apply Table Style", kKFCSpecialApplyTableStyle, false, kTakesTables, "rows", true, ApplyTableStyleAt };
 
 // A WRITE THAT WROTE NOTHING: one row's reason in full, several rows' counted by reason - after the op's name, and the style it was to give (op.namesStyle:
 // 'Apply Cell Style "CS1": ...').
@@ -3945,8 +4007,15 @@ ClearRefusal TextRowRefusal(const TextRowOp& op, int32 chapterIdx, int32 hitIdx)
 	if (KFCResultModel::GetHitItem(chapterIdx, hitIdx) != kInvalidUID || (op.kohakuText && KFCResultModel::ListIsTables()))
 		return kClearNotText;
 	// A TABLE ROW LIST'S ROWS TAKE APPLY CELL STYLE ALONE, AND IT TAKES NOTHING ELSE (the table-rows spec's T6, T8): a row is no match.
-	if (op.tableRows != KFCResultModel::ListIsTableRows())
-		return op.tableRows ? kClearNotTableRow : kClearNotText;
+	// A script label list's table and cell rows the same (the script-label-tables-cells spec's L7): a cell's takes Apply Cell Style, a table's Apply Table Style - neither a match's
+	// op (L7: Clear Overrides, Create Outlines, Tate-chu-yoko grey).
+	const int32 holder = KFCResultModel::GetHitHolderKind(chapterIdx, hitIdx);
+	if (op.takes == kTakesCells && holder != kKFCHolderTableRow && holder != kKFCHolderCell)
+		return kClearNotTableRow;
+	if (op.takes == kTakesTables && holder != kKFCHolderTable)
+		return kClearNotTableLabel;
+	if (op.takes == kTakesMatches && (holder != kKFCHolderNone || KFCResultModel::ListIsTableRows() || KFCResultModel::ListIsScriptLabels()))
+		return kClearNotText;
 	if (!KFCResultModel::GetHitRow(chapterIdx, hitIdx, look) || look.outlined)
 		return kClearOutlined;
 	if (!KFCResultModel::GetHitFlags(chapterIdx, hitIdx, replaced, locked) || locked)
@@ -4065,6 +4134,41 @@ bool KFCReplaceEngine::CellStyleHits(const KFCRowsByChapter& rowsByChapter, cons
 	return WriteTextRows(kCellStyleOp, rowsByChapter, params, outStatus);
 }
 
+bool KFCReplaceEngine::CanTableStyleHit(int32 chapterIdx, int32 hitIdx)
+{
+	return CanWriteTextRow(kTableStyleOp, chapterIdx, hitIdx);
+}
+
+bool KFCReplaceEngine::TableStyleHits(const KFCRowsByChapter& rowsByChapter, const KFCSpecialParams& params, PMString& outStatus)
+{
+	KFC_DIAG_WRITTEN_DOCS_CHECK("table-style-rows");
+	return WriteTextRows(kTableStyleOp, rowsByChapter, params, outStatus);
+}
+
+bool KFCReplaceEngine::CanRemoveLabelHit(int32 chapterIdx, int32 hitIdx)
+{
+	// Read off the row alone, as the menu greys (CanCellStyleHit's way): a script label list's row - an item's, a table's, a cell's - there and not locked
+	// (WhyGreyed - a row its tab wrote still takes it), its label not taken away already (the row's word).
+	if (!KFCResultModel::ListIsScriptLabels())
+		return false;
+	const GreyedReason greyed = WhyGreyed(chapterIdx, hitIdx);
+	KFCResultModel::RowDisplay shown;
+	return (greyed == kGreyedNot || greyed == kGreyedReplaced)
+		&& !(KFCResultModel::GetHitRow(chapterIdx, hitIdx, shown) && shown.special == kKFCSpecialRemoveLabel);
+}
+
+bool KFCReplaceEngine::RemoveLabelHits(const KFCRowsByChapter& rowsByChapter, PMString& outStatus)
+{
+	if (!KFCResultModel::ListIsScriptLabels())
+	{
+		outStatus.Clear();
+		outStatus.SetTranslatable(kFalse);
+		outStatus.Append("Remove Label: these rows are not script labels.");
+		return false;
+	}
+	return ReplaceLabelRows(rowsByChapter, outStatus, true);
+}
+
 namespace
 {
 
@@ -4074,7 +4178,7 @@ bool WriteTextRows(const TextRowOp& op, const KFCRowsByChapter& rowsByChapter, c
 {
 	outStatus.Clear();
 	outStatus.SetTranslatable(kFalse);
-	if (RefuseRunListRow(op.name, outStatus) || (!op.kohakuText && RefuseOwnTabRow(op.name, outStatus)) || (!op.tableRows && RefuseTableRowsRow(op.name, outStatus)))
+	if (RefuseRunListRow(op.name, outStatus) || (!op.kohakuText && RefuseOwnTabRow(op.name, outStatus)) || (op.takes == kTakesMatches && RefuseTableRowsRow(op.name, outStatus)))
 		return false;
 	if (KFCRunGuard::IsAnyRunning())
 	{
@@ -4204,6 +4308,20 @@ bool WriteTextRows(const TextRowOp& op, const KFCRowsByChapter& rowsByChapter, c
 		chapterIdxs.push_back(chapters[c].chapterIdx);
 	KFCUndoFollow::StepRecorder recorder(chapterIdxs);
 	recorder.SetName(op.name);
+	// A TABLE'S OWN WRITE moves no story (a script label list's table row's Apply Table Style): its Undo is told by the table's print, once a table - the Table
+	// kind's rows' way (WriteOwnTabRows; KFCObjectSearch::Fingerprint - its style, its overrides, its labels).
+	if (op.takes == kTakesTables)
+		for (size_t c = 0; c < chapters.size(); ++c)
+		{
+			std::set<UID> tables;
+			for (size_t k = 0; k < chapters[c].rows.size(); ++k)
+			{
+				InterfacePtr<ITableModel> table(KFCTableSearch::QueryTableAt(UIDRef(chapters[c].docRef.GetDataBase(), chapters[c].rows[k].story),
+					chapters[c].rows[k].start));
+				if (table != nil && tables.insert(::GetUID(table)).second)
+					recorder.RecordItem(chapters[c].chapterIdx, ::GetUID(table));
+			}
+		}
 	bool ok = false;
 	bool failed = false;
 	int32 clearedRows = 0;
@@ -4950,11 +5068,12 @@ namespace
 // One row to write, as the doors found it.
 struct LabelRow
 {
-	int32		hit;
-	UID			item;
-	PMString	key;		// the key of the label the row stands for (Hit::labelKey - an item has a row per key when no key was asked)
-	PMString	value;		// the label it is given
-	bool		done;
+	int32							hit;
+	UID								item;		// an object row's item (kKFCHolderNone)
+	KFCScriptLabelSearch::Holder	holder;		// what the label stands on - an item, or a cell (a text row: docs/superpowers/specs/2026-11-05-kfc-script-label-tables-cells-design.md L2)
+	PMString						key;		// the key of the label the row stands for (Hit::labelKey - an item has a row per key when no key was asked)
+	PMString						value;		// the label it is given (empty: Remove Label - the key taken away)
+	bool							done;
 	LabelRow() : hit(-1), item(kInvalidUID), done(false) {}
 };
 
@@ -4969,11 +5088,15 @@ struct LabelChapter
 };
 }	// anonymous namespace
 
-static bool ReplaceLabelRows(const KFCRowsByChapter& rowsByChapter, PMString& outStatus)
+// REPLACE - or, `remove`, SPECIAL OPERATIONS > REMOVE LABEL (the table-cells spec's L8b - the author: "what is common to every thing, in your choice"): the same doors and step,
+// each row's label of its key taken away (an empty value - insertLabel(key, "")'s rule). The rows are an item's (object rows), a table's or a cell's (text rows - the
+// table whose character they stand on, the cell their first character is in - their place followed as any text row's: KFCScriptLabelSearch::HolderAt, WriteHolder).
+static bool ReplaceLabelRows(const KFCRowsByChapter& rowsByChapter, PMString& outStatus, bool remove)
 {
-	KFC_DIAG_WRITTEN_DOCS_CHECK("label-rows");	// (test builds: after DocsAfterWrite, below - KFCDiagWrittenDocs.h)
+	KFC_DIAG_WRITTEN_DOCS_CHECK(remove ? "label-remove-rows" : "label-rows");	// (test builds: after DocsAfterWrite, below - KFCDiagWrittenDocs.h)
 	outStatus.Clear();
 	outStatus.SetTranslatable(kFalse);
+	const char* const head = remove ? "Remove Label: " : "Replace: ";
 	// (The run guard is the callers' - ReplaceRows in the UI half, as WriteOwnTabRows' note says.)
 	const size_t total = KFCRowCount(rowsByChapter);
 	if (total == 0)
@@ -4996,13 +5119,13 @@ static bool ReplaceLabelRows(const KFCRowsByChapter& rowsByChapter, PMString& ou
 	{
 		LabelChapter chapter;
 		chapter.chapterIdx = rowsByChapter[c].chapter;
-		// The row's own flags first: a chapter with nothing to write is not opened.
-		std::vector<int32> candidates;
+		// The row's own flags first: a chapter with nothing to write is not opened. A table's label row: not written (L6).
+		std::vector<LabelRow> candidates;
 		const std::vector<int32>& hits = rowsByChapter[c].hits;
 		for (size_t k = 0; k < hits.size(); ++k)
 		{
 			const KFCReplaceEngine::GreyedReason greyed = KFCReplaceEngine::WhyGreyed(chapter.chapterIdx, hits[k]);
-			const OwnTabRefusal why = (greyed == KFCReplaceEngine::kGreyedNot) ? kOwnTabOk
+			OwnTabRefusal why = (greyed == KFCReplaceEngine::kGreyedNot || (remove && greyed == KFCReplaceEngine::kGreyedReplaced)) ? kOwnTabOk
 				: (greyed == KFCReplaceEngine::kGreyedLocked) ? kOwnTabLocked : kOwnTabMissing;
 			if (why != kOwnTabOk)
 			{
@@ -5010,7 +5133,9 @@ static bool ReplaceLabelRows(const KFCRowsByChapter& rowsByChapter, PMString& ou
 				lastWhy = why;
 				continue;
 			}
-			candidates.push_back(hits[k]);
+			LabelRow row;
+			row.hit = hits[k];
+			candidates.push_back(row);
 		}
 		if (candidates.empty())
 			continue;
@@ -5029,23 +5154,69 @@ static bool ReplaceLabelRows(const KFCRowsByChapter& rowsByChapter, PMString& ou
 		}
 		KFCResultModel::RebindChapterDoc(chapter.chapterIdx, chapter.docRef);
 		IDataBase* const db = chapter.docRef.GetDataBase();
+		// A CELL'S ROWS FOLLOW THEIR STORIES' FOCI FIRST (a text row's way - FollowStoriesOf), once per story.
+		std::map<UID, KFCSearchEngine::FollowResult> followed;
+		FollowStoriesOf(chapter.chapterIdx, db, candidates, followed);
 		for (size_t k = 0; k < candidates.size(); ++k)
 		{
-			LabelRow row;
-			row.hit = candidates[k];
-			row.item = KFCResultModel::GetHitItem(chapter.chapterIdx, row.hit);
+			LabelRow& row = candidates[k];
 			row.key = KFCResultModel::GetHitLabelKey(chapter.chapterIdx, row.hit);
 			if (row.key.IsEmpty())
 				row.key = key;		// (a row of no key of its own: the list's)
+			const int32 kind = KFCResultModel::GetHitHolderKind(chapter.chapterIdx, row.hit);
 			OwnTabRefusal why = kOwnTabOk;
-			if (row.item == kInvalidUID || !KFCResultModel::RowItemIsThere(chapter.chapterIdx, row.hit, db))
-				why = kOwnTabItemGone;
-			else if (KFCScriptLabelSearch::IsLockedNow(db, row.item))
-				why = kOwnTabLocked;		// (read at the write, as the own tabs' rows read their frame's lock - the row's own flag is the search's)
+			PMString label;
+			label.SetTranslatable(kFalse);
+			if (kind == kKFCHolderNone)
+			{
+				row.item = KFCResultModel::GetHitItem(chapter.chapterIdx, row.hit);
+				row.holder.item = row.item;
+				if (row.item == kInvalidUID || !KFCResultModel::RowItemIsThere(chapter.chapterIdx, row.hit, db))
+					why = kOwnTabItemGone;
+				else if (KFCScriptLabelSearch::IsLockedNow(db, row.item))
+					why = kOwnTabLocked;		// (read at the write, as the own tabs' rows read their frame's lock - the row's own flag is the search's)
+				else
+					label = KFCScriptLabelSearch::LabelOf(db, row.item, row.key);
+			}
 			else
 			{
-				const PMString label(KFCScriptLabelSearch::LabelOf(db, row.item, row.key));
-				if (!KFCScriptLabelSearch::Matches(label, asked))
+				// A TABLE'S OR A CELL'S ROW: where its text is now, then the table whose character it stands on, or the cell its first character is in. The cell's
+				// own text edited since is no matter (the label is what is written): such a row's place is its focus's (KFCRowFoci - it followed every edit; the
+				// identity's start did not), unless the focus closed up - the text is gone with its row or its table.
+				UID story = kInvalidUID;
+				TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
+				const PlaceFollowed place = RowPlaceFollowed(chapter.chapterIdx, row.hit, db, followed, story, start, end);
+				if (place == kPlaceNotFollowed)
+					why = kOwnTabNotFollowed;
+				else if (place == kPlaceEdited)
+				{
+					TextIndex fs = kInvalidTextIndex, fe = kInvalidTextIndex;
+					if (story != kInvalidUID && KFCRowFoci::Where(chapter.chapterIdx, row.hit, db, fs, fe) == KFCRowFoci::kFocused && fs < fe)
+						start = fs;
+					else
+						why = kOwnTabEdited;
+				}
+				if (why == kOwnTabOk)
+				{
+					if (!KFCScriptLabelSearch::HolderAt(db, kind, story, start, row.holder))
+						why = kOwnTabItemGone;
+					else if (KFCScriptLabelSearch::HolderLockedNow(db, story, start))
+						why = kOwnTabLocked;
+					else
+						label = KFCScriptLabelSearch::HolderLabel(db, row.holder, row.key);
+				}
+			}
+			if (why == kOwnTabOk)
+			{
+				if (remove)
+				{
+					// REMOVE LABEL: the key's label taken away - nothing there to take: counted as already as asked.
+					row.value.Clear();
+					row.value.SetTranslatable(kFalse);
+					if (label.IsEmpty())
+						why = kOwnTabAsAsked;
+				}
+				else if (!KFCScriptLabelSearch::Matches(label, asked))
 					why = KFCResultModel::GetHitTabWritten(chapter.chapterIdx, row.hit) ? kOwnTabAsAsked : kOwnTabEdited;	// (KFC's own write is what it reads - a Special Operation since leaves it so)
 				else
 				{
@@ -5069,7 +5240,7 @@ static bool ReplaceLabelRows(const KFCRowsByChapter& rowsByChapter, PMString& ou
 	}
 	if (toWrite == 0)
 	{
-		outStatus.Append("Replace: ");
+		outStatus.Append(head);
 		if (total == 1)
 			outStatus.Append(OwnTabRefusalSentence(lastWhy));
 		else
@@ -5088,29 +5259,43 @@ static bool ReplaceLabelRows(const KFCRowsByChapter& rowsByChapter, PMString& ou
 	{
 		if (!KFCBookScope::IsDocStillOpen(chapters[c].docRef))
 		{
-			outStatus.Append("Replace: a document of the selected rows has been closed - nothing was changed.");
+			outStatus.Append(head);
+			outStatus.Append("a document of the selected rows has been closed - nothing was changed.");
 			return false;
 		}
 	}
 
-	// RECORDED FOR THE PANEL'S FOLLOWING OF UNDO: one step for every document of it - each row's item, by its print (KFCObjectSearch::Fingerprint).
+	// RECORDED FOR THE PANEL'S FOLLOWING OF UNDO: one step for every document of it - each object row's item, by its print (KFCObjectSearch::Fingerprint).
 	std::vector<int32> chapterIdxs;
 	for (size_t c = 0; c < chapters.size(); ++c)
 		chapterIdxs.push_back(chapters[c].chapterIdx);
 	KFCUndoFollow::StepRecorder recorder(chapterIdxs);
-	recorder.SetName("Change Script Label");
+	recorder.SetName(remove ? "Remove Script Label" : "Change Script Label");
+	// A TABLE'S OR A CELL'S ROW BY ITS TABLE, once a table (11-05: a label on either moves no story - a cell's Remove Label went unfollowed by Undo): the table's
+	// print holds its labels and its cells' (KFCObjectSearch::Fingerprint).
 	for (size_t c = 0; c < chapters.size(); ++c)
+	{
+		std::set<UID> tables;
 		for (size_t k = 0; k < chapters[c].rows.size(); ++k)
-			recorder.RecordItem(chapters[c].chapterIdx, chapters[c].rows[k].item);
+		{
+			const LabelRow& row = chapters[c].rows[k];
+			if (row.item != kInvalidUID)
+				recorder.RecordItem(chapters[c].chapterIdx, row.item);
+			else if (row.holder.table != kInvalidUID && tables.insert(row.holder.table).second)
+				recorder.RecordItem(chapters[c].chapterIdx, row.holder.table);
+		}
+	}
 	bool ok = false;
 	bool failed = false;
 	int32 writtenRows = 0;
 	{
 		KFCReplaceEngine::WriteStep step;
-		if (!KFCReplaceEngine::BeginWriteStep(acrossDocuments, step, kKFCLabelChangeStepKey, "Change Script Label"))
+		if (!KFCReplaceEngine::BeginWriteStep(acrossDocuments, step, remove ? kKFCLabelRemoveStepKey : kKFCLabelChangeStepKey,
+			remove ? "Remove Script Label" : "Change Script Label"))
 		{
-			outStatus.Append(acrossDocuments ? "Replace: InDesign would not start an undoable step - nothing was changed."
-				: "Replace: InDesign would not start a command sequence - nothing was changed.");
+			outStatus.Append(head);
+			outStatus.Append(acrossDocuments ? "InDesign would not start an undoable step - nothing was changed."
+				: "InDesign would not start a command sequence - nothing was changed.");
 			return false;
 		}
 		for (size_t c = 0; c < chapters.size() && !failed; ++c)
@@ -5119,15 +5304,23 @@ static bool ReplaceLabelRows(const KFCRowsByChapter& rowsByChapter, PMString& ou
 			for (size_t k = 0; k < chapters[c].rows.size(); ++k)
 			{
 				LabelRow& row = chapters[c].rows[k];
-				if (KFCScriptLabelSearch::Write(db, row.item, row.key, row.value) != kSuccess)
+				if (KFCScriptLabelSearch::WriteHolder(db, row.holder, row.key, row.value) != kSuccess)
 				{
 					failed = true;
 					break;
 				}
-				KFC_DIAG_LOG("LABELWRITE chapter=%d row=%d item=%u", chapters[c].chapterIdx, row.hit, static_cast<unsigned>(row.item.Get()));
+				KFC_DIAG_LOG("LABELWRITE chapter=%d row=%d item=%u kind=%d remove=%d", chapters[c].chapterIdx, row.hit, static_cast<unsigned>(row.item.Get()),
+					static_cast<int>(row.holder.kind), remove ? 1 : 0);
 				row.done = true;
 				++chapters[c].written;
-				KFCScriptLabelSearch::MarkRowWritten(chapters[c].chapterIdx, row.hit, chapters[c].docRef, row.item, row.key, row.value);		// (an object row's marks: MarkHitOwnChange leaves one alone)
+				// THE ROW'S MARKS: a written label - Labeled, counted (an object row's MarkRowWritten, a cell's own-change mark); a removed one - Removed, a special operation's word.
+				if (remove)
+					KFCScriptLabelSearch::MarkRowRemoved(chapters[c].chapterIdx, row.hit, chapters[c].docRef, row.holder, row.key);
+				else if (row.holder.kind == kKFCHolderNone)
+					KFCScriptLabelSearch::MarkRowWritten(chapters[c].chapterIdx, row.hit, chapters[c].docRef, row.item, row.key, row.value);		// (an object row's marks: MarkHitOwnChange leaves one alone)
+				else
+					KFCResultModel::MarkHitOwnChange(chapters[c].chapterIdx, row.hit, kKFCSpecialScriptLabel,
+						KFCScriptLabelSearch::HolderRowWords(db, row.holder, row.key, row.value), KFCRowUpper());
 			}
 			writtenRows += chapters[c].written;
 		}
@@ -5142,7 +5335,8 @@ static bool ReplaceLabelRows(const KFCRowsByChapter& rowsByChapter, PMString& ou
 	if (!ok)
 	{
 		KFCResultModel::RollBackRows();
-		outStatus.Append(failed ? "Replace: InDesign would not write a label - nothing was changed." : "Replace: no row was written.");
+		outStatus.Append(head);
+		outStatus.Append(failed ? "InDesign would not write a label - nothing was changed." : "no row was written.");
 		return false;
 	}
 	recorder.Keep();
@@ -5154,10 +5348,10 @@ static bool ReplaceLabelRows(const KFCRowsByChapter& rowsByChapter, PMString& ou
 		KFC_DIAG_NOTE_WRITE(chapters[c].docRef);
 	}
 
-	// WHAT IT DID (SayRowsWritten): "Labeled ID:262." / "Labeled 2 of 3 items: ID:262, ID:270. Left as they were: 1 locked."
+	// WHAT IT DID (SayRowsWritten): "Labeled ID:262." / "Labeled 2 of 3 items: ID:262, ID:270. Left as they were: 1 locked." - Remove Label's "Removed the label of ...".
 	PMString leftWords;
 	AppendCountsByWhy(leftWords, counts, OwnTabRefusalWords);
-	SayRowsWritten(outStatus, "Labeled", "items", RowsDone(chapters), total, leftWords);
+	SayRowsWritten(outStatus, remove ? "Removed the label of" : "Labeled", remove ? "rows" : "items", RowsDone(chapters), total, leftWords);
 	return true;
 }
 

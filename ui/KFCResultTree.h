@@ -312,6 +312,20 @@ namespace KFCResultTree
 	/** Can Apply Cell Style be offered on these rows (KFCRuns()->CanCellStyleHit - read only)? The menu's grey. */
 	bool CanCellStyleAny(const KFCRowsByChapter& rows);
 
+	/** A SCRIPT LABEL LIST'S TABLE ROW'S SPECIAL OPERATIONS > APPLY TABLE STYLE > <style> (docs/superpowers/specs/2026-11-05-kfc-script-label-tables-cells-design.md L7):
+	    the rows' tables given the style params names, by the model (KFCRuns()->TableStyleRows), Apply Cell Style's way - each one written reads "Styled". True = written. */
+	bool TableStyleRows(const KFCRowsByChapter& rows, const KFCSpecialParams& params);
+
+	/** Can Apply Table Style be offered on these rows (KFCRuns()->CanTableStyleHit - read only)? The menu's grey. */
+	bool CanTableStyleAny(const KFCRowsByChapter& rows);
+
+	/** A SCRIPT LABEL LIST'S ROW'S SPECIAL OPERATIONS > REMOVE LABEL (L8b): the rows' labels of their keys taken away, by the model (KFCRuns()->RemoveLabelRows) -
+	    each one written reads "Removed". True = written. */
+	bool RemoveLabelRows(const KFCRowsByChapter& rows);
+
+	/** Can Remove Label be offered on these rows (KFCRuns()->CanRemoveLabelHit - read only)? The menu's grey. */
+	bool CanRemoveLabelAny(const KFCRowsByChapter& rows);
+
 	/** AN OBJECT ROW'S OTHER SPECIAL OPERATIONS (docs/superpowers/specs/2026-10-17-kfc-object-special-operations-design.md):
 	    the rows' objects written where they stand - across spreads and documents - by InDesign's own Object menu commands
 	    (op, a KFCSpecialOp, with params - Move to Active Layer's layer name), by the model (KFCRuns()->SpecialRows,

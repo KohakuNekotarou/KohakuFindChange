@@ -70,6 +70,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCClearStyleOverridesStepKey,		"Clear Object Style Overrides",
                 kKFCApplyObjStyleStepKey,			"Apply Object Style",
                 kKFCApplyCellStyleStepKey,			"Apply Cell Style",
+                kKFCLabelRemoveStepKey,			"Remove Script Label",
                 kKFCDeleteStepKey,					"Delete",
                 kKFCMoveStepKey,					"Move",
                 kKFCScaleStepKey,					"Scale",

@@ -276,6 +276,8 @@ namespace KFCResultModel
 		// IsHitItemGone).
 		bool		itemGone;
 		UID			tableUID;	// A TABLE KIND'S ROW: its table (KFCTableSearch - Search Text in These Tables searches the text in it); kInvalidUID for any other row
+								// (a table row list's row, a script label list's table or cell label row: its table too)
+		int32		holderKind;	// WHAT A TEXT ROW STANDS FOR BEYOND ITS TEXT (KFCHolderKind): a table row list's row, a table's or a cell's label row - kKFCHolderNone for the rest
 
 		Hit() : pageIndex(-1), isOverset(false), isLocked(false), isHidden(false), onHiddenSpread(false),
 				fontGroup(-1), fontGroupPos(-1), storyUID(kInvalidUID),
@@ -285,7 +287,7 @@ namespace KFCResultModel
 				frameLayer(kInvalidUID), outcome(kOutcomeNone),
 				pageOrdinal(0), storyOrdinal(-1),
 				itemUID(kInvalidUID), onPasteboard(false), isMaster(false), isGrouped(false), isInline(false),
-				isAnchored(false), itemPrint(0), itemPrintLength(0), itemGone(false), tableUID(kInvalidUID) {}
+				isAnchored(false), itemPrint(0), itemPrintLength(0), itemGone(false), tableUID(kInvalidUID), holderKind(0) {}
 	};
 
 	/** One STORY of a chapter's hits - one story row in the tree. The struct keeps the name it had when
@@ -770,6 +772,10 @@ namespace KFCResultModel
 	/** The table a Table kind's row stands for (Hit::tableUID); kInvalidUID for any other row or an index out of range. */
 	UID GetHitTable(int32 chapterIdx, int32 hitIdx);
 
+	/** What a text row stands for beyond its text (Hit::holderKind - KFCHolderKind: a table row list's row, a script label list's table or cell label row);
+	    kKFCHolderNone for any other row or an index out of range. */
+	int32 GetHitHolderKind(int32 chapterIdx, int32 hitIdx);
+
 	/** The page item an OBJECT row stands for (Hit::itemUID); kInvalidUID for a text row or an index out of range. */
 	UID GetHitItem(int32 chapterIdx, int32 hitIdx);
 
@@ -813,8 +819,9 @@ namespace KFCResultModel
 
 	/** AN OBJECT ROW KFC'S OWN WRITE CHANGED (a script label row's - KFCScriptLabelSearch::MarkRowWritten): MarkItemSpecial's marks - its word (op), its eye, its place and
 	    print as the write left them, backed up for an Undo - and its words, what it reads now (runChain, as an own tab's text row reads its after-text: MarkHitOwnChange,
-	    which leaves an object row alone). place = nil: the place could not be read - the row keeps its own (never MarkItemSpecial's "taken away"). */
-	void MarkItemOwnChange(int32 chapterIdx, int32 hitIdx, int32 op, const PMString& words, uint64 newPrint, uint32 newLength, const Hit* place);
+	    which leaves an object row alone). place = nil: the place could not be read - the row keeps its own (never MarkItemSpecial's "taken away"). counted = false: the
+	    row is not counted as its tab's write (Hit::tabWritten left as it is - a script label row's Remove Label: "Removed", a Special Operation's word). */
+	void MarkItemOwnChange(int32 chapterIdx, int32 hitIdx, int32 op, const PMString& words, uint64 newPrint, uint32 newLength, const Hit* place, bool counted = true);
 
 	/** An object row a write of KFC's own did NOT replace, but whose item's fingerprint the write moved - the text frame of
 	    the story an inline written hangs in, the group holding an item written (KFCObjectSearch::WriteReach): its fingerprint
@@ -878,8 +885,8 @@ namespace KFCResultModel
 	void MarkHitSpecial(int32 chapterIdx, int32 hitIdx, int32 op);
 
 	/** A ROW ITS OWN TAB'S REPLACE WROTE (the table tab spec's T9, the ruby tab spec's R8): MarkHitSpecial's marks (op - its word), and what it draws as the write left it
-	    (Hit::runChain - empty: its own text - and Hit::upper). Backed up first, so an Undo puts both back. */
-	void MarkHitOwnChange(int32 chapterIdx, int32 hitIdx, int32 op, const PMString& words, const KFCRowUpper& upper = KFCRowUpper());
+	    (Hit::runChain - empty: its own text - and Hit::upper). Backed up first, so an Undo puts both back. counted = false: not counted as its tab's write (MarkItemOwnChange's). */
+	void MarkHitOwnChange(int32 chapterIdx, int32 hitIdx, int32 op, const PMString& words, const KFCRowUpper& upper = KFCRowUpper(), bool counted = true);
 
 	/** A chapter's document binding and file. The replace pass works chapter at a time, so it
 	    needs this without going through a hit. false = index out of range. */

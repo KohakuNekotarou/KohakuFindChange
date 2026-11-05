@@ -66,13 +66,25 @@
 #include "KFCResultTree.h"		// TakeKeyboard - the hand-off after a click; DiagKeyFocus - who holds the keyboard, for that trace
 #include "KFCResultHistory.h"	// SwitchToKeptRowLater - a grey row's click
 #include "KFCKohakuTab.h"		// IsJapaneseUI - a text row's Tate-chu-yoko, a Japanese InDesign's alone
-#include "KFCStyleMenu.h"		// PutOnMenu - an object row's Apply Object Style > the front document's object styles; a table row's Apply Cell Style >, its cell styles
+#include "KFCStyleMenu.h"		// PutOnMenu - an object row's Apply Object Style > the front document's object styles; a table row's Apply Cell Style >, its cell styles;
+								// a script label list's table row's Apply Table Style >, its table styles
 
 #include <cstring>				// strcmp - which menu pops
 #include <vector>				// a row's word's other readings (KFCResultTree::UnifyReadingsOf)
 
 namespace
 {
+
+// What the hit row popping stands for beyond its text (IKFCResults::GetHitHolderKind - a script label list's table or cell row, a table row list's row);
+// kKFCHolderNone for any other row.
+int32 HolderOfRow(IPMUnknown* widget)
+{
+	InterfacePtr<const ITreeNodeIDData> nodeData(widget, UseDefaultIID());
+	if (nodeData == nil)
+		return kKFCHolderNone;
+	TreeNodePtr<KFCResultNodeID> row(nodeData->Get());
+	return (row != nil && row->IsHitRow()) ? KFCResults()->GetHitHolderKind(row->GetChapter(), row->GetHit()) : kKFCHolderNone;
+}
 
 // Pop a row's right-click menu (a MenuDef subtree, by its internal name) at the click. The item the user picks
 // fires through the ordinary action component.
@@ -131,24 +143,46 @@ void PopRowMenu(const char* menuName, IEvent* e, IPMUnknown* widget)
 		KFCStyleMenu::PutOnMenu(menuMgr, path, KFCStyleMenu::kObjectStyles);
 	}
 	// APPLY CELL STYLE (docs/superpowers/specs/2026-11-05-kfc-table-rows-cell-style-design.md T6): a text row's Special Operations > Apply Cell Style > - over
-	// a row of a table row list alone: the submenu's entry put first (IMenuManager.h: kInvalidActionID and the path with a delimiter - a node in the MenuDef
-	// stood empty on every text row's menu, measured 11-05), then the front document's cell styles the same way as the object styles. Over any other list's
-	// text row the submenu goes, entry and items (RemoveSubmenuAndChildren - taken off first every time, so it is never put twice).
+	// a row of a table row list, or a script label list's cell row (the script-label-tables-cells spec's L7): the submenu's entry put first (IMenuManager.h:
+	// kInvalidActionID and the path with a delimiter - a node in the MenuDef stood empty on every text row's menu, measured 11-05), then the front document's
+	// cell styles the same way as the object styles. APPLY TABLE STYLE > the same over a script label list's table row (L7 - its table styles). Over any other
+	// text row both submenus go, entry and items (RemoveSubmenuAndChildren - taken off first every time, so neither is ever put twice).
 	if (std::strcmp(menuName, kKFCResultHitMenuName) == 0)
 	{
-		PMString path(kKFCApplyCellStyleSubmenuPath);
-		path.SetTranslatable(kFalse);
-		// (The entry TRANSLATABLE, as a MenuDef node's path is: put untranslatable, the submenu drew its key - "0x1EA600kKFCApplyCellStyleSubmenuKey", measured
+		PMString cellPath(kKFCApplyCellStyleSubmenuPath), tablePath(kKFCApplyTableStyleSubmenuPath);
+		cellPath.SetTranslatable(kFalse);
+		tablePath.SetTranslatable(kFalse);
+		// (The entries TRANSLATABLE, as a MenuDef node's path is: put untranslatable, the submenu drew its key - "0x1EA600kKFCApplyCellStyleSubmenuKey", measured
 		// 11-05. The items' path stays as the object styles' is - untranslatable, found by its keys.)
-		PMString entry(kKFCApplyCellStyleSubmenuEntry);
-		menuMgr->RemoveSubmenuAndChildren(entry);
-		if (KFCResults()->ListIsTableRows())
+		PMString cellEntry(kKFCApplyCellStyleSubmenuEntry), tableEntry(kKFCApplyTableStyleSubmenuEntry);
+		menuMgr->RemoveSubmenuAndChildren(cellEntry);
+		menuMgr->RemoveSubmenuAndChildren(tableEntry);
+		const int32 holder = HolderOfRow(widget);
+		if (KFCResults()->ListIsTableRows() || holder == kKFCHolderCell)
 		{
-			menuMgr->AddMenuItem(kInvalidActionID, entry, PMReal(kKFCApplyCellStyleSubmenuPosition), kFalse);
-			KFCStyleMenu::PutOnMenu(menuMgr, path, KFCStyleMenu::kCellStyles);
+			menuMgr->AddMenuItem(kInvalidActionID, cellEntry, PMReal(kKFCApplyCellStyleSubmenuPosition), kFalse);
+			KFCStyleMenu::PutOnMenu(menuMgr, cellPath, KFCStyleMenu::kCellStyles);
+		}
+		else if (holder == kKFCHolderTable)
+		{
+			menuMgr->AddMenuItem(kInvalidActionID, tableEntry, PMReal(kKFCApplyTableStyleSubmenuPosition), kFalse);
+			KFCStyleMenu::PutOnMenu(menuMgr, tablePath, KFCStyleMenu::kTableStyles);
 		}
 		else
-			KFCStyleMenu::PutOnMenu(menuMgr, path, KFCStyleMenu::kNone);
+			KFCStyleMenu::PutOnMenu(menuMgr, cellPath, KFCStyleMenu::kNone);
+	}
+	// REMOVE LABEL (the script-label-tables-cells spec's L8b - common to every row of a script label list): on an object row's and a text row's Special Operations
+	// over such a list - one action, taken off both paths first, then put on the path of the menu popping (the style items' rule: one action on one path).
+	if (std::strcmp(menuName, kKFCResultHitMenuName) == 0 || std::strcmp(menuName, kKFCResultObjectMenuName) == 0)
+	{
+		PMString textPath(kKFCHitSpecialOpsSubmenuPath), objectPath(kKFCSpecialOpsSubmenuPath);
+		textPath.SetTranslatable(kFalse);
+		objectPath.SetTranslatable(kFalse);
+		menuMgr->RemoveMenuItem(textPath, kKFCRemoveLabelActionID);
+		menuMgr->RemoveMenuItem(objectPath, kKFCRemoveLabelActionID);
+		if (KFCResults()->ListIsScriptLabels())
+			menuMgr->AddMenuItem(kKFCRemoveLabelActionID, (std::strcmp(menuName, kKFCResultHitMenuName) == 0) ? textPath : objectPath,
+				PMReal(kKFCRemoveLabelMenuItemPosition), kFalse);
 	}
 	menuMgr->HandlePopupMenu(menuName, e->GlobalWhere(), e->GlobalWhere(), removeDisabledItems, widget);
 }

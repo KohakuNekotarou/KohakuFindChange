@@ -25,8 +25,10 @@
 #define __KFCScriptLabelSearch_h__
 
 #include "PMString.h"
+#include "TableTypes.h"			// GridAddress - a cell holder's
 #include "UIDRef.h"
 
+#include <map>
 #include <vector>
 
 #include "KFCBookScope.h"		// ChapterDoc, SkippedChapter - a run's targets
@@ -73,10 +75,10 @@ namespace KFCScriptLabelSearch
 	void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBook, std::vector<KFCBookScope::SkippedChapter>& unopenable,
 		KFCSearchEngine::CollectTally& out, int32 reserved, const KFCScriptLabelConditions& asked);
 
-	/** One open document's labels again (Search This Document Again): its rows in outHits - at most `limit` (outCapped when there were more).
-	    False = no walk, or Cancel was pressed (outCancelled) - the rows are not to be used. */
+	/** One open document's labels again (Search This Document Again): its rows in outHits - at most `limit` (outCapped when there were more) - the table and cell rows'
+	    stories' versions in outVersions (text rows). False = no walk, or Cancel was pressed (outCancelled) - the rows are not to be used. */
 	bool WalkOneDocument(const UIDRef& docRef, const PMString& name, size_t limit, const KFCScriptLabelConditions& asked,
-		std::vector<KFCResultModel::Hit>& outHits, bool& outCapped, bool& outCancelled);
+		std::vector<KFCResultModel::Hit>& outHits, std::map<UID, uint32>& outVersions, bool& outCapped, bool& outCancelled);
 
 	/** WHAT A ROW DRAWS FOR AN ITEM AND ITS LABEL (S5): "ID<uid>:<the Layers panel's name>  <label>" - the label as it stands, cut where a row's text
 	    is kept short; the panel draws its line breaks as a pilcrow and its tabs as KFC's other rows draw them. Untranslatable. */
@@ -118,6 +120,47 @@ namespace KFCScriptLabelSearch
 	    the search or Find Next counts as it stands - as the Table part's and its rows' writers read a frame's lock at the write. The one place S7's
 	    lock rule is kept. */
 	bool IsLockedNow(IDataBase* db, UID item);
+
+	/** A LABEL'S HOLDER - what a row of a script label list stands on (docs/superpowers/specs/2026-11-05-kfc-script-label-tables-cells-design.md L1, L2): a page item (kind
+	    kKFCHolderNone, item), a table (kKFCHolderTable - its labels on the scripting object the DOM makes for it: TableScript) or a cell (kKFCHolderCell -
+	    table and the cell's top-left; the cell attribute kCellAttrScriptLabelBoss). */
+	struct Holder
+	{
+		int32		kind;
+		UID			item;
+		UID			table;
+		GridAddress	cell;
+		Holder() : kind(kKFCHolderNone), item(kInvalidUID), table(kInvalidUID) {}
+	};
+
+	/** The holder a TEXT row of a script label list stands on now (its kind - Hit::holderKind - and its place, followed): a table's row, the table whose character is at
+	    `start` (KFCTableSearch::QueryTableAt); a cell's row, the cell its first character is in (KFCTableRows::TableCellAt). False = nothing of that kind there now. */
+	bool HolderAt(IDataBase* db, int32 kind, UID story, TextIndex start, Holder& out);
+
+	/** The holder's label under `key` (an item's: LabelOf's) - untranslatable; empty for none. */
+	PMString HolderLabel(IDataBase* db, const Holder& holder, const PMString& key);
+
+	/** ONE HOLDER'S LABEL WRITTEN inside the caller's step - an empty value takes the key away (insertLabel(key, "")): an item's (Write); a cell's by its label attribute - its tags
+	    now, that key set - handed to ITableCommands::ApplyCellOverrides; a table's by IScriptUtils::SetScriptingTag on its scripting object, made with the table's
+	    story for its parent (one made without took InDesign down - memory table-label-write-crash-and-cell-label-write). Read back after. kSuccess = done. */
+	ErrorCode WriteHolder(IDataBase* db, const Holder& holder, const PMString& key, const PMString& value);
+
+	/** WHAT A TABLE'S OR A CELL'S LABEL ROW DRAWS (L1, L2): "Table 5x2  <key>: <label>" / "Cell r2 c1  <key>: <label>" (the panel's key not written - an item's row's rule; the
+	    label cut as an item's row cuts it). Untranslatable. */
+	PMString HolderRowWords(IDataBase* db, const Holder& holder, const PMString& key, const PMString& label);
+
+	/** IS A TABLE'S OR A CELL'S LABEL ROW LOCKED NOW - its place's story, frame or layer (a text row's lock: KFCSearchEngine::IsFrameEditable), read at the write. */
+	bool HolderLockedNow(IDataBase* db, UID story, TextIndex start);
+
+	/** A LIST'S ROW WHOSE LABEL OF `key` SPECIAL OPERATIONS > REMOVE LABEL JUST TOOK AWAY (the table-cells spec's L8b), marked inside the write's step: "Removed"
+	    (kKFCSpecialRemoveLabel - a Special Operation's word, NOT counted as the tab's write), its words read again with no label - an item's row MarkRowWritten's way, a
+	    cell's as a text row's own change (KFCResultModel::MarkHitOwnChange). */
+	void MarkRowRemoved(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, const Holder& holder, const PMString& key);
+
+	/** EVERY LABEL OF A TABLE AND OF ITS CELLS as one string - the table's "key=value;" pairs, then each cell's after "@row,col:" - for the table's print
+	    (KFCObjectSearch::Fingerprint): a label written on a table or a cell moves no story, so its Undo is followed by the table's print (KFCUndoFollow's
+	    RecordItem - 11-05: a cell's Remove Label went unfollowed by Undo). Untranslatable; empty for none. */
+	PMString TableLabelsWords(IDataBase* db, UID table);
 
 	/** WHY AN OBJECT ROW'S OTHER WRITES REFUSE A SCRIPT LABEL LIST'S ROWS (Special Operations, Create Outlines, InDesign's object replace - the doors
 	    a press that never went through the menu meets; the menu greys them): a row's Replace writes its label alone. */

@@ -5804,7 +5804,7 @@ bool KFCSearchEngine::SearchDocumentAgain(int32 chapterIdx, PMString& outStatus)
 			KFCScriptLabelConditions listAsked;
 			if (asked != nil)
 				listAsked = asked->label;
-			walked = KFCScriptLabelSearch::WalkOneDocument(docRef, name, limit, listAsked, hits, capped, cancelled);
+			walked = KFCScriptLabelSearch::WalkOneDocument(docRef, name, limit, listAsked, hits, storyVersions, capped, cancelled);
 		}
 		else if (KFCResultModel::GetSearchMode() == IFindChangeOptions::kObjectSearch)
 			walked = KFCObjectSearch::WalkOneDocument(docRef, name, limit, hits, capped, cancelled,

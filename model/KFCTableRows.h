@@ -22,6 +22,7 @@
 #define __KFCTableRows_h__
 
 #include "PMString.h"
+#include "TableTypes.h"			// GridAddress
 #include "UIDRef.h"
 
 class ITableModel;
@@ -42,6 +43,10 @@ namespace KFCTableRows
 	/** THE TABLE ROW A TEXT POSITION STANDS IN (T7): the story thread of `at` in `story` - a cell of a table - its table and the row of its cell
 	    (ITextStoryThread::GetDictKey as a GridID - ITableModel::GetGridAddress). False = the position is in no table's cell. */
 	bool TableRowAt(const UIDRef& story, TextIndex at, UIDRef& outTable, int32& outRow);
+
+	/** ...and THE CELL: its table and the cell's top-left (a script label list's cell row - docs/superpowers/specs/2026-11-05-kfc-script-label-tables-cells-design.md
+	    L2). False = the position is in no table's cell. */
+	bool TableCellAt(const UIDRef& story, TextIndex at, UIDRef& outTable, GridAddress& outCell);
 }
 
 #endif // __KFCTableRows_h__

@@ -94,7 +94,9 @@ DECLARE_PMID(kInterfaceIDSpace, IID_IKFCUIBOUNDARY, kKFCPrefix + 14)
 //  Apply Object Style.)
 // (50, 2026-11-05: a table row list - IKFCRuns::ListRowsOfTables / CellStyleRows / CanCellStyleHit and IKFCResults::ListIsTableRows appended,
 //  KFCSpecialOp gained kKFCSpecialApplyCellStyle - List Rows of These Tables and Special Operations > Apply Cell Style.)
-#define kKFCBoundaryRevision	"50"
+// (51, 2026-11-05: a script label list's table and cell rows - IKFCResults::GetHitHolderKind and IKFCRuns::TableStyleRows / CanTableStyleHit /
+//  RemoveLabelRows / CanRemoveLabelHit appended, KFCSpecialOp gained kKFCSpecialApplyTableStyle and kKFCSpecialRemoveLabel.)
+#define kKFCBoundaryRevision	"51"
 #define kKFCBoundaryStamp		kKFCVersion "/" kKFCBoundaryRevision
 
 #endif // __KFCBoundaryID_h__

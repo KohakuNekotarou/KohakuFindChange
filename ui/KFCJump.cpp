@@ -1048,7 +1048,7 @@ const char* NotSelectedWords(NotSelected why)
 // put on, as Find Next does (PutTypeToolOn - the author's call); the keyboard stays on the list - the row's LButtonUp
 // acquires it after the jump, the walk takes it back - so the arrows walk on and Return replaces. The document is in
 // front and composed, inside JumpToHit's dirty guard, its selection cleared.
-NotSelected SelectRangeNow(const UIDRef& storyRef, TextIndex start, TextIndex end, bool hidden);
+NotSelected SelectRangeNow(const UIDRef& storyRef, TextIndex start, TextIndex end, bool hidden, int32 holder = kKFCHolderNone);
 NotSelected SelectMatchOnClick(int32 chapterIdx, int32 hitIdx, const UIDRef& storyRef, TextIndex start, TextIndex end,
 	bool found)
 {
@@ -1061,12 +1061,12 @@ NotSelected SelectMatchOnClick(int32 chapterIdx, int32 hitIdx, const UIDRef& sto
 	KFCResults()->GetHitReach(chapterIdx, hitIdx, locked, hidden);
 	if (locked)
 		return kNotSelectedLocked;
-	return SelectRangeNow(storyRef, start, end, hidden);
+	return SelectRangeNow(storyRef, start, end, hidden, KFCResults()->GetHitHolderKind(chapterIdx, hitIdx));
 }
 
 // THE TABLE AND ROW A TEXT POSITION STANDS IN (a table row list's row - its first character's cell: the model's KFCTableRows::TableRowAt, read here in the UI
 // half): the table AddRef'd, or nil - outRow its row.
-ITableModel* TableOfRowAt(const UIDRef& storyRef, TextIndex at, int32& outRow)
+ITableModel* TableOfRowAt(const UIDRef& storyRef, TextIndex at, int32& outRow, GridAddress* outCell = nil)
 {
 	outRow = -1;
 	InterfacePtr<ITextModel> model(storyRef, UseDefaultIID());
@@ -1084,11 +1084,14 @@ ITableModel* TableOfRowAt(const UIDRef& storyRef, TextIndex at, int32& outRow)
 	if (cell.row < 0 || cell.row >= table->GetTotalRows().count)
 		return nil;
 	outRow = cell.row;
+	if (outCell != nil)
+		*outCell = cell;		// (the cell the text is in - its anchor: a GridID names a cell by its anchor)
 	return table.forget();
 }
 
-// [start, end) OF THE STORY SELECTED, THE TYPE TOOL ON (SelectMatchOnClick's, the Table part's Find Next's) - a table row list's row: its cells. Asks no lock.
-NotSelected SelectRangeNow(const UIDRef& storyRef, TextIndex start, TextIndex end, bool hidden)
+// [start, end) OF THE STORY SELECTED, THE TYPE TOOL ON (SelectMatchOnClick's, the Table part's Find Next's) - a table row list's row: its cells; a script label
+// list's cell row (holder - IKFCResults::GetHitHolderKind): its cell. Asks no lock.
+NotSelected SelectRangeNow(const UIDRef& storyRef, TextIndex start, TextIndex end, bool hidden, int32 holder)
 {
 	InterfacePtr<ITextModel> textModel(storyRef, UseDefaultIID());
 	if (textModel == nil)
@@ -1122,6 +1125,19 @@ NotSelected SelectRangeNow(const UIDRef& storyRef, TextIndex start, TextIndex en
 		if (table == nil || tableSelection == nil)
 			return kNotSelectedQuietly;
 		tableSelection->SelectRows(row, 1, table, kTrue, kFalse);
+		return hidden ? kSelectedHidden : kSelected;
+	}
+	// A SCRIPT LABEL LIST'S CELL ROW (docs/superpowers/specs/2026-11-05-kfc-script-label-tables-cells-design.md L5): the CELL selected - the one its text stands in
+	// now, whole (ITableSelectionSuite::Select over its area: a merged cell's every grid cell) - the row stands for the cell's label, not for its words. No scroll.
+	if (holder == kKFCHolderCell)
+	{
+		int32 row = -1;
+		GridAddress cell;
+		InterfacePtr<ITableModel> table(TableOfRowAt(storyRef, start, row, &cell));
+		InterfacePtr<ITableSelectionSuite> tableSelection(selectionManager, UseDefaultIID());
+		if (table == nil || tableSelection == nil)
+			return kNotSelectedQuietly;
+		tableSelection->Select(table, table->GetCellArea(cell), ITableSelectionSuite::kReplace, kFalse);
 		return hidden ? kSelectedHidden : kSelected;
 	}
 	// ! RangeData is (start, END) - not (start, length). Getting that wrong selects from the match to a point measured

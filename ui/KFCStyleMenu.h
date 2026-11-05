@@ -31,7 +31,8 @@ namespace KFCStyleMenu
 	{
 		kNone = 0,
 		kObjectStyles,		// an object row's Special Operations > Apply Object Style
-		kCellStyles			// a table row list's row's Special Operations > Apply Cell Style
+		kCellStyles,		// a table row list's row's, or a script label list's cell row's, Special Operations > Apply Cell Style
+		kTableStyles		// a script label list's table row's Special Operations > Apply Table Style (the script-label-tables-cells spec's L7)
 	};
 
 	/** The items and the note taken off `path` and off the path the last menu put them on, the list of `kind` read again - the
@@ -44,7 +45,7 @@ namespace KFCStyleMenu
 	    false = no item k on the menu now. */
 	bool ItemName(int32 k, PMString& outName);
 
-	/** The note's words ("No Object Styles", "<N> more - use the Object Styles panel"; the cell styles' alike); untranslatable. false = no note now. */
+	/** The note's words ("No Object Styles", "<N> more - use the Object Styles panel"; the cell and table styles' alike); untranslatable. false = no note now. */
 	bool NoteName(PMString& outName);
 
 	/** What item k gives: its list's kind, the style's untranslated full path (IStyleGroupHierarchy::GetFullPath(kFalse) - a
