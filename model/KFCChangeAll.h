@@ -10,10 +10,10 @@
 //  many were replaced, and how many in each chapter - and, since 2026-11-04 (the author: "list alone" -
 //  docs/superpowers/specs/2026-11-04-kfc-change-all-in-book-list-design.md), lists what it wrote as a query run lists it
 //  (KFCRunList: each chapter's matches walked just before its Change All, placed after it). Track Changes is each story's own
-//  setting, left as it is (F1). Runs only while the panel holds no list; Clear Results empties it
-//  (docs/superpowers/specs/_done/2026-10-05-kfc-change-all-no-list-design.md C4, C8). What may stand then - a search that found
-//  nothing, a book's "(0/0)" row - is thrown away at the run's commit point, as the query run throws its list away
-//  (Run says why). The query run writes through WriteDocument too, in whatever scope Search: names, and leaves its
+//  setting, left as it is (F1). A list standing is let go by the run itself at its commit point, as the query run lets its list
+//  go - a text tab's run copies it first, so a cancel, a failure and the run's Ctrl+Z put it back (Run says why; until 2026-11-04
+//  the run was refused over a list and Clear Results came first - docs/superpowers/specs/_done/2026-10-05-kfc-change-all-no-list-design.md
+//  C4, C8). The query run writes through WriteDocument too, in whatever scope Search: names, and leaves its
 //  documents by the same rule (LeaveRunDocuments, PutRunDocumentsBack).
 //
 //========================================================================================

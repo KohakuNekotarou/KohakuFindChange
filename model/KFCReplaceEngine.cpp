@@ -1559,9 +1559,19 @@ namespace
 // own number: in a book the chapter row above says which document. One place for the messages of every write of text
 // rows (SayRowsWritten - the Replace, Restore from Copy, Create Outlines). "ID:262 #3" for one row - empty when its
 // story or its place under the story row cannot be read.
+// AN OBJECT ROW (a script label list's item - ReplaceLabelRows, the only write of object rows that says its rows here) BY ITS
+// ITEM'S UID, as an object row's Replace names it (KFCObjectReplace - "ID:262"): until 2026-11-06 it was named by nothing - the
+// since-2.1.0 re-inspection's D9-b: "Labeled.", "Labeled 2 items: .", "Removed the label of.".
 PMString RowName(int32 chapterIdx, int32 hitIdx)
 {
 	PMString name;
+	const UID item = KFCResultModel::GetHitItem(chapterIdx, hitIdx);
+	if (item != kInvalidUID)
+	{
+		name.Append("ID:");
+		name.AppendNumber(static_cast<int32>(item.Get()));
+		return name;
+	}
 	UID story = kInvalidUID;
 	TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
 	uint64 hash = 0;
@@ -4168,6 +4178,10 @@ bool KFCReplaceEngine::CanRemoveLabelHit(int32 chapterIdx, int32 hitIdx)
 
 bool KFCReplaceEngine::RemoveLabelHits(const KFCRowsByChapter& rowsByChapter, PMString& outStatus)
 {
+	// COUNTED FROM THE DOOR TO THE HAND-BACK (IsReplacing - ReplaceHit's; block 11's D11-1 rule): it reopens a closed chapter
+	// windowless and gives a written one its window, and both run the message loop. Until 2026-11-06 it was not counted (the
+	// since-2.1.0 re-inspection's D9-a - a test build's REOPEN and WINDOW lines read running=0: sl-remove-book-closed).
+	const WriteUnderWay replacing;
 	if (!KFCResultModel::ListIsScriptLabels())
 	{
 		outStatus.Clear();
