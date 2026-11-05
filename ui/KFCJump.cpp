@@ -1104,8 +1104,8 @@ ITableModel* TableOfRowAt(const UIDRef& storyRef, TextIndex at, int32& outRow, G
 	return table.forget();
 }
 
-// [start, end) OF THE STORY SELECTED, THE TYPE TOOL ON (SelectMatchOnClick's, the Table part's Find Next's) - a table row list's row: its cells; a script label
-// list's cell row (holder - IKFCResults::GetHitHolderKind): its cell. Asks no lock.
+// [start, end) OF THE STORY SELECTED, THE TYPE TOOL ON (SelectMatchOnClick's, the Kohaku+ face's Find Next's) - by the row's holder (IKFCResults::GetHitHolderKind;
+// kKFCHolderNone for the face's, which no row stands for): a table row list's row, its cells; a script label list's cell row, its cell. Asks no lock.
 NotSelected SelectRangeNow(const UIDRef& storyRef, TextIndex start, TextIndex end, bool hidden, int32 holder)
 {
 	InterfacePtr<ITextModel> textModel(storyRef, UseDefaultIID());
@@ -1132,7 +1132,10 @@ NotSelected SelectRangeNow(const UIDRef& storyRef, TextIndex start, TextIndex en
 	// InDesign's own row selection selects it (ITableSelectionSuite::SelectRows). Measured 11-05 (work/cpp-probe/examples/table-row-select.cpp): the row's text
 	// selected as text is shrunk to its first cell's words; SelectRows selects the row from any selection, a row a merged cell from above covers without that
 	// cell (InDesign's shrink - the cells the row's text holds). No scroll: the jump has already shown it.
-	if (KFCResults()->ListIsTableRows())
+	// ASKED OF THE ROW (its holder - KFCTableRows marks every row of such a list), NOT OF THE LIST ON THE PANEL: the Kohaku+ face's Find Next lands here too
+	// (LandOnPlace), on what it found whatever list the panel shows - asked of the list, a table it found was left unselected while a table row list stood
+	// there (its character is in no cell - the since-2.1.0 re-inspection's D12-a, trw-face-findnext).
+	if (holder == kKFCHolderTableRow)
 	{
 		int32 row = -1;
 		InterfacePtr<ITableModel> table(TableOfRowAt(storyRef, start, row));
