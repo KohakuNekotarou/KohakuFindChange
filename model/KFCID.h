@@ -231,6 +231,7 @@ DECLARE_PMID(kImplementationIDSpace, kKFCCopyStoreImpl, kKFCPrefix + 47)
 #define kKFCShowStepKey						kKFCStringPrefix "kKFCShowStepKey"
 #define kKFCMoveToLayerStepKey				kKFCStringPrefix "kKFCMoveToLayerStepKey"
 #define kKFCClearStyleOverridesStepKey		kKFCStringPrefix "kKFCClearStyleOverridesStepKey"
+#define kKFCApplyObjStyleStepKey			kKFCStringPrefix "kKFCApplyObjStyleStepKey"		// Apply Object Style (2026-11-05)
 #define kKFCDeleteStepKey					kKFCStringPrefix "kKFCDeleteStepKey"
 #define kKFCMoveStepKey						kKFCStringPrefix "kKFCMoveStepKey"
 #define kKFCScaleStepKey					kKFCStringPrefix "kKFCScaleStepKey"

@@ -68,6 +68,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCShowStepKey,					"Show",
                 kKFCMoveToLayerStepKey,				"Move to Active Layer",
                 kKFCClearStyleOverridesStepKey,		"Clear Object Style Overrides",
+                kKFCApplyObjStyleStepKey,			"Apply Object Style",
                 kKFCDeleteStepKey,					"Delete",
                 kKFCMoveStepKey,					"Move",
                 kKFCScaleStepKey,					"Scale",

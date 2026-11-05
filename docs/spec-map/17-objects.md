@@ -284,6 +284,20 @@
 
 ---
 
+## 12. スタイルを当てる（2026-11-05）
+
+- **OBJ-25** ★**Special Operations ▸ Apply Object Style ▸**（作者 11-04 夜「行の物に、文書のオブジェクトスタイルを当てる子メニュー」→11-05「Special Operations でオブジェクトスタイルを当てる件　も進めて下さい。」・設計書 `docs/superpowers/specs/2026-11-05-kfc-apply-object-style-design.md`＝作者の「設計は貴方のお勧めで」で私が決めた形 A1〜A14）――
+  ・出る所＝物の行の右クリックの Special Operations の**一番上**（abc 順・OBJ-20）。物の一覧（Object タブ）とスクリプトラベルの一覧（SL-）。QR コードの一覧は Special Operations ごと灰色（QR-18）。文字の行には無い。
+  ・中身＝**前面の文書のオブジェクトスタイル**（前面に文書が無いときはアプリのスタイル＝Table の面の表スタイルの一覧と同じ取り方）を、オブジェクトスタイルパネルと同じ並びで・人が読む名前（訳した名前・グループの中は `G1:S2`＝Table の面の表スタイルの一覧と同じ書き方）。`[なし]` も入る（当てると本体どおりスタイルが外れる）。**メニューを開くたびに読み直す**。40 まで＝41 以上は先頭の 40 と灰色の `<N> more - use the Object Styles panel`・1つも無ければ灰色の `No Object Styles`。名前の `&` はそのまま出る（本体のメニューと同じ `IMenuUtils::InsertAmpersandForDisplay`）。
+  ・当てる行＝右クリックした行、またはまとめて選んだ行（REP-36）。**名前で当てる**＝行ごとに、その行の文書の同じ名前（訳さない全体の道）のスタイル（Move to Active Layer と同じ決まり）。その名前の無い文書の行は断る＝数なら `no object style named "S1"`・1行なら `the document of this row has no object style named "S1".`。スタイルを持てない物＝`cannot take an object style`。鍵・あふれ・消えた物の断りはほかの操作と同じ（OBJ-20）。
+  ・★**上書きは残す**＝本体のオブジェクトスタイルパネルで普通にクリックしたときと同じ（`IObjectStylesFacade::ApplyObjectStyleToUIDList` に消すカテゴリを空で＝本体の DOM の `applyObjectStyle(S1, false, false)` で線幅の上書きが残るのを実測・2026-11-05）。消すなら続けて Clear Object Style Overrides。本体のパネルメニューの「スタイル適用時にオーバーライドを消去」には従わない（読む口 `kSessionBoss` の `IID_ICLEAROVERRIDESWHENAPPLYSTYLE` の型のヘッダーが SDK に無い＝Exchange に出す KFC では使わない）。
+  ・取り消し1段 `Undo Apply Object Style`・行の語 `Styled`・目玉・同じスタイルで何も変わらない物は `unchanged`（OBJ-20 の決まり）。文＝`Apply Object Style: 4 objects to "S1" - ID:…`（Move to Active Layer と同じ形・スタイルは人が読む名前）。
+  ・アクション ID＝スタイルの項目 40 は `kKFCPrefix + 64〜103`（model の帯・model はアクションを持たない）・灰色の1行は `kKFCUIPrefix + 121`。キーボードショートカットの窓には出ない。項目は**ほかのスタイルの一覧と共用**できる作り（`ui/KFCStyleMenu`・11-05 作者の次の依頼＝表の行の一覧にセルスタイル）。
+  回帰＝`objsp-style-apply`・`-undo`・`-twin`・`-none`・`-group`・`-amp`・`-alldocs`・`-locked`・`-same`・`-over40`（obj-cases）・`sl-special-style`（sl-cases）。
+  - 訂正:
+
+---
+
 ## ⬜ この章で未確認
 
 この章を書くにあたって**確かめていない**もの。「書いていない＝そういう決まりが無い」ではない。

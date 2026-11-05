@@ -227,6 +227,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCBookPanelPlacement.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCColorTextView.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCKentenMark.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCStyleMenu.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCSwitchIcon.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCFindChangeMinimize.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCAlertAnswer.cpp"/>
@@ -289,6 +290,7 @@
       <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCBookPanelPlacement.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCColorTextView.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCKentenMark.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCStyleMenu.h"/>
     <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCJapanese.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCFindChangeMinimize.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCAppBarSearchEnter.h"/>

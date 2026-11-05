@@ -26,13 +26,14 @@
 #include "IPageItemVisibilityFacade.h"		// Object > Hide / Show
 #include "IPersistUIDData.h"				// IID_IPERSISTOBJECTSTYLEDATA - the object style applied to an item
 #include "ISpreadLayer.h"					// GetDocLayerUID - the layer an item at the top of a spread layer is on
+#include "IStyleGroupManager.h"				// FindByName - a document's object style of a path (Apply Object Style)
 #include "ITransformFacade.h"				// Object > Transform
 #include "ITransformPanelPrefs.h"			// the Transform panel's settings InDesign's own transforms read
 #include "IWorkspace.h"
 
 // General includes:
 #include "ErrorUtils.h"
-#include "GenericID.h"						// IID_IPERSISTOBJECTSTYLEDATA
+#include "GenericID.h"						// IID_IPERSISTOBJECTSTYLEDATA, IID_IOBJECTSTYLEGROUPMANAGER
 #include "K2Vector.h"
 #include "PreferenceUtils.h"				// QuerySessionPreferences
 #include "TransformTypes.h"
@@ -114,6 +115,7 @@ const OpInfo kOps[] =
 	{ kKFCSpecialScale,					"Scale",								kKFCScaleStepKey,				kWriteEach,		false,	"cannot be scaled" },
 	{ kKFCSpecialRotate,				"Rotate",								kKFCRotateStepKey,				kWriteEach,		false,	"cannot be rotated" },
 	{ kKFCSpecialShear,					"Shear",								kKFCShearStepKey,				kWriteEach,		false,	"cannot be sheared" },
+	{ kKFCSpecialApplyObjectStyle,		"Apply Object Style",					kKFCApplyObjStyleStepKey,		kWriteBatch,	false,	"cannot take an object style" },
 };
 
 const OpInfo* FindOp(int32 op)
@@ -141,11 +143,21 @@ enum Refusal
 	kRefusedNested,			// Move to Active Layer: in a group or in text - its group or its story moves it
 	kRefusedNoLayer,		// ...its document has no layer of that name
 	kRefusedOnLayer,		// ...on that layer already
+	kRefusedNoStyle,		// Apply Object Style: its document has no object style of that path (the spec's A5)
 	kRefusedBeyondPasteboard,	// a transform would take it a pasteboard beyond its spread's (BeyondPasteboard)
 	kRefusedNotApplicable,	// InDesign's own question said no (OpInfo::notApplicable)
 	kRefusedUnchanged,		// written, and InDesign changed nothing of it (E7 - not marked)
 	kRefusalCount
 };
+
+// APPLY OBJECT STYLE'S STYLE as a person reads it - the submenu's words (KFCSpecialParams::words), or its path read out when a
+// caller gave none.
+PMString StyleWords(const KFCSpecialParams& params)
+{
+	PMString out(params.words.IsEmpty() ? KFCStylePathWords(params.text) : params.words);
+	out.SetTranslatable(kFalse);
+	return out;
+}
 
 // One row's refusal, after "<operation>: ".
 PMString RowSentence(const OpInfo& info, Refusal why, const KFCSpecialParams& params)
@@ -174,6 +186,11 @@ PMString RowSentence(const OpInfo& info, Refusal why, const KFCSpecialParams& pa
 			out = "the object is on \"";
 			out.Append(params.text);
 			out.Append("\" already.");
+			break;
+		case kRefusedNoStyle:
+			out = "the document of this row has no object style named \"";
+			out.Append(StyleWords(params));
+			out.Append("\".");
 			break;
 		case kRefusedBeyondPasteboard:	out = "the object would go beyond the pasteboard - left as it is."; break;
 		case kRefusedNotApplicable:
@@ -213,6 +230,11 @@ PMString RefusalWords(const OpInfo& info, Refusal why, const KFCSpecialParams& p
 			out = "on \"";
 			out.Append(params.text);
 			out.Append("\" already");
+			break;
+		case kRefusedNoStyle:
+			out = "no object style named \"";
+			out.Append(StyleWords(params));
+			out.Append("\"");
 			break;
 		case kRefusedBeyondPasteboard:	out = "beyond the pasteboard"; break;
 		case kRefusedNotApplicable:	out = info.notApplicable; break;
@@ -300,6 +322,38 @@ Refusal CheckLayerMove(const KFCSpecialParams& params, const UIDRef& docRef, UID
 	if (target == kInvalidUID)
 		return kRefusedNoLayer;
 	return (spreadLayer->GetDocLayerUID() == target) ? kRefusedOnLayer : kRefusedNone;
+}
+
+// A DOCUMENT'S OBJECT STYLE OF A PATH (Apply Object Style - the spec's A5): the one IStyleGroupManager::FindByName finds by its
+// untranslated full path (KFCTableSearch::StyleNamed's shape, the object styles' manager). kInvalidUID = none.
+UID ObjectStyleNamed(IDataBase* db, const PMString& path)
+{
+	if (db == nil || path.IsEmpty())
+		return kInvalidUID;
+	InterfacePtr<IDocument> doc(db, db->GetRootUID(), UseDefaultIID());
+	InterfacePtr<IWorkspace> workspace(db, (doc != nil) ? doc->GetDocWorkSpace().GetUID() : kInvalidUID, UseDefaultIID());
+	InterfacePtr<IStyleGroupManager> styles(workspace, IID_IOBJECTSTYLEGROUPMANAGER);
+	return (styles != nil) ? styles->FindByName(path) : kInvalidUID;
+}
+
+// CAN AN ITEM TAKE AN OBJECT STYLE: it holds the data an applied object style lives in (StyleOf's IID_IPERSISTOBJECTSTYLEDATA).
+bool CanTakeObjectStyle(IDataBase* db, UID item)
+{
+	InterfacePtr<IPersistUIDData> style(db, item, IID_IPERSISTOBJECTSTYLEDATA);
+	return style != nil;
+}
+
+// APPLY OBJECT STYLE'S DOORS of one item (the spec's A7): an item with no object style data is not applicable; no path (the
+// menu's grey - CanSpecialHit asks with none, as Move to Active Layer's no layer) asks no more; a document with no style of
+// the path refused (A5).
+Refusal CheckStyleApply(const KFCSpecialParams& params, const UIDRef& docRef, UID item)
+{
+	IDataBase* const db = docRef.GetDataBase();
+	if (!CanTakeObjectStyle(db, item))
+		return kRefusedNotApplicable;
+	if (params.text.IsEmpty())
+		return kRefusedNone;
+	return (ObjectStyleNamed(db, params.text) != kInvalidUID) ? kRefusedNone : kRefusedNoStyle;
 }
 
 // ARRANGE'S QUESTION, OF A SPREAD'S ITEMS TOGETHER - as InDesign asks it of a selection: the items move together, their
@@ -427,6 +481,8 @@ Refusal AskInDesign(const OpInfo& info, const KFCSpecialParams& params, const UI
 		case kKFCSpecialClearStyleOverrides:
 			can = StyleOf(db, item) != kInvalidUID;
 			break;
+		case kKFCSpecialApplyObjectStyle:
+			return CheckStyleApply(params, docRef, item);
 		case kKFCSpecialDelete:
 		{
 			Utils<Facade::IPageItemScrapFacade> scrap;
@@ -604,6 +660,26 @@ ErrorCode ClearOverrides(const UIDRef& docRef, const UIDList& items)
 	return kSuccess;
 }
 
+// APPLY OBJECT STYLE over one document's items (the spec's A5 / A6): the document's style of the path, given as a plain apply in
+// the Object Styles panel gives it - no category's overrides cleared (IObjectStylesFacade.h: the categories passed are the
+// ones cleared) - over items of any spread. kSuccess, or the error.
+ErrorCode ApplyStyle(const UIDRef& docRef, const UIDList& items, const PMString& path)
+{
+	Utils<Facade::IObjectStylesFacade> styles;
+	InterfacePtr<IDocument> doc(docRef, UseDefaultIID());
+	const UID style = ObjectStyleNamed(docRef.GetDataBase(), path);
+	if (!styles || doc == nil || style == kInvalidUID)
+		return kFailure;
+	InterfacePtr<IWorkspace> ws(doc->GetDocWorkSpace(), UseDefaultIID());
+	if (ws == nil)
+		return kFailure;
+	K2Vector<ClassID> none;
+	const ErrorCode err = styles->ApplyObjectStyleToUIDList(items, ws, style, none, kFalse);
+	if (err != kSuccess)
+		return err;
+	return ErrorUtils::PMGetGlobalErrorCode();
+}
+
 // THE WRITE OF ONE SPREAD'S ITEMS (E5 - SpreadGroups): InDesign's own Facade over them - one call over them all, as over a
 // selection of them; a transform one call per item about its own centre. kSuccess, or the error.
 ErrorCode WriteDocument(const OpInfo& info, const KFCSpecialParams& params, const UIDRef& docRef, const UIDList& items)
@@ -691,6 +767,8 @@ ErrorCode WriteDocument(const OpInfo& info, const KFCSpecialParams& params, cons
 		}
 		case kKFCSpecialClearStyleOverrides:
 			return ClearOverrides(docRef, items);
+		case kKFCSpecialApplyObjectStyle:
+			return ApplyStyle(docRef, items, params.text);
 		case kKFCSpecialDelete:
 		{
 			Utils<Facade::IPageItemScrapFacade> scrap;
@@ -1010,7 +1088,8 @@ bool KFCObjectSpecial::SpecialRows(int32 op, const KFCRowsByChapter& rows, const
 	recorder.Keep();
 
 	// E8: "<operation>: 3 objects - ID:259, ID:260, ID:261." - the items' IDs (SayItemsWritten), each document's in its
-	// rows' order; Move to Active Layer's layer named after the count ("... 5 of 8 objects to "Images" - ...").
+	// rows' order; Move to Active Layer's layer named after the count ("... 5 of 8 objects to "Images" - ..."), and Apply
+	// Object Style's style as a person reads it (the spec's A9: "... 2 objects to "S1" - ...").
 	KFCObjectReplace::ItemsWritten items;
 	for (size_t c = 0; c < chapters.size(); ++c)
 	{
@@ -1029,6 +1108,12 @@ bool KFCObjectSpecial::SpecialRows(int32 op, const KFCRowsByChapter& rows, const
 	{
 		toLayer = " to \"";
 		toLayer.Append(params.text);
+		toLayer.Append("\"");
+	}
+	else if (info.op == kKFCSpecialApplyObjectStyle)
+	{
+		toLayer = " to \"";
+		toLayer.Append(StyleWords(params));
 		toLayer.Append("\"");
 	}
 	PMString left;

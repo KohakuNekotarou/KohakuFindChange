@@ -1484,6 +1484,7 @@ const char* KFCResultTree::SpecialRowWord(int32 op)
 		case kKFCSpecialScale:					return "Scaled";
 		case kKFCSpecialShear:					return "Sheared";
 		case kKFCSpecialClearStyleOverrides:	return "Cleared";
+		case kKFCSpecialApplyObjectStyle:		return "Styled";	// an object row's Special Operations > Apply Object Style (its spec's A8)
 		case kKFCSpecialClearTextOverrides:		return "Cleared";	// a text row's Clear Overrides - the same word
 		case kKFCSpecialTableStyle:				return "Styled";	// a table row's Replace (the table tab spec's T9)
 		case kKFCSpecialRubyChange:				return "Changed";	// a ruby row's Replace (the ruby tab spec's R8)

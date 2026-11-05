@@ -214,18 +214,28 @@ enum KFCSpecialOp
 	// A script label row's Replace (the Script Label kind - docs/superpowers/specs/2026-11-04-kfc-script-label-design.md S8): its mark alone - the row reads "Labeled", counted as
 	// written, and can be written again. Written by KFCReplaceEngine's label rows, never by SpecialRows.
 	kKFCSpecialScriptLabel,
+	// An object row's Special Operations > Apply Object Style > <style> (docs/superpowers/specs/2026-11-05-kfc-apply-object-style-design.md
+	// A1-A10): the front document's object style chosen in the submenu, given BY NAME to each row's item in its own document
+	// (KFCSpecialParams::text - Move to Active Layer's rule), its overrides kept as a plain apply in the Object Styles panel. The row
+	// reads "Styled".
+	kKFCSpecialApplyObjectStyle,
 	kKFCSpecialOpCount
 };
 
 /** WHAT A SPECIAL OPERATION IS GIVEN besides its rows (IKFCRuns::SpecialRows). x, y: Move - the horizontal and vertical
     distances in points (right and down positive); Scale - the horizontal and vertical percentages; Rotate, Shear - the
     angle in degrees in x (counter-clockwise positive, as InDesign's dialogs have it); Shear - its axis in y, 0 Horizontal
-    and 1 Vertical (the Shear dialog's Axis, as InDesign's own). text: Move to Active Layer - the layer's name. */
+    and 1 Vertical (the Shear dialog's Axis, as InDesign's own). text: Move to Active Layer - the layer's name; Apply Object
+    Style - the style's full path, untranslated (IStyleGroupHierarchy::GetFullPath(kFalse): a group's separator in it - each
+    row's document's style of that path is given). words: Apply Object Style - the style as a person reads it (the submenu's
+    words: translated, a group joined with ":" - KFCStylePathWords) - the status line's 'to "<words>"' and its refusals;
+    empty for the others. */
 struct KFCSpecialParams
 {
 	double		x;
 	double		y;
 	PMString	text;
+	PMString	words;
 
 	KFCSpecialParams() : x(0.0), y(0.0) {}
 };

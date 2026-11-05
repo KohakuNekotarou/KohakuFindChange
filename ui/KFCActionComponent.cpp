@@ -54,6 +54,7 @@
 #include "KFCSpecialDialogs.h"	// Move... / Scale... / Rotate... / Shear... - their values asked first
 #include "KFCCopyResults.h"		// Copy Results / Copy Rows / Copy These Results - the rows as text on the clipboard
 #include "KFCResultStep.h"		// Next Result / Previous Result - the live tier's next / previous hit row landed on
+#include "KFCStyleMenu.h"		// Apply Object Style > - the style items the object row's menu popped with
 #include "KFCDiagHiddenDocs.h"		// the hidden-document check after an action - test builds only
 #include "KFCDiag.h"				// KFC_DIAG_LOG - test builds only (the menu states asked for inside a landing)
 
@@ -403,14 +404,25 @@ bool ActiveLayerName(IActiveContext* ac, PMString& outName)
 // Active Layer takes the active layer's name with it (ActiveLayerName); Move, Scale, Rotate and Shear their values, asked
 // first (KFCSpecialDialogs - the special-operations spec's E12): Cancel writes nothing and says nothing, a value that
 // would change nothing (0 and 0, 100%, 0 degrees) is said rather than written. No object row (the action pressed by its
-// ActionID): nothing.
-void DoSpecial(IActiveContext* ac, int32 op, IPMUnknown* widget)
+// ActionID): nothing. Apply Object Style takes the style its submenu's item gave (styleText - the path each row's document's
+// own is found by, styleWords - the status line's): none, nothing.
+void DoSpecial(IActiveContext* ac, int32 op, IPMUnknown* widget, const PMString* styleText = nil, const PMString* styleWords = nil)
 {
 	int32 chapter = -1, hit = -1;
 	if (!RightClickedHit(widget, chapter, hit) || KFCResults()->GetHitItem(chapter, hit) == kInvalidUID)
 		return;
 	const KFCRowsByChapter rows(KFCResultTree::RowsOfRightClick(chapter, hit));
 	KFCSpecialParams params;
+	if (op == kKFCSpecialApplyObjectStyle)
+	{
+		if (styleText == nil || styleText->IsEmpty())
+			return;
+		params.text = *styleText;
+		params.text.SetTranslatable(kFalse);
+		if (styleWords != nil)
+			params.words = *styleWords;
+		params.words.SetTranslatable(kFalse);
+	}
 	if (op == kKFCSpecialMoveToLayer && !ActiveLayerName(ac, params.text))
 	{
 		KFCResultTree::ShowStatus("Move to Active Layer: no layer is active"
@@ -890,6 +902,17 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 
 		default:
 		{
+			// An object row's Special Operations > Apply Object Style > <style> (2026-11-05): an item of the style list the menu
+			// popped with (KFCStyleMenu) - its style given by the Special Operations' door.
+			int32 styleItem = -1;
+			if (KFCStyleMenu::IsStyleItem(actionID, styleItem))
+			{
+				KFCStyleMenu::Kind kind = KFCStyleMenu::kNone;
+				PMString path, words;
+				if (KFCStyleMenu::ItemStyle(styleItem, kind, path, words) && kind == KFCStyleMenu::kObjectStyles)
+					DoSpecial(ac, kKFCSpecialApplyObjectStyle, widget, &path, &words);
+				break;
+			}
 			// An object row's other Special Operations - one door for them all (SpecialOpOf's table, DoSpecial).
 			const int32 op = SpecialOpOf(actionID);
 			if (op != kKFCSpecialNone)
@@ -1319,8 +1342,36 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 				break;
 			}
+			case kKFCStyleNoteActionID:
+			{
+				// APPLY OBJECT STYLE'S NOTE (2026-11-05): "No Object Styles" / "<N> more - use the Object Styles panel" - named,
+				// never pressed.
+				PMString note;
+				if (KFCStyleMenu::NoteName(note))
+					listToUpdate->SetNthActionName(i, note);
+				listToUpdate->SetNthActionState(i, kDisabled_Unselected);
+				break;
+			}
 			default:
 			{
+				// APPLY OBJECT STYLE'S ITEMS (2026-11-05): each named for its style as it is drawn (KFCStyleMenu - the list the
+				// menu popped with), pressable as the other Special Operations are: while the row - or one of those selected
+				// with it - can take an object style (CanSpecialAny - read only). Which rows' documents lack the style the
+				// write says, row by row counted (Move to Active Layer's rule).
+				int32 styleItem = -1;
+				if (KFCStyleMenu::IsStyleItem(action, styleItem))
+				{
+					PMString name;
+					const bool named = KFCStyleMenu::ItemName(styleItem, name);
+					if (named)
+						listToUpdate->SetNthActionName(i, name);
+					int32 chapter = -1, hit = -1;
+					const bool enable = named && RightClickedHit(widget, chapter, hit)
+						&& KFCResults()->GetHitItem(chapter, hit) != kInvalidUID
+						&& KFCResultTree::CanSpecialAny(kKFCSpecialApplyObjectStyle, KFCResultTree::RowsOfRightClick(chapter, hit));
+					listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
+					break;
+				}
 				// A tier heading's Narrow Down: over a tier's row - a condition only a text row can meet greyed over a
 				// tier of object rows (the narrow-down spec's N2 - kept on the menu, SET-11). Its other refusals (no
 				// query of its own, a document or book not open, a part of a document's Object tab Selection) said on

@@ -514,6 +514,58 @@ DECLARE_PMID(kActionIDSpace, kKFCSearchTextInTablesActionID, kKFCUIPrefix + 112)
 // story and document rows' Replace of their TICKED rows, gone with Change Checked - spec F16): this one takes every row, and
 // a shortcut recorded against those IDs must not bind to it. + 120: the next after the highest spent.
 DECLARE_PMID(kActionIDSpace, kKFCReplaceAllRowsActionID, kKFCUIPrefix + 120)
+// APPLY OBJECT STYLE (docs/superpowers/specs/2026-11-05-kfc-apply-object-style-design.md A1-A3): an object row's Special
+// Operations > Apply Object Style > - one item a style of the front document's, put on the menu as it pops (KFCStyleMenu, from
+// KFCResultNodeEH's PopRowMenu - no MenuDef for the items), named as it is drawn (UpdateActionStates). THE STYLE ITEMS ARE ANY
+// STYLE LIST'S (KFCStyleMenu::Kind - the cell styles of a table row list are to share them, the author's ask of 11-05): the
+// list the last menu popped with says what an item gives. Consecutive: an item's place is its ActionID less the first's. In
+// THE MODEL HALF'S BAND of the action space (kKFCPrefix + n): the model declares no action, the UI band's last free IDs are
+// + 121 ... + 127, and the widget space's model band is spent the same way (the Ruby face's boxes - kKFCPrefix + 40 up, below);
+// + 64 up, clear of the low numbers the one plug-in of before the model/UI split gave its actions (its retired ones are
+// marked above).
+DECLARE_PMID(kActionIDSpace, kKFCStyleItem0ActionID, kKFCPrefix + 64)
+DECLARE_PMID(kActionIDSpace, kKFCStyleItem1ActionID, kKFCPrefix + 65)
+DECLARE_PMID(kActionIDSpace, kKFCStyleItem2ActionID, kKFCPrefix + 66)
+DECLARE_PMID(kActionIDSpace, kKFCStyleItem3ActionID, kKFCPrefix + 67)
+DECLARE_PMID(kActionIDSpace, kKFCStyleItem4ActionID, kKFCPrefix + 68)
+DECLARE_PMID(kActionIDSpace, kKFCStyleItem5ActionID, kKFCPrefix + 69)
+DECLARE_PMID(kActionIDSpace, kKFCStyleItem6ActionID, kKFCPrefix + 70)
+DECLARE_PMID(kActionIDSpace, kKFCStyleItem7ActionID, kKFCPrefix + 71)
+DECLARE_PMID(kActionIDSpace, kKFCStyleItem8ActionID, kKFCPrefix + 72)
+DECLARE_PMID(kActionIDSpace, kKFCStyleItem9ActionID, kKFCPrefix + 73)
+DECLARE_PMID(kActionIDSpace, kKFCStyleItem10ActionID, kKFCPrefix + 74)
+DECLARE_PMID(kActionIDSpace, kKFCStyleItem11ActionID, kKFCPrefix + 75)
+DECLARE_PMID(kActionIDSpace, kKFCStyleItem12ActionID, kKFCPrefix + 76)
+DECLARE_PMID(kActionIDSpace, kKFCStyleItem13ActionID, kKFCPrefix + 77)
+DECLARE_PMID(kActionIDSpace, kKFCStyleItem14ActionID, kKFCPrefix + 78)
+DECLARE_PMID(kActionIDSpace, kKFCStyleItem15ActionID, kKFCPrefix + 79)
+DECLARE_PMID(kActionIDSpace, kKFCStyleItem16ActionID, kKFCPrefix + 80)
+DECLARE_PMID(kActionIDSpace, kKFCStyleItem17ActionID, kKFCPrefix + 81)
+DECLARE_PMID(kActionIDSpace, kKFCStyleItem18ActionID, kKFCPrefix + 82)
+DECLARE_PMID(kActionIDSpace, kKFCStyleItem19ActionID, kKFCPrefix + 83)
+DECLARE_PMID(kActionIDSpace, kKFCStyleItem20ActionID, kKFCPrefix + 84)
+DECLARE_PMID(kActionIDSpace, kKFCStyleItem21ActionID, kKFCPrefix + 85)
+DECLARE_PMID(kActionIDSpace, kKFCStyleItem22ActionID, kKFCPrefix + 86)
+DECLARE_PMID(kActionIDSpace, kKFCStyleItem23ActionID, kKFCPrefix + 87)
+DECLARE_PMID(kActionIDSpace, kKFCStyleItem24ActionID, kKFCPrefix + 88)
+DECLARE_PMID(kActionIDSpace, kKFCStyleItem25ActionID, kKFCPrefix + 89)
+DECLARE_PMID(kActionIDSpace, kKFCStyleItem26ActionID, kKFCPrefix + 90)
+DECLARE_PMID(kActionIDSpace, kKFCStyleItem27ActionID, kKFCPrefix + 91)
+DECLARE_PMID(kActionIDSpace, kKFCStyleItem28ActionID, kKFCPrefix + 92)
+DECLARE_PMID(kActionIDSpace, kKFCStyleItem29ActionID, kKFCPrefix + 93)
+DECLARE_PMID(kActionIDSpace, kKFCStyleItem30ActionID, kKFCPrefix + 94)
+DECLARE_PMID(kActionIDSpace, kKFCStyleItem31ActionID, kKFCPrefix + 95)
+DECLARE_PMID(kActionIDSpace, kKFCStyleItem32ActionID, kKFCPrefix + 96)
+DECLARE_PMID(kActionIDSpace, kKFCStyleItem33ActionID, kKFCPrefix + 97)
+DECLARE_PMID(kActionIDSpace, kKFCStyleItem34ActionID, kKFCPrefix + 98)
+DECLARE_PMID(kActionIDSpace, kKFCStyleItem35ActionID, kKFCPrefix + 99)
+DECLARE_PMID(kActionIDSpace, kKFCStyleItem36ActionID, kKFCPrefix + 100)
+DECLARE_PMID(kActionIDSpace, kKFCStyleItem37ActionID, kKFCPrefix + 101)
+DECLARE_PMID(kActionIDSpace, kKFCStyleItem38ActionID, kKFCPrefix + 102)
+DECLARE_PMID(kActionIDSpace, kKFCStyleItem39ActionID, kKFCPrefix + 103)
+#define kKFCStyleItems	40		// (the items above: a list of more shows its first 40 and the note below says how many more)
+// ...and the submenu's note, greyed: "No Object Styles", or "<N> more - use the Object Styles panel". + 121.
+DECLARE_PMID(kActionIDSpace, kKFCStyleNoteActionID, kKFCUIPrefix + 121)
 
 
 // WidgetIDs:
@@ -788,6 +840,11 @@ DECLARE_PMID(kWidgetIDSpace, kKFCKentenChangeLabelWidgetID, kKFCPrefix + 92)
 #define kKFCClearTextOverridesMenuKey	kKFCStringPrefix "kKFCClearTextOverridesMenuKey"	// "Clear Overrides"
 #define kKFCTcyTextMenuKey				kKFCStringPrefix "kKFCTcyTextMenuKey"				// "Tate-chu-yoko" (a text row's Special Operations - key_collisions.py)
 #define kKFCRubyUnifyMenuKey			kKFCStringPrefix "kKFCRubyUnifyMenuKey"			// "Unify Reading" - an item's name until it is drawn (key_collisions.py: kKFCUnifyReadingMenuKey would read as kKFCFlipVerticalMenuKey)
+// ...and Apply Object Style (2026-11-05): its submenu's name, a style item's and the note's names until they are drawn
+// (measured against every other key - key_collisions.py).
+#define kKFCApplyObjStyleSubmenuKey		kKFCStringPrefix "kKFCApplyObjStyleSubmenuKey"	// "Apply Object Style"
+#define kKFCStyleItemMenuKey			kKFCStringPrefix "kKFCStyleItemMenuKey"			// "Style"
+#define kKFCStyleNoteMenuKey			kKFCStringPrefix "kKFCStyleNoteMenuKey"			// "No Styles"
 // ...and Copy Results: the panel menu's, a row's Copy Rows, a tier heading's Copy These Results (measured against every
 // other key - key_collisions.py).
 #define kKFCCopyResultsMenuKey			kKFCStringPrefix "kKFCCopyResultsMenuKey"
@@ -1017,6 +1074,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCKentenChangeLabelWidgetID, kKFCPrefix + 92)
 #define kKFCFittingSubmenuPath				kKFCSpecialOpsSubmenuPath kSDKDefDelimitMenuPath kKFCFittingSubmenuKey
 #define kKFCArrangeSubmenuPath				kKFCSpecialOpsSubmenuPath kSDKDefDelimitMenuPath kKFCArrangeSubmenuKey
 #define kKFCTransformSubmenuPath			kKFCSpecialOpsSubmenuPath kSDKDefDelimitMenuPath kKFCTransformSubmenuKey
+// ...and Apply Object Style's (2026-11-05): its parent node in the MenuDef, its items put as the menu pops (KFCStyleMenu).
+#define kKFCApplyObjStyleSubmenuPath		kKFCSpecialOpsSubmenuPath kSDKDefDelimitMenuPath kKFCApplyObjStyleSubmenuKey
 // A tier heading's Narrow Down submenu (the narrow-down spec's N1) - named by KFC's own key, as Fitting is.
 #define kKFCNarrowDownSubmenuPath			kKFCResultTierMenuName kSDKDefDelimitMenuPath kKFCNarrowDownSubmenuKey
 
@@ -1120,6 +1179,7 @@ DECLARE_PMID(kWidgetIDSpace, kKFCKentenChangeLabelWidgetID, kKFCPrefix + 92)
 #define kKFCNarrowWithOverridesMenuItemPosition	8.0		// With Overrides
 // Special Operations, in abc order (an object row's whole; a text row's holds Clear Overrides, Create Outlines and - in a Japanese InDesign - Tate-chu-yoko).
 #define kKFCTcyTextMenuItemPosition				9.0		// Tate-chu-yoko (a text row's menu - its own path; after Create Outlines' 3.0)
+#define kKFCApplyObjStyleSubmenuPosition		0.5		// Apply Object Style > (2026-11-05 - first in abc order)
 #define kKFCArrangeSubmenuPosition				1.0		// Arrange >
 #define kKFCClearStyleOverridesMenuItemPosition	2.0		// Clear Object Style Overrides
 #define kKFCClearTextOverridesMenuItemPosition	2.0		// Clear Overrides (a text row's menu - its own path, so no clash with the 2.0 above)
@@ -1132,6 +1192,10 @@ DECLARE_PMID(kWidgetIDSpace, kKFCKentenChangeLabelWidgetID, kKFCPrefix + 92)
 #define kKFCShowMenuItemPosition				9.0		// Show
 #define kKFCTransformSubmenuPosition			10.0	// Transform >
 #define kKFCUnlockMenuItemPosition				11.0	// Unlock
+// Apply Object Style's items (2026-11-05): in the style list's own order (the Object Styles panel's) from 1.0, one a step; the
+// note after them.
+#define kKFCStyleItemFirstPosition				1.0
+#define kKFCStyleNotePosition					100.0
 // Fitting, in abc order.
 #define kKFCCenterContentMenuItemPosition		1.0		// Center Content
 #define kKFCContentAwareFitMenuItemPosition		2.0		// Content-Aware Fit

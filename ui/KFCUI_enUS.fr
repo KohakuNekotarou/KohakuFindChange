@@ -108,6 +108,10 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCShowMenuKey,					"Show",
                 kKFCMoveToLayerMenuKey,				"Move to Active Layer",
                 kKFCClearStyleOverridesMenuKey,		"Clear Object Style Overrides",
+                // Apply Object Style > (2026-11-05): the submenu, a style item's and its note's names until they are drawn.
+                kKFCApplyObjStyleSubmenuKey,		"Apply Object Style",
+                kKFCStyleItemMenuKey,				"Style",
+                kKFCStyleNoteMenuKey,				"No Styles",
                 kKFCDeleteMenuKey,					"Delete",
                 kKFCMoveMenuKey,					"Move...",
                 kKFCScaleMenuKey,					"Scale...",

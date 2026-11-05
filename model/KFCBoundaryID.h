@@ -90,7 +90,9 @@ DECLARE_PMID(kInterfaceIDSpace, IID_IKFCUIBOUNDARY, kKFCPrefix + 14)
 //  and IKFCResults::ListIsScriptLabels appended; KFCKohakuQueryData gained its label conditions.)
 // (48, 2026-11-04: KFCScriptLabelConditions gained grep, and its empty key now means every key; KFCScriptLabelLook gained lastKey, KFCScriptLabelFound key;
 //  IKFCRuns::ScriptLabelNow appended - the face's box of the found item's label.)
-#define kKFCBoundaryRevision	"48"
+// (49, 2026-11-05: KFCSpecialOp gained kKFCSpecialApplyObjectStyle and KFCSpecialParams gained words - Special Operations >
+//  Apply Object Style.)
+#define kKFCBoundaryRevision	"49"
 #define kKFCBoundaryStamp		kKFCVersion "/" kKFCBoundaryRevision
 
 #endif // __KFCBoundaryID_h__

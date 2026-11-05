@@ -66,6 +66,7 @@
 #include "KFCResultTree.h"		// TakeKeyboard - the hand-off after a click; DiagKeyFocus - who holds the keyboard, for that trace
 #include "KFCResultHistory.h"	// SwitchToKeptRowLater - a grey row's click
 #include "KFCKohakuTab.h"		// IsJapaneseUI - a text row's Tate-chu-yoko, a Japanese InDesign's alone
+#include "KFCStyleMenu.h"		// PutOnMenu - an object row's Apply Object Style > the front document's object styles
 
 #include <cstring>				// strcmp - which menu pops
 #include <vector>				// a row's word's other readings (KFCResultTree::UnifyReadingsOf)
@@ -119,6 +120,15 @@ void PopRowMenu(const char* menuName, IEvent* e, IPMUnknown* widget)
 		if (nodeData != nil && KFCResultTree::UnifyReadingsOf(nodeData->Get(), word, readings))
 			for (int32 k = 0; k < kKFCUnifyReadingItems && k < static_cast<int32>(readings.size()); ++k)
 				menuMgr->AddMenuItem(kUnify[k], path, PMReal(kKFCUnifyReadingMenuItemPosition + 0.01 * k), kFalse);
+	}
+	// APPLY OBJECT STYLE (docs/superpowers/specs/2026-11-05-kfc-apply-object-style-design.md A1 / A2): an object row's Special
+	// Operations > Apply Object Style > - the front document's object styles, read again and put as the menu pops (KFCStyleMenu),
+	// named as they are drawn (KFCActionComponent's UpdateActionStates). Its parent node is the MenuDef's.
+	if (std::strcmp(menuName, kKFCResultObjectMenuName) == 0)
+	{
+		PMString path(kKFCApplyObjStyleSubmenuPath);
+		path.SetTranslatable(kFalse);
+		KFCStyleMenu::PutOnMenu(menuMgr, path, KFCStyleMenu::kObjectStyles);
 	}
 	menuMgr->HandlePopupMenu(menuName, e->GlobalWhere(), e->GlobalWhere(), removeDisabledItems, widget);
 }
