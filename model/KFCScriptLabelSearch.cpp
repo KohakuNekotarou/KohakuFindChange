@@ -515,10 +515,10 @@ void WalkTablesAndCells(const UIDRef& docRef, size_t limit, const KFCScriptLabel
 	std::vector<std::pair<PMString, PMString> > labels;
 	// Composing to read a row's page dirties nothing the person made (a search's walk's rule - BuildListedHits composes).
 	IDataBase::SaveRestoreModifiedState dirtyGuard(db);
-	const int32 count = stories->GetAllTextModelCount();
+	const int32 count = stories->GetUserAccessibleStoryCount();		// (the user's stories alone - a table of the XML structure's text stands on no page: KFCRubySearch.cpp's WalkDoc's note, D24-a)
 	for (int32 s = 0; s < count && !ioCapped; ++s)
 	{
-		const UIDRef storyRef(stories->GetNthTextModelUID(s));
+		const UIDRef storyRef(stories->GetNthUserAccessibleStoryUID(s));
 		InterfacePtr<ITableModelList> tables(storyRef, UseDefaultIID());
 		InterfacePtr<ITextModel> model(storyRef, UseDefaultIID());
 		if (tables == nil || model == nil)

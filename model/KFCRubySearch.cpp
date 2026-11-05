@@ -732,10 +732,13 @@ bool WalkDoc(const UIDRef& docRef, const KFCRubyConditions& asked, const std::ve
 		readings = own;
 	}
 	std::vector<ListFound> found;
-	const int32 count = stories->GetAllTextModelCount();
+	// THE USER'S STORIES ALONE (IStoryList.h: "Internal stories are not subject to search through find change, spell checking" - the XML structure's text that stands in no
+	// frame): as InDesign's own Text tab, which this kind answers as (KFCOwnScope.h). Until 2026-11-06 the internal ones were walked too, and such text listed as "overset" (the
+	// since-2.1.0 re-inspection's D24-a - rb-xml-hidden-text). The same in every walk of this file and of the Kenten, Warichu, Table and Script Label kinds; the Story kind lists them.
+	const int32 count = stories->GetUserAccessibleStoryCount();
 	for (int32 s = 0; s < count && !outCapped; ++s)
 	{
-		const UIDRef storyRef(stories->GetNthTextModelUID(s));
+		const UIDRef storyRef(stories->GetNthUserAccessibleStoryUID(s));
 		InterfacePtr<ITextModel> model(storyRef, UseDefaultIID());
 		if (model == nil || (part != nil && !KFCSearchEngine::StretchesTouch(*part, storyRef.GetUID(), 0, kMaxInt32)) || !taken.TakesStory(storyRef))
 			continue;
@@ -835,10 +838,10 @@ void CollectDocumentWords(const UIDRef& docRef, const KFCOwnSwitches& switches, 
 	// Composing to read a place's frame dirties nothing the person made (a search's walk's rule).
 	IDataBase::SaveRestoreModifiedState dirtyGuard(db);
 	KFCOwnScope taken(switches);
-	const int32 count = stories->GetAllTextModelCount();
+	const int32 count = stories->GetUserAccessibleStoryCount();		// (the user's stories alone - WalkDoc's note, D24-a)
 	for (int32 s = 0; s < count; ++s)
 	{
-		const UIDRef storyRef(stories->GetNthTextModelUID(s));
+		const UIDRef storyRef(stories->GetNthUserAccessibleStoryUID(s));
 		InterfacePtr<ITextModel> model(storyRef, UseDefaultIID());
 		if (model == nil || (part != nil && !KFCSearchEngine::StretchesTouch(*part, storyRef.GetUID(), 0, kMaxInt32)) || !taken.TakesStory(storyRef))
 			continue;
@@ -1374,10 +1377,10 @@ void KFCRubySearch::CountReadings(const UIDRef& docRef, const KFCOwnSwitches& sw
 	IDataBase::SaveRestoreModifiedState dirtyGuard(db);
 	KFCOwnScope taken(switches);
 	const KFCFold::Flags flags(KFCFoldFlagsOf(switches));
-	const int32 count = stories->GetAllTextModelCount();
+	const int32 count = stories->GetUserAccessibleStoryCount();		// (the user's stories alone - WalkDoc's note, D24-a)
 	for (int32 s = 0; s < count; ++s)
 	{
-		const UIDRef storyRef(stories->GetNthTextModelUID(s));
+		const UIDRef storyRef(stories->GetNthUserAccessibleStoryUID(s));
 		InterfacePtr<ITextModel> model(storyRef, UseDefaultIID());
 		if (model == nil || (part != nil && !KFCSearchEngine::StretchesTouch(*part, storyRef.GetUID(), 0, kMaxInt32)) || !taken.TakesStory(storyRef))
 			continue;

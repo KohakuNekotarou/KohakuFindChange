@@ -241,10 +241,10 @@ bool WalkDoc(const UIDRef& docRef, const KFCKentenConditions& asked, const std::
 	IDataBase::SaveRestoreModifiedState dirtyGuard(db);
 	std::vector<KFCSearchEngine::ListedPlace> places;
 	KFCOwnScope taken(asked.switches);
-	const int32 count = stories->GetAllTextModelCount();
+	const int32 count = stories->GetUserAccessibleStoryCount();		// (the user's stories alone, as InDesign's Text tab - KFCRubySearch.cpp's WalkDoc's note, D24-a: kt-xml-hidden-text)
 	for (int32 s = 0; s < count && !outCapped; ++s)
 	{
-		const UIDRef storyRef(stories->GetNthTextModelUID(s));
+		const UIDRef storyRef(stories->GetNthUserAccessibleStoryUID(s));
 		InterfacePtr<ITextModel> model(storyRef, UseDefaultIID());
 		if (model == nil || (part != nil && !KFCSearchEngine::StretchesTouch(*part, storyRef.GetUID(), 0, kMaxInt32)) || !taken.TakesStory(storyRef))
 			continue;

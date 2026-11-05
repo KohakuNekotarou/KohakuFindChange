@@ -142,10 +142,10 @@ bool WalkDoc(const UIDRef& docRef, const PMString& findStyle, bool overridesOnly
 	std::vector<KFCSearchEngine::ListedPlace> places;
 	std::vector<PMString> words;
 	std::vector<UID> tables;
-	const int32 count = stories->GetAllTextModelCount();
+	const int32 count = stories->GetUserAccessibleStoryCount();		// (the user's stories alone - a table of the XML structure's text stands on no page: KFCRubySearch.cpp's WalkDoc's note, D24-a)
 	for (int32 s = 0; s < count && !outCapped; ++s)
-		if (part == nil || KFCSearchEngine::StretchesTouch(*part, stories->GetNthTextModelUID(s).GetUID(), 0, kMaxInt32))
-			WalkStory(stories->GetNthTextModelUID(s), findStyle, overridesOnly, part, limit, places, words, tables, outCapped);
+		if (part == nil || KFCSearchEngine::StretchesTouch(*part, stories->GetNthUserAccessibleStoryUID(s).GetUID(), 0, kMaxInt32))
+			WalkStory(stories->GetNthUserAccessibleStoryUID(s), findStyle, overridesOnly, part, limit, places, words, tables, outCapped);
 	KFCSearchEngine::BuildListedHits(docRef, places, outHits, outVersions);
 	for (size_t h = 0; h < outHits.size(); ++h)
 	{
