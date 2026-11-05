@@ -11,15 +11,11 @@
 #include "VCPlugInHeaders.h"
 
 // Interface includes:
-#include "IApplication.h"
-#include "IDocument.h"
-#include "IDocumentList.h"
 #include "IExtendScriptUtils.h"		// RunScriptInEngine - the long form, the one that answers (KIDMCPRunScript.cpp's note)
 #include "IScript.h"
 #include "IScriptEngine.h"
 #include "IScriptManager.h"
 #include "IScriptUtils.h"			// GenerateSpecifier - a row's object as words its script resolves
-#include "ISession.h"
 #include "ITableModel.h"
 #include "ITableModelList.h"
 #include "ITableTextContainer.h"
@@ -95,19 +91,6 @@ void AppendJSString(std::string& out, const char* ascii)
 	PMString words(ascii);
 	words.SetTranslatable(kFalse);
 	AppendJSString(out, words);
-}
-
-// IS THE DOCUMENT OF THIS DATABASE OPEN NOW (RS5: a closed chapter's rows are counted, not run)? Only compared - a closed one's address is never read through.
-bool DocIsOpen(IDataBase* db)
-{
-	if (db == nil)
-		return false;
-	InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
-	InterfacePtr<IDocumentList> documents((app != nil) ? app->QueryDocumentList() : nil);
-	for (int32 d = 0; documents != nil && d < documents->GetDocCount(); ++d)
-		if (::GetDataBase(documents->GetNthDoc(d)) == db)
-			return true;
-	return false;
 }
 
 // A scripting object's specifier in ExtendScript's own words (RS3) - empty when it could not be made.
@@ -201,8 +184,13 @@ RowTarget TargetOf(const EngineContext& context, int32 chapter, int32 hit)
 		out.why = kWhyGone;
 		return out;
 	}
+	// THE ROW'S DOCUMENT OPEN NOW, ASKED BY ITS FILE (RS5: a closed chapter's rows are counted, not run): KFCSearchEngine::ChapterDocNow, the model's own
+	// question. NOT the docRef the results hold - a book list keeps a closed chapter's rows, and the next document opened can be given that chapter's address
+	// (memory uidref-reuse-after-close): compared alone, it answered "open" and the row's script ran on ANOTHER document's text (the since-2.1.0
+	// re-inspection's D20-a - rs-book-closed-reused).
+	docRef = KFCRuns()->ChapterDocNow(chapter);
 	IDataBase* const db = docRef.GetDataBase();
-	if (!DocIsOpen(db))
+	if (db == nil)
 	{
 		out.why = kWhyNotOpen;
 		return out;

@@ -236,6 +236,7 @@ namespace
 		virtual bool CanTableStyleHit(int32, int32) { return false; }
 		virtual bool RemoveLabelRows(const KFCRowsByChapter&, PMString& outStatus) { SayWhy(outStatus); return false; }
 		virtual bool CanRemoveLabelHit(int32, int32) { return false; }
+		virtual UIDRef ChapterDocNow(int32) { return UIDRef::gNull; }
 	};
 
 	class KFCChaptersStandInImpl : public IKFCChapters

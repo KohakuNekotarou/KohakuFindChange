@@ -246,6 +246,7 @@ public:
 	virtual bool CanTableStyleHit(int32 chapterIdx, int32 hitIdx) { return KFCReplaceEngine::CanTableStyleHit(chapterIdx, hitIdx); }
 	virtual bool RemoveLabelRows(const KFCRowsByChapter& rows, PMString& outStatus) { return KFCReplaceEngine::RemoveLabelHits(rows, outStatus); }
 	virtual bool CanRemoveLabelHit(int32 chapterIdx, int32 hitIdx) { return KFCReplaceEngine::CanRemoveLabelHit(chapterIdx, hitIdx); }
+	virtual UIDRef ChapterDocNow(int32 chapterIdx) { return KFCSearchEngine::ChapterDocNow(chapterIdx); }
 };
 
 CREATE_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)

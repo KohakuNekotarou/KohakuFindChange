@@ -96,7 +96,10 @@ DECLARE_PMID(kInterfaceIDSpace, IID_IKFCUIBOUNDARY, kKFCPrefix + 14)
 //  KFCSpecialOp gained kKFCSpecialApplyCellStyle - List Rows of These Tables and Special Operations > Apply Cell Style.)
 // (51, 2026-11-05: a script label list's table and cell rows - IKFCResults::GetHitHolderKind and IKFCRuns::TableStyleRows / CanTableStyleHit /
 //  RemoveLabelRows / CanRemoveLabelHit appended, KFCSpecialOp gained kKFCSpecialApplyTableStyle and kKFCSpecialRemoveLabel.)
-#define kKFCBoundaryRevision	"52"
+// (52, 2026-11-06: Find: Story on the Kohaku+ tab - commit 4c6d711.)
+// (53, 2026-11-06: IKFCRuns::ChapterDocNow appended - Run Script asks for a row's document by its file, not by the address the results hold
+//  (the since-2.1.0 re-inspection's D20-a).)
+#define kKFCBoundaryRevision	"53"
 #define kKFCBoundaryStamp		kKFCVersion "/" kKFCBoundaryRevision
 
 #endif // __KFCBoundaryID_h__

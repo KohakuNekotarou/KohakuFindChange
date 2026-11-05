@@ -266,6 +266,11 @@ public:
 	virtual bool RemoveLabelRows(const KFCRowsByChapter& rows, PMString& outStatus) = 0;
 	/** = KFCReplaceEngine::CanRemoveLabelHit (appended) - can Remove Label be offered on the row (the menu's grey). Read only. */
 	virtual bool CanRemoveLabelHit(int32 chapterIdx, int32 hitIdx) = 0;
+	/** = KFCSearchEngine::ChapterDocNow (appended - revision 53) - the chapter's document if it is open now, asked by its file (KFCBookScope::FindOpenChapterDoc);
+	    UIDRef::gNull when it is not. Never the docRef the results hold: a book list keeps a closed chapter's rows, and the next document opened can
+	    be given that chapter's address (memory uidref-reuse-after-close). Nothing opened, nothing rebound. For the UI half's own reads of a row's
+	    document (KFCRowScript). */
+	virtual UIDRef ChapterDocNow(int32 chapterIdx) = 0;
 };
 
 #endif // __IKFCRuns_h__
