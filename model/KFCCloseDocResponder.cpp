@@ -186,10 +186,12 @@ void KFCCloseDocResponder::Respond(ISignalMgr* signalMgr)
 	// in the chapters left open, the closed one keeping the rows it has (KFCUndoFollow::ForgetBookChapter - a document of
 	// any other list, or of none, is let go below, its chapter emptied: ForgetClosingDocument). Ahead of the run guard
 	// below: a query run closes the chapters it holds at its commit point, before it clears the list, and a write kept
-	// from before it may have written one of them (saved since, so it closes). (The chapters a query run hands back at its end
-	// close after the list is cleared - IsFromBook is false by then. A write kept from before it wrote none of them, short
-	// of a window that could not be opened: KFC gives a chapter it writes a window, and a chapter with a window is no
-	// longer held - KFCBookScope::ShowChapterWindow.)
+	// from before it may have written one of them (saved since, so it closes). (The chapters a query run hands back at
+	// its end close while the list it leaves stands - a book's, when it ran on one: KFCQuerySequence makes it first,
+	// RF8 - so they come here too, and the writes kept for the list it found stay: KFCUndoFollow's DropOtherResultSets
+	// counts the set a write being recorded found. A write kept from before it wrote none of them, short of a window
+	// that could not be opened: KFC gives a chapter it writes a window, and a chapter with a window is no longer held -
+	// KFCBookScope::ShowChapterWindow.)
 	if (KFCResultModel::IsFromBook())
 		KFCUndoFollow::ForgetBookChapter(closingDocRef);
 
@@ -215,12 +217,12 @@ void KFCCloseDocResponder::Respond(ISignalMgr* signalMgr)
 	}
 
 	// THE KEPT WRITES LET IT GO, WHATEVER THE LIST SHOWS (the author's call - the spec map's UNDO-12 for a query
-	// run): All Documents, one document, or no list at all - a query run leaves it empty (NO LIST in KFCQuerySequence.cpp)
-	// while its write, kept, still names this document. Its stories and items come off every write and its chapter is
-	// emptied in every kept list (KFCUndoFollow::ForgetClosingDocument - a chapter of a kept book's list is frozen
-	// instead), so an Undo in a document still open is still followed (case xq-alldocs-close-undo). Past the run guard,
-	// not ahead of it: the chapters a query run hands back close before the run is kept, and nothing would yet lead back
-	// from the list it leaves to the writes kept for the list it found.
+	// run): All Documents, one document, or no list at all - a query run that wrote nothing leaves it empty
+	// (KFCQuerySequence.cpp) while its write, kept, still names this document. Its stories and items come off every
+	// write and its chapter is emptied in every kept list (KFCUndoFollow::ForgetClosingDocument - a chapter of a kept
+	// book's list is frozen instead), so an Undo in a document still open is still followed (case
+	// xq-alldocs-close-undo). Past the run guard, not ahead of it: the chapters a query run hands back close before the
+	// run is kept, and nothing would yet lead back from the list it leaves to the writes kept for the list it found.
 	KFCUndoFollow::ForgetClosingDocument(closingDocRef);
 
 	// Nothing on display, nothing to retire. This signal fires for every document close in the

@@ -256,6 +256,14 @@ void DropOtherResultSets(const Step* incoming = nil)
 {
 	std::set<uint32> reached;
 	reached.insert(KFCResultModel::GetResultSetId());
+	// ...AND, WHILE A WRITE IS BEING RECORDED, THE SET IT FOUND (gRecording - a query run's RunRecorder): the
+	// chapters a query run hands back at its end close before its Keep, while the list it leaves stands - a book's,
+	// when it ran on one (KFCQuerySequence makes the list first: RF8) - and a close under a book's list comes here
+	// (ForgetBookChapter). Not counted, the writes kept for the list the run found went then, before the run's step
+	// could lead back to them, and the second Ctrl+Z left a row reading "Changed" over its text (xq-done-undo's
+	// symptom over a book - case xq-book-done-undo).
+	if (gRecording.open)
+		reached.insert(gRecording.resultSet);
 	// ...and every kept tier's (the tier switch - KFCTierStore): a tier is a list that can be switched back to, so the writes
 	// made on it while it was the live list stay its Undo's to follow - onto its copy while it is kept, onto the list when it
 	// comes back (Follow).

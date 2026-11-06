@@ -598,9 +598,11 @@ namespace KFCResultModel
 	PMString GetWalkSignature();
 
 	/** THE QUERY THE LIST WAS SEARCHED WITH, COPIED (KFCQueryCopy - docs/superpowers/specs/2026-10-14-kfc-tier-switch-design.md
-	    3-3): set by the search after its commit point, beside the walk signature; null for a list no search made (a query
-	    run's, Change All's) and after Clear(). Shared, not copied, by every snapshot of the list (an immutable copy) - what
-	    the tier switch states back into Find/Change when the list is switched to (KFCTierStore::SwitchTo). */
+	    3-3): set by the search after its commit point, beside the walk signature; a query run's list, Change All's
+	    and a table row list's hold their mode alone (KFCQueryCopier::CaptureRunList, CaptureTableRows - a tier without
+	    a copy could not be switched back to); null after Clear() and for a run that listed nothing. Shared, not
+	    copied, by every snapshot of the list (an immutable copy) - what the tier switch states back into Find/Change
+	    when the list is switched to (KFCTierStore::SwitchTo). */
 	void SetQueryCopy(const std::shared_ptr<const KFCQueryCopy>& copy);
 	std::shared_ptr<const KFCQueryCopy> GetQueryCopy();
 
