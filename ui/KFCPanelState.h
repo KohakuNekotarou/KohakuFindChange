@@ -32,6 +32,9 @@
 //      restored ON cannot act on its own: the jump asks ShouldHidePreviousChapter, which ALSO
 //      requires the results to have come from a book. In document scope the toggle is greyed out
 //      and the sweep never runs.
+//    - Open Without a Window, the book row's toggle (key "openWithoutWindow" - kept, KFCJump.h). The flag
+//      alone: only a book list's row reads it, as it lands (KFCJump.cpp), so a restored ON does nothing
+//      until a book is searched.
 //    - Find/Change Selected Documents (Book) (key "selectedDocuments" - the author's call: kept). The flag
 //      alone, the model half's (KFCBookScope): it narrows only a Book Scope run, and Book Scope is not kept, so a
 //      restored ON shows ticked and grey until Book Scope is turned on.
