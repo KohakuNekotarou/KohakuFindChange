@@ -9,8 +9,8 @@
 //  result set (the tier's name - the UI half's grey copy of it carries the same number) and the book it was searched
 //  in; its query copy rides in the list's header (ListHeader::query). The order (search order -
 //  docs/superpowers/specs/2026-10-14-kfc-tier-switch-v2-design.md R4: no tier moves when one is switched to) and the
-//  cap are kept HERE, and only here - the UI half reads them. Clear Results, a query run and Change All in Book (No
-//  List) that go through let every tier go (the UI half asks), and a tier heading's Clear These Results one (the v2
+//  cap are kept HERE, and only here - the UI half reads them. Clear Results, a query run and Change All in Book
+//  that go through let every tier go (the UI half asks), and a tier heading's Clear These Results one (the v2
 //  spec's R9); a closing document leaves its chapters empty in every tier, as a kept query run's list does
 //  (KFCUndoFollow::ForgetDocument). The main thread only.
 //
@@ -37,8 +37,10 @@ namespace KFCTierStore
 	void GetTierSets(std::vector<uint32>& out);
 
 	/** KEPT OR NOT - the one answer, asked of the live list: is it a tier - a list with a row, or one a search made
-	    (its query was copied: a search that found nothing is a tier too)? A query run's list or Change All's is
-	    neither, nor a list the tiers were let go over (DropAll). Asked by a search's commit point (ParkCurrent), by the
+	    (its query was copied: a search that found nothing is a tier too)? A query run's list or Change All's is one
+	    only with a row (its heading "[Run/...]" or "[Change All/Book] ..." - the spec map's ROW-39, ROW-41): one with
+	    none is neither, nor is a list the tiers were let go over (DropAll). Asked by a search's commit point
+	    (ParkCurrent), by the
 	    switch (the list it puts aside) and by the close responder (a list whose last document closed keeps its heading
 	    while it is one - the author's call). The stacked results' ROW-41, the model's side of it. */
 	bool LiveListIsKeepable();

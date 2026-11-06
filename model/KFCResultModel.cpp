@@ -273,10 +273,14 @@ namespace
 	// AN INCONSISTENT RUBY LIST'S HEADINGS (2026-11-03 - the author: "a heading per reading, the places found with it under it"): its rows put together by their word and reading (Hit::groupKey) - the
 	// key's word part before U+001F -, each heading its first row's words; a word's headings together, in the order their words first stand, its most read reading first (the same count: the
 	// first to stand). The rows of a heading in the chapter's own order, as a story's. A row taken off the list is in no group, as BuildFontGroups has it.
+	// THE KEY IS READ AS ITS UTF-16 UNITS, NEVER THROUGH UTF-8: the page's word or reading can hold half a
+	// surrogate pair (KFCUtf8.h), and GetUTF8String -> SetUTF8String threw on a low half here - out of a search's
+	// grouping, a search again's or a Clear from Results' - and took the U+001F after a high half into one
+	// character, so the word read the whole key.
 	void BuildReadingGroups(KFCResultModel::Chapter& chapter)
 	{
 		chapter.fontGroups.clear();
-		std::map<std::string, int32> groupOf;
+		std::map<std::vector<UTF16TextChar>, int32> groupOf;
 		std::vector<KFCResultModel::FontGroup> made;
 		for (size_t i = 0; i < chapter.hits.size(); ++i)
 		{
@@ -285,16 +289,24 @@ namespace
 			hit.fontGroupPos = -1;
 			if (hit.cleared)
 				continue;
-			const std::string key(hit.groupKey.GetUTF8String());
-			std::map<std::string, int32>::const_iterator known = groupOf.find(key);
+			int32 units = 0;
+			const UTF16TextChar* const buf = hit.groupKey.GrabUTF16Buffer(&units);
+			std::vector<UTF16TextChar> key;
+			if (buf != nil && units > 0)
+				key.assign(buf, buf + units);
+			std::map<std::vector<UTF16TextChar>, int32>::const_iterator known = groupOf.find(key);
 			if (known == groupOf.end())
 			{
 				KFCResultModel::FontGroup group;
 				group.story = hit.storyUID;
 				group.label = hit.groupLabel;
 				group.otherReadings = hit.otherReadings;
-				const std::string::size_type cut = key.find('\x1F');
-				group.word.SetUTF8String(key.substr(0, cut));
+				// The word: the units before the first U+001F (the whole key when there is none).
+				const std::vector<UTF16TextChar>::const_iterator cut =
+					std::find(key.begin(), key.end(), static_cast<UTF16TextChar>(0x1F));
+				group.word.SetTranslatable(kFalse);
+				if (cut != key.begin())
+					group.word.AppendW(&key[0], static_cast<int32>(cut - key.begin()));
 				made.push_back(group);
 				known = groupOf.insert(std::make_pair(key, static_cast<int32>(made.size()) - 1)).first;
 			}
@@ -523,7 +535,7 @@ bool KFCResultModel::ListIsFrames()
 
 int32 KFCResultModel::ListLimit()
 {
-	return ListLimitFor(ListHoldsObjects() || ListIsOwnKind() || ListIsTableRows());		// (a table, ruby, kenten, warichu or table row list's are text rows, one a thing: the object lists' number)
+	return ListLimitFor(ListHoldsObjects() || ListIsOwnKind() || ListIsTableRows());		// (a Kohaku+ kind's list and a table row list's are rows one a thing: the object lists' number)
 }
 
 int32 KFCResultModel::ListLimitFor(bool objectRows)
@@ -1523,8 +1535,10 @@ void KFCResultModel::MarkHitSpecial(int32 chapterIdx, int32 hitIdx, int32 op)
 
 void KFCResultModel::MarkHitOwnChange(int32 chapterIdx, int32 hitIdx, int32 op, const PMString& words, const KFCRowUpper& upper, bool counted)
 {
+	// (An object row's own change is MarkItemOwnChange's: MarkHitSpecial takes no backup of one, and the words below
+	// would be written with none.)
 	Hit* hp = HitAt(chapterIdx, hitIdx);
-	if (hp == nil)
+	if (hp == nil || hp->itemUID != kInvalidUID)
 		return;
 	MarkHitSpecial(chapterIdx, hitIdx, op);		// (its backup taken there - before this change too)
 	if (counted)

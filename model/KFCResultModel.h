@@ -487,10 +487,12 @@ namespace KFCResultModel
 	    2026-11-06-kfc-label-spelling-runscript-design.md SP1 - SP6)? Text rows, one a word Dynamic Spelling underlines (Hit::spellKind which line) - nothing
 	    writes them but a text row's Special Operations (no Replace - SP3), as a warichu list's. */
 	bool ListIsSpelling();
-	/** Is the list A KOHAKU+ KIND'S, with a Change side or not (ListHasOwnChangeTab, or a warichu list)? Its conditions are its tab's: not searched again by story or over part of a document, not
+	/** Is the list A KOHAKU+ KIND'S, with a Change side or not (ListHasOwnChangeTab, or a warichu, script label,
+	    story, spelling or document list - a QR code list is asked by ListIsQRCodes)? Its conditions are its tab's:
+	    not searched again by story or over part of a document, not
 	    narrowed, and its rows are counted as the object lists' (one a thing). */
 	bool ListIsOwnKind();
-	/** IS THE LIST ONE OF A TAB OF KFC'S THAT HAS A CHANGE SIDE - Table, Ruby? Its rows are text rows standing for something no text row's other write means anything to: a
+	/** IS THE LIST ONE OF A TAB OF KFC'S THAT HAS A CHANGE SIDE - Table, Ruby, Kenten? Its rows are text rows standing for something no text row's other write means anything to: a
 	    Replace is that tab's (KFCReplaceEngine's WriteOwnTabRows), and the list is not narrowed. */
 	bool ListHasOwnChangeTab();
 	/** IS THE LIST ONE WHOSE HIT ROWS STAND ON TWO LINES (ruby, kenten - the author, 11-01)? Every row of it: a Replace gives a row with nothing above it a reading, and a row keeps its height. */

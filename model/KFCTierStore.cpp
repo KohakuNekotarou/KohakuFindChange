@@ -85,7 +85,8 @@ namespace
 
 void KFCTierStore::ParkCurrent()
 {
-	// (A query run's list or Change All's goes with the commit point as it always has.)
+	// (A query run's list or Change All's is kept only with a row - LiveListIsKeepable; one with none goes with the
+	// commit point.)
 	if (!LiveListIsKeepable())
 	{
 		KFC_DIAG_LOG("TIER park skipped (no row, no search) set=%u", KFCResultModel::GetResultSetId());
