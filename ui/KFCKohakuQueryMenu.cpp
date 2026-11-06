@@ -198,6 +198,13 @@ void SaveFromTab()
 	}
 	PMString text;
 	KFCRuns()->KohakuQueryText(query, text);
+	if (text.IsEmpty())
+	{
+		// (IKFCRuns::KohakuQueryText: a box holds half of a surrogate pair - a paste can bring one - and no UTF-8 is made of it. Block 0's D0-a.)
+		said.Append("Save Query: a box holds a broken character - nothing was saved.");
+		KFCResultTree::ShowStatus(said);
+		return;
+	}
 	const char* const failure = KFCWriteFileSafely(file, std::string(text.GetUTF8String()));
 	PMString entry;
 	FileUtils::GetBaseFileName(file, entry);

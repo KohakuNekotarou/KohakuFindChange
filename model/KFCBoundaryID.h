@@ -102,9 +102,11 @@ DECLARE_PMID(kInterfaceIDSpace, IID_IKFCUIBOUNDARY, kKFCPrefix + 14)
 // (54, 2026-11-06: Special Operations > Label > Add Key... / Edit Value... / Remove Key... - IKFCRuns::LabelKeysOfRows / WriteLabelRows / CanLabelHit
 //  appended, the types KFCLabelKey, KFCLabelEdit and KFCLabelOp - docs/superpowers/specs/2026-11-06-kfc-label-spelling-runscript-design.md LB6.)
 // (55, 2026-11-06: Find: Spelling on the Kohaku+ tab - IKFCUIServices::SpellingTabConditions appended, the type KFCSpellingConditions (SP1).)
-// (56, 2026-11-06: Find: Document on the Kohaku+ tab - IKFCUIServices::DocumentTabCurrent and IKFCResults::ListIsDocuments appended, KFCHolderKind
-//  gained kKFCHolderDocument - docs/superpowers/specs/2026-11-06-kfc-windowless-documents-design.md W3.)
-#define kKFCBoundaryRevision	"56"
+// (56, 2026-11-06: Find: Document on the Kohaku+ tab - IKFCUIServices::DocumentTabCurrent and CountDocWindows and IKFCResults::ListIsDocuments
+//  appended, KFCHolderKind gained kKFCHolderDocument - docs/superpowers/specs/2026-11-06-kfc-windowless-documents-design.md W3.)
+// (57, 2026-11-06: IKFCRuns::KohakuQueryText answers empty for a query a word of which holds half of a surrogate pair - no UTF-8, no file: block 0's D0-a,
+//  where its SetUTF8String threw out of the door.)
+#define kKFCBoundaryRevision	"57"
 #define kKFCBoundaryStamp		kKFCVersion "/" kKFCBoundaryRevision
 
 #endif // __KFCBoundaryID_h__

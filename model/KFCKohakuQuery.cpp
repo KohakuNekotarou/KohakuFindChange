@@ -125,8 +125,17 @@ std::string Unescaped(const std::string& value)
 	return out;
 }
 
-void Attribute(std::string& io, const char* key, const PMString& value)
+// A PERSON'S WORDS AS AN ATTRIBUTE (Escaped) - none written, and ioWhole false, when they hold half of a surrogate pair
+// (KFCHasLoneSurrogate - a box's paste): no UTF-8 is made of them, so FileText makes no file (block 0's D0-a).
+void Attribute(std::string& io, const char* key, const PMString& value, bool& ioWhole)
 {
+	int32 units = 0;
+	const UTF16TextChar* const text = value.GrabUTF16Buffer(&units);
+	if (KFCHasLoneSurrogate(text, units))
+	{
+		ioWhole = false;
+		return;
+	}
 	io.append(" ");
 	io.append(key);
 	io.append("=\"");
@@ -174,39 +183,19 @@ std::vector<std::string> SplitAtTabs(const std::string& words)
 	return out;
 }
 
-std::string JoinedReadings(const std::vector<KFCRubyChangePiece>& pieces)
+// One word of every piece - its reading, its base or Find's reading (`which`) - joined as the person's words they are, for Attribute
+// to make UTF-8 of once (a tab between two boxes keeps a half pair at either edge a half).
+PMString Joined(const std::vector<KFCRubyChangePiece>& pieces, PMString KFCRubyChangePiece::* which)
 {
-	std::string out;
+	PMString out;
+	out.SetTranslatable(kFalse);
 	for (size_t p = 0; p < pieces.size(); ++p)
 	{
 		if (p > 0)
-			out.push_back('\t');
-		out.append(pieces[p].reading.GetUTF8String());
+			out.Append('\t');
+		out.Append(pieces[p].*which);
 	}
-	return out;
-}
-
-std::string JoinedBases(const std::vector<KFCRubyChangePiece>& pieces)
-{
-	std::string out;
-	for (size_t p = 0; p < pieces.size(); ++p)
-	{
-		if (p > 0)
-			out.push_back('\t');
-		out.append(pieces[p].base.GetUTF8String());
-	}
-	return out;
-}
-
-std::string JoinedFindReadings(const std::vector<KFCRubyChangePiece>& pieces)
-{
-	std::string out;
-	for (size_t p = 0; p < pieces.size(); ++p)
-	{
-		if (p > 0)
-			out.push_back('\t');
-		out.append(pieces[p].findReading.GetUTF8String());
-	}
+	out.SetTranslatable(kFalse);
 	return out;
 }
 }	// anonymous namespace
@@ -361,41 +350,43 @@ bool KFCKohakuQuery::Read(const IDFile& file, KFCKohakuQueryData& out)
 
 std::string KFCKohakuQuery::FileText(const KFCKohakuQueryData& query)
 {
-	// THE ELEMENT OF KFC'S. Its kind's conditions alone.
+	// THE ELEMENT OF KFC'S. Its kind's conditions alone - or no file at all, when a word of them holds half of a surrogate pair
+	// (Attribute: no UTF-8 is made of it).
 	std::string element(kElement);
 	element.resize(element.size() - 1);		// (Attribute writes the space before each)
+	bool whole = true;
 	Attribute(element, "version", 1);
-	Attribute(element, "kind", PMString(KFCSavedQueries::KindName(query.mode)));
+	Attribute(element, "kind", PMString(KFCSavedQueries::KindName(query.mode)), whole);
 	if (query.mode == kKFCTableSearchMode)
 	{
-		Attribute(element, "find", query.table.findStyle);
+		Attribute(element, "find", query.table.findStyle, whole);
 		Attribute(element, "overrides", query.table.overridesOnly ? 1 : 0);
-		Attribute(element, "changeStyle", query.table.changeStyle);
+		Attribute(element, "changeStyle", query.table.changeStyle, whole);
 		Attribute(element, "clear", query.table.clearOverrides ? 1 : 0);
 	}
 	else if (query.mode == kKFCRubySearchMode)
 	{
 		Attribute(element, "rubyLook", query.ruby.kind);
-		Attribute(element, "rubyList", query.ruby.listPath);
+		Attribute(element, "rubyList", query.ruby.listPath, whole);
 		Attribute(element, "rubyFirst", query.ruby.listFirst);
 		Attribute(element, "rubyOther", query.ruby.listOtherRuby ? 1 : 0);
 		Attribute(element, "rubyFindOnly", query.ruby.findOnly ? 1 : 0);
 		Attribute(element, "switches", query.ruby.switches.Bits());
-		Attribute(element, "rubyBase", query.ruby.base);
-		Attribute(element, "ruby", query.ruby.reading);
-		Attribute(element, "rubyChange", Words(JoinedReadings(query.ruby.change)));
-		Attribute(element, "rubyChangeBase", Words(JoinedBases(query.ruby.change)));
-		Attribute(element, "rubyFind", Words(JoinedFindReadings(query.ruby.change)));
+		Attribute(element, "rubyBase", query.ruby.base, whole);
+		Attribute(element, "ruby", query.ruby.reading, whole);
+		Attribute(element, "rubyChange", Joined(query.ruby.change, &KFCRubyChangePiece::reading), whole);
+		Attribute(element, "rubyChangeBase", Joined(query.ruby.change, &KFCRubyChangePiece::base), whole);
+		Attribute(element, "rubyFind", Joined(query.ruby.change, &KFCRubyChangePiece::findReading), whole);
 	}
 	else if (query.mode == kKFCKentenSearchMode)
 	{
 		Attribute(element, "kentenLook", query.kenten.kind);
 		Attribute(element, "switches", query.kenten.switches.Bits());
-		Attribute(element, "kentenBase", query.kenten.base);
+		Attribute(element, "kentenBase", query.kenten.base, whole);
 		Attribute(element, "kentenMark", query.kenten.mark);
-		Attribute(element, "kentenMarkChar", CharacterWords(query.kenten.markChar));
+		Attribute(element, "kentenMarkChar", CharacterWords(query.kenten.markChar), whole);
 		Attribute(element, "kentenChange", query.kenten.changeTo);
-		Attribute(element, "kentenChangeChar", CharacterWords(query.kenten.changeChar));
+		Attribute(element, "kentenChangeChar", CharacterWords(query.kenten.changeChar), whole);
 		Attribute(element, "kentenRemove", query.kenten.removeKenten ? 1 : 0);
 	}
 	else if (query.mode == kKFCWarichuSearchMode)
@@ -404,12 +395,14 @@ std::string KFCKohakuQuery::FileText(const KFCKohakuQueryData& query)
 		Attribute(element, "switches", query.spelling.switches.Bits());		// (its icons alone, as Warichu's - SP6)
 	else if (query.mode == kKFCScriptLabelSearchMode)
 	{
-		Attribute(element, "labelKey", query.label.key);
-		Attribute(element, "labelFind", query.label.find);
-		Attribute(element, "labelChange", query.label.change);
+		Attribute(element, "labelKey", query.label.key, whole);
+		Attribute(element, "labelFind", query.label.find, whole);
+		Attribute(element, "labelChange", query.label.change, whole);
 		Attribute(element, "labelWhole", query.label.whole ? 1 : 0);
 		Attribute(element, "labelGrep", query.label.grep ? 1 : 0);
 	}
+	if (!whole)
+		return std::string();
 	element.append(">\n</KohakuFindChange>\n");
 	// A QUERY OF THE COLOR TAB ASKING NOTHING, as InDesign writes one (measured - app.saveFindChangeQuery), for InDesign to load where KFC is not there.
 	std::string text("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<Query>\n<Header>\n<Version major=\"5\" minor=\"1\">\n</Version>\n"

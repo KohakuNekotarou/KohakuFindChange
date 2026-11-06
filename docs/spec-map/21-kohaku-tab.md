@@ -76,6 +76,7 @@
   - 訂正:
 
 - **KOHAKU-33** ★Kohaku+ タブで本体の保存ボタンを押す＝KFC の名前の窓（`Query Name:`）。名前の規則は本体と同じ（空・全部空白・`" * / : < > ? \ |`）。同じ種類に同じ名前があれば `Replace it?`（既定は No）。保存すると欄に並び、その行が選ばれる。本体のタブでの保存ボタンは本体のまま。回帰 `kq-save`・`kq-save-roundtrip`・`kq-save-replace`・`kq-save-replace-no`・`kq-save-chars`・`kq-save-cancel`・`kq-save-native-untouched`
+  ★面の箱のどれかに**壊れた字**（サロゲートの片割れ＝貼り付けで入りうる）があると保存しない＝名前を聞いた後に `Save Query: a box holds a broken character - nothing was saved.`・ファイルは書かない（UTF-8 にできない字＝2026-11-06 ブロック0 の D0-a・それまでは片割れの下で KFC の中の例外が保存のボタンの押下から抜け、上では黙って別の字のファイルになった）。回帰 `kq-save-broken-low`・`kq-save-broken-high`・`kq-save-pair`（対照＝正しい組は保存して読み戻せる）＝実入力のケース（⬜まだ回していない）
   - 訂正:
 
 - **KOHAKU-34** 本体の削除ボタン＝そのクエリのファイルを消す（本体のまま）。回帰 `kq-delete`

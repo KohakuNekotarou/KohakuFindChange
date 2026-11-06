@@ -32,7 +32,8 @@ namespace KFCKohakuQuery
 	/** The file's conditions. False = it is not there, or is no query of KFC's (a query of InDesign's: most files this is asked of). */
 	bool Read(const IDFile& file, KFCKohakuQueryData& out);
 
-	/** The whole of a query's file, as UTF-8. */
+	/** The whole of a query's file, as UTF-8 - empty when one of its words holds half of a surrogate pair (KFCHasLoneSurrogate, KFCUtf8.h - a box's
+	    paste): no UTF-8 is made of it, and no file is to be written (Save Query says so - IKFCRuns::KohakuQueryText). */
 	std::string FileText(const KFCKohakuQueryData& query);
 
 	/** "<Kind> - <name>": the file's name without .xml, and the entry InDesign's menu shows. */

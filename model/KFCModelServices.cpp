@@ -206,8 +206,12 @@ public:
 	virtual bool ReadKohakuQuery(const IDFile& file, KFCKohakuQueryData& out) { return KFCKohakuQuery::Read(file, out); }
 	virtual void KohakuQueryText(const KFCKohakuQueryData& query, PMString& outText)
 	{
+		// EMPTY = NO FILE: a word of the query holds half of a surrogate pair (KFCKohakuQuery::FileText) - its UTF-8 would have thrown
+		// in SetUTF8String here, out of this door into the UI half's Save Query (block 0's D0-a).
 		outText.Clear();
-		outText.SetUTF8String(KFCKohakuQuery::FileText(query));
+		const std::string text(KFCKohakuQuery::FileText(query));
+		if (!text.empty())
+			outText.SetUTF8String(text);
 		outText.SetTranslatable(kFalse);
 	}
 	virtual bool KohakuQueryFile(int32 mode, const PMString& name, IDFile& out) { return KFCKohakuQuery::FileOf(mode, name, out); }

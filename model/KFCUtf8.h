@@ -11,6 +11,8 @@
 //  name in CP932 - Notepad's "ANSI" on a Japanese PC - case qd-load-not-utf8, block 19's D19-3). The readers of a file a
 //  person can edit: a run order (ui/KFCQueryOrderFile.cpp) and a Kohaku+ query (KFCKohakuQuery::Read - the since-2.1.0
 //  re-inspection's D22-a, 2026-11-06: until then it read with no such question).
+//  AND THE OTHER WAY - CAN A TEXT BE MADE UTF-8 (KFCHasLoneSurrogate): asked of a text a person typed or pasted before it
+//  is written out as UTF-8 (KFCKohakuQuery::FileText - block 0's D0-a, 2026-11-06).
 //  STD ONLY.
 //
 //========================================================================================
@@ -69,6 +71,30 @@ inline bool KFCIsWellFormedUtf8(const std::string& text)
 		i += length;
 	}
 	return true;
+}
+
+/** HALF OF A SURROGATE PAIR in a text, its UTF-16 read as it stands (PMString::GrabUTF16Buffer - UTF16TextChar is an unsigned
+    short). No UTF-8 is made of such a text: PMString::GetUTF8String takes a lone high surrogate together with the character after
+    it (or, at the end, makes something else of it), and what it makes of a lone low one is UTF-8 that SetUTF8String throws on
+    (measured - KT's u8trip probe, 2026-10-23; memory pmstring-from-utf8-bytes). A paste can bring one (block 20's D20-3 - the
+    Pages field of a dialog since gone). */
+inline bool KFCHasLoneSurrogate(const unsigned short* units, long count)
+{
+	for (long i = 0; units != nullptr && i < count; ++i)
+	{
+		if (units[i] >= 0xD800 && units[i] <= 0xDBFF)
+		{
+			if (i + 1 < count && units[i + 1] >= 0xDC00 && units[i + 1] <= 0xDFFF)
+			{
+				++i;		// a pair: one character
+				continue;
+			}
+			return true;
+		}
+		if (units[i] >= 0xDC00 && units[i] <= 0xDFFF)
+			return true;
+	}
+	return false;
 }
 
 #endif // __KFCUtf8_h__

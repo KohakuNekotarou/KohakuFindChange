@@ -195,7 +195,8 @@ public:
 	virtual bool KentenConditions(KFCKentenConditions& outConditions) = 0;
 	/** = KFCKohakuQuery::Read (appended) - a query file's conditions, if it is one of the Kohaku+ tab's. False = it is not. */
 	virtual bool ReadKohakuQuery(const IDFile& file, KFCKohakuQueryData& out) = 0;
-	/** = KFCKohakuQuery::FileText (appended) - the whole of such a file. */
+	/** = KFCKohakuQuery::FileText (appended) - the whole of such a file. Empty (revision 57) when one of the query's words holds half of a surrogate pair:
+	    no UTF-8 is made of it, and nothing is to be written. */
 	virtual void KohakuQueryText(const KFCKohakuQueryData& query, PMString& outText) = 0;
 	/** = KFCKohakuQuery::FileOf (appended) - the file of a query of this kind and name. */
 	virtual bool KohakuQueryFile(int32 mode, const PMString& name, IDFile& out) = 0;
