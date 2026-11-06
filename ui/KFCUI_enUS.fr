@@ -116,6 +116,13 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCApplyTableStyleSubmenuKey,		"Apply Table Style",
                 kKFCRemoveLabelMenuKey,				"Remove Label",
                 kKFCRunScriptMenuKey,				"Run Script...",
+                kKFCOpenWithoutWindowMenuKey,		"Open Without a Window",	// (2026-11-06 - the book row's toggle, W2)
+                kKFCDocShowMenuKey,				"Show",					// (2026-11-06 - a Find: Document row's Special Operations, W3)
+                kKFCDocCloseMenuKey,				"Close",
+                kKFCDocSaveMenuKey,				"Save",
+                kKFCDocumentRevertMenuKey,				"Revert",
+                kKFCDocumentOpenHiddenKey,		"Open Hidden...",		// (2026-11-06 - the Document kind's button: a document opened without a window)
+                kKFCDocumentOpenHiddenTitleKey,	"Open Hidden",			// (its file dialog's title)
                 kKFCEditInStoryEditorMenuKey,		"Edit in Story Editor",		// (2026-11-06 - a Story row's Special Operations; InDesign's own Edit menu's words)
                 kKFCDeleteMenuKey,					"Delete",
                 kKFCMoveMenuKey,					"Move...",
@@ -236,6 +243,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCKentenTabAnyMarkKey,		"[Any Kenten]",
                 kKFCKohakuTabScriptLabelKey,	"Script Label",
                 kKFCKohakuTabStoryKindKey,		"Story",			// (Find:'s Story kind - docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md ST1)
+                kKFCKohakuTabDocumentsKindKey,	"Document",			// (Find:'s Document kind - docs/superpowers/specs/2026-11-06-kfc-windowless-documents-design.md W3)
                 kKFCKohakuTabSpellingKindKey,	"Spelling",			// (Find:'s Spelling kind - docs/superpowers/specs/2026-11-06-kfc-label-spelling-runscript-design.md SP1)
                 kKFCLabelTabKeyKey,				"Script Key:",		// (the author, 11-04: "Key alone is hard to follow - Script Key or the like")
                 kKFCLabelTabFindKey,			"Find Label:",

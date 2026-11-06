@@ -1347,6 +1347,8 @@ static bool RefuseWarichuRow(PMString& outStatus)
 {
 	if (KFCResultModel::ListIsStory())
 		outStatus = "Replace: Find: Story lists the stories and changes nothing - a row is not replaced.";
+	else if (KFCResultModel::ListIsDocuments())		// (A DOCUMENT LIST'S the same - 2026-11-06, W3: its Special Operations work on the document instead)
+		outStatus = "Replace: Find: Document lists the open documents and changes nothing - a row is not replaced.";
 	else if (KFCResultModel::ListIsSpelling())		// (A SPELLING LIST'S the same - docs/superpowers/specs/2026-11-06-kfc-label-spelling-runscript-design.md SP3)
 		outStatus = "Replace: Find: Spelling lists the words Dynamic Spelling underlines and changes nothing - a row is not replaced.";
 	else if (KFCResultModel::ListIsWarichu())
@@ -1381,8 +1383,8 @@ bool KFCReplaceEngine::CanReplaceHit(int32 chapterIdx, int32 hitIdx)
 	// - the doors that turn a press away name it (ReplaceHit, ReplaceHits, KFCObjectReplace). Nor a query run's (RefuseRunListRow). Nor a warichu list's: the Warichu kind changes nothing
 	// (docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md A4 - as QR Code's). Nor a table row list's (RefuseTableRowsRow).
 	if (KFCResultModel::ListIsQRCodes() || KFCResultModel::ListIsRunList() || KFCResultModel::ListIsWarichu() || KFCResultModel::ListIsStory() || KFCResultModel::ListIsTableRows()
-		|| KFCResultModel::ListIsSpelling())
-		return false;		// (a story list's too - ST8: the Story kind changes nothing; a spelling list's - SP3)
+		|| KFCResultModel::ListIsSpelling() || KFCResultModel::ListIsDocuments())
+		return false;		// (a story list's too - ST8: the Story kind changes nothing; a spelling list's - SP3; a document list's - W3)
 	return WhyGreyed(chapterIdx, hitIdx) == kGreyedNot;
 }
 
@@ -3468,8 +3470,9 @@ bool OutlineInChapter(OutlineChapter& chapter, int32 (&counts)[kOutlineRefusalCo
 
 bool KFCReplaceEngine::CanOutlineHit(int32 chapterIdx, int32 hitIdx)
 {
-	if (KFCResultModel::ListIsRunList() || KFCResultModel::ListHasOwnChangeTab() || KFCResultModel::ListIsTableRows() || KFCResultModel::ListIsScriptLabels() || KFCResultModel::ListIsStory())
-		return false;		// (RefuseRunListRow's, RefuseOwnTabRow's and RefuseTableRowsRow's notes; a script label list's text rows are a table's or a cell's label, a story list's a story whole - OutlineHits)
+	if (KFCResultModel::ListIsRunList() || KFCResultModel::ListHasOwnChangeTab() || KFCResultModel::ListIsTableRows() || KFCResultModel::ListIsScriptLabels() || KFCResultModel::ListIsStory()
+		|| KFCResultModel::ListIsDocuments())
+		return false;		// (RefuseRunListRow's, RefuseOwnTabRow's and RefuseTableRowsRow's notes; a script label list's text rows are a table's or a cell's label, a story list's a story whole - OutlineHits; a document list's a document - W3)
 	return OutlineRowRefusal(chapterIdx, hitIdx) == kOutlineOk;
 }
 
@@ -3490,6 +3493,12 @@ bool KFCReplaceEngine::OutlineHits(const KFCRowsByChapter& rowsByChapter, PMStri
 	{
 		// A STORY LIST'S ROWS stand for a story whole (docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md ST9 - Create Outlines grey), not for a match to outline.
 		outStatus.Append("Create Outlines: these rows are stories - a story is not outlined from here.");
+		return false;
+	}
+	if (KFCResultModel::ListIsDocuments())
+	{
+		// A DOCUMENT LIST'S ROWS stand for a document (2026-11-06, W3 - Create Outlines grey), not for a match to outline.
+		outStatus.Append("Create Outlines: these rows are documents - nothing is outlined from here.");
 		return false;
 	}
 	if (KFCRunGuard::IsAnyRunning())
@@ -4115,8 +4124,8 @@ bool WriteInChapter(const TextRowOp& op, ClearChapter& chapter, const KFCSpecial
 // CAN THE OPERATION BE OFFERED ON THE ROW - the menu's grey (each op's B6).
 bool CanWriteTextRow(const TextRowOp& op, int32 chapterIdx, int32 hitIdx)
 {
-	if (KFCResultModel::ListIsRunList() || (KFCResultModel::ListHasOwnChangeTab() && !op.kohakuText))
-		return false;		// (RefuseRunListRow's and RefuseOwnTabRow's notes)
+	if (KFCResultModel::ListIsRunList() || (KFCResultModel::ListHasOwnChangeTab() && !op.kohakuText) || KFCResultModel::ListIsDocuments())
+		return false;		// (RefuseRunListRow's and RefuseOwnTabRow's notes; a document list's row is a document, no text - W3)
 	return TextRowRefusal(op, chapterIdx, hitIdx) == kClearOk;
 }
 
@@ -5428,6 +5437,12 @@ OwnTabRefusal LabelHolderOfRow(int32 chapterIdx, int32 hit, IDataBase* db, const
 		return kOwnTabOk;
 	}
 	const int32 kind = KFCResultModel::GetHitHolderKind(chapterIdx, hit);
+	// A DOCUMENT LIST'S ROW (2026-11-06, W3): the document itself - its root, a scripting object as an item is (doc.insertLabel's): no lock to keep it.
+	if (kind == kKFCHolderDocument)
+	{
+		out.item = db->GetRootUID();
+		return kOwnTabOk;
+	}
 	const bool storyRow = (kind == kKFCHolderStory || kind == kKFCHolderInternalStory);
 	const bool tableRow = (kind == kKFCHolderTable || (kind == kKFCHolderNone && KFCResultModel::ListIsTables()));
 	if (!storyRow && !tableRow && kind != kKFCHolderCell)
@@ -5530,7 +5545,7 @@ bool KFCReplaceEngine::CanLabelHit(int32 chapterIdx, int32 hitIdx)
 	if (KFCResultModel::GetHitItem(chapterIdx, hitIdx) != kInvalidUID)
 		return true;
 	const int32 kind = KFCResultModel::GetHitHolderKind(chapterIdx, hitIdx);
-	return kind == kKFCHolderStory || kind == kKFCHolderInternalStory || kind == kKFCHolderTable || kind == kKFCHolderCell
+	return kind == kKFCHolderStory || kind == kKFCHolderInternalStory || kind == kKFCHolderTable || kind == kKFCHolderCell || kind == kKFCHolderDocument
 		|| (kind == kKFCHolderNone && KFCResultModel::ListIsTables());
 }
 

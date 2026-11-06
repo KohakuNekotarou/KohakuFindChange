@@ -120,6 +120,18 @@ void PopRowMenu(const char* menuName, IEvent* e, IPMUnknown* widget)
 		menuMgr->RemoveMenuItem(path, kKFCEditInStoryEditorActionID);
 		if (HolderOfRow(widget) == kKFCHolderStory)
 			menuMgr->AddMenuItem(kKFCEditInStoryEditorActionID, path, kKFCEditInStoryEditorMenuItemPosition, kFalse);
+		// A DOCUMENT LIST'S ROW'S FOUR (2026-11-06 - W3: "Special Operations: Close", "Show, for a hidden document"; Save and Revert of the ideas): over a Document
+		// row alone - taken off first, then put, as Tate-chu-yoko.
+		static const ActionID kDocOps[] = { kKFCDocShowActionID, kKFCDocCloseActionID, kKFCDocSaveActionID, kKFCDocRevertActionID };
+		static const PMReal kDocOpPlaces[] = { PMReal(kKFCDocShowMenuItemPosition), PMReal(kKFCDocCloseMenuItemPosition), PMReal(kKFCDocSaveMenuItemPosition),
+			PMReal(kKFCDocRevertMenuItemPosition) };
+		const bool documentRow = (HolderOfRow(widget) == kKFCHolderDocument);
+		for (size_t k = 0; k < sizeof(kDocOps) / sizeof(kDocOps[0]); ++k)
+		{
+			menuMgr->RemoveMenuItem(path, kDocOps[k]);
+			if (documentRow)
+				menuMgr->AddMenuItem(kDocOps[k], path, kDocOpPlaces[k], kFalse);
+		}
 	}
 	// UNIFY TO A READING (2026-11-03 - the author: an Inconsistent Ruby list's heading and rows offer their word's other readings, "<<tarou>> ni soroeru"): on a hit row's and a story row's menus,
 	// under Replace, an item a reading the row's word has besides its own - taken off first, then put, as Tate-chu-yoko; named as the menu draws them (KFCActionComponent's UpdateActionStates).

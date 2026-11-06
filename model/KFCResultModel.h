@@ -476,6 +476,8 @@ namespace KFCResultModel
 	/** Is the list A STORY LIST - the Story kind's (KFCStorySearch: its search mode kKFCStorySearchMode - docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md)? Text rows, one a story
 	    (Hit::holderKind kKFCHolderStory or kKFCHolderInternalStory) - nothing writes them (ST8, ST9). */
 	bool ListIsStory();
+	/** A Document list (the Kohaku+ tab's Document kind - 2026-11-06, W3; KFCDocumentSearch): a row a document, hanging off the list's top. */
+	bool ListIsDocuments();
 	/** Is the list A TABLE ROW LIST - a Table list's List Rows of These Tables' (KFCTableRows: its search mode kKFCTableRowsSearchMode -
 	    docs/superpowers/specs/2026-11-05-kfc-table-rows-cell-style-design.md)? Text rows, one a table row: the text of its cells whose top-left is in it. No
 	    search made it - a query run's list's way: not searched again, not narrowed, its rows not replaced; a row is written by its Special Operations > Apply

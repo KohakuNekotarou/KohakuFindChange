@@ -141,6 +141,8 @@ namespace KFCQueryCopier
 
 	/** A STORY LIST'S (KFCStorySearch - docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md): the mode, kKFCStorySearchMode - it asks nothing (ST3). */
 	void CaptureStories(KFCQueryCopy& out);
+	/** A Document list's (the Kohaku+ tab's Document kind - 2026-11-06, W3): its kind alone. */
+	void CaptureDocuments(KFCQueryCopy& out);
 
 	/** A SPELLING LIST'S (KFCSpellingSearch - docs/superpowers/specs/2026-11-06-kfc-label-spelling-runscript-design.md SP3): the mode, kKFCSpellingSearchMode - it asks nothing but
 	    its icons (ownSwitches, set by the caller), as a warichu list's. */

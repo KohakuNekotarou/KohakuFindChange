@@ -53,6 +53,7 @@
 
 - **ST-31** ★**この版では Special Operations はストーリーの行に効かない**（Clear Overrides・Create Outlines・Tate-chu-yoko は灰色＝ストーリーの行は一致でない＝表・セルのラベルの行と同じ。Restore from Copy も灰色）。Clear from Results・Copy・目玉・Next／Previous Result はふつうの行と同じ。⬜次の候補（作者が 11-05 に気に入った案）＝Open in Story Editor・Apply Paragraph Style。回帰 `st-menus-grey`
   - 訂正: 2026-11-06 作者「ストーリータブでの検索結果できちんとスペシャルオペレーションも行えるように。」→ 案を聞いて「Open in Story Editor を足す」・使い方「ドキュメントを非表示で作る、表示する、その後ストーリーを検索する。ストーリーエディターで開ければドキュメントが非表示でストーリーだけを編集できて大変便利になりそう。」＝★**Special Operations > Edit in Story Editor**（本体の Edit > Edit in Story Editor と同じ語）を**ストーリーの行にだけ**出す（内部ストーリーの行・ほかの種類の行には出ない）。選んだ行ごとにそのストーリーをストーリーエディターで開く（DOM の `story.storyEdit()`＝Run Script と同じ行から物への道）＝★**窓なしで開いた文書でも開くのはストーリーエディターの窓だけ**（レイアウトの窓は開かない＝`layoutWindows 0`・`storyWindows 1`・11-06 実測）。文書は変えない＝取り消しの段は作らない。状態の文＝`Edit in Story Editor: opened N of M row(s).`（開けなかった行は理由ごとに `; N row(s) not found - search again`・`; N row(s) whose documents are not open`・`; N row(s) of InDesign's own (internal) stories, which open in no Story Editor`・最初の誤り）。Clear Overrides・Create Outlines・Tate-chu-yoko・Restore from Copy は灰色のまま。Copy（結果の写し）は CR で同じ日に無くなった。回帰 `st-se-menu`・`st-se-hidden`・`st-se-text-none`・`st-menus-grey`
+  - 訂正: 2026-11-06 夕（W2 の一部）＝**Edit in Story Editor は、ブックの閉じた章の行でも章を窓なしで開いてからストーリーエディターを開く**（それまでは `whose documents are not open` と数えて飛ばした）。開いた章は利用者のもの（DOC-31・回帰 `wl-book-se-closed`）。
 
 - **ST-32** ストーリーを作った段を Ctrl+Z しても InDesign は固まらない（行のテキストフォーカスが自分で外れる＝UNDO-19）。回帰 `st-undo-story`
   - 訂正:

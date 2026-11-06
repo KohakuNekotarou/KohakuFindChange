@@ -54,6 +54,7 @@
 #include "KFCSpecialDialogs.h"	// Move... / Scale... / Rotate... / Shear... - their values asked first
 #include "KFCLabelDialogs.h"		// Special Operations > Label > Add Key... / Edit Value... / Remove Key... - asked first (2026-11-06)
 #include "KFCRowScript.h"			// EditInStoryEditor - a Story row's Special Operations > Edit in Story Editor (2026-11-06)
+#include "KFCDocumentOps.h"			// a Find: Document row's Show / Close / Save / Revert (2026-11-06 - W3)
 #include "KFCResultStep.h"		// Next Result / Previous Result - the live tier's next / previous hit row landed on
 #include "KFCStyleMenu.h"		// Apply Object Style > - the style items the object row's menu popped with
 #include "KFCDiagHiddenDocs.h"		// the hidden-document check after an action - test builds only
@@ -920,13 +921,51 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			// A Story row's Special Operations > Edit in Story Editor (2026-11-06 - the author): the row it was popped over, or the rows selected together when it is
 			// one of them - each one's story opened in the Story Editor (KFCRowScript::EditInStoryEditor - its storyEdit(): on a document opened hidden, the Story
 			// Editor's window alone). What it opened, or why not, on the status line. No hit row: nothing.
+			// NOT UNDER A LANDING OR A RUN (the list's other writes' door - WriteRowsInPlace: a press that never went through the grey menu, a script's, comes here
+			// too; this one reopens a closed chapter and opens a window, each running the message loop - the re-inspection of 11-06, D9-a's shape).
 			int32 chapter = -1, hit = -1;
-			if (RightClickedHit(widget, chapter, hit))
+			if (!KFCJump::IsLanding() && !KFCResultTree::RefusedWhileRunning() && RightClickedHit(widget, chapter, hit))
 			{
 				PMString status;
 				(void)KFCRowScript::EditInStoryEditor(KFCResultTree::RowsOfRightClick(chapter, hit), status);
 				KFCResultTree::ShowStatus(status);
 			}
+			break;
+		}
+
+		case kKFCDocShowActionID:
+		case kKFCDocCloseActionID:
+		case kKFCDocSaveActionID:
+		case kKFCDocRevertActionID:
+		{
+			// A Find: Document row's Special Operations > Show / Close / Save / Revert (2026-11-06 - W3; KFCDocumentOps): the row it was popped over, or the
+			// rows selected together when it is one of them - each document once. What was done, or why not, on the status line.
+			// Not under a landing or a run - the list's other writes' door (WriteRowsInPlace), as Edit in Story Editor's above.
+			int32 chapter = -1, hit = -1;
+			if (!KFCJump::IsLanding() && !KFCResultTree::RefusedWhileRunning() && RightClickedHit(widget, chapter, hit))
+			{
+				const KFCDocumentOps::Op op = (actionID == kKFCDocShowActionID) ? KFCDocumentOps::kShow : (actionID == kKFCDocCloseActionID) ? KFCDocumentOps::kClose
+					: (actionID == kKFCDocSaveActionID) ? KFCDocumentOps::kSave : KFCDocumentOps::kRevert;
+				const KFCRowsByChapter rows(KFCResultTree::RowsOfRightClick(chapter, hit));
+				PMString status;
+				const bool done = KFCDocumentOps::Do(op, rows, status);
+				// THE ROWS SAY WHAT THE DOCUMENTS ARE NOW (the re-inspection of 11-06: a row read "no window" after its Show, "modified" after its Save - the words of
+				// the search): each document's row made again, Search This Document Again's way (one row for a Document list - KFCDocumentSearch::RowOf). Not after
+				// a Close (scheduled - its row goes as the document closes, LIFE-01) nor a Revert (InDesign closes and opens the document again: its row goes so).
+				if (done && (op == KFCDocumentOps::kShow || op == KFCDocumentOps::kSave))
+					for (size_t c = 0; c < rows.size(); ++c)
+						(void)KFCResultTree::SearchDocumentAgain(rows[c].chapter);
+				KFCResultTree::ShowStatus(status);
+			}
+			break;
+		}
+
+		case kKFCOpenWithoutWindowActionID:
+		{
+			// The book row's Open Without a Window (2026-11-06 - W2): the toggle KFCJump's landing reads; its check mark UpdateActionStates'.
+			KFCJump::ToggleOpenWithoutWindow();
+			KFCResultTree::ShowStatus(KFCJump::IsOpenWithoutWindowOn() ? "Open Without a Window: on - a click on this book's rows opens no window on a chapter."
+				: "Open Without a Window: off.");
 			break;
 		}
 
@@ -1419,6 +1458,26 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 				int32 chapter = -1, hit = -1;
 				const bool enable = RightClickedHit(widget, chapter, hit) && KFCResults()->GetHitHolderKind(chapter, hit) == kKFCHolderStory;
 				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
+				break;
+			}
+			case kKFCDocShowActionID:
+			case kKFCDocCloseActionID:
+			case kKFCDocSaveActionID:
+			case kKFCDocRevertActionID:
+			{
+				// A Document row's four (W3), asked of the row right-clicked: Show greys over a document with a layout window (the author); the rest as InDesign's
+				// own file doors say (KFCDocumentOps::CanDo).
+				const KFCDocumentOps::Op op = (action == kKFCDocShowActionID) ? KFCDocumentOps::kShow : (action == kKFCDocCloseActionID) ? KFCDocumentOps::kClose
+					: (action == kKFCDocSaveActionID) ? KFCDocumentOps::kSave : KFCDocumentOps::kRevert;
+				int32 chapter = -1, hit = -1;
+				const bool enable = RightClickedHit(widget, chapter, hit) && KFCDocumentOps::CanDo(op, chapter, hit);
+				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
+				break;
+			}
+			case kKFCOpenWithoutWindowActionID:
+			{
+				// The book row's toggle (W2): always offered on it, its check mark the state.
+				listToUpdate->SetNthActionState(i, KFCJump::IsOpenWithoutWindowOn() ? (kEnabledAction | kSelectedAction) : kEnabledAction);
 				break;
 			}
 			case kKFCRestoreOriginalActionID:

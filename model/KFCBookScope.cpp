@@ -48,6 +48,7 @@
 #include "KFCDiag.h"			// KFC_DIAG_FAULT / KFC_DIAG_LOG - a test build's fault switch (compiled out of a shipping one)
 #include "KFCDiagWrittenDocs.h"	// KFC_DIAG_NOTE_CLOSE_ASKED - a test build's written-document check (nothing in a shipping one)
 #include "IKFCUIServices.h"		// the windows and the Book panel are the UI half's
+#include "KFCSearchEngine.h"	// RunWalksAllDocuments - HasScopeTarget's All Documents half (2026-11-06)
 #ifdef KFC_DIAG
 #include "KFCRunGuard.h"		// REOPEN / WINDOW: is an open or a window counted by a run of ours (test builds only)
 #endif
@@ -1083,7 +1084,16 @@ bool KFCBookScope::HasScopeTarget()
 	// this is the document-scope branch, where the active document is exactly what gets searched.
 	// A chapter one of our own runs is holding open therefore does not count as a target, which is
 	// what we want.
-	return ActiveDocument() != nil;
+	if (ActiveDocument() != nil)
+		return true;
+	// ...BUT ALL DOCUMENTS WALKS EVERY OPEN DOCUMENT, WINDOW OR NOT (2026-11-06 - the author: "searchable even with documents that
+	// have no window"): with Search: read as All Documents, an open document of the run's list counts - ListOpenDocuments leaves
+	// out the chapters a run of ours holds, as above (KFCSearchEngine::ResolveRunTarget asks the same).
+	if (!KFCSearchEngine::RunWalksAllDocuments())
+		return false;
+	std::vector<ChapterDoc> open;
+	ListOpenDocuments(open);
+	return !open.empty();
 }
 
 IDocument* KFCBookScope::ActiveDocument()

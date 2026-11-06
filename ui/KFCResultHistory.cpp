@@ -754,6 +754,12 @@ namespace
 			label.Append(" Find:\"[All Stories]\"");
 			return label;
 		}
+		// THE DOCUMENT KIND ASKS NOTHING (2026-11-06 - W3): Find:"[All Documents]", as Story's.
+		if (mode == kKFCDocumentSearchMode)
+		{
+			label.Append(" Find:\"[All Documents]\"");
+			return label;
+		}
 		// THE SPELLING KIND ASKS NOTHING BUT ITS ICONS (docs/superpowers/specs/2026-11-06-kfc-label-spelling-runscript-design.md SP3): Find:"[Spelling]", as Warichu's.
 		if (mode == kKFCSpellingSearchMode)
 		{
@@ -1257,7 +1263,8 @@ void KFCResultHistory::KeptChapterGone(uint32 set, int32 chapterIdx, int32 repla
 	{
 		const int32 row = kept.top[i];
 		TreeNodePtr<KFCResultNodeID> id(kept.rows[static_cast<size_t>(row)].live);
-		if (id == nil || !id->IsDocumentRow() || id->GetChapter() != chapterIdx)
+		// (A Document list's tier holds its rows themselves under its own row - hit rows, one a document: 2026-11-06, W3 - the re-inspection of 11-06.)
+		if (id == nil || !(id->IsDocumentRow() || id->IsHitRow()) || id->GetChapter() != chapterIdx)
 			continue;
 		found = true;
 		// Out of the tree first, while the copy still holds it (KFCResultTree::BeforeChapterRowGoes' order for the live

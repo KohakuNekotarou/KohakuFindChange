@@ -187,6 +187,12 @@ public:
 	/** IS THE KOHAKU+ TAB'S SPELLING KIND FIND/CHANGE'S NOW (appended - revision 55, docs/superpowers/specs/2026-11-06-kfc-label-spelling-runscript-design.md SP1;
 	    KFCSpellingSearch::IsTabCurrent asks it) - the same for its conditions (its icons and its Search:). */
 	virtual bool				SpellingTabConditions(KFCSpellingConditions& outConditions) = 0;
+	/** IS THE KOHAKU+ TAB'S DOCUMENT KIND FIND/CHANGE'S NOW (appended - revision 56, docs/superpowers/specs/2026-11-06-kfc-windowless-documents-design.md W3;
+	    KFCDocumentSearch::IsTabCurrent asks it). It asks nothing - its Search: is All Documents alone. */
+	virtual bool				DocumentTabCurrent() = 0;
+	/** A DOCUMENT'S WINDOWS, BY KIND (appended - revision 56, W3: a Document row's words): its layout windows and its other ones (a Story Editor's) - every
+	    presentation of its list, a layout window the one holding a layout view (KIDMCP's measured way - KIDMCPUIUiReader::QueryLayoutWindowInOrder). */
+	virtual void				CountDocWindows(const UIDRef& docRef, int32& outLayout, int32& outOther) = 0;
 };
 
 /** HOW THE MODEL HALF ASKS FOR IKFCUIServices - the only way. IKFCUIServices has no kDefaultIID, so a Query of its

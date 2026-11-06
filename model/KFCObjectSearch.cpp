@@ -682,10 +682,11 @@ bool KFCObjectSearch::ResolveObjectRunScope(KFCSearchEngine::RunScope& out, PMSt
 			return false;
 		}
 	}
-	if (!KFCSearchEngine::ResolveRunTarget(fromBook, outRefusal))
+	const bool allDocuments = !fromBook && scope == IWalkerScopeFactoryUtils::kAllDocumentScope;
+	if (!KFCSearchEngine::ResolveRunTarget(fromBook, allDocuments, outRefusal))		// (All Documents: windowless documents count - 2026-11-06)
 		return false;
 	out.fromBook = fromBook;
-	out.allDocuments = !fromBook && scope == IWalkerScopeFactoryUtils::kAllDocumentScope;
+	out.allDocuments = allDocuments;
 	out.selectionScope = (!fromBook && scope == IWalkerScopeFactoryUtils::kSelectionScope)
 		? static_cast<int32>(IWalkerScopeFactoryUtils::kSelectionScope) : static_cast<int32>(IWalkerScopeFactoryUtils::kDocumentScope);
 	if (!fromBook)

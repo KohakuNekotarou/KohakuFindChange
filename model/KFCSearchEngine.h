@@ -196,8 +196,16 @@ namespace KFCSearchEngine
 	    once, and an EMPTY one refused here, ahead of the commit point like every other refusal: refused past it
 	    (by ListBookChapters), the previous results would already be gone - a whole book's results, for a book
 	    with nothing in it (KFCBookScope::GetTargetBook says which case was in mind). false = refused, its
-	    sentence appended to outRefusal. Touches nothing. */
-	bool ResolveRunTarget(bool fromBook, PMString& outRefusal);
+	    sentence appended to outRefusal. Touches nothing.
+	    allDocuments (2026-11-06 - the author: "searchable even with documents that have no window"): All Documents asks for an
+	    open document - window or not (KFCBookScope::ListOpenDocuments) - not for the front one: a document opened without a
+	    window is never in front, and All Documents walks it. */
+	bool ResolveRunTarget(bool fromBook, bool allDocuments, PMString& outRefusal);
+
+	/** Would the panel's Find walk ALL DOCUMENTS now - Book Scope off and Search: read as the run reads it (FindCommandName's
+	    reading: the Object tab's own, the others' through SearchScopeForSelection)? KFCBookScope::HasScopeTarget asks it, so a
+	    run over windowless documents alone is offered (2026-11-06). Touches nothing. */
+	bool RunWalksAllDocuments();
 
 	/** Its refusal of an empty book - and the same words from every run's safety net past its commit point, where
 	    KFCBookScope::ListBookChapters finds no chapters after all (SearchBook, KFCChangeAll::Run,

@@ -115,6 +115,7 @@ namespace
 		virtual bool ListIsScriptLabels() { return false; }
 		virtual bool ListIsTableRows() { return false; }
 		virtual int32 GetHitHolderKind(int32, int32) { return kKFCHolderNone; }
+		virtual bool ListIsDocuments() { return false; }
 	};
 
 	class KFCRunsStandInImpl : public IKFCRuns

@@ -19,6 +19,7 @@
   - 訂正: 2026-11-06＝**Story** をどの言語でも最後に足した（日本語は7つ目・他の言語は4つ目＝ST-01）。それまでの並びと位置はそのまま。
   - 訂正: 2026-11-06 朝 作者「Kohaku+でのFindの並び QR ScriptLabel Story Table の順番に」＝QR Code／Script Label／Story／Table（日本語だけの3つはその後ろのまま）。
   - 訂正: 2026-11-06＝**Spelling** をどの言語でも Script Label と Story の間に足した（ABC 順＝設計書の FO1・SP1・28-spelling.md）。
+  - 訂正: 2026-11-06 夕 作者「検索にドキュメントタブというのを追加してほしい。」＝Find: の一番上に Document（ABC 順・どの言語でも＝日本語9つ・他の言語6つ・DOC-10）。ほかの種類の位置は1つずつ下がった。
 
 - **KOHAKU-04** Find: の値に応じて、パネルのタイトル（`Kohaku Find/Change - Table - Document`）と Find の名前、Find in … の動きが**その場で**変わる。本体のタブへ移れば本体のタブに戻り、戻れば前の種類のまま。閉じても開き直しても同じ。（K3・K4）回帰 `kh-kinds-title`・`kh-kinds-find`・`kh-closed-kind`・`kh-leave-back`
   - 訂正:

@@ -167,6 +167,9 @@ public:
 	    text row stands for beyond its text (KFCHolderKind: a table row list's row, a script label list's table or cell label row; kKFCHolderNone
 	    otherwise) - the row's menu offers by it (Apply Table Style on a table's, Apply Cell Style on a cell's). */
 	virtual int32 GetHitHolderKind(int32 chapterIdx, int32 hitIdx) = 0;
+	/** = KFCResultModel::ListIsDocuments (appended - revision 56, docs/superpowers/specs/2026-11-06-kfc-windowless-documents-design.md W3): the list is a
+	    Document list - a row a document (kKFCHolderDocument), hanging off the list's top (or the book row), not off a document row. */
+	virtual bool ListIsDocuments() = 0;
 };
 
 #endif // __IKFCResults_h__

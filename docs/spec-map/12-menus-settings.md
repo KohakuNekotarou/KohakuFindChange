@@ -71,7 +71,7 @@
   `Clear Results` ＝ヒットの行が無いとき灰色（0件のブックの行だけのときも・REP-34）。ただし段を積んでいる間（ROW-39）は、ヒットの行が無くても押せる（2026-10-14）。
   置換の文字は見ない（空でも「一致を消す」としてやれる）。
   `Run Saved Queries...` ＝走っている間（SET-04）のほかは灰色にならない（文書が無くても・結果が出ていても押せる＝QRY-02）。
-  - 訂正:
+  - 訂正: 2026-11-06 夕 作者「窓なしの文章でも検索できるようにしてほしい。」＝**Search: が All Documents なら、窓なしの文書だけが開いていても `Find in …` は押せる**（開いている文書が1つでもあればよい＝DOC-01）。それまでは前面の文書が要り、窓なしの文書だけでは灰色だった。
 
 - **SET-05b** `Find/Change Selected Documents (Book)` ＝Book Scope が ON のときだけ押せる。灰色でもチェックの印は見えたまま（SET-06 と同じ扱い・SCOPE-28）。
   押すと ON／OFF が入れ替わるだけで、メッセージ欄には何も書かない（どの文書を相手にするかは、検索・置換・Run が走る瞬間に決まる＝SCOPE-30）。
@@ -116,7 +116,7 @@
   （2026-11-04 にストーリーと文書の行の一番上に Replace All Rows＝ROW-50。今の並びは ROW-32 の絵。）
   （2026-10-09〜10-10 の形＝ヒットの行（`Replace` の1つ）とストーリーの行（`Search This Story Again` の1つ）だけ。それまでの「ヒットの行だけ」は 2026-10-09 に直した。）
   （Reject／Accept の仲間・Replace Again・Check All／Uncheck All・本／文書／ストーリー／run の行のメニューは 2026-10-06 に外した。）
-  - 訂正:
+  - 訂正: 2026-11-06 夕 作者「ブックに対して検索したときに、ブックの行の右クリックに欲しい」＝ブックの行のメニューに `Open Without a Window`（トグル・DOC-30）。Find: Document の行の Special Operations に Show・Close・Save・Revert（DOC-20〜23）。
 
 - **SET-11** ★**灰色の項目もメニューに出す**（2026-10-17 作者の決定「不可能なときは、灰色でいいです」）＝`Replace` が灰色のとき（置換済み・ロック・検索の一致でない。まとめて選んだ行の1つを右クリックしたときは、選んだ行のどれも置換できないとき＝REP-36）も、メニューは開いて `Replace` を灰色で見せる（`HandlePopupMenu` の `removeDisabledItems = kFalse`）。（2026-08-01〜10-17 は灰色の項目を出さず、項目が全部灰色ならメニューは開かなかった＝KFC の引数 kTrue。作者が受け入れていた形。）
   ストーリー・文書の行のメニューは、実行中のほかは開く（Search This Story Again／Search This Document Again が断るときは、押した後にメッセージ欄で理由を言う）。
@@ -158,7 +158,7 @@
   Hide Previous Chapter／Find/Change Selected Documents (Book)（2026-10-07・キー `selectedDocuments`＝SCOPE-34）／Remember Book Panel Placement と、ブックパネルの位置（開いていれば今の位置、無ければ最後に覚えた位置）。
   （2026-10-14 の1日だけ Keep Previous Results もキー `keepPreviousResults` で保存していた＝そのトグルは外した・キーは読まない＝SET-24。段そのものは作業の状態で、保存しない。）
   （保存したクエリの並びは、このファイルに入れない ―― InDesign を起動している間だけ覚え、ファイルにするのは `Save Order...` で利用者が選んだ場所＝QRY-14〜16・QRY-26。2026-10-07 の昼の版が書いていた `KFCQueryOrder.txt` はもう使わない。）
-  - 訂正:
+  - 訂正: 2026-11-06 夕＝ブックの行の `Open Without a Window`（DOC-30）もキー `openWithoutWindow` で保存する（既定 OFF）。
 
 - **SET-17** ★**保存しないもの＝Book Scope**（GEN-26・「次に何を探すか」は設定ではなく今の作業）。起動のたびに OFF から。
   - 訂正:

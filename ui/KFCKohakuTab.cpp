@@ -67,6 +67,7 @@
 #include "KFCPanelTitle.h"				// Update - the panel's title names the kind and its Search:
 #include "KFCAppBarSearchEnter.h"		// KFCMirrorAppBarFieldNow - the Application Bar's field shows the tab's nothing
 #include "KFCJump.h"					// LandOnQRCode, LandOnPlace - Find Next lands as a row's click does
+#include "KFCDocumentOps.h"			// OpenHidden - the Document kind's Open Hidden... (2026-11-06, W3)
 #include "KFCBookPanelLookup.h"		// QueryPanelManager - Find in KFC shows the panel first
 #include "KFCResultHistory.h"			// Find - Find in KFC is the panel's own Find
 #include "KFCModelAccess.h"				// KFCRuns()->QRCodeNext - the QR code after the one found last (the model's)
@@ -89,6 +90,7 @@ const int32 kKindWarichu = 4;		// (docs/superpowers/specs/2026-11-02-kfc-warichu
 const int32 kKindScriptLabel = 5;	// (docs/superpowers/specs/2026-11-04-kfc-script-label-design.md S1 - every language's. A kind's number is not its entry on Find: - Find:'s order is the author's of 11-06, kKindsInOrder: EntryOfKind)
 const int32 kKindStory = 6;			// (docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md ST1 - every language's; its place on Find: kKindsInOrder's)
 const int32 kKindSpelling = 7;		// (docs/superpowers/specs/2026-11-06-kfc-label-spelling-runscript-design.md SP1 - every language's: the words Dynamic Spelling underlines)
+const int32 kKindDocument = 8;		// (docs/superpowers/specs/2026-11-06-kfc-windowless-documents-design.md W3 - every language's: every open document, window or not; first on Find:)
 
 // Search:'s entries: the .fr's two for every kind, the three after them for what stands in a story's text (ShowScopeEntries).
 const IWalkerScopeFactoryUtils::WalkScopeType kScopeOfEntry[] =
@@ -111,7 +113,7 @@ IPMUnknown* gShownFace = nil;	// the face, while shown - from its AutoAttach to 
 int32 gKind = kKindQRCode;	// its Find: - QR Code at launch, the tab InDesign's dialog first had
 // WHAT EACH KIND LAST SAID ON THE FACE'S TWO LINES (docs/superpowers/specs/2026-11-02-kfc-kohaku-face-buttons-design.md L4 - the author, 11-02: "the same place as the other messages"): the first line, what a button or the list
 // said; the second, why what was found could not be selected. One pair of lines for every kind - shown again as its kind is.
-const int32 kKindCount = 8;
+const int32 kKindCount = 9;
 PMString gSaid[kKindCount][2];
 int32 gScope = IWalkerScopeFactoryUtils::kDocumentScope;	// its Search: - Document at launch
 KFCTableConditions gTable;	// what the Table part asks, kept from its widgets (its scope is gScope)
@@ -375,7 +377,7 @@ int32 TextModeOfKind()
 {
 	return (gKind == kKindKenten) ? static_cast<int32>(kKFCKentenSearchMode) : (gKind == kKindWarichu) ? static_cast<int32>(kKFCWarichuSearchMode)
 		: (gKind == kKindStory) ? static_cast<int32>(kKFCStorySearchMode) : (gKind == kKindSpelling) ? static_cast<int32>(kKFCSpellingSearchMode)
-		: static_cast<int32>(kKFCRubySearchMode);
+		: (gKind == kKindDocument) ? static_cast<int32>(kKFCDocumentSearchMode) : static_cast<int32>(kKFCRubySearchMode);
 }
 
 // DOES THE KIND'S CHANGE SIDE ASK ANYTHING (B5)? Table: a style, or Clear Overrides. Ruby: nothing with Find Only (11-03); with Text Without Ruby a reading in a Change Ruby To box; with the rest always - no reading
@@ -407,7 +409,7 @@ bool ChangeSideAsks()
 // Change and Change/Find are for what Find Next found, while it is selected and has not been written; all of them want something on the Change side. Grey otherwise, as the Text tab's after the selection moves or a Change.
 void ShowFaceButtons(IPanelControlData* panel)
 {
-	if (panel == nil || gKind == kKindQRCode || gKind == kKindWarichu || gKind == kKindStory || gKind == kKindSpelling)		// (no Change buttons on them: they change nothing)
+	if (panel == nil || gKind == kKindQRCode || gKind == kKindWarichu || gKind == kKindStory || gKind == kKindSpelling || gKind == kKindDocument)		// (no Change buttons on them: they change nothing)
 		return;
 	if (gKind == kKindScriptLabel)
 		ShowFoundLabel(panel);		// (the box of the found label - every press and every field's change comes here, and a selection's move: the label as it reads now)
@@ -1727,9 +1729,10 @@ bool JapaneseKinds()
 // alone (their order of 11-04 kept, abc too).
 // An entry is its place here; a kind keeps its number (kKind* - the face's own arrays are counted by it, and a saved query names its kind by its word): EntryOfKind and KindOfEntry go between
 // them. -1 = none (a kind the list there does not hold, or an entry past it).
-const int32 kKindsInOrder[kKindCount] = { kKindQRCode, kKindScriptLabel, kKindSpelling, kKindStory, kKindTable, kKindKenten, kKindRuby, kKindWarichu };
-const int32 kEntriesForEveryLanguage = 5;
-const int32 kKindsInOrderForEveryLanguage[kEntriesForEveryLanguage] = { kKindQRCode, kKindScriptLabel, kKindSpelling, kKindStory, kKindTable };
+// Document (2026-11-06, W3) first - its abc place, every language's: the others one place down.
+const int32 kKindsInOrder[kKindCount] = { kKindDocument, kKindQRCode, kKindScriptLabel, kKindSpelling, kKindStory, kKindTable, kKindKenten, kKindRuby, kKindWarichu };
+const int32 kEntriesForEveryLanguage = 6;
+const int32 kKindsInOrderForEveryLanguage[kEntriesForEveryLanguage] = { kKindDocument, kKindQRCode, kKindScriptLabel, kKindSpelling, kKindStory, kKindTable };
 
 int32 EntriesHere()
 {
@@ -1769,6 +1772,7 @@ const char* KindKey(int32 kind)
 		case kKindRuby:			return kKFCKohakuTabRubyKey;
 		case kKindStory:		return kKFCKohakuTabStoryKindKey;
 		case kKindSpelling:		return kKFCKohakuTabSpellingKindKey;
+		case kKindDocument:		return kKFCKohakuTabDocumentsKindKey;
 		default:				return kKFCKohakuTabWarichuKindKey;
 	}
 }
@@ -1803,18 +1807,21 @@ void ShowKindEntries(IPMUnknown* face)
 const char* KindWord()
 {
 	return (gKind == kKindTable) ? "TBLTAB" : (gKind == kKindRuby) ? "RUBYTAB" : (gKind == kKindKenten) ? "KENTAB" : (gKind == kKindWarichu) ? "WARITAB"
-		: (gKind == kKindScriptLabel) ? "LABELTAB" : (gKind == kKindStory) ? "STORYTAB" : (gKind == kKindSpelling) ? "SPELLTAB" : "QRTAB";
+		: (gKind == kKindScriptLabel) ? "LABELTAB" : (gKind == kKindStory) ? "STORYTAB" : (gKind == kKindSpelling) ? "SPELLTAB" : (gKind == kKindDocument) ? "DOCTAB" : "QRTAB";
 }
 
 // THE KINDS WHOSE SEARCH: IS ALL DOCUMENTS OR DOCUMENT (QR Code's two): a QR code's frame stands in no story's text, a label is no story's text either (S2), and a story is the list's unit itself (ST2).
 bool KindTakesWholeDocuments()
 {
-	return gKind == kKindQRCode || gKind == kKindScriptLabel || gKind == kKindStory;
+	return gKind == kKindQRCode || gKind == kKindScriptLabel || gKind == kKindStory || gKind == kKindDocument;
 }
 
 // WHAT SEARCH: IS FOR THE KIND NOW: a part of a story picked for the others reads as Document on those kinds - and is there again when they come back (nothing is written here).
+// The Document kind's is All Documents alone (W3 - one document in front, listed, would find nothing hidden): whatever was picked for the others.
 int32 ScopeForKind()
 {
+	if (gKind == kKindDocument)
+		return IWalkerScopeFactoryUtils::kAllDocumentScope;
 	if (KindTakesWholeDocuments() && gScope != IWalkerScopeFactoryUtils::kAllDocumentScope)
 		return IWalkerScopeFactoryUtils::kDocumentScope;
 	return gScope;
@@ -1829,12 +1836,20 @@ void ShowScopeEntries(IPMUnknown* face)
 	InterfacePtr<IDropDownListController> list(dropDown, UseDefaultIID());
 	if (strings == nil || list == nil)
 		return;
-	if (KindTakesWholeDocuments())
+	// THE DOCUMENT KIND'S ONE ENTRY, All Documents (W3): Document taken off while it is shown - put back before any other kind's entries are counted.
+	if (gKind == kKindDocument)
+	{
+		while (strings->Length() > 1)
+			strings->RemoveString(strings->Length() - 1, kFalse, kFalse);
+	}
+	else if (strings->Length() < kEntriesForAnyKind)
+		strings->AddString(PMString(kKFCKohakuDocumentKey, PMString::kTranslateDuringCall), IStringListControlData::kEnd, kFalse, kFalse);
+	if (gKind != kKindDocument && KindTakesWholeDocuments())
 	{
 		while (strings->Length() > kEntriesForAnyKind)
 			strings->RemoveString(strings->Length() - 1, kFalse, kFalse);
 	}
-	else if (strings->Length() < kEntriesInAStory)
+	else if (gKind != kKindDocument && strings->Length() < kEntriesInAStory)
 	{
 		strings->AddString(PMString(kKFCKohakuStoryEntryKey, PMString::kTranslateDuringCall), IStringListControlData::kEnd, kFalse, kFalse);
 		strings->AddString(PMString(kKFCKohakuTabToEndKey, PMString::kTranslateDuringCall), IStringListControlData::kEnd, kFalse, kFalse);
@@ -1873,6 +1888,7 @@ void ShowRubyButtons(IPanelControlData* panel)
 const WidgetID kColumnButtons[] =
 {
 	kKFCKohakuFindInKFCWidgetID,
+	kKFCDocumentOpenHiddenWidgetID,		// (the Document kind's Open Hidden... - W3)
 	kKFCRubyListChooseWidgetID,
 	kKFCRubyListSaveWidgetID,
 	kKFCKohakuHowToWidgetID,
@@ -1943,8 +1959,10 @@ void ShowSwitches(IPanelControlData* panel)
 void ShowKind(IPMUnknown* face)
 {
 	InterfacePtr<IPanelControlData> panel(face, UseDefaultIID());
-	const bool writes = (gKind != kKindQRCode && gKind != kKindWarichu && gKind != kKindStory && gKind != kKindSpelling);
-	ShowPart(panel, kKFCQRTabFindNextWidgetID, true);
+	const bool writes = (gKind != kKindQRCode && gKind != kKindWarichu && gKind != kKindStory && gKind != kKindSpelling && gKind != kKindDocument);
+	// THE DOCUMENT KIND (W3): no Find Next (a document with no window cannot be landed on) - Open Hidden... stacked in its place.
+	ShowPart(panel, kKFCQRTabFindNextWidgetID, gKind != kKindDocument);
+	ShowPart(panel, kKFCDocumentOpenHiddenWidgetID, gKind == kKindDocument);
 	ShowPart(panel, kKFCTableTabChangeWidgetID, writes);
 	ShowPart(panel, kKFCTableTabChangeAllWidgetID, writes);
 	ShowPart(panel, kKFCTableTabChangeFindWidgetID, writes);
@@ -2058,6 +2076,12 @@ bool KFCKohakuTab::IsStoryCurrent(KFCStoryConditions& outConditions)
 	return FaceIsCurrent() && gKind == kKindStory;
 }
 
+bool KFCKohakuTab::IsDocumentCurrent()
+{
+	// Its Search: is All Documents alone (W3) - nothing to hand over.
+	return FaceIsCurrent() && gKind == kKindDocument;
+}
+
 bool KFCKohakuTab::IsSpellingCurrent(KFCSpellingConditions& outConditions)
 {
 	// Search: as Warichu's - its five (SP3).
@@ -2108,6 +2132,8 @@ void KFCKohakuTab::StateQuery(const KFCKohakuQueryData& query, bool forItsFind, 
 	}
 	else if (query.mode == kKFCStorySearchMode)
 		gKind = kKindStory;		// (its kind alone - ST11)
+	else if (query.mode == kKFCDocumentSearchMode)
+		gKind = kKindDocument;	// (its kind alone, as Story's - W3)
 	else if (query.mode == kKFCSpellingSearchMode)
 	{
 		gKind = kKindSpelling;
@@ -2143,7 +2169,8 @@ void KFCKohakuTab::QueryOfFace(KFCKohakuQueryData& out)
 	out.mode = (gKind == kKindTable) ? static_cast<int32>(kKFCTableSearchMode) : (gKind == kKindRuby) ? static_cast<int32>(kKFCRubySearchMode)
 		: (gKind == kKindKenten) ? static_cast<int32>(kKFCKentenSearchMode) : (gKind == kKindWarichu) ? static_cast<int32>(kKFCWarichuSearchMode)
 		: (gKind == kKindScriptLabel) ? static_cast<int32>(kKFCScriptLabelSearchMode) : (gKind == kKindStory) ? static_cast<int32>(kKFCStorySearchMode)
-		: (gKind == kKindSpelling) ? static_cast<int32>(kKFCSpellingSearchMode) : static_cast<int32>(kKFCQRCodeSearchMode);
+		: (gKind == kKindSpelling) ? static_cast<int32>(kKFCSpellingSearchMode) : (gKind == kKindDocument) ? static_cast<int32>(kKFCDocumentSearchMode)
+		: static_cast<int32>(kKFCQRCodeSearchMode);
 	out.table = gTable;
 	out.ruby = gRuby;
 	out.kenten = gKenten;
@@ -2401,7 +2428,9 @@ public:
 			// SEARCH: CHANGED - kept for KFC's Find and its menu's name, and said in the panel's title.
 			InterfacePtr<IDropDownListController> list(view, UseDefaultIID());
 			const int32 entry = (list != nil) ? list->GetSelected() : -1;
-			if (entry >= 0 && entry < kEntriesInAStory)
+			// (Not on the Document kind: its one entry, All Documents, is its own - kept, it would be the other kinds' Search: when they come back. The
+			// re-inspection of 11-06.)
+			if (entry >= 0 && entry < kEntriesInAStory && gKind != kKindDocument)
 				gScope = kScopeOfEntry[entry];
 			KFC_DIAG_LOG("%s scope=%d", KindWord(), static_cast<int>(gScope));
 			KFCPanelTitle::Update();
@@ -2417,6 +2446,18 @@ public:
 		}
 		else if (widget == kKFCKohakuFindInKFCWidgetID && theChange == kTrueStateMessage)
 			FindInKFC();
+		else if (widget == kKFCDocumentOpenHiddenWidgetID && theChange == kTrueStateMessage)
+		{
+			// OPEN HIDDEN... (W3 - the author: "open a document without a window, in that tab"): the documents chosen opened without a window; the face's first line
+			// says what was opened (a search lists them - nothing is searched here).
+			PMString said;
+			(void)KFCDocumentOps::OpenHidden(said);
+			KFC_DIAG_LOG("%s openhidden %s", KindWord(), said.GetUTF8String().c_str());
+			gSaid[gKind][0] = said;
+			gSaid[gKind][1] = PMString();
+			InterfacePtr<IPanelControlData> panel(this, UseDefaultIID());
+			ShowSaid(panel);
+		}
 		else if ((widget == kKFCKohakuHowToWidgetID || widget == kKFCKentenHowToWidgetID) && theChange == kTrueStateMessage)
 		{
 			KFC_DIAG_LOG("%s how to", KindWord());

@@ -120,6 +120,14 @@ namespace KFCJump
 	    remembered value - flipping would come out inverted whenever the saved state matches the
 	    default. Nothing else should use it: the flyout toggles. */
 	void SetHidePreviousChapter(bool on);
+
+	/** THE BOOK ROW'S OPEN WITHOUT A WINDOW (2026-11-06 - docs/superpowers/specs/2026-11-06-kfc-windowless-documents-design.md W2 - the author: "on the book row's
+	    right-click, when a book is searched; a toggle"): while on, a click on a book list's row whose chapter has no layout window opens no window - a closed
+	    chapter is reopened without one, a windowless one stays so, nothing is selected, the status line says so - and the chapter is the person's from then
+	    on. A chapter with a layout window lands as always. OFF at launch; Save Panel Settings keeps it (openWithoutWindow). */
+	bool IsOpenWithoutWindowOn();
+	void ToggleOpenWithoutWindow();
+	void SetOpenWithoutWindow(bool on);
 }
 
 #endif // __KFCJump_h__

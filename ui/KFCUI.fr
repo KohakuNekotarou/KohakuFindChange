@@ -953,6 +953,12 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCSelectAllRowsMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// ----- Open Without a Window: the book row's menu (2026-11-06 - the author: "on the book row's right-click, when a book is searched" - W2) -----
+		kKFCOpenWithoutWindowActionID,
+		kKFCResultBookMenuName
+		kKFCOpenWithoutWindowMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 		// ----- A tier's own row's right-click menu (the author's call) -----
 		// Popped by KFCResultNodeEH::RButtonDn over a tier's row: Clear These Results lets that tier alone go - a grey one, or
 		// the live list (KFCResultHistory::ClearTier).
@@ -2450,6 +2456,55 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKFCActionComponentBoss,
 		kKFCEditInStoryEditorActionID,
 		kKFCEditInStoryEditorMenuKey,	// "Edit in Story Editor"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// The book row's Open Without a Window (2026-11-06 - docs/superpowers/specs/2026-11-06-kfc-windowless-documents-design.md W2): a toggle - its check mark is
+		// UpdateActionStates' - a click on that book's rows opens no window on a chapter. Its MenuDef node is the book row's (below).
+		kKFCActionComponentBoss,
+		kKFCOpenWithoutWindowActionID,
+		kKFCOpenWithoutWindowMenuKey,	// "Open Without a Window"
+		kOtherActionArea,
+		kNormalAction,					// (a toggle as Hide Previous Chapter is: kNormalAction, its check mark UpdateActionStates')
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// A Find: Document row's Special Operations > Show / Close / Save / Revert (2026-11-06 - W3, KFCDocumentOps). No MenuDef node: KFCResultNodeEH's PopRowMenu
+		// puts them on a Document row's menu as it pops. Show greys over a document with a layout window (the author); Close, Save, Revert as InDesign's File menu.
+		kKFCActionComponentBoss,
+		kKFCDocShowActionID,
+		kKFCDocShowMenuKey,			// "Show"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCDocCloseActionID,
+		kKFCDocCloseMenuKey,		// "Close"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCDocSaveActionID,
+		kKFCDocSaveMenuKey,			// "Save"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCDocRevertActionID,
+		kKFCDocumentRevertMenuKey,		// "Revert"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
@@ -5483,6 +5538,16 @@ resource KFCKohakuTabPanelWidget (kKFCKohakuTabRsrcID + index_enUS)
 									Frame(0, 0, 116, 26)		// Frame
 									kTrue, kTrue,				// Visible, Enabled
 									kKFCQRTabFindNextKey,		// "Find Next"
+									kEVENoSpaceAfter,
+								),
+								EVEButtonWidget
+								(
+									kKFCDocumentOpenHiddenWidgetID,	// WidgetId - the Document kind's Open Hidden... (2026-11-06 - W3), stacked over Find Next: ShowKind shows one of the two
+									kSysButtonPMRsrcId,			// RsrcId
+									kBindNone,					// Frame binding
+									Frame(0, 0, 116, 26)		// Frame
+									kFalse, kFalse,				// Visible, Enabled - ShowKind's
+									kKFCDocumentOpenHiddenKey,	// "Open Hidden..."
 									kEVENoSpaceAfter,
 								),
 							}

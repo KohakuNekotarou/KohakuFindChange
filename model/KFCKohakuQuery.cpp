@@ -245,7 +245,7 @@ bool KFCKohakuQuery::Read(const IDFile& file, KFCKohakuQueryData& out)
 		if (key == "kind")
 		{
 			const int32 modes[] = { kKFCQRCodeSearchMode, kKFCTableSearchMode, kKFCRubySearchMode, kKFCKentenSearchMode, kKFCWarichuSearchMode, kKFCScriptLabelSearchMode,
-				kKFCStorySearchMode, kKFCSpellingSearchMode };		// (a Story query holds its kind alone; a Spelling query its icons - SP6 - docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md ST11)
+				kKFCStorySearchMode, kKFCSpellingSearchMode, kKFCDocumentSearchMode };		// (a Document query - W3 - its kind alone, as Story's)		// (a Story query holds its kind alone; a Spelling query its icons - SP6 - docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md ST11)
 			for (size_t m = 0; m < sizeof(modes) / sizeof(modes[0]); ++m)
 				if (value == KFCSavedQueries::KindName(modes[m]))
 					out.mode = modes[m];

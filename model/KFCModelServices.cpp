@@ -109,6 +109,7 @@ public:
 	virtual bool ListIsScriptLabels() { return KFCResultModel::ListIsScriptLabels(); }
 	virtual bool ListIsTableRows() { return KFCResultModel::ListIsTableRows(); }
 	virtual int32 GetHitHolderKind(int32 chapterIdx, int32 hitIdx) { return KFCResultModel::GetHitHolderKind(chapterIdx, hitIdx); }
+	virtual bool ListIsDocuments() { return KFCResultModel::ListIsDocuments(); }
 };
 
 CREATE_PMINTERFACE(KFCResultsSession, kKFCResultsImpl)

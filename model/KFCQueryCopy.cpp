@@ -312,6 +312,14 @@ void KFCQueryCopier::CaptureStories(KFCQueryCopy& out)
 	out.valid = true;
 }
 
+void KFCQueryCopier::CaptureDocuments(KFCQueryCopy& out)
+{
+	// THE DOCUMENT KIND (2026-11-06, W3): its kind alone - it asks nothing (the Story kind's way).
+	out = KFCQueryCopy();
+	out.mode = static_cast<int32>(kKFCDocumentSearchMode);
+	out.valid = true;
+}
+
 void KFCQueryCopier::CaptureSpelling(KFCQueryCopy& out)
 {
 	out = KFCQueryCopy();

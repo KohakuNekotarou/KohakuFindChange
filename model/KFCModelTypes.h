@@ -243,7 +243,9 @@ enum KFCHolderKind
 	kKFCHolderTable,		// a script label list's row of a TABLE's label - the table takes Apply Table Style
 	kKFCHolderCell,			// a script label list's row of a CELL's label - the cell takes Apply Cell Style, a click selects it
 	kKFCHolderStory,		// a Story list's row (KFCStorySearch - docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md ST5): the story whole - a click selects its text as it is now
-	kKFCHolderInternalStory	// ...of an INTERNAL story (IStoryList's kNotUserAccessible - the XML structure's backing store): on no page - a click selects nothing (ST6)
+	kKFCHolderInternalStory,	// ...of an INTERNAL story (IStoryList's kNotUserAccessible - the XML structure's backing store): on no page - a click selects nothing (ST6)
+	kKFCHolderDocument		// a Document list's row (KFCDocumentSearch - docs/superpowers/specs/2026-11-06-kfc-windowless-documents-design.md W3): the document itself - no
+							// story, no item; its row hangs off the list's top, its click fronts its window (none opened), its Special Operations Show, Close, Save, Revert
 };
 
 /** WHAT A SPECIAL OPERATION IS GIVEN besides its rows (IKFCRuns::SpecialRows). x, y: Move - the horizontal and vertical
@@ -498,6 +500,11 @@ struct KFCStoryConditions
     underlines. KFC'S ALONE - never handed to InDesign. */
 enum { kKFCSpellingSearchMode = 109 };
 
+/** THE DOCUMENT KIND'S "SEARCH MODE" (the author, 11-06: "a Document tab on the search - to find the documents with no window" -
+    docs/superpowers/specs/2026-11-06-kfc-windowless-documents-design.md W3; KFCDocumentSearch.h): every open document, window or not, a row each. It asks
+    nothing (its Search: is All Documents alone). KFC'S ALONE - never handed to InDesign. */
+enum { kKFCDocumentSearchMode = 110 };
+
 /** WHAT THE SPELLING KIND ASKS (the face's - KFCKohakuTab, read by IKFCUIServices::SpellingTabConditions): its icons and its Search: - nothing else; it
     changes nothing (SP3 - the Warichu kind's shape). */
 struct KFCSpellingConditions
@@ -610,7 +617,7 @@ struct KFCTableConditions
 inline bool KFCIsKohakuQueryMode(int32 mode)
 {
 	return mode == kKFCQRCodeSearchMode || mode == kKFCTableSearchMode || mode == kKFCRubySearchMode || mode == kKFCKentenSearchMode || mode == kKFCWarichuSearchMode
-		|| mode == kKFCScriptLabelSearchMode || mode == kKFCStorySearchMode || mode == kKFCSpellingSearchMode;
+		|| mode == kKFCScriptLabelSearchMode || mode == kKFCStorySearchMode || mode == kKFCSpellingSearchMode || mode == kKFCDocumentSearchMode;
 }
 
 /** WHAT A SAVED QUERY OF THE KOHAKU+ TAB HOLDS: its kind (kKFCTableSearchMode ...) and what that kind asks. A query's scope is no part of it: it runs on what Search: says when it runs. */

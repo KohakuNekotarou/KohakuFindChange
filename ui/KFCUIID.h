@@ -597,6 +597,14 @@ DECLARE_PMID(kActionIDSpace, kKFCLabelRemoveKeyActionID, kKFCUIPrefix + 127)
 // Story Editor's window alone on a document with none). The UI band is spent (+ 125 ... + 127 its last; its gaps retired): the model band's ActionIDs
 // after the style items (+ 64 ... + 103) are free - + 120, away from them should the style items grow.
 DECLARE_PMID(kActionIDSpace, kKFCEditInStoryEditorActionID, kKFCPrefix + 120)
+// WINDOWLESS DOCUMENTS (2026-11-06 - docs/superpowers/specs/2026-11-06-kfc-windowless-documents-design.md): the book row's Open Without a Window toggle (W2 -
+// the author: "on the book row's right-click, when a book is searched"), and a Find: Document row's Special Operations Show, Close, Save and Revert (W3 - the
+// author: "Special Operations: Close", "Show, for a hidden document - grey for a shown one"). The model band's, after Edit in Story Editor's.
+DECLARE_PMID(kActionIDSpace, kKFCOpenWithoutWindowActionID, kKFCPrefix + 121)
+DECLARE_PMID(kActionIDSpace, kKFCDocShowActionID, kKFCPrefix + 122)
+DECLARE_PMID(kActionIDSpace, kKFCDocCloseActionID, kKFCPrefix + 123)
+DECLARE_PMID(kActionIDSpace, kKFCDocSaveActionID, kKFCPrefix + 124)
+DECLARE_PMID(kActionIDSpace, kKFCDocRevertActionID, kKFCPrefix + 125)
 
 
 // WidgetIDs:
@@ -785,6 +793,9 @@ DECLARE_PMID(kWidgetIDSpace, kKFCRubyListSaveWidgetID, kKFCPrefix + 80)
 DECLARE_PMID(kWidgetIDSpace, kKFCKohakuFindInKFCWidgetID, kKFCPrefix + 81)
 DECLARE_PMID(kWidgetIDSpace, kKFCKentenHowToWidgetID, kKFCPrefix + 82)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyListOtherRubyWidgetID, kKFCPrefix + 83)
+// The Document kind's Open Hidden... (2026-11-06 - W3: "open a document without a window, in that tab"), stacked over Find Next in the right column (the model band's
+// next free number after the Label dialogs' + 93 ... + 97).
+DECLARE_PMID(kWidgetIDSpace, kKFCDocumentOpenHiddenWidgetID, kKFCPrefix + 98)
 DECLARE_PMID(kWidgetIDSpace, kKFCRubyButtonsWidgetID, kKFCPrefix + 84)
 DECLARE_PMID(kWidgetIDSpace, kKFCKentenButtonsWidgetID, kKFCPrefix + 85)
 // THE KENTEN PART'S BOXES OF A CUSTOM MARK'S CHARACTER (2026-11-03 - the author: "a box of one character for what custom holds"; docs/superpowers/specs/2026-11-03-kfc-kenten-face-japanese-design.md C1):
@@ -893,6 +904,14 @@ DECLARE_PMID(kWidgetIDSpace, kKFCLabelNoteWidgetID, kKFCPrefix + 97)
 #define kKFCRemoveLabelMenuKey			kKFCStringPrefix "kKFCRemoveLabelMenuKey"			// "Remove Label"
 #define kKFCRunScriptMenuKey			kKFCStringPrefix "kKFCRunScriptMenuKey"				// "Run Script..." (2026-11-06 - KFCRowScript)
 #define kKFCEditInStoryEditorMenuKey	kKFCStringPrefix "kKFCEditInStoryEditorMenuKey"		// "Edit in Story Editor" (2026-11-06 - InDesign's own Edit menu's words; KFCRowScript)
+// Windowless documents (2026-11-06 - KFCDocumentOps): the book row's toggle, a Document row's four (File menu's words, Show ours) and the face's button.
+#define kKFCOpenWithoutWindowMenuKey	kKFCStringPrefix "kKFCOpenWithoutWindowMenuKey"		// "Open Without a Window"
+#define kKFCDocShowMenuKey				kKFCStringPrefix "kKFCDocShowMenuKey"				// "Show"
+#define kKFCDocCloseMenuKey				kKFCStringPrefix "kKFCDocCloseMenuKey"				// "Close"
+#define kKFCDocSaveMenuKey				kKFCStringPrefix "kKFCDocSaveMenuKey"				// "Save"
+#define kKFCDocumentRevertMenuKey			kKFCStringPrefix "kKFCDocumentRevertMenuKey"				// "Revert"
+#define kKFCDocumentOpenHiddenKey		kKFCStringPrefix "kKFCDocumentOpenHiddenKey"		// "Open Hidden..."
+#define kKFCDocumentOpenHiddenTitleKey	kKFCStringPrefix "kKFCDocumentOpenHiddenTitleKey"	// "Open Hidden" (its file dialog's title)
 // ...and Special Operations > Label's submenu, its three items and their dialogs' words (2026-11-06 - KFCLabelDialogs; measured against every other key -
 // key_collisions.py).
 #define kKFCLabelSubmenuKey				kKFCStringPrefix "kKFCLabelSubmenuKey"				// "Label"
@@ -1073,6 +1092,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCLabelNoteWidgetID, kKFCPrefix + 97)
 #define kKFCKohakuTabStoryKindKey		kKFCStringPrefix "kKFCKohakuTabStoryKindKey"
 // The Spelling kind (docs/superpowers/specs/2026-11-06-kfc-label-spelling-runscript-design.md SP1): Find:'s entry between Script Label and Story in every language - the words Dynamic Spelling underlines.
 #define kKFCKohakuTabSpellingKindKey	kKFCStringPrefix "kKFCKohakuTabSpellingKindKey"
+// The Document kind (docs/superpowers/specs/2026-11-06-kfc-windowless-documents-design.md W3): Find:'s first entry in every language - every open document, window or not.
+#define kKFCKohakuTabDocumentsKindKey	kKFCStringPrefix "kKFCKohakuTabDocumentsKindKey"
 #define kKFCLabelTabKeyKey				kKFCStringPrefix "kKFCLabelTabKeyKey"
 #define kKFCLabelTabFindKey				kKFCStringPrefix "kKFCLabelTabFindKey"
 #define kKFCLabelTabChangeKey			kKFCStringPrefix "kKFCLabelTabChangeKey"
@@ -1261,6 +1282,13 @@ DECLARE_PMID(kWidgetIDSpace, kKFCLabelNoteWidgetID, kKFCPrefix + 97)
 #define kKFCRemoveLabelMenuItemPosition			8.5		// Remove Label (a script label list's rows - an object row's after Move to Active Layer, before Show; a text row's after Create Outlines, before Tate-chu-yoko)
 #define kKFCRunScriptMenuItemPosition			8.7		// Run Script... (2026-11-06 - every row's: after Remove Label, before Show / Tate-chu-yoko)
 #define kKFCEditInStoryEditorMenuItemPosition	4.0		// Edit in Story Editor (2026-11-06 - a Story row's text menu: after Create Outlines' 3.0, before Label's 6.5 - the abc order)
+// A Document row's four (2026-11-06 - W3), in the abc order among the text menu's: Close after Clear Overrides, before Create Outlines; Revert after Remove Label, before
+// Run Script...; Save and Show after it, before Tate-chu-yoko.
+#define kKFCDocCloseMenuItemPosition			2.5
+#define kKFCDocRevertMenuItemPosition			8.6
+#define kKFCDocSaveMenuItemPosition				8.8
+#define kKFCDocShowMenuItemPosition				8.9
+#define kKFCOpenWithoutWindowMenuItemPosition	12.0	// Open Without a Window (2026-11-06 - W2: the book row's menu, after Select All Rows' 11.0)
 #define kKFCLabelSubmenuPosition				6.5		// Label > (2026-11-06 - an object row's after Hide, before Lock; a text row's after Create Outlines, before Remove Label)
 #define kKFCLabelAddKeyMenuItemPosition			1.0		// ...its Add Key...
 #define kKFCLabelEditValueMenuItemPosition		2.0		// ...Edit Value...

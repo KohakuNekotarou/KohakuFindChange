@@ -83,6 +83,7 @@
 #include "KFCBookPanelLookup.h"		// BringBookTabForward - a book row's tab
 #include "KFCResultTree.h"			// RefreshRows / ShowStatus - telling the panel what was found here
 #include "KFCDiag.h"				// KFC_DIAG_LOG / KFC_DIAG_FAULT - test builds only
+#include "IKFCUIServices.h"			// CountDocWindows - a document's layout windows (W2, W3)
 #include <chrono>					// how soon after a click Search: changed (KeepSearchScopeAfterClick)
 #include <vector>
 
@@ -92,6 +93,7 @@ namespace
 	// leaves the desk clean, showing only the chapter a jump landed in). The sweep it gates
 	// (CloseDisplayedDocsIfClean) is stateless, so flipping it mid-session is safe.
 	bool gHidePrevChapterOn = true;
+	bool gOpenWithoutWindowOn = false;	// the book row's Open Without a Window (W2) - IsOpenWithoutWindowOn
 
 	/** May the "close everything else" sweep run for the results now on the panel?
 
@@ -639,6 +641,65 @@ namespace
 		return false;
 	}
 
+	// A DOCUMENT'S LAYOUT WINDOWS (IKFCUIServices::CountDocWindows - this half's own: a Story Editor's window shows no layout).
+	int32 LayoutWindowsOf(const UIDRef& docRef)
+	{
+		int32 layout = 0, other = 0;
+		InterfacePtr<IKFCUIServices> ui(KFCQueryUIServices());
+		if (ui != nil)
+			ui->CountDocWindows(docRef, layout, other);
+		return layout;
+	}
+
+	PMString DocNameOf(const UIDRef& docRef)
+	{
+		PMString name;
+		InterfacePtr<IDocument> doc(docRef, UseDefaultIID());
+		if (doc != nil)
+			doc->GetName(name);
+		name.SetTranslatable(kFalse);
+		return name;
+	}
+
+	// OPEN WITHOUT A WINDOW (W2): a book list's row, the toggle on, its chapter - reached, closed or not - with no layout window. Then the chapter is the person's
+	// (not handed back, never closed by a sweep - no window to sweep), nothing is selected and the status line says why. True = landed so; the caller stops.
+	bool LandWithoutWindow(const UIDRef& docRef)
+	{
+		if (!gOpenWithoutWindowOn || !KFCResults()->IsFromBook() || docRef.GetDataBase() == nil || LayoutWindowsOf(docRef) > 0)
+			return false;
+		KFCChapters()->ForgetHeldDoc(docRef);
+		PMString said(DocNameOf(docRef));
+		said.Append(" is open without a window (Open Without a Window) - nothing is selected.");
+		said.SetTranslatable(kFalse);
+		KFCResultTree::ShowStatus(said);
+		KFC_DIAG_LOG("NOWINDOW landed %s", said.GetUTF8String().c_str());
+		return true;
+	}
+
+	// A DOCUMENT LIST'S ROW (W3): its document in front when it has a layout window; with none, no window opened - the row says how to show it.
+	void LandOnDocumentRow(int32 chapterIdx)
+	{
+		const UIDRef docRef = KFCRuns()->ChapterDocNow(chapterIdx);
+		if (docRef.GetDataBase() == nil)
+		{
+			KFCResultTree::ShowStatus("That document is no longer open.");
+			return;
+		}
+		if (LayoutWindowsOf(docRef) == 0)
+		{
+			PMString said(DocNameOf(docRef));
+			said.Append(" has no window - Special Operations > Show opens one.");
+			said.SetTranslatable(kFalse);
+			KFCResultTree::ShowStatus(said);
+			KFC_DIAG_LOG("DOCROW landed nowindow %s", said.GetUTF8String().c_str());
+			return;
+		}
+		// Its window in front - no Hide Previous Chapter sweep: a document list is no landing in a chapter's text (EnsureDocFrontmost, the jump's own door).
+		if (!EnsureDocFrontmost(docRef))
+			KFCResultTree::ShowStatus("Cannot bring that document's window to the front.");
+		KFC_DIAG_LOG("DOCROW landed front");
+	}
+
 } // anonymous namespace
 
 //----------------------------------------------------------------------------------------
@@ -653,6 +714,21 @@ bool KFCJump::IsHidePreviousChapterOn()
 void KFCJump::ToggleHidePreviousChapter()
 {
 	gHidePrevChapterOn = !gHidePrevChapterOn;
+}
+
+bool KFCJump::IsOpenWithoutWindowOn()
+{
+	return gOpenWithoutWindowOn;
+}
+
+void KFCJump::ToggleOpenWithoutWindow()
+{
+	gOpenWithoutWindowOn = !gOpenWithoutWindowOn;
+}
+
+void KFCJump::SetOpenWithoutWindow(bool on)
+{
+	gOpenWithoutWindowOn = on;
 }
 
 void KFCJump::SetHidePreviousChapter(bool on)
@@ -1271,6 +1347,9 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx, NotSelected& outWhy)
 	// it back windowless by file - see EnsureChapterReachable, which ShowChapter shares.
 	if (!EnsureChapterReachable(chapterIdx, docRef, file))
 		return false;	// it has already said why through the status line
+	// OPEN WITHOUT A WINDOW (W2 - the book row's toggle): no window given, nothing selected - said.
+	if (LandWithoutWindow(docRef))
+		return false;
 
 	IDataBase* db = docRef.GetDataBase();
 	if (db == nil)
@@ -1436,6 +1515,8 @@ void ShowChapter(int32 chapterIdx)
 		return;
 
 	if (!EnsureChapterReachable(chapterIdx, docRef, file))
+		return;
+	if (LandWithoutWindow(docRef))		// (OPEN WITHOUT A WINDOW - W2: a chapter row's the same)
 		return;
 
 	// The guard the file's header promises for everything after the database is in hand - opening a
@@ -1612,6 +1693,8 @@ bool JumpToObject(int32 chapterIdx, int32 hitIdx, UID item)
 	TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
 	if (!KFCResults()->GetHitLocation(chapterIdx, hitIdx, docRef, file, story, start, end)
 		|| !EnsureChapterReachable(chapterIdx, docRef, file))
+		return false;
+	if (LandWithoutWindow(docRef))		// (OPEN WITHOUT A WINDOW - W2)
 		return false;
 	IDataBase* const db = docRef.GetDataBase();
 	if (db == nil)
@@ -1844,7 +1927,13 @@ void KFCJump::ActivateNode(int32 chapterIdx, int32 hitIdx)
 	// A GREP row landed on: what its Replace would write, on the message area (KFCResultTree::ShowRowPreview).
 	// Any other landing - a jump refused (its reason stands), a branch row - takes a previous row's preview
 	// away, so it never stands beside a row it does not belong to.
-	if (hitIdx >= 0)
+	if (hitIdx >= 0 && KFCResults()->GetHitHolderKind(chapterIdx, hitIdx) == kKFCHolderDocument)
+	{
+		// A DOCUMENT LIST'S ROW (W3): its document's window in front - none opened.
+		KFCResultTree::DropRowPreview();
+		LandOnDocumentRow(chapterIdx);
+	}
+	else if (hitIdx >= 0)
 	{
 		const UID item = KFCResults()->GetHitItem(chapterIdx, hitIdx);
 		NotSelected why = kNotSelectedQuietly;

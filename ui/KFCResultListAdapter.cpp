@@ -53,6 +53,59 @@ NodeID_rv LiveTop()
 		return KFCResultNodeID::CreateLiveTier();
 	return KFCResultNodeID::CreateRoot();
 }
+
+// A DOCUMENT LIST'S ROWS (2026-11-06 - docs/superpowers/specs/2026-11-06-kfc-windowless-documents-design.md W3): a row a document, off the list's top - or the
+// book row - with no document row above it to say its name again: the shown chapters in their order, each one's row while it is shown (Clear from Results
+// takes it off - GetObjectRowHit counts it out).
+int32 DocumentRowCount()
+{
+	int32 n = 0;
+	const int32 chapters = KFCResults()->GetDisplayChapterCount();
+	for (int32 k = 0; k < chapters; ++k)
+	{
+		const int32 chapter = KFCResults()->GetShownChapter(k);
+		if (chapter >= 0 && KFCResults()->GetObjectRowHit(chapter, 0) >= 0)
+			++n;
+	}
+	return n;
+}
+
+bool DocumentRow(int32 nth, int32& outChapter, int32& outHit)
+{
+	const int32 chapters = KFCResults()->GetDisplayChapterCount();
+	int32 n = 0;
+	for (int32 k = 0; k < chapters; ++k)
+	{
+		const int32 chapter = KFCResults()->GetShownChapter(k);
+		const int32 hit = (chapter >= 0) ? KFCResults()->GetObjectRowHit(chapter, 0) : -1;
+		if (hit < 0)
+			continue;
+		if (n == nth)
+		{
+			outChapter = chapter;
+			outHit = hit;
+			return true;
+		}
+		++n;
+	}
+	return false;
+}
+
+int32 DocumentRowPos(int32 chapter)
+{
+	const int32 chapters = KFCResults()->GetDisplayChapterCount();
+	int32 n = 0;
+	for (int32 k = 0; k < chapters; ++k)
+	{
+		const int32 shown = KFCResults()->GetShownChapter(k);
+		if (shown < 0 || KFCResults()->GetObjectRowHit(shown, 0) < 0)
+			continue;
+		if (shown == chapter)
+			return n;
+		++n;
+	}
+	return -1;
+}
 }	// anonymous namespace
 
 /** The hierarchy over KFCResultModel: hidden root -> the BOOK row when the results came from a book
@@ -88,6 +141,9 @@ public:
 		}
 		if (nodeID->IsHitRow())
 		{
+			// A DOCUMENT LIST'S ROW hangs off the list's top, or the book row (W3 - DocumentRow).
+			if (KFCResults()->ListIsDocuments())
+				return KFCResults()->IsFromBook() ? KFCResultNodeID::CreateBook() : LiveTop();
 			// A hit hangs off its story ("font") row - and off the document row when it names no group: an
 			// object row, which has no story (KFCResultModel's BuildFontGroups).
 			const int32 font = nodeID->GetFont();
@@ -173,6 +229,9 @@ public:
 			return KFCResultHistory::KeptChildPos(childID->GetTier(), childID->GetKeptRow());
 		if (childID->IsHitRow())
 		{
+			// A DOCUMENT LIST'S ROW: its place among the list's top's rows (W3 - DocumentRow's reverse).
+			if (KFCResults()->ListIsDocuments())
+				return DocumentRowPos(childID->GetChapter());
 			// Its place under its story ("font") row - an object row's among its document's rows (GetNthChild's reverse); -1
 			// for a row taken off the list (Clear from Results), which is no row's child now.
 			return KFCResults()->GetHitFontGroupPos(childID->GetChapter(), childID->GetHit());
@@ -203,9 +262,9 @@ int32 KFCResultTree::LiveRowCount(const NodeID& node)
 	// The list's top - the root, or the live tier's row: the book row alone while the results came from a book, the
 	// documents shown otherwise.
 	if (nodeID->IsRoot() || nodeID->IsTierRow())
-		return KFCResults()->IsFromBook() ? 1 : KFCResults()->GetDisplayChapterCount();
+		return KFCResults()->IsFromBook() ? 1 : (KFCResults()->ListIsDocuments() ? DocumentRowCount() : KFCResults()->GetDisplayChapterCount());
 	if (nodeID->IsBookRow())
-		return KFCResults()->GetDisplayChapterCount();
+		return KFCResults()->ListIsDocuments() ? DocumentRowCount() : KFCResults()->GetDisplayChapterCount();	// (a document list's rows - W3)
 	if (nodeID->IsFontRow())
 		return KFCResults()->GetDisplayFontHitCount(nodeID->GetChapter(), nodeID->GetFont());
 
@@ -228,6 +287,10 @@ NodeID_rv KFCResultTree::LiveRow(const NodeID& node, int32 nth)
 		// the documents hang off the top directly, exactly as they always have.
 		if (KFCResults()->IsFromBook())
 			return (nth == 0) ? KFCResultNodeID::CreateBook() : kInvalidNodeID;
+		// A DOCUMENT LIST: its rows themselves (W3 - DocumentRow).
+		int32 docChapter = -1, docHit = -1;
+		if (KFCResults()->ListIsDocuments())
+			return DocumentRow(nth, docChapter, docHit) ? KFCResultNodeID::Create(docChapter, docHit) : kInvalidNodeID;
 		// The nth SHOWN chapter, which is chapter nth unless a closed document's chapter was emptied in
 		// place before it (All Documents - KFCResultModel::CloseChapter).
 		const int32 chapter = KFCResults()->GetShownChapter(nth);
@@ -235,6 +298,9 @@ NodeID_rv KFCResultTree::LiveRow(const NodeID& node, int32 nth)
 	}
 	if (nodeID->IsBookRow())
 	{
+		int32 docChapter = -1, docHit = -1;
+		if (KFCResults()->ListIsDocuments())
+			return DocumentRow(nth, docChapter, docHit) ? KFCResultNodeID::Create(docChapter, docHit) : kInvalidNodeID;
 		const int32 chapter = KFCResults()->GetShownChapter(nth);
 		return (chapter >= 0) ? KFCResultNodeID::Create(chapter) : kInvalidNodeID;
 	}

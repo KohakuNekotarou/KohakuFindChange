@@ -785,6 +785,21 @@ void KFCResultTree::RefreshRows()
 	if (KFCResults()->IsFromBook())
 		treeMgr->NodeChanged(KFCResultNodeID::CreateBook(), kFalse /*children handled below*/);
 
+	// A DOCUMENT LIST'S ROWS (2026-11-06 - W3) hang off the list's top, no document row above them: each one told itself (the re-inspection of 11-06 - the
+	// loop below names document rows, which such a list does not draw).
+	if (KFCResults()->ListIsDocuments())
+	{
+		const int32 shown = KFCResults()->GetDisplayChapterCount();
+		for (int32 n = 0; n < shown; ++n)
+		{
+			const int32 c = KFCResults()->GetShownChapter(n);
+			const int32 hit = (c >= 0) ? KFCResults()->GetObjectRowHit(c, 0) : -1;
+			if (hit >= 0)
+				treeMgr->NodeChanged(KFCResultNodeID::Create(c, hit), kFalse);
+		}
+		return;
+	}
+
 	// The chapter AND each of its story rows, because childrenChangedAlso reaches a node's children -
 	// and under the story level the hit rows are GRANDchildren. One call per story row: a handful for most
 	// documents, one per hit for a document of one-hit stories (a frame per entry) - still one per row, never
@@ -812,6 +827,15 @@ void KFCResultTree::BeforeChapterRowGoes(int32 chapterIdx)
 	// A row the tree does not show is nothing to take out.
 	if (KFCResults()->GetShownChapterPos(chapterIdx) < 0)
 		return;
+	// A DOCUMENT LIST'S ROW (2026-11-06 - W3) is the chapter's one hit row, off the list's top - that is the node the tree holds (the re-inspection of 11-06:
+	// the document row named here is none of its, and a closed document's row stood in the tree after its chapter was emptied).
+	if (KFCResults()->ListIsDocuments())
+	{
+		const int32 hit = KFCResults()->GetObjectRowHit(chapterIdx, 0);
+		if (hit >= 0)
+			treeMgr->BeforeNodeDeleted(KFCResultNodeID::Create(chapterIdx, hit));
+		return;
+	}
 	treeMgr->BeforeNodeDeleted(KFCResultNodeID::Create(chapterIdx));
 }
 

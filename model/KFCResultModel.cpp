@@ -205,7 +205,8 @@ static bool IsStoryRow(const KFCResultModel::Hit& hit)
 // counted out (GetObjectRowHit).
 static bool HangsOffItsDocument(const KFCResultModel::Hit& hit)
 {
-	return hit.itemUID != kInvalidUID || IsStoryRow(hit);
+	// (A Document list's row - 2026-11-06, W3 - is in no story group either: it is the document. The UI half draws it off the list's top - KFCResultTree.)
+	return hit.itemUID != kInvalidUID || IsStoryRow(hit) || hit.holderKind == kKFCHolderDocument;
 }
 
 namespace
@@ -582,6 +583,11 @@ bool KFCResultModel::ListIsTableRows()
 	return gHeader.searchMode == static_cast<int32>(kKFCTableRowsSearchMode);
 }
 
+bool KFCResultModel::ListIsDocuments()
+{
+	return gHeader.searchMode == static_cast<int32>(kKFCDocumentSearchMode);
+}
+
 bool KFCResultModel::ListIsSpelling()
 {
 	return gHeader.searchMode == static_cast<int32>(kKFCSpellingSearchMode);
@@ -594,7 +600,7 @@ bool KFCResultModel::ListHasOwnChangeTab()
 
 bool KFCResultModel::ListIsOwnKind()
 {
-	return ListHasOwnChangeTab() || ListIsWarichu() || ListIsScriptLabels() || ListIsStory() || ListIsSpelling();
+	return ListHasOwnChangeTab() || ListIsWarichu() || ListIsScriptLabels() || ListIsStory() || ListIsSpelling() || ListIsDocuments();
 }
 
 bool KFCResultModel::ListDrawsTwoLines()
@@ -1600,6 +1606,10 @@ void KFCResultModel::BuildHitLocator(Hit& hit)
 	{
 		// AN INTERNAL STORY'S ROW (a Story list's - docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md ST5): no frame to be set in, which is no overset - it is InDesign's own.
 		hit.locator.Append("internal");
+	}
+	else if (hit.holderKind == kKFCHolderDocument)
+	{
+		// A DOCUMENT LIST'S ROW (W3): the document itself - no page to name, nothing overset. Its words say what it is (KFCDocumentSearch::RowOf).
 	}
 	else if (hit.pageString.IsEmpty())
 	{

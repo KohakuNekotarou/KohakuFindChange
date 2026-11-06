@@ -574,6 +574,7 @@ void KFCSavePanelState()
 	pairs.push_back(KFCJsonPair("minimizableFindChange", KFCBoolLiteral(KFCGetFindChangeMinimizable())));
 	pairs.push_back(KFCJsonPair("appBarSearchEnter",     KFCBoolLiteral(KFCGetAppBarSearchEnter())));
 	pairs.push_back(KFCJsonPair("hidePreviousChapter",   KFCBoolLiteral(KFCJump::IsHidePreviousChapterOn())));
+	pairs.push_back(KFCJsonPair("openWithoutWindow",     KFCBoolLiteral(KFCJump::IsOpenWithoutWindowOn())));		// (the book row's toggle - 2026-11-06, W2)
 	// Find/Change Selected Documents (Book): kept (the author's call - unlike Book Scope).
 	{
 		InterfacePtr<IKFCChapters> chapters(KFCChapters());
@@ -661,6 +662,8 @@ void KFCLoadPanelStateIfPresent()
 	// closing documents in document scope. The menu greys the toggle out there for the same reason.
 	// (KFCJump speaks bool, so the bool reader.)
 	KFCJump::SetHidePreviousChapter(KFCPanelStateReadBool(text, "hidePreviousChapter", KFCJump::IsHidePreviousChapterOn()));
+	// The book row's Open Without a Window (2026-11-06, W2): a book list's landing alone reads it - restored ON, it opens no window until a book is searched.
+	KFCJump::SetOpenWithoutWindow(KFCPanelStateReadBool(text, "openWithoutWindow", KFCJump::IsOpenWithoutWindowOn()));
 
 	// Find/Change Selected Documents (Book): the flag alone. It narrows only a Book Scope run, and Book
 	// Scope is not kept (above), so a restored ON changes nothing until Book Scope is turned on - the menu shows it

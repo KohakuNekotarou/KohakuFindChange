@@ -17,6 +17,7 @@
 #include "IDataBase.h"
 #include "IDocumentUIUtils.h"	// FindPresentationForDocument (has-a-window test), FindPresentationsForDocument
 #include "IDocumentPresentation.h"	// ...the windows it lists - a background document's every layout window
+#include "IPresentationList.h"	// CountDocWindows - a document's windows, every one (W3)
 #include "IPanelControlData.h"	// FindWidget - a window's layout pane(s), by WidgetID
 #include "IOpenLayoutCmdData.h"	// GetResultingPresentation - did the window actually appear?
 #include "IWindow.h"			// the window kOpenLayoutCmdBoss is supposed to have produced
@@ -617,6 +618,34 @@ public:
 	virtual bool SpellingTabConditions(KFCSpellingConditions& outConditions)
 	{
 		return KFCKohakuTab::IsSpellingCurrent(outConditions);
+	}
+
+	virtual bool DocumentTabCurrent()
+	{
+		return KFCKohakuTab::IsDocumentCurrent();
+	}
+
+	virtual void CountDocWindows(const UIDRef& docRef, int32& outLayout, int32& outOther)
+	{
+		// EVERY PRESENTATION OF THE DOCUMENT'S LIST, a layout window the one holding a layout view (KIDMCP's measured way - KIDMCPUIUiReader::
+		// QueryLayoutWindowInOrder); the others - a Story Editor's - counted apart (W3: a Document row's words).
+		outLayout = 0;
+		outOther = 0;
+		IDataBase* const db = docRef.GetDataBase();
+		if (db == nil)
+			return;
+		InterfacePtr<IPresentationList> presentations(db, db->GetRootUID(), UseDefaultIID());
+		if (presentations == nil)
+			return;
+		for (int32 i = 0; i < presentations->Length(); ++i)
+		{
+			IDocumentPresentation* const presentation = presentations->At(i);
+			InterfacePtr<IPanelControlData> window(presentation, UseDefaultIID());
+			if (window != nil && window->FindWidget(kLayoutWidgetID) != nil)
+				++outLayout;
+			else if (presentation != nil)
+				++outOther;
+		}
 	}
 };
 
