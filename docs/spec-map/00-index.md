@@ -97,6 +97,8 @@ git log -p -- docs/spec-map/        # コミット済みの書き込み
 | 15 | [アプリケーションバーの検索欄（Link the Application Bar's Search Field to This Panel）](15-app-bar.md)（欄に映すもの・書き戻し・Return で検索・テキストと正規表現だけ・見えないとき） | `BAR-` | 17 | ✅ |
 | 16 | [保存したクエリを順に実行（Run Saved Queries...）](16-queries.md)（入口・モードレスのダイアログ・左の一覧・右の並びとボタン・並びのファイル・Runs on: の行・Run・Find（1本ずつ検索して段に積む）） | `QRY-` | 19・18 | ✅（2026-10-07） |
 | 17 | [オブジェクトの検索（Object タブ）](17-objects.md)（4つの機能・本体の照合・範囲・歩き方・選択を戻す・行の形・クリック・行の置換と断る順・Undo・指紋・Change All in Book・クエリの実行・版・文書の中の Cancel・まとめて選ぶ・まとめて置換する） | `OBJ-` | ―（未記入） | ✅（2026-10-10・1.4.0／2026-10-11・10-13 追記） |
+| 28 | [波線の語を一覧にする（Kohaku+ タブの Find: Spelling）](28-spelling.md)（面・探す・行・書かない・面のボタンとクエリ） | `SPELL-` | — | ⬜（2026-11-06・試験を書いて実機待ち） |
+| 27 | [行の物のスクリプトラベルのキーを付ける・書き換える・外す（Special Operations ▸ Label）](27-label.md)（メニュー・窓・書き込み） | `LBL-` | — | ⬜（2026-11-06・試験を書いて実機待ち） |
 | 26 | [行にスクリプトを実行する（Special Operations ▸ Run Script...・変数 kfcResult）](26-run-script.md)（メニューと窓・kfcResult・走らせ方） | `RUN-` | — | ✅（2026-11-06・rs-cases 12/12） |
 | 25 | [ストーリーを一覧にする（Kohaku+ タブの Find: Story・内部ストーリーも）](25-story.md)（面・探す・行・クリック・書かない・クエリ） | `ST-` | — | ✅（2026-11-06・st-cases 30/30） |
 | 24 | [スクリプトラベルを一覧にする・書き換える（Kohaku+ タブの Find: Script Label）](24-script-label.md)（面・探す・行・Replace・面のボタン・クエリ） | `SL-` | — | ⬜（2026-11-04・一覧は実機 14/14・ほかは試験を書いて実機待ち） |

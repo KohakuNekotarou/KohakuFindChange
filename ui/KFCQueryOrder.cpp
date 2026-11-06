@@ -60,7 +60,8 @@ namespace
 	{
 		const int32 modes[] = { IFindChangeOptions::kTextSearch, IFindChangeOptions::kGrepSearch,
 			IFindChangeOptions::kGlyphSearch, IFindChangeOptions::kObjectSearch, IFindChangeOptions::kTransliterateSearch,
-			kKFCQRCodeSearchMode, kKFCTableSearchMode, kKFCRubySearchMode, kKFCKentenSearchMode, kKFCWarichuSearchMode, kKFCScriptLabelSearchMode, kKFCStorySearchMode };
+			kKFCQRCodeSearchMode, kKFCTableSearchMode, kKFCRubySearchMode, kKFCKentenSearchMode, kKFCWarichuSearchMode, kKFCScriptLabelSearchMode, kKFCStorySearchMode,
+			kKFCSpellingSearchMode };
 		for (size_t i = 0; i < sizeof(modes) / sizeof(modes[0]); ++i)
 			if (kind == KFCRuns()->QueryKindName(modes[i]))
 				return modes[i];

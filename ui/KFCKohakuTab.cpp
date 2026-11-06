@@ -86,8 +86,9 @@ const int32 kKindTable = 1;
 const int32 kKindRuby = 2;
 const int32 kKindKenten = 3;
 const int32 kKindWarichu = 4;		// (docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md A1 - a Japanese InDesign's, as Ruby and Kenten)
-const int32 kKindScriptLabel = 5;	// (docs/superpowers/specs/2026-11-04-kfc-script-label-design.md S1 - every language's. A kind's number is not its entry on Find: - Find:'s order is the author's of 11-04, kKindsInOrder: EntryOfKind)
-const int32 kKindStory = 6;			// (docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md ST1 - every language's, Find:'s last)
+const int32 kKindScriptLabel = 5;	// (docs/superpowers/specs/2026-11-04-kfc-script-label-design.md S1 - every language's. A kind's number is not its entry on Find: - Find:'s order is the author's of 11-06, kKindsInOrder: EntryOfKind)
+const int32 kKindStory = 6;			// (docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md ST1 - every language's; its place on Find: kKindsInOrder's)
+const int32 kKindSpelling = 7;		// (docs/superpowers/specs/2026-11-06-kfc-label-spelling-runscript-design.md SP1 - every language's: the words Dynamic Spelling underlines)
 
 // Search:'s entries: the .fr's two for every kind, the three after them for what stands in a story's text (ShowScopeEntries).
 const IWalkerScopeFactoryUtils::WalkScopeType kScopeOfEntry[] =
@@ -110,13 +111,14 @@ IPMUnknown* gShownFace = nil;	// the face, while shown - from its AutoAttach to 
 int32 gKind = kKindQRCode;	// its Find: - QR Code at launch, the tab InDesign's dialog first had
 // WHAT EACH KIND LAST SAID ON THE FACE'S TWO LINES (docs/superpowers/specs/2026-11-02-kfc-kohaku-face-buttons-design.md L4 - the author, 11-02: "the same place as the other messages"): the first line, what a button or the list
 // said; the second, why what was found could not be selected. One pair of lines for every kind - shown again as its kind is.
-const int32 kKindCount = 7;
+const int32 kKindCount = 8;
 PMString gSaid[kKindCount][2];
 int32 gScope = IWalkerScopeFactoryUtils::kDocumentScope;	// its Search: - Document at launch
 KFCTableConditions gTable;	// what the Table part asks, kept from its widgets (its scope is gScope)
 KFCRubyConditions gRuby;	// what the Ruby part asks
 KFCKentenConditions gKenten;	// what the Kenten part asks
 KFCWarichuConditions gWarichu;	// what the Warichu kind asks: its icons alone
+KFCSpellingConditions gSpelling;	// what the Spelling kind asks: its icons alone, as Warichu's (SP3)
 KFCScriptLabelConditions gLabel;	// what the Script Label part asks, kept from its widgets (its scope is gScope - All Documents or Document)
 // MATCH:'S ENTRIES, in KFCUI.fr's order (the author, 11-04: "these three chosen in a list?", "that list above Find"): how Find Label: is read. gLabel keeps the entry as whole
 // and grep, as a query saves them (KFCKohakuQuery - one of the two at most).
@@ -190,6 +192,7 @@ void TakeTestReset()
 		gRuby = KFCRubyConditions();
 		gKenten = KFCKentenConditions();
 		gWarichu = KFCWarichuConditions();
+		gSpelling = KFCSpellingConditions();
 		gLabel = KFCScriptLabelConditions();
 		BoxesFromKept();
 		for (int32 k = 0; k < kKindCount; ++k)
@@ -371,7 +374,8 @@ bool LabelSelectionAsLeft()
 int32 TextModeOfKind()
 {
 	return (gKind == kKindKenten) ? static_cast<int32>(kKFCKentenSearchMode) : (gKind == kKindWarichu) ? static_cast<int32>(kKFCWarichuSearchMode)
-		: (gKind == kKindStory) ? static_cast<int32>(kKFCStorySearchMode) : static_cast<int32>(kKFCRubySearchMode);
+		: (gKind == kKindStory) ? static_cast<int32>(kKFCStorySearchMode) : (gKind == kKindSpelling) ? static_cast<int32>(kKFCSpellingSearchMode)
+		: static_cast<int32>(kKFCRubySearchMode);
 }
 
 // DOES THE KIND'S CHANGE SIDE ASK ANYTHING (B5)? Table: a style, or Clear Overrides. Ruby: nothing with Find Only (11-03); with Text Without Ruby a reading in a Change Ruby To box; with the rest always - no reading
@@ -403,7 +407,7 @@ bool ChangeSideAsks()
 // Change and Change/Find are for what Find Next found, while it is selected and has not been written; all of them want something on the Change side. Grey otherwise, as the Text tab's after the selection moves or a Change.
 void ShowFaceButtons(IPanelControlData* panel)
 {
-	if (panel == nil || gKind == kKindQRCode || gKind == kKindWarichu || gKind == kKindStory)		// (no Change buttons on them: they change nothing)
+	if (panel == nil || gKind == kKindQRCode || gKind == kKindWarichu || gKind == kKindStory || gKind == kKindSpelling)		// (no Change buttons on them: they change nothing)
 		return;
 	if (gKind == kKindScriptLabel)
 		ShowFoundLabel(panel);		// (the box of the found label - every press and every field's change comes here, and a selection's move: the label as it reads now)
@@ -1718,13 +1722,14 @@ bool JapaneseKinds()
 	return !asAnother && LocaleSetting::GetLocale().GetUserInterfaceId() == k_jaJP;
 }
 
-// FIND:'S ENTRIES IN ORDER (the author, 11-04: "Find in the order Label, QR, Table - then Kenten, Ruby, Wari"): Script Label, QR Code and Table - every language's - then Kenten, Ruby and Warichu, a
-// Japanese InDesign's alone - and Story LAST in either (2026-11-06 - docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md ST1: appended, so the author's order and every entry's place stand as
-// they were). An entry is its place here; a kind keeps its number (kKind* - the face's own arrays are counted by it): EntryOfKind and KindOfEntry go between them. -1 = none (a kind the list there
-// does not hold, or an entry past it).
-const int32 kKindsInOrder[kKindCount] = { kKindScriptLabel, kKindQRCode, kKindTable, kKindKenten, kKindRuby, kKindWarichu, kKindStory };
-const int32 kEntriesForEveryLanguage = 4;
-const int32 kKindsInOrderForEveryLanguage[kEntriesForEveryLanguage] = { kKindScriptLabel, kKindQRCode, kKindTable, kKindStory };
+// FIND:'S ENTRIES IN ORDER (the author, 11-06: "QR, ScriptLabel, Story, Table, in this order" - docs/superpowers/specs/2026-11-06-kfc-label-spelling-runscript-design.md FO1; abc order):
+// QR Code, Script Label, Spelling, Story and Table - every language's, at the same places in each (Spelling, 11-06, at its abc place - SP1) - then Kenten, Ruby and Warichu, a Japanese InDesign's
+// alone (their order of 11-04 kept, abc too).
+// An entry is its place here; a kind keeps its number (kKind* - the face's own arrays are counted by it, and a saved query names its kind by its word): EntryOfKind and KindOfEntry go between
+// them. -1 = none (a kind the list there does not hold, or an entry past it).
+const int32 kKindsInOrder[kKindCount] = { kKindQRCode, kKindScriptLabel, kKindSpelling, kKindStory, kKindTable, kKindKenten, kKindRuby, kKindWarichu };
+const int32 kEntriesForEveryLanguage = 5;
+const int32 kKindsInOrderForEveryLanguage[kEntriesForEveryLanguage] = { kKindQRCode, kKindScriptLabel, kKindSpelling, kKindStory, kKindTable };
 
 int32 EntriesHere()
 {
@@ -1763,6 +1768,7 @@ const char* KindKey(int32 kind)
 		case kKindKenten:		return kKFCKohakuTabKentenKey;
 		case kKindRuby:			return kKFCKohakuTabRubyKey;
 		case kKindStory:		return kKFCKohakuTabStoryKindKey;
+		case kKindSpelling:		return kKFCKohakuTabSpellingKindKey;
 		default:				return kKFCKohakuTabWarichuKindKey;
 	}
 }
@@ -1797,7 +1803,7 @@ void ShowKindEntries(IPMUnknown* face)
 const char* KindWord()
 {
 	return (gKind == kKindTable) ? "TBLTAB" : (gKind == kKindRuby) ? "RUBYTAB" : (gKind == kKindKenten) ? "KENTAB" : (gKind == kKindWarichu) ? "WARITAB"
-		: (gKind == kKindScriptLabel) ? "LABELTAB" : (gKind == kKindStory) ? "STORYTAB" : "QRTAB";
+		: (gKind == kKindScriptLabel) ? "LABELTAB" : (gKind == kKindStory) ? "STORYTAB" : (gKind == kKindSpelling) ? "SPELLTAB" : "QRTAB";
 }
 
 // THE KINDS WHOSE SEARCH: IS ALL DOCUMENTS OR DOCUMENT (QR Code's two): a QR code's frame stands in no story's text, a label is no story's text either (S2), and a story is the list's unit itself (ST2).
@@ -1910,22 +1916,22 @@ bool IsSwitchIcon(const WidgetID& widget)
 	return false;
 }
 
-// The kind's own icons (Ruby's, Kenten's, Warichu's) - the one place each is kept.
+// The kind's own icons (Ruby's, Kenten's, Warichu's, Spelling's) - the one place each is kept.
 KFCOwnSwitches& SwitchesOfKind()
 {
-	return (gKind == kKindKenten) ? gKenten.switches : (gKind == kKindWarichu) ? gWarichu.switches : gRuby.switches;
+	return (gKind == kKindKenten) ? gKenten.switches : (gKind == kKindWarichu) ? gWarichu.switches : (gKind == kKindSpelling) ? gSpelling.switches : gRuby.switches;
 }
 
-// The icons of the kind now: shown for Ruby, Kenten and Warichu, each as that kind holds it - Warichu's without Kana and Width Sensitive (no text is compared - the warichu-tcy spec's A2). Not heard
-// (notifyOfChange kFalse).
+// The icons of the kind now: shown for Ruby, Kenten, Warichu and Spelling, each as that kind holds it - Warichu's and Spelling's without Kana and Width Sensitive (no text is compared - the warichu-tcy
+// spec's A2; the label-spelling spec's SP3). Not heard (notifyOfChange kFalse).
 void ShowSwitches(IPanelControlData* panel)
 {
-	const bool shown = (gKind == kKindRuby || gKind == kKindKenten || gKind == kKindWarichu);
+	const bool shown = (gKind == kKindRuby || gKind == kKindKenten || gKind == kKindWarichu || gKind == kKindSpelling);
 	const KFCOwnSwitches& kept = SwitchesOfKind();
 	for (int32 k = 0; k < kSwitchIconCount; ++k)
 	{
 		const bool comparesText = (kSwitchIcons[k].widget == kKFCSwitchKanaWidgetID || kSwitchIcons[k].widget == kKFCSwitchWidthWidgetID);
-		const bool shownHere = shown && !(comparesText && gKind == kKindWarichu);
+		const bool shownHere = shown && !(comparesText && (gKind == kKindWarichu || gKind == kKindSpelling));
 		ShowPart(panel, kSwitchIcons[k].widget, shownHere);
 		if (shownHere)
 			SetBox(panel, kSwitchIcons[k].widget, kept.*(kSwitchIcons[k].value));
@@ -1933,11 +1939,11 @@ void ShowSwitches(IPanelControlData* panel)
 }
 
 // THE CHOSEN KIND'S PART, the others away, its buttons, its lines, and Search: for it. Every kind has Find Next and Find in KFC; Table, Ruby, Kenten and Script Label Change, Change All and Change/Find
-// (QR Code, Warichu and Story write nothing - Story has no part at all: ST3).
+// (QR Code, Warichu, Story and Spelling write nothing - Story has no part at all: ST3; Spelling its icons alone: SP3).
 void ShowKind(IPMUnknown* face)
 {
 	InterfacePtr<IPanelControlData> panel(face, UseDefaultIID());
-	const bool writes = (gKind != kKindQRCode && gKind != kKindWarichu && gKind != kKindStory);
+	const bool writes = (gKind != kKindQRCode && gKind != kKindWarichu && gKind != kKindStory && gKind != kKindSpelling);
 	ShowPart(panel, kKFCQRTabFindNextWidgetID, true);
 	ShowPart(panel, kKFCTableTabChangeWidgetID, writes);
 	ShowPart(panel, kKFCTableTabChangeAllWidgetID, writes);
@@ -2052,6 +2058,14 @@ bool KFCKohakuTab::IsStoryCurrent(KFCStoryConditions& outConditions)
 	return FaceIsCurrent() && gKind == kKindStory;
 }
 
+bool KFCKohakuTab::IsSpellingCurrent(KFCSpellingConditions& outConditions)
+{
+	// Search: as Warichu's - its five (SP3).
+	outConditions = gSpelling;
+	outConditions.scope = ScopeAsked();
+	return FaceIsCurrent() && gKind == kKindSpelling;
+}
+
 void KFCKohakuTab::YieldToSavedQuery()
 {
 	gYield = true;
@@ -2094,6 +2108,11 @@ void KFCKohakuTab::StateQuery(const KFCKohakuQueryData& query, bool forItsFind, 
 	}
 	else if (query.mode == kKFCStorySearchMode)
 		gKind = kKindStory;		// (its kind alone - ST11)
+	else if (query.mode == kKFCSpellingSearchMode)
+	{
+		gKind = kKindSpelling;
+		gSpelling = query.spelling;		// (its icons - SP6)
+	}
 	else
 		gKind = kKindQRCode;
 	gYield = false;
@@ -2124,12 +2143,13 @@ void KFCKohakuTab::QueryOfFace(KFCKohakuQueryData& out)
 	out.mode = (gKind == kKindTable) ? static_cast<int32>(kKFCTableSearchMode) : (gKind == kKindRuby) ? static_cast<int32>(kKFCRubySearchMode)
 		: (gKind == kKindKenten) ? static_cast<int32>(kKFCKentenSearchMode) : (gKind == kKindWarichu) ? static_cast<int32>(kKFCWarichuSearchMode)
 		: (gKind == kKindScriptLabel) ? static_cast<int32>(kKFCScriptLabelSearchMode) : (gKind == kKindStory) ? static_cast<int32>(kKFCStorySearchMode)
-		: static_cast<int32>(kKFCQRCodeSearchMode);
+		: (gKind == kKindSpelling) ? static_cast<int32>(kKFCSpellingSearchMode) : static_cast<int32>(kKFCQRCodeSearchMode);
 	out.table = gTable;
 	out.ruby = gRuby;
 	out.kenten = gKenten;
 	out.warichu = gWarichu;
 	out.label = gLabel;
+	out.spelling = gSpelling;
 }
 
 void KFCKohakuTab::ShutdownCleanup()
@@ -2148,6 +2168,7 @@ void KFCKohakuTab::ShutdownCleanup()
 	gRuby = KFCRubyConditions();
 	gKenten = KFCKentenConditions();
 	gWarichu = KFCWarichuConditions();
+	gSpelling = KFCSpellingConditions();
 	gLabel = KFCScriptLabelConditions();
 	gFoundLabel = KFCScriptLabelFound();
 	gLeftLabelDB = nil;

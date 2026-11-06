@@ -208,9 +208,6 @@
 //                the old way (ui/KFCResultListWidgetMgr.cpp's SearchAgain, ui/KFCResultHistory.cpp's Narrow): the rows
 //                its walk had follow their foci first - a line read again - stay drawn as before
 //                (sr-toend-edge-repaint-armed)
-//    copy-name-from-label  (UI half) Copy Results' Document column reads a document row's name off its label, the old
-//                way (ui/KFCCopyResults.cpp's DocumentName): a document with no window, searched with All Documents, is
-//                named "<name> (no window)" (copy-results-nowindow-armed)
 //    frame-owner-climb  Frames of These Matches climbs a match's frame's hierarchy to the first item with
 //                IGraphicFrameData, the old way (KFCNarrow::FrameOwner): text on a path reaches its
 //                kTOPSplineItemBoss - which carries IGraphicFrameData - and not the path (nd-frames-path-armed)

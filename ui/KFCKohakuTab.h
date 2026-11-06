@@ -5,9 +5,9 @@
 //  KohakuFindChange (KFC)
 //
 //  THE KOHAKU TAB'S FACE IN INDESIGN'S FIND/CHANGE DIALOG. One face of KFC's own among the dialog's tabs - "Kohaku+" (the author's word: "Kohaku" alone says little) - offered through kFindChangeMiniTabbedDialogService (KFCUI.fr's IDList /
-//  IDListPair). Its Find: chooses what KFC's Find looks for, in the author's order of 11-04: Script Label (2026-11-04-kfc-script-label-design.md), QR Code (docs/superpowers/specs/2026-10-27-kfc-qr-code-search-design.md),
-//  Table (2026-10-31-kfc-table-tab-design.md) and, in a Japanese InDesign alone (the author's call, 10-31), Kenten (model/KFCKentenSearch.h), Ruby (2026-10-31-kfc-ruby-tab-design.md) and Warichu
-//  (KFCKohakuTab.cpp's kKindsInOrder). ONE TAB, ON THE AUTHOR'S CALL (10-31): a tab each made nine, and the dialog's strip, which no face can widen (measured), then cut its first and last down to a
+//  IDListPair). Its Find: chooses what KFC's Find looks for, in the author's order of 11-06 (abc - docs/superpowers/specs/2026-11-06-kfc-label-spelling-runscript-design.md FO1): QR Code
+//  (docs/superpowers/specs/2026-10-27-kfc-qr-code-search-design.md), Script Label (2026-11-04-kfc-script-label-design.md), Story (2026-11-06-kfc-story-kind-design.md), Table (2026-10-31-kfc-table-tab-design.md)
+//  and, in a Japanese InDesign alone (the author's call, 10-31), Kenten (model/KFCKentenSearch.h), Ruby (2026-10-31-kfc-ruby-tab-design.md) and Warichu (KFCKohakuTab.cpp's kKindsInOrder). ONE TAB, ON THE AUTHOR'S CALL (10-31): a tab each made nine, and the dialog's strip, which no face can widen (measured), then cut its first and last down to a
 //  character or two in the Japanese InDesign.
 //  Search: is theirs together. What stands in a story's text - Table, Ruby, Kenten - has InDesign's five (All Documents, Document, Story, To End of Story, Selection: the author, "a table stands in a
 //  story"); a QR code's frame the first two, which is what a Story on Table reads as on QR Code. Document at launch. Every entry is always on the list, unlike the dialog's own: what the selection does
@@ -25,10 +25,10 @@
 //             Its buttons Choose List..., Save List..., How to Use... (a page in a Japanese InDesign's one language - the author, 11-02).
 //    Kenten   Base Text:, Kenten: ([Any] / none / the kinds / custom - InDesign's kenten dialog's words), Change Kenten To: ([Leave] / none / the kinds / custom), a box of one character beside each list, a
 //             custom mark's (2026-11-03 - docs/superpowers/specs/2026-11-03-kfc-kenten-face-japanese-design.md: Look For and Remove Kenten went into the lists' none; the samples went). Its button How to Use....
-//    Script Label  every language's, Find:'s first (docs/superpowers/specs/2026-11-04-kfc-script-label-design.md S1, S2 - first since the author's order of 11-04): Key: (empty: every key - 11-04), Match: (Text (Contains), Text (Whole
+//    Script Label  every language's (docs/superpowers/specs/2026-11-04-kfc-script-label-design.md S1, S2 - first on Find: 11-04 to 11-06, second since): Key: (empty: every key - 11-04), Match: (Text (Contains), Text (Whole
 //             Label) or GREP - always case by case, 11-04), Find Label: (empty: every label of the key), Change Label: - Search: All Documents or Document, as QR Code's. Its Find Next lands on an item as an object row's click lands
 //             (KFCJump::LandOnQRCode); its Change, Change All and Change/Find write labels (the model's KFCScriptLabelSearch).
-//    Story    every language's, Find:'s last (docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md ST1 - ST3): no part at all - every story is listed, the internal ones too. Search: All Documents or Document, as QR Code's. Its
+//    Story    every language's (docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md ST1 - ST3 - last on Find: until the order of 11-06): no part at all - every story is listed, the internal ones too. Search: All Documents or Document, as QR Code's. Its
 //             Find Next lands on a story's text as its row's click lands (KFCFaceText, KFCJump::LandOnPlace - an internal story selected nothing); it writes nothing.
 //  TABLE, RUBY AND KENTEN'S FIND NEXT, CHANGE, CHANGE ALL, CHANGE/FIND (2026-11-01-kfc-kohaku-trial-fixes-design.md F1 - F9; 2026-11-02-kfc-kohaku-face-buttons-design.md B1 - B5): the model's (KFCTableSearch, KFCFaceText), landed on as a
 //  row's click lands (KFCJump::LandOnPlace); Change and Change/Find grey until Find Next has found something, and once the selection leaves it or it is written, as the Text tab's.
@@ -73,6 +73,10 @@ namespace KFCKohakuTab
 	/** IS THE STORY KIND FIND/CHANGE'S NOW (docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md ST1 - asked by the model through IKFCUIServices::StoryTabConditions), and its Search: -
 	    All Documents or Document, as QR Code's (ST2). */
 	bool IsStoryCurrent(KFCStoryConditions& outConditions);
+
+	/** IS THE SPELLING KIND FIND/CHANGE'S NOW (docs/superpowers/specs/2026-11-06-kfc-label-spelling-runscript-design.md SP1 - asked by the model through IKFCUIServices::SpellingTabConditions),
+	    and what it asks: its icons and Search: - its five, as Warichu's (SP3). */
+	bool IsSpellingCurrent(KFCSpellingConditions& outConditions);
 
 	/** A SAVED QUERY STATES ITS OWN TAB (the query dialog's Find - KFCQueryDialog, once the query is loaded): the Kohaku tab steps aside until the person shows its face again or picks in its Find:, so
 	    the Find searches what the query says. */

@@ -1475,6 +1475,18 @@ bool KFCResultTree::CanRemoveLabelAny(const KFCRowsByChapter& rows)
 	return AnyRowCan(rows, [](int32 chapter, int32 hit) { return KFCRuns()->CanRemoveLabelHit(chapter, hit); });
 }
 
+bool KFCResultTree::LabelRows(int32 op, const KFCRowsByChapter& rows, const std::vector<KFCLabelEdit>& edits)
+{
+	// (The steps around every write from the list - WriteRowsInPlace: not under a landing or a run; the rows drawn again after it - a script label list's
+	// rows read their labels again, the model marked them.)
+	return WriteRowsInPlace(rows, [&](PMString& status) { return KFCRuns()->WriteLabelRows(rows, op, edits, status); });
+}
+
+bool KFCResultTree::CanLabelAny(const KFCRowsByChapter& rows)
+{
+	return AnyRowCan(rows, [](int32 chapter, int32 hit) { return KFCRuns()->CanLabelHit(chapter, hit); });
+}
+
 bool KFCResultTree::RunScriptRows(const KFCRowsByChapter& rows)
 {
 	// (The steps around every write from the list - WriteRowsInPlace: not under a landing or a run; the rows drawn again after it, no word on them - RS7.)

@@ -52,7 +52,8 @@
 #include "KFCBookPanelPlacement.h"	// "Remember Book Panel Placement" - InDesign's own Book panel
 #include "KFCQueryDialog.h"		// "Run Saved Queries..." - the query dialog
 #include "KFCSpecialDialogs.h"	// Move... / Scale... / Rotate... / Shear... - their values asked first
-#include "KFCCopyResults.h"		// Copy Results / Copy Rows / Copy These Results - the rows as text on the clipboard
+#include "KFCLabelDialogs.h"		// Special Operations > Label > Add Key... / Edit Value... / Remove Key... - asked first (2026-11-06)
+#include "KFCRowScript.h"			// EditInStoryEditor - a Story row's Special Operations > Edit in Story Editor (2026-11-06)
 #include "KFCResultStep.h"		// Next Result / Previous Result - the live tier's next / previous hit row landed on
 #include "KFCStyleMenu.h"		// Apply Object Style > - the style items the object row's menu popped with
 #include "KFCDiagHiddenDocs.h"		// the hidden-document check after an action - test builds only
@@ -216,24 +217,6 @@ bool ReplaceAllRowsTarget(IPMUnknown* widget, KFCRowsByChapter& out)
 	else if (RightClickedDocument(widget, chapter))
 		(void)KFCResultTree::RowsUnder(KFCResultNodeID::Create(chapter), out);
 	return KFCRowCount(out) > 0;
-}
-
-// THE ROWS COPY ROWS COPIES (docs/superpowers/specs/2026-10-18-kfc-copy-results-progress-share-design.md): the rows Clear from
-// Results would take off (ClearTargetRows) - and on the book row, every row of the list (outAll). false = neither, or no row
-// to copy. The menu's grey state and the action ask it - one answer for both.
-bool CopyTargetRows(IPMUnknown* widget, KFCRowsByChapter& out, bool& outAll)
-{
-	outAll = false;
-	if (ClearTargetRows(widget, out))
-		return true;
-	const NodeID node(RightClickedRow(widget));
-	TreeNodePtr<KFCResultNodeID> row(node);
-	if (row != nil && row->IsBookRow() && KFCResults()->IsFromBook() && KFCCopyResults::TierHasRows(-1))
-	{
-		outAll = true;
-		return true;
-	}
-	return false;
 }
 
 // The TIER whose own row was right-clicked (docs/superpowers/specs/2026-10-14-kfc-tier-switch-v2-design.md R9) - a grey
@@ -448,6 +431,67 @@ void DoSpecial(IActiveContext* ac, int32 op, IPMUnknown* widget, const PMString*
 		}
 	}
 	(void)KFCResultTree::SpecialRows(op, rows, params);
+}
+
+// SPECIAL OPERATIONS > LABEL > ADD KEY... / EDIT VALUE... / REMOVE KEY... (docs/superpowers/specs/2026-11-06-kfc-label-spelling-runscript-design.md LB3 - LB5; op a
+// KFCLabelOp): the rows of the right-click - the row, or the rows selected together when it is one of them. Edit Value and Remove Key read the keys their items have
+// first (the model's - a closed chapter reached to be read, and handed back), then the dialog asks (KFCLabelDialogs), then the model writes (KFCResultTree::LabelRows).
+// What stopped it is said on the status line; a Cancel says nothing. No hit row: nothing.
+void DoLabel(IPMUnknown* widget, int32 op)
+{
+	int32 chapter = -1, hit = -1;
+	if (!RightClickedHit(widget, chapter, hit))
+		return;
+	const KFCRowsByChapter rows(KFCResultTree::RowsOfRightClick(chapter, hit));
+	std::vector<KFCLabelEdit> edits;
+	PMString why;
+	if (op == kKFCLabelAddKey)
+	{
+		KFCLabelEdit edit;
+		if (!KFCLabelDialogs::AskAddKey(edit, why))
+		{
+			if (!why.IsEmpty())
+				KFCResultTree::ShowStatus(why);
+			return;
+		}
+		edits.push_back(edit);
+	}
+	else
+	{
+		std::vector<KFCLabelKey> keys;
+		int32 holders = 0, unread = 0;
+		if (!KFCRuns()->LabelKeysOfRows(rows, true, keys, holders, unread, why))
+		{
+			KFCResultTree::ShowStatus(why);
+			return;
+		}
+		if (keys.empty())
+		{
+			KFCResultTree::ShowStatus(op == kKFCLabelEditValue ? "Edit Value: the items of these rows have no label." : "Remove Key: the items of these rows have no label.");
+			return;
+		}
+		if (op == kKFCLabelEditValue)
+		{
+			if (!KFCLabelDialogs::AskEditValues(keys, holders, edits, why))
+			{
+				if (!why.IsEmpty())
+					KFCResultTree::ShowStatus(why);
+				return;
+			}
+		}
+		else
+		{
+			KFCLabelEdit edit;
+			if (!KFCLabelDialogs::AskRemoveKey(keys, holders, edit.key, why))
+			{
+				if (!why.IsEmpty())
+					KFCResultTree::ShowStatus(why);
+				return;
+			}
+			edits.push_back(edit);
+		}
+	}
+	(void)KFCResultTree::LabelRows(op, rows, edits);
 }
 }
 
@@ -850,6 +894,16 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			break;
 		}
 
+		case kKFCLabelAddKeyActionID:
+			DoLabel(widget, kKFCLabelAddKey);		// Special Operations > Label > Add Key... (2026-11-06 - DoLabel above)
+			break;
+		case kKFCLabelEditValueActionID:
+			DoLabel(widget, kKFCLabelEditValue);
+			break;
+		case kKFCLabelRemoveKeyActionID:
+			DoLabel(widget, kKFCLabelRemoveKey);
+			break;
+
 		case kKFCRunScriptActionID:
 		{
 			// Any row's Special Operations > Run Script... (docs/superpowers/specs/2026-11-06-kfc-run-script-on-rows-design.md RS1 - RS6): Remove Label's way - the row it was
@@ -858,6 +912,21 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			int32 chapter = -1, hit = -1;
 			if (RightClickedHit(widget, chapter, hit))
 				(void)KFCResultTree::RunScriptRows(KFCResultTree::RowsOfRightClick(chapter, hit));
+			break;
+		}
+
+		case kKFCEditInStoryEditorActionID:
+		{
+			// A Story row's Special Operations > Edit in Story Editor (2026-11-06 - the author): the row it was popped over, or the rows selected together when it is
+			// one of them - each one's story opened in the Story Editor (KFCRowScript::EditInStoryEditor - its storyEdit(): on a document opened hidden, the Story
+			// Editor's window alone). What it opened, or why not, on the status line. No hit row: nothing.
+			int32 chapter = -1, hit = -1;
+			if (RightClickedHit(widget, chapter, hit))
+			{
+				PMString status;
+				(void)KFCRowScript::EditInStoryEditor(KFCResultTree::RowsOfRightClick(chapter, hit), status);
+				KFCResultTree::ShowStatus(status);
+			}
 			break;
 		}
 
@@ -891,47 +960,6 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			// live tier's next / previous hit row selected and landed on, from wherever the keyboard is (KFCResultStep - grey
 			// when no step can be taken, below). Nothing to undo: it selects.
 			(void)KFCResultStep::Step(actionID == kKFCNextResultActionID);
-			break;
-		}
-
-		case kKFCCopyResultsActionID:
-		{
-			// Copy Results (the copy-results spec): every row of the live list as text on the clipboard - the documents are
-			// not touched, nothing to undo. What it copied (or why nothing) on the status line.
-			PMString status;
-			(void)KFCCopyResults::CopyLiveList(status);
-			KFCResultTree::ShowStatus(status);
-			break;
-		}
-
-		case kKFCCopyRowsActionID:
-		{
-			// Copy Rows: the rows of the row it was popped over (CopyTargetRows) - the book row's, every row. No such row (the
-			// action pressed by its ActionID): do nothing.
-			KFCRowsByChapter rows;
-			bool all = false;
-			if (CopyTargetRows(widget, rows, all))
-			{
-				PMString status;
-				if (all)
-					(void)KFCCopyResults::CopyLiveList(status);
-				else
-					(void)KFCCopyResults::CopyLiveRows(rows, status);
-				KFCResultTree::ShowStatus(status);
-			}
-			break;
-		}
-
-		case kKFCCopyTheseResultsActionID:
-		{
-			// Copy These Results: the rows of the tier whose own row it was popped over - a grey tier's as its copy holds them.
-			int32 tier = -1;
-			if (RightClickedTier(widget, tier))
-			{
-				PMString status;
-				(void)KFCCopyResults::CopyTier(tier, status);
-				KFCResultTree::ShowStatus(status);
-			}
 			break;
 		}
 
@@ -1350,12 +1378,46 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 				break;
 			}
+			case kKFCLabelAddKeyActionID:
+			case kKFCLabelEditValueActionID:
+			case kKFCLabelRemoveKeyActionID:
+			{
+				// Special Operations > Label (2026-11-06 - LB2, LB3): over a row whose item can hold a label (a run standing greys everything, above); Edit
+				// Value... and Remove Key... a key among the items too - read without reaching or following anything: a closed chapter's row, or one not read
+				// where it was found, may have keys, and does not grey them (the dialogs' reading reaches it).
+				int32 chapter = -1, hit = -1;
+				bool enable = false;
+				if (RightClickedHit(widget, chapter, hit))
+				{
+					const KFCRowsByChapter rows(KFCResultTree::RowsOfRightClick(chapter, hit));
+					enable = KFCResultTree::CanLabelAny(rows);
+					if (enable && action != kKFCLabelAddKeyActionID)
+					{
+						std::vector<KFCLabelKey> keys;
+						int32 holders = 0, unread = 0;
+						PMString why;
+						(void)KFCRuns()->LabelKeysOfRows(rows, false, keys, holders, unread, why);
+						enable = !keys.empty() || unread > 0;
+					}
+				}
+				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
+				break;
+			}
 			case kKFCRunScriptActionID:
 			{
 				// Any row's menu: Run Script... while there is a row (a run standing greys everything, above). What a row's object is, and whether its document is open, is
 				// read when it is pressed - a row that cannot be run is counted then (RS5), not greyed now.
 				int32 chapter = -1, hit = -1;
 				const bool enable = RightClickedHit(widget, chapter, hit) && KFCRowCount(KFCResultTree::RowsOfRightClick(chapter, hit)) > 0;
+				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
+				break;
+			}
+			case kKFCEditInStoryEditorActionID:
+			{
+				// A Story row's menu (put there over its own stories alone - PopRowMenu): while there is such a row (a run standing greys everything, above). Whether
+				// its document is open is read when it is pressed - a row whose story cannot be opened is counted then, as Run Script counts its rows.
+				int32 chapter = -1, hit = -1;
+				const bool enable = RightClickedHit(widget, chapter, hit) && KFCResults()->GetHitHolderKind(chapter, hit) == kKFCHolderStory;
 				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 				break;
 			}
@@ -1386,30 +1448,6 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* ac, IActionStateList
 				// The panel menu's Next / Previous Result: while the panel is open and the live tier has a hit row to land on
 				// (KFCResultStep::CanStep - the spec's A6; a run standing greys everything, above).
 				const bool enable = KFCResultStep::CanStep();
-				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
-				break;
-			}
-			case kKFCCopyResultsActionID:
-			{
-				// The panel menu's Copy Results: while the live list has a row (a run standing greys everything, above).
-				const bool enable = KFCCopyResults::TierHasRows(-1);
-				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
-				break;
-			}
-			case kKFCCopyRowsActionID:
-			{
-				// A row's Copy Rows: over a row with a row to copy (CopyTargetRows).
-				KFCRowsByChapter rows;
-				bool all = false;
-				const bool enable = CopyTargetRows(widget, rows, all);
-				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
-				break;
-			}
-			case kKFCCopyTheseResultsActionID:
-			{
-				// A tier's own row's Copy These Results: over a tier's row whose tier has a row.
-				int32 tier = -1;
-				const bool enable = RightClickedTier(widget, tier) && KFCCopyResults::TierHasRows(tier);
 				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 				break;
 			}

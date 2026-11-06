@@ -32,19 +32,50 @@
 // Project includes:
 #include "KFCQueryList.h"
 #include "KFCQueryOrder.h"
+#include "KFCLabelDialogs.h"		// Special Operations > Label's keys - the third list (2026-11-06)
 #include "KFCUIID.h"
 
 namespace
 {
-	/** Is this list the run order (the right one)? Asked of the list's own widget id - the one thing the two differ in. */
-	bool IsOrderList(const IPMUnknown* boss)
+	/** WHICH LIST THIS IS - the query dialog's saved queries (the left) or run order (the right), or Special Operations > Label's keys (KFCLabelDialogs -
+	    2026-11-06): asked of the list's own widget id, the one thing they differ in. */
+	enum WhichList { kSavedList, kOrderList, kLabelKeyList };
+
+	WhichList ListOf(const WidgetID& id)
+	{
+		return (id == kKFCQueryOrderListWidgetID) ? kOrderList : (id == kKFCLabelKeyListWidgetID) ? kLabelKeyList : kSavedList;
+	}
+
+	WhichList ListOf(const IPMUnknown* boss)
 	{
 		InterfacePtr<IControlView> view(boss, UseDefaultIID());
-		return view != nil && view->GetWidgetID() == kKFCQueryOrderListWidgetID;
+		return (view != nil) ? ListOf(view->GetWidgetID()) : kSavedList;
+	}
+
+	/** How many rows the list has. */
+	int32 CountOf(WhichList list)
+	{
+		switch (list)
+		{
+			case kOrderList:		return static_cast<int32>(KFCQueryOrder::Order().size());
+			case kLabelKeyList:		return KFCLabelDialogs::KeyRowCount();
+			default:				return static_cast<int32>(KFCQueryOrder::Saved().size());
+		}
+	}
+
+	/** A row's words. */
+	PMString TextOf(WhichList list, int32 index)
+	{
+		switch (list)
+		{
+			case kOrderList:		return KFCQueryOrder::OrderRowText(index);
+			case kLabelKeyList:		return KFCLabelDialogs::KeyRowText(index);
+			default:				return KFCQueryOrder::SavedRowText(index);
+		}
 	}
 }
 
-/** The two lists' hierarchy: flat, as long as the list it is. ListTreeViewAdapter's own count is a placeholder that
+/** The lists' hierarchy: flat, as long as the list it is. ListTreeViewAdapter's own count is a placeholder that
     answers 10 (ListTreeViewAdapter.cpp), so this is the one method a flat list has to say. */
 class KFCQueryListAdapter : public ListTreeViewAdapter
 {
@@ -55,7 +86,7 @@ public:
 protected:
 	virtual int32 GetNumListItems() const
 	{
-		return static_cast<int32>(IsOrderList(this) ? KFCQueryOrder::Order().size() : KFCQueryOrder::Saved().size());
+		return CountOf(ListOf(this));
 	}
 };
 
@@ -122,7 +153,7 @@ public:
 		const int32 index = nodeID != nil ? nodeID->GetIndex() : -1;
 		// Written on EVERY apply, an unknown row included: rows are recycled as the list scrolls, and a cell left alone
 		// keeps what the row it used to be said. (kTrue for an unknown row too - a new widget would not know it either.)
-		const PMString text = IsOrderList(this) ? KFCQueryOrder::OrderRowText(index) : KFCQueryOrder::SavedRowText(index);
+		const PMString text = TextOf(ListOf(this), index);
 		this->SetNodeName(widgetList, text, kKFCQueryRowTextWidgetID);
 		return kTrue;
 	}
@@ -166,8 +197,7 @@ void KFCQueryListSelect(IPanelControlData* dialogPanel, const WidgetID& tree, in
 	InterfacePtr<ITreeViewController> controller(treeView, UseDefaultIID());
 	if (controller == nil)
 		return;
-	const int32 count = static_cast<int32>(tree == kKFCQueryOrderListWidgetID ? KFCQueryOrder::Order().size()
-		: KFCQueryOrder::Saved().size());
+	const int32 count = CountOf(ListOf(tree));
 	if (index < 0 || index >= count)
 	{
 		controller->DeselectAll();

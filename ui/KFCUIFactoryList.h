@@ -100,6 +100,8 @@ REGISTER_PMINTERFACE(KFCAlertAnswerService, kKFCAlertAnswerServiceImpl)
 // (KFCSpecialDialogs.cpp).
 REGISTER_PMINTERFACE(KFCValueDialogController, kKFCValueDialogControllerImpl)
 REGISTER_PMINTERFACE(KFCValueDialogObserver, kKFCValueDialogObserverImpl)
+REGISTER_PMINTERFACE(KFCLabelDialogController, kKFCLabelDialogControllerImpl)	// Special Operations > Label's dialogs (2026-11-06 - KFCLabelDialogs.cpp)
+REGISTER_PMINTERFACE(KFCLabelDialogObserver, kKFCLabelDialogObserverImpl)
 // The Kohaku tab's face in InDesign's Find/Change dialog: its creator, its observer and its controller (KFCKohakuTab.cpp).
 REGISTER_PMINTERFACE(KFCKohakuTabPanelCreator, kKFCKohakuTabPanelCreatorImpl)
 REGISTER_PMINTERFACE(KFCKohakuTabObserver, kKFCKohakuTabObserverImpl)

@@ -271,6 +271,18 @@ public:
 	    be given that chapter's address (memory uidref-reuse-after-close). Nothing opened, nothing rebound. For the UI half's own reads of a row's
 	    document (KFCRowScript). */
 	virtual UIDRef ChapterDocNow(int32 chapterIdx) = 0;
+	/** = KFCReplaceEngine::LabelKeysOfRows (appended - revision 54, docs/superpowers/specs/2026-11-06-kfc-label-spelling-runscript-design.md LB3, LB4) - the keys
+	    the rows' label holders have (a page item, a story, a table, a cell - LB2): each once, in the order first met, its count and its value when the same on
+	    every holder. reachClosed: a closed chapter's document reopened windowless to be read, and handed back (the dialogs' question); without it nothing is
+	    opened or followed - a closed chapter's rows, and a text row whose place cannot be read as it was found, are counted in outUnread (the menu's grey: they
+	    may have keys). outHolders = the holders read. False = no row stands for a label holder (outWhy says why). Nothing written. */
+	virtual bool LabelKeysOfRows(const KFCRowsByChapter& rows, bool reachClosed, std::vector<KFCLabelKey>& outKeys, int32& outHolders, int32& outUnread,
+		PMString& outWhy) = 0;
+	/** = KFCReplaceEngine::WriteLabelRows (appended - LB5) - Special Operations > Label > Add Key... / Edit Value... / Remove Key... (op, a KFCLabelOp): the rows'
+	    label holders given the edits, in one undoable step. True = something written; outStatus says what. */
+	virtual bool WriteLabelRows(const KFCRowsByChapter& rows, int32 op, const std::vector<KFCLabelEdit>& edits, PMString& outStatus) = 0;
+	/** = KFCReplaceEngine::CanLabelHit (appended - LB2) - does the row stand for a label holder: the Label submenu on its menu. Read off the row. */
+	virtual bool CanLabelHit(int32 chapterIdx, int32 hitIdx) = 0;
 };
 
 #endif // __IKFCRuns_h__

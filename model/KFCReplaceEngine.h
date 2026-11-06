@@ -204,6 +204,27 @@ namespace KFCReplaceEngine
 	/** Can Remove Label be offered on a row - a script label list's row, not missing, not locked, not removed already - the menu's grey. */
 	bool CanRemoveLabelHit(int32 chapterIdx, int32 hitIdx);
 
+	/** SPECIAL OPERATIONS > LABEL (docs/superpowers/specs/2026-11-06-kfc-label-spelling-runscript-design.md LB2 - LB5 - the author, 11-06: "labels on the Story and
+	    Object rows found: add a key, remove a key - not offered with none -, edit its value"). THE KEYS THE ROWS' LABEL HOLDERS HAVE: a row's holder is an object
+	    row's page item (any list's), a Story row's story, a Kohaku+ Table row's table, a script label list's table or cell row's table or cell - a text match's row
+	    and a table row list's hold none. Each key once, first met first, with its count and its value when every holder that has it has the same one; a holder
+	    two rows stand for read once. reachClosed: a closed chapter's document reopened windowless to be read, and handed back - the dialogs' question; without
+	    it nothing is reached or followed (the menu's grey): a closed chapter's rows and a text row not read where it was found counted in outUnread. outHolders
+	    = the holders read. False = no row stands for a holder, or none could be read (outWhy). Nothing written. */
+	bool LabelKeysOfRows(const KFCRowsByChapter& rows, bool reachClosed, std::vector<KFCLabelKey>& outKeys, int32& outHolders, int32& outUnread, PMString& outWhy);
+
+	/** ...AND THE WRITE (op, a KFCLabelOp): Add Key... gives every holder edits[0]'s key and value (one that has the key has its value replaced); Edit Value...
+	    gives each edit's key its value on the holders that have the key (an empty value takes it away); Remove Key... takes each edit's key away from the holders
+	    that have it. ReplaceLabelRows' doors and step (a run list refused, a run going refused, a closed chapter reached and handed back, a locked holder counted
+	    and left - S7's rule, ONE undo step "Add Label Key" / "Edit Label Value" / "Remove Label Key"); a script label list's row whose own key is written reads
+	    its label again (its marks - MarkRowWritten, MarkRowRemoved). A holder that reads as asked already is counted, not written. True = something written;
+	    outStatus says what. */
+	bool WriteLabelRows(const KFCRowsByChapter& rows, int32 op, const std::vector<KFCLabelEdit>& edits, PMString& outStatus);
+
+	/** Does a row stand for a label holder (LB2) - read off the row, as the menus ask: an object row, a Story row, a Kohaku+ Table row, a script label list's
+	    table or cell row; not on a query run's list (its rows are not written - QRY-38). */
+	bool CanLabelHit(int32 chapterIdx, int32 hitIdx);
+
 	/** ONE UNDO STEP FOR A WRITE FROM THE LIST, the one rule for every such write - its callers are the list (a row's
 	    Replace of text or object rows, Restore from Copy, Create Outlines, the Special Operations), each naming its
 	    step by stepKey ("Replace" - kKFCReplaceStepKey - by default):

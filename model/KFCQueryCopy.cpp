@@ -312,6 +312,13 @@ void KFCQueryCopier::CaptureStories(KFCQueryCopy& out)
 	out.valid = true;
 }
 
+void KFCQueryCopier::CaptureSpelling(KFCQueryCopy& out)
+{
+	out = KFCQueryCopy();
+	out.mode = static_cast<int32>(kKFCSpellingSearchMode);
+	out.valid = true;
+}
+
 void KFCQueryCopier::CaptureScriptLabels(KFCQueryCopy& out, const KFCScriptLabelConditions& asked)
 {
 	out = KFCQueryCopy();

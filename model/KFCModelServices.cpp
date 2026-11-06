@@ -247,6 +247,11 @@ public:
 	virtual bool RemoveLabelRows(const KFCRowsByChapter& rows, PMString& outStatus) { return KFCReplaceEngine::RemoveLabelHits(rows, outStatus); }
 	virtual bool CanRemoveLabelHit(int32 chapterIdx, int32 hitIdx) { return KFCReplaceEngine::CanRemoveLabelHit(chapterIdx, hitIdx); }
 	virtual UIDRef ChapterDocNow(int32 chapterIdx) { return KFCSearchEngine::ChapterDocNow(chapterIdx); }
+	virtual bool LabelKeysOfRows(const KFCRowsByChapter& rows, bool reachClosed, std::vector<KFCLabelKey>& outKeys, int32& outHolders, int32& outUnread,
+		PMString& outWhy) { return KFCReplaceEngine::LabelKeysOfRows(rows, reachClosed, outKeys, outHolders, outUnread, outWhy); }
+	virtual bool WriteLabelRows(const KFCRowsByChapter& rows, int32 op, const std::vector<KFCLabelEdit>& edits, PMString& outStatus)
+		{ return KFCReplaceEngine::WriteLabelRows(rows, op, edits, outStatus); }
+	virtual bool CanLabelHit(int32 chapterIdx, int32 hitIdx) { return KFCReplaceEngine::CanLabelHit(chapterIdx, hitIdx); }
 };
 
 CREATE_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)

@@ -135,7 +135,12 @@ namespace KFCSearchEngine
 		int32					gone;
 		// A RUBY LIST'S WALK: its words a ruby stood on already - not rows, and said (a list gives readings to text with none).
 		int32					hadRuby;
-		CollectTally() : total(0), chaptersWithHits(0), truncated(false), cancelled(false), objects(0), noText(0), gone(0), hadRuby(0) {}
+		// A SPELLING LIST'S WALK (KFCSpellingSearch - 2026-11-06): the stories with text Dynamic Spelling had not checked yet - no line, no row, and said: of open
+		// documents (InDesign checks them while it is idle - a search again in a moment finds them), and of the closed chapters it opened (they read as they were
+		// saved, and go back at once - no idle comes between).
+		int32					notChecked;
+		int32					notCheckedClosed;
+		CollectTally() : total(0), chaptersWithHits(0), truncated(false), cancelled(false), objects(0), noText(0), gone(0), hadRuby(0), notChecked(0), notCheckedClosed(0) {}
 	};
 
 	/** ONE TARGET'S ROWS INTO THE MODEL AS A CHAPTER, AND INTO THE TALLY - the one way a walk's rows are filed (both

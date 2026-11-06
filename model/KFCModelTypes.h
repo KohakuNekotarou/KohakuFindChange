@@ -264,6 +264,36 @@ struct KFCSpecialParams
 	KFCSpecialParams() : x(0.0), y(0.0) {}
 };
 
+/** SPECIAL OPERATIONS > LABEL (docs/superpowers/specs/2026-11-06-kfc-label-spelling-runscript-design.md LB1 - LB6): a key the rows' label holders have - each key
+    once (IKFCRuns::LabelKeysOfRows), how many of the holders have it, and its value when they all have the same one. The key as stored, untranslated; panel = it is
+    the Script Label panel's own (IScriptLabel::kDefaultScriptLabelKey). Crosses the boundary. */
+struct KFCLabelKey
+{
+	PMString	key;
+	int32		count;		// the holders that have it
+	bool		same;		// they all have the same value - value is it (else value is empty)
+	PMString	value;
+	bool		panel;		// the Script Label panel's own key
+
+	KFCLabelKey() : count(0), same(true), panel(false) {}
+};
+
+/** One key and what an Add Key... or an Edit Value... gives it (an empty value takes the key away - insertLabel's rule); Remove Key...'s key, its value
+    unread (IKFCRuns::WriteLabelRows). Untranslated. Crosses the boundary. */
+struct KFCLabelEdit
+{
+	PMString	key;
+	PMString	value;
+};
+
+/** Which of the Label submenu's three (IKFCRuns::WriteLabelRows' op). Crosses the boundary - FIXED. */
+enum KFCLabelOp
+{
+	kKFCLabelAddKey = 1,	// every holder given the key and its value - one that has the key already has its value replaced
+	kKFCLabelEditValue,		// each key given its value on the holders that have it
+	kKFCLabelRemoveKey		// the key taken away from the holders that have it
+};
+
 /** Where the overset "+" locator for a text position is. 'found' is false when nothing in the
     thread (or any enclosing thread) is placed, so there is no on-page location to point at. */
 struct KFCOversetLoc
@@ -463,6 +493,21 @@ struct KFCStoryConditions
 	KFCStoryConditions() : scope(0) {}
 };
 
+/** THE SPELLING KIND'S "SEARCH MODE" (the author, 11-06: "a list of the spelling mistakes - the words with the wavy line in English text - can it be one
+    of the search tab's?" - docs/superpowers/specs/2026-11-06-kfc-label-spelling-runscript-design.md SP1; KFCSpellingSearch.h): the words Dynamic Spelling
+    underlines. KFC'S ALONE - never handed to InDesign. */
+enum { kKFCSpellingSearchMode = 109 };
+
+/** WHAT THE SPELLING KIND ASKS (the face's - KFCKohakuTab, read by IKFCUIServices::SpellingTabConditions): its icons and its Search: - nothing else; it
+    changes nothing (SP3 - the Warichu kind's shape). */
+struct KFCSpellingConditions
+{
+	KFCOwnSwitches	switches;	// the icons
+	int32			scope;		// its Search: - as KFCRubyConditions::scope
+
+	KFCSpellingConditions() : scope(0) {}
+};
+
 /** WHAT THE SCRIPT LABEL KIND ASKS (the face's - KFCKohakuTab, read by IKFCUIServices::ScriptLabelTabConditions; a label list keeps its find side in its
     query copy, so its searches again ask what its search asked) - the design's S2, S4 and S7. */
 struct KFCScriptLabelConditions
@@ -565,7 +610,7 @@ struct KFCTableConditions
 inline bool KFCIsKohakuQueryMode(int32 mode)
 {
 	return mode == kKFCQRCodeSearchMode || mode == kKFCTableSearchMode || mode == kKFCRubySearchMode || mode == kKFCKentenSearchMode || mode == kKFCWarichuSearchMode
-		|| mode == kKFCScriptLabelSearchMode || mode == kKFCStorySearchMode;
+		|| mode == kKFCScriptLabelSearchMode || mode == kKFCStorySearchMode || mode == kKFCSpellingSearchMode;
 }
 
 /** WHAT A SAVED QUERY OF THE KOHAKU+ TAB HOLDS: its kind (kKFCTableSearchMode ...) and what that kind asks. A query's scope is no part of it: it runs on what Search: says when it runs. */
@@ -578,6 +623,7 @@ struct KFCKohakuQueryData
 	KFCWarichuConditions	warichu;
 	KFCScriptLabelConditions	label;
 	KFCStoryConditions	story;		// (nothing but its Search:, which no query holds - its kind alone is saved: ST11)
+	KFCSpellingConditions	spelling;	// (its icons alone, as the Warichu kind's - 2026-11-06, SP6)
 
 	KFCKohakuQueryData() : mode(-1) {}
 };

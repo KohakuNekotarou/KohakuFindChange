@@ -545,6 +545,22 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	},
 
 	/*
+	 * Special Operations > Label's dialogs - Add Key..., Edit Value..., Remove Key... (2026-11-06 - docs/superpowers/specs/
+	 * 2026-11-06-kfc-label-spelling-runscript-design.md LB4): one boss for the three, each its own view below, as the value
+	 * dialogs. The controller fills the dialog that stands and keeps the answer on OK; the observer stands in for the stock
+	 * CDialogObserver and calls it - and follows Edit Value's list (KFCLabelDialogs.cpp).
+	 */
+	Class
+	{
+		kKFCLabelDialogBoss,
+		kDialogBoss,
+		{
+			IID_IDIALOGCONTROLLER, kKFCLabelDialogControllerImpl,
+			IID_IOBSERVER, kKFCLabelDialogObserverImpl,
+		}
+	},
+
+	/*
 	 * The Kohaku+ tab's queries in Find/Change's own Query menu (KFCKohakuQueryMenu.cpp): the watch that takes InDesign's load of a query of KFC's, and the filter - pushed on the application's event dispatcher while the tab
 	 * is shown - that takes the press of its Save Query.
 	 */
@@ -729,12 +745,8 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCClearResultsMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// Copy Results (docs/superpowers/specs/2026-10-18-kfc-copy-results-progress-share-design.md): every row of the live list as
-		// text on the clipboard - a line of column names, a tab between columns (KFCCopyResults - the Links panel's Copy Info).
-		kKFCCopyResultsActionID,
-		kKFCTargetMenuPath
-		kKFCCopyResultsMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
+		// (Copy Results stood here 10-18 to 11-06 - gone with Copy Rows and Copy These Results at the author's word, 11-06:
+		// docs/superpowers/specs/2026-11-06-kfc-label-spelling-runscript-design.md CR1. Their ActionIDs are retired - KFCUIID.h.)
 
 		// Run Saved Queries...: the query dialog - saved queries put in an order and run with InDesign's own
 		// Change All, one after another (KFCQueryDialog.cpp). Last in the block (the author's call).
@@ -941,25 +953,12 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCSelectAllRowsMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// ...and the book row's Copy Rows: every row of the list (the copy-results spec).
-		kKFCCopyRowsActionID,
-		kKFCResultBookMenuName
-		kKFCCopyRowsMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
 		// ----- A tier's own row's right-click menu (the author's call) -----
 		// Popped by KFCResultNodeEH::RButtonDn over a tier's row: Clear These Results lets that tier alone go - a grey one, or
 		// the live list (KFCResultHistory::ClearTier).
 		kKFCClearTheseResultsActionID,
 		kKFCResultTierMenuName
 		kKFCClearTheseResultsMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
-		// ...and Copy These Results above it (the copy-results spec): that tier's rows as text on the clipboard - a grey tier's
-		// as its copy holds them (KFCCopyResults::CopyTier).
-		kKFCCopyTheseResultsActionID,
-		kKFCResultTierMenuName
-		kKFCCopyTheseResultsMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// ...and Search These Results Again (the author's call): that tier's own search run once more - a grey one
@@ -1059,29 +1058,6 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCClearFromResultsActionID,
 		kKFCResultDocumentMenuName
 		kKFCClearFromResultsMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
-		// ----- Copy Rows: the same four menus (the copy-results spec) -----
-		// The rows Clear from Results would take off - the row's, the rows selected together, a story's or a document's - as text
-		// on the clipboard (KFCCopyResults::CopyLiveRows). Nothing is taken away.
-		kKFCCopyRowsActionID,
-		kKFCResultHitMenuName
-		kKFCCopyRowsMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
-		kKFCCopyRowsActionID,
-		kKFCResultObjectMenuName
-		kKFCCopyRowsMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
-		kKFCCopyRowsActionID,
-		kKFCResultStoryMenuName
-		kKFCCopyRowsMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
-		kKFCCopyRowsActionID,
-		kKFCResultDocumentMenuName
-		kKFCCopyRowsMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// ----- An OBJECT row's right-click menu (the author's call) -----
@@ -1894,39 +1870,6 @@ resource ActionDef (kSDKDefActionResourceID)
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
 
-		// Copy Results - the panel menu's (docs/superpowers/specs/2026-10-18-kfc-copy-results-progress-share-design.md).
-		// kCustomEnabling: greyed with no row to copy. In the Keyboard Shortcuts editor under Palette Menus, like Clear Results
-		// (the author's call - the spec map's SET-13).
-		kKFCActionComponentBoss,
-		kKFCCopyResultsActionID,
-		kKFCCopyResultsMenuKey,			// "Copy Results"
-		kKFCPanelMenuActionArea,
-		kNormalAction,
-		kCustomEnabling|kDisableIfLowMem,
-		kInvalidInterfaceID,
-		kSDKDefVisibleInKBSCEditorFlag,
-
-		// Copy Rows - a hit, object, story, document or book row's right-click menu. kCustomEnabling: greyed when it comes with no
-		// such row (pressed by ID) or with no row to copy.
-		kKFCActionComponentBoss,
-		kKFCCopyRowsActionID,
-		kKFCCopyRowsMenuKey,			// "Copy Rows"
-		kOtherActionArea,
-		kNormalAction,
-		kCustomEnabling|kDisableIfLowMem,
-		kInvalidInterfaceID,
-		kSDKDefInvisibleInKBSCEditorFlag,
-
-		// Copy These Results - a tier's own row's right-click menu. kCustomEnabling: greyed with no tier row or no row to copy.
-		kKFCActionComponentBoss,
-		kKFCCopyTheseResultsActionID,
-		kKFCCopyTierResultsMenuKey,		// "Copy These Results"
-		kOtherActionArea,
-		kNormalAction,
-		kCustomEnabling|kDisableIfLowMem,
-		kInvalidInterfaceID,
-		kSDKDefInvisibleInKBSCEditorFlag,
-
 		// Narrow Down's items - a tier heading's submenu (docs/superpowers/specs/2026-10-18-kfc-narrow-down-design.md). kCustomEnabling:
 		// UpdateActionStates greys them with no tier row (pressed by ID), and a text-only one over a tier of object rows.
 		kKFCActionComponentBoss,
@@ -2471,6 +2414,48 @@ resource ActionDef (kSDKDefActionResourceID)
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
 
+		// Special Operations > Label > Add Key... / Edit Value... / Remove Key... - an object row's and a text row's whose item can hold a label
+		// (2026-11-06 - docs/superpowers/specs/2026-11-06-kfc-label-spelling-runscript-design.md LB1 - LB3; KFCLabelDialogs, the model's WriteLabelRows).
+		// kCustomEnabling: grey under a run or a landing, with no such row - Edit Value... and Remove Key... with no key among the rows' items, too.
+		kKFCActionComponentBoss,
+		kKFCLabelAddKeyActionID,
+		kKFCLabelAddKeyMenuKey,			// "Add Key..."
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCLabelEditValueActionID,
+		kKFCLabelEditValueMenuKey,		// "Edit Value..."
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCLabelRemoveKeyActionID,
+		kKFCLabelRemoveKeyMenuKey,		// "Remove Key..."
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// Special Operations > Edit in Story Editor - a Story row's (a Find: Story list's, its own stories - not an internal one's): the story opened in the Story
+		// Editor, the document's own windows as they are - none for a document opened hidden (2026-11-06 - the author; KFCRowScript::EditInStoryEditor). No
+		// MenuDef node: KFCResultNodeEH's PopRowMenu puts it on a Story row's menu as it pops. kCustomEnabling: grey under a run or a landing.
+		kKFCActionComponentBoss,
+		kKFCEditInStoryEditorActionID,
+		kKFCEditInStoryEditorMenuKey,	// "Edit in Story Editor"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
 		// Restore from Copy - a text row's right-click menu, under Replace (the copy-restore spec).
 		// kCustomEnabling: a text row a Replace wrote (CanRestoreAny); why a copy cannot go back it says on the status line.
 		kKFCActionComponentBoss,
@@ -2650,6 +2635,11 @@ type KFCQueryFixedTextWidget(kViewRsrcType) : EVEStaticTextWidget(ClassID = kKFC
 type KFCSwitchIconWidget(kViewRsrcType) : EVERollOverIconButtonWidget(ClassID = kKFCSwitchIconWidgetBoss) { };
 // The value dialogs (KFCSpecialDialogs.cpp): DialogBoss with WidgetEveInfo, as the query dialog - EVE lays them out.
 type KFCValueDialogWidget(kViewRsrcType) : DialogBoss(ClassID = kKFCValueDialogBoss)
+{
+	WidgetEveInfo;
+};
+// Special Operations > Label's dialogs (KFCLabelDialogs.cpp - 2026-11-06): the same, their own boss.
+type KFCLabelDialogWidget(kViewRsrcType) : DialogBoss(ClassID = kKFCLabelDialogBoss)
 {
 	WidgetEveInfo;
 };
@@ -3058,6 +3048,31 @@ resource LocaleIndex (kKFCQueryNameDialogRsrcID)
 	kViewRsrcType,
 	{
 		kWildFS, k_Wild, kKFCQueryNameDialogRsrcID + index_enUS
+	}
+};
+
+// Special Operations > Label's views (2026-11-06 - KFCLabelDialogs.cpp).
+resource LocaleIndex (kKFCAddKeyDialogRsrcID)
+{
+	kViewRsrcType,
+	{
+		kWildFS, k_Wild, kKFCAddKeyDialogRsrcID + index_enUS
+	}
+};
+
+resource LocaleIndex (kKFCEditValueDialogRsrcID)
+{
+	kViewRsrcType,
+	{
+		kWildFS, k_Wild, kKFCEditValueDialogRsrcID + index_enUS
+	}
+};
+
+resource LocaleIndex (kKFCRemoveKeyDialogRsrcID)
+{
+	kViewRsrcType,
+	{
+		kWildFS, k_Wild, kKFCRemoveKeyDialogRsrcID + index_enUS
 	}
 };
 
@@ -4223,6 +4238,409 @@ resource KFCValueDialogWidget (kKFCQueryNameDialogRsrcID + index_enUS)
 					kTrue, kTrue,				// Visible, Enabled
 					kKFCValueCancelKey,			// "Cancel"
 					kTrue,						// "Reset" with Alt, as InDesign's own: the fields filled again
+					kEVENoSpaceAfter,
+				),
+			}
+		),
+	},
+
+	kEVEArrangeChildrenInRow | kEVERegularMargin,
+};
+
+/*
+ * SPECIAL OPERATIONS > LABEL'S DIALOGS (2026-11-06 - KFCLabelDialogs.cpp, docs/superpowers/specs/2026-11-06-kfc-label-spelling-runscript-design.md
+ * LB4): the value dialogs' shape - what is asked on the left, OK and Cancel stacked on the right. The labels one width in a column, right
+ * aligned (the Move dialog's). Value: is a box of several lines (EVEMultilineTextEditBoxWidget - a Windows edit box: KCM's Paw dialog is the
+ * worked example, KCMUI.fr); the keys' list is the query dialog's list (KFCQueryListWidget - its adapter tells it apart by its id).
+ */
+resource KFCLabelDialogWidget (kKFCAddKeyDialogRsrcID + index_enUS)
+{
+	__FILE__, __LINE__,
+	kKFCLabelDialogWidgetID,		// WidgetID
+	kPMRsrcID_None,					// RsrcID
+	kBindNone,						// Binding
+	Frame(0, 0, 420, 160)			// Frame (l,t,r,b) - not the window's size: EVE sizes it from the children
+	kTrue, kTrue,					// Visible, Enabled
+	kKFCLabelAddDialogKey,			// Dialog name - "... - Add Key"
+	{
+		EVEGenericPanelWidget
+		(
+			kInvalidWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+			kBindNone,							// Frame binding
+			Frame(0, 0, 0, 0)					// Frame (EVE sizes it)
+			kTrue, kTrue,						// Visible, Enabled
+			kEVEAlignLeft | kEVELargeSpaceAfter | kEVEArrangeChildrenInColumn,
+			{
+				EVEGenericPanelWidget
+				(
+					kInvalidWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+					kBindNone,							// Frame binding
+					Frame(0, 0, 0, 0)					// Frame (EVE sizes it)
+					kTrue, kTrue,						// Visible, Enabled
+					kEVEAlignLeft | kEVERegularSpaceAfter | kEVEArrangeChildrenInRow,
+					{
+						EVEStaticTextWidget
+						(
+							kInvalidWidgetID,			// WidgetId
+							kSysStaticTextPMRsrcId,		// RsrcId
+							kBindNone,					// Frame binding
+							Frame(0, 0, 48, 0)			// Frame - the column's one width
+							kTrue, kTrue, kAlignRight,	// Visible, Enabled, Alignment
+							kDontEllipsize, kTrue,		// Ellipsize style, Convert ampersands
+							kKFCLabelKeyFieldKey,		// "Key:"
+							kKFCLabelKeyFieldWidgetID	// Associated control - the field
+							kEVESmallSpaceAfter,
+						),
+						EVETextEditBoxWidget
+						(
+							kKFCLabelKeyFieldWidgetID,	// WidgetId
+							kSysEditBoxPMRsrcId,		// RsrcId
+							kBindNone,					// Frame binding
+							Frame(0, 0, 300, 0)			// Frame - a height of 0: the field's own
+							kTrue, kTrue,				// Visible, Enabled
+							kInvalidWidgetID,			// Nudge control (none)
+							1.0, 10.0,					// Small / large nudge
+							0,							// Max chars (no limit)
+							kFalse,						// Read only
+							kFalse,						// Notify every key stroke
+							kFalse,						// Range checking
+							kTrue,						// Blank entry allowed (OK says so - KFCLabelDialogController)
+							0, 0,						// Upper / lower limits
+							"",							// Initial text (the controller empties it)
+							kEVENoSpaceAfter,
+						),
+					}
+				),
+				EVEGenericPanelWidget
+				(
+					kInvalidWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+					kBindNone,							// Frame binding
+					Frame(0, 0, 0, 0)					// Frame (EVE sizes it)
+					kTrue, kTrue,						// Visible, Enabled
+					kEVEAlignLeft | kEVENoSpaceAfter | kEVEArrangeChildrenInRow,
+					{
+						EVEStaticTextWidget
+						(
+							kInvalidWidgetID,			// WidgetId
+							kSysStaticTextPMRsrcId,		// RsrcId
+							kBindNone,					// Frame binding
+							Frame(0, 0, 48, 0)			// Frame - the column's one width
+							kTrue, kTrue, kAlignRight,	// Visible, Enabled, Alignment
+							kDontEllipsize, kTrue,		// Ellipsize style, Convert ampersands
+							kKFCLabelValueFieldKey,		// "Value:"
+							kKFCLabelValueFieldWidgetID	// Associated control - the field
+							kEVESmallSpaceAfter,
+						),
+						EVEMultilineTextEditBoxWidget
+						(
+							kKFCLabelValueFieldWidgetID,	// WidgetId
+							kSysEditBoxPMRsrcId,		// RsrcId
+							kBindNone,					// Frame binding
+							Frame(0, 0, 300, 76)		// Frame - about four lines: a box of several lines does not grow itself
+							kTrue, kTrue,				// Visible, Enabled
+							kInvalidWidgetID,			// Nudge control (none)
+							0, 0,						// Small / large nudge
+							0,							// Max chars (no limit)
+							kFalse,						// Read only
+							kFalse,						// Notify every key stroke
+							kFalse,						// Range checking
+							kTrue,						// Blank entry allowed (OK says so)
+							0, 0,						// Upper / lower limits
+							"",							// Initial text (the controller empties it)
+							kEVENoSpaceAfter,
+						),
+					}
+				),
+			}
+		),
+		// ----- OK and Cancel, stacked on the right, as InDesign's own -----
+		EVEGenericPanelWidget
+		(
+			kInvalidWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+			kBindNone,							// Frame binding
+			Frame(0, 0, 0, 0)					// Frame (EVE sizes it)
+			kTrue, kTrue,						// Visible, Enabled
+			kEVEAlignLeft | kEVENoSpaceAfter | kEVEArrangeChildrenInColumn,
+			{
+				EVEDefaultButtonWidget
+				(
+					kOKButtonWidgetID,			// WidgetID - the dialog's default button: Enter
+					kSysButtonPMRsrcId,			// RsrcID
+					kBindNone,					// Binding
+					Frame(0, 0, 0, 0)			// Frame (EVE sizes it)
+					kTrue, kTrue,				// Visible, Enabled
+					kKFCValueOKKey,				// "OK"
+					kEVERegularSpaceAfter,
+				),
+				EVECancelButtonWidget
+				(
+					kCancelButton_WidgetID,		// WidgetID - the dialog's cancel button: Escape
+					kSysButtonPMRsrcId,			// RsrcID
+					kBindNone,					// Binding
+					Frame(0, 0, 0, 0)			// Frame (EVE sizes it)
+					kTrue, kTrue,				// Visible, Enabled
+					kKFCValueCancelKey,			// "Cancel"
+					kTrue,						// "Reset" with Alt, as InDesign's own: the fields filled again
+					kEVENoSpaceAfter,
+				),
+			}
+		),
+	},
+
+	kEVEArrangeChildrenInRow | kEVERegularMargin,
+};
+
+resource KFCLabelDialogWidget (kKFCEditValueDialogRsrcID + index_enUS)
+{
+	__FILE__, __LINE__,
+	kKFCLabelDialogWidgetID,		// WidgetID
+	kPMRsrcID_None,					// RsrcID
+	kBindNone,						// Binding
+	Frame(0, 0, 420, 300)			// Frame (l,t,r,b) - not the window's size: EVE sizes it from the children
+	kTrue, kTrue,					// Visible, Enabled
+	kKFCLabelEditDialogKey,			// Dialog name - "... - Edit Value"
+	{
+		EVEGenericPanelWidget
+		(
+			kInvalidWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+			kBindNone,							// Frame binding
+			Frame(0, 0, 0, 0)					// Frame (EVE sizes it)
+			kTrue, kTrue,						// Visible, Enabled
+			kEVEAlignLeft | kEVELargeSpaceAfter | kEVEArrangeChildrenInColumn,
+			{
+				EVEGenericPanelWidget
+				(
+					kInvalidWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+					kBindNone,							// Frame binding
+					Frame(0, 0, 0, 0)					// Frame (EVE sizes it)
+					kTrue, kTrue,						// Visible, Enabled
+					kEVEAlignLeft | kEVERegularSpaceAfter | kEVEArrangeChildrenInRow,
+					{
+						EVEStaticTextWidget
+						(
+							kInvalidWidgetID,			// WidgetId
+							kSysStaticTextPMRsrcId,		// RsrcId
+							kBindNone,					// Frame binding
+							Frame(0, 0, 48, 0)			// Frame - the column's one width
+							kTrue, kTrue, kAlignRight,	// Visible, Enabled, Alignment
+							kDontEllipsize, kTrue,		// Ellipsize style, Convert ampersands
+							kKFCLabelKeysListKey,		// "Keys:"
+							kInvalidWidgetID			// Associated control (none - a list)
+							kEVESmallSpaceAfter,
+						),
+						// One key a row, "<key>  (<n> of <holders>)"; single selection; kDrawBorder makes it read as a list box (the query dialog's).
+						KFCQueryListWidget
+						(
+							kKFCLabelKeyListWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+							kBindNone,						// Frame binding (EVE places it)
+							Frame(0, 0, 300, kKFCQueryRowHeight * 7)	// Frame - seven rows at a glance
+							kTrue, kTrue,					// Visible, Enabled
+							kTrue,							// EraseBeforeDraw
+							kInterfacePaletteFill,			// InterfaceColor
+							"",								// Panel name
+							kHideRootNode | kDrawBorder,	// Options: the root is not a row
+							kFalse,							// Use H scroll bar
+							kTrue,							// Use V scroll bar
+							kKFCQueryRowHeight,				// fVScrollButtonIncrement (one row)
+							kKFCQueryRowHeight,				// fVThumbScrollIncrement
+							kKFCQueryRowHeight,				// fHScrollButtonIncrement (unused, no H bar)
+							kKFCQueryRowHeight,				// fHThumbScrollIncrement
+							1,								// Items selectable: 1 = single selection
+							kFalse,							// Allow children from multiple parents to be selected
+							kFalse,							// Allow discontiguous selection
+							{
+							},
+							kEVENoSpaceAfter,
+						),
+					}
+				),
+				EVEGenericPanelWidget
+				(
+					kInvalidWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+					kBindNone,							// Frame binding
+					Frame(0, 0, 0, 0)					// Frame (EVE sizes it)
+					kTrue, kTrue,						// Visible, Enabled
+					kEVEAlignLeft | kEVESmallSpaceAfter | kEVEArrangeChildrenInRow,
+					{
+						EVEStaticTextWidget
+						(
+							kInvalidWidgetID,			// WidgetId
+							kSysStaticTextPMRsrcId,		// RsrcId
+							kBindNone,					// Frame binding
+							Frame(0, 0, 48, 0)			// Frame - the column's one width
+							kTrue, kTrue, kAlignRight,	// Visible, Enabled, Alignment
+							kDontEllipsize, kTrue,		// Ellipsize style, Convert ampersands
+							kKFCLabelValueFieldKey,		// "Value:"
+							kKFCLabelValueFieldWidgetID	// Associated control - the field
+							kEVESmallSpaceAfter,
+						),
+						EVEMultilineTextEditBoxWidget
+						(
+							kKFCLabelValueFieldWidgetID,	// WidgetId
+							kSysEditBoxPMRsrcId,		// RsrcId
+							kBindNone,					// Frame binding
+							Frame(0, 0, 300, 76)		// Frame - about four lines
+							kTrue, kTrue,				// Visible, Enabled
+							kInvalidWidgetID,			// Nudge control (none)
+							0, 0,						// Small / large nudge
+							0,							// Max chars (no limit)
+							kFalse,						// Read only
+							kFalse,						// Notify every key stroke (read as a key is picked, and on OK)
+							kFalse,						// Range checking
+							kTrue,						// Blank entry allowed - an empty value takes the key away
+							0, 0,						// Upper / lower limits
+							"",							// Initial text (the controller fills it)
+							kEVENoSpaceAfter,
+						),
+					}
+				),
+				// What the key shown is: its values differ, or not every item has it (KFCLabelDialogs' ShowKey) - and the rule of an empty value.
+				EVEStaticTextWidget
+				(
+					kKFCLabelNoteWidgetID,		// WidgetId
+					kSysStaticTextPMRsrcId,		// RsrcId
+					kBindNone,					// Frame binding
+					Frame(0, 0, 360, 0)			// Frame
+					kTrue, kTrue, kAlignLeft,	// Visible, Enabled, Alignment
+					kEllipsizeEnd, kTrue,		// Ellipsize style, Convert ampersands
+					"",							// (the controller writes it)
+					kInvalidWidgetID			// Associated control (none)
+					kEVESmallSpaceAfter,
+				),
+				EVEStaticTextWidget
+				(
+					kInvalidWidgetID,			// WidgetId
+					kSysStaticTextPMRsrcId,		// RsrcId
+					kBindNone,					// Frame binding
+					Frame(0, 0, 360, 0)			// Frame
+					kTrue, kTrue, kAlignLeft,	// Visible, Enabled, Alignment
+					kEllipsizeEnd, kTrue,		// Ellipsize style, Convert ampersands
+					kKFCLabelEmptyValueNoteKey,	// "An empty value takes the key away."
+					kInvalidWidgetID			// Associated control (none)
+					kEVENoSpaceAfter,
+				),
+			}
+		),
+		// ----- OK and Cancel, stacked on the right, as InDesign's own -----
+		EVEGenericPanelWidget
+		(
+			kInvalidWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+			kBindNone,							// Frame binding
+			Frame(0, 0, 0, 0)					// Frame (EVE sizes it)
+			kTrue, kTrue,						// Visible, Enabled
+			kEVEAlignLeft | kEVENoSpaceAfter | kEVEArrangeChildrenInColumn,
+			{
+				EVEDefaultButtonWidget
+				(
+					kOKButtonWidgetID,			// WidgetID - the dialog's default button: Enter
+					kSysButtonPMRsrcId,			// RsrcID
+					kBindNone,					// Binding
+					Frame(0, 0, 0, 0)			// Frame (EVE sizes it)
+					kTrue, kTrue,				// Visible, Enabled
+					kKFCValueOKKey,				// "OK"
+					kEVERegularSpaceAfter,
+				),
+				EVECancelButtonWidget
+				(
+					kCancelButton_WidgetID,		// WidgetID - the dialog's cancel button: Escape
+					kSysButtonPMRsrcId,			// RsrcID
+					kBindNone,					// Binding
+					Frame(0, 0, 0, 0)			// Frame (EVE sizes it)
+					kTrue, kTrue,				// Visible, Enabled
+					kKFCValueCancelKey,			// "Cancel"
+					kTrue,						// "Reset" with Alt, as InDesign's own: the fields filled again
+					kEVENoSpaceAfter,
+				),
+			}
+		),
+	},
+
+	kEVEArrangeChildrenInRow | kEVERegularMargin,
+};
+
+resource KFCLabelDialogWidget (kKFCRemoveKeyDialogRsrcID + index_enUS)
+{
+	__FILE__, __LINE__,
+	kKFCLabelDialogWidgetID,		// WidgetID
+	kPMRsrcID_None,					// RsrcID
+	kBindNone,						// Binding
+	Frame(0, 0, 420, 200)			// Frame (l,t,r,b) - not the window's size: EVE sizes it from the children
+	kTrue, kTrue,					// Visible, Enabled
+	kKFCLabelRemoveDialogKey,		// Dialog name - "... - Remove Key"
+	{
+		EVEGenericPanelWidget
+		(
+			kInvalidWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+			kBindNone,							// Frame binding
+			Frame(0, 0, 0, 0)					// Frame (EVE sizes it)
+			kTrue, kTrue,						// Visible, Enabled
+			kEVEAlignLeft | kEVELargeSpaceAfter | kEVEArrangeChildrenInRow,
+			{
+				EVEStaticTextWidget
+				(
+					kInvalidWidgetID,			// WidgetId
+					kSysStaticTextPMRsrcId,		// RsrcId
+					kBindNone,					// Frame binding
+					Frame(0, 0, 48, 0)			// Frame - the column's one width
+					kTrue, kTrue, kAlignRight,	// Visible, Enabled, Alignment
+					kDontEllipsize, kTrue,		// Ellipsize style, Convert ampersands
+					kKFCLabelKeysListKey,		// "Keys:"
+					kInvalidWidgetID			// Associated control (none - a list)
+					kEVESmallSpaceAfter,
+				),
+				KFCQueryListWidget
+				(
+					kKFCLabelKeyListWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+					kBindNone,						// Frame binding (EVE places it)
+					Frame(0, 0, 300, kKFCQueryRowHeight * 7)	// Frame - seven rows at a glance
+					kTrue, kTrue,					// Visible, Enabled
+					kTrue,							// EraseBeforeDraw
+					kInterfacePaletteFill,			// InterfaceColor
+					"",								// Panel name
+					kHideRootNode | kDrawBorder,	// Options: the root is not a row
+					kFalse,							// Use H scroll bar
+					kTrue,							// Use V scroll bar
+					kKFCQueryRowHeight,				// fVScrollButtonIncrement (one row)
+					kKFCQueryRowHeight,				// fVThumbScrollIncrement
+					kKFCQueryRowHeight,				// fHScrollButtonIncrement (unused, no H bar)
+					kKFCQueryRowHeight,				// fHThumbScrollIncrement
+					1,								// Items selectable: 1 = single selection
+					kFalse,							// Allow children from multiple parents to be selected
+					kFalse,							// Allow discontiguous selection
+					{
+					},
+					kEVENoSpaceAfter,
+				),
+			}
+		),
+		// ----- OK and Cancel, stacked on the right, as InDesign's own -----
+		EVEGenericPanelWidget
+		(
+			kInvalidWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+			kBindNone,							// Frame binding
+			Frame(0, 0, 0, 0)					// Frame (EVE sizes it)
+			kTrue, kTrue,						// Visible, Enabled
+			kEVEAlignLeft | kEVENoSpaceAfter | kEVEArrangeChildrenInColumn,
+			{
+				EVEDefaultButtonWidget
+				(
+					kOKButtonWidgetID,			// WidgetID - the dialog's default button: Enter
+					kSysButtonPMRsrcId,			// RsrcID
+					kBindNone,					// Binding
+					Frame(0, 0, 0, 0)			// Frame (EVE sizes it)
+					kTrue, kTrue,				// Visible, Enabled
+					kKFCValueOKKey,				// "OK"
+					kEVERegularSpaceAfter,
+				),
+				EVECancelButtonWidget
+				(
+					kCancelButton_WidgetID,		// WidgetID - the dialog's cancel button: Escape
+					kSysButtonPMRsrcId,			// RsrcID
+					kBindNone,					// Binding
+					Frame(0, 0, 0, 0)			// Frame (EVE sizes it)
+					kTrue, kTrue,				// Visible, Enabled
+					kKFCValueCancelKey,			// "Cancel"
+					kTrue,						// "Reset" with Alt, as InDesign's own
 					kEVENoSpaceAfter,
 				),
 			}

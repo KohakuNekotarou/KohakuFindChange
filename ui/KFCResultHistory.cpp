@@ -754,6 +754,12 @@ namespace
 			label.Append(" Find:\"[All Stories]\"");
 			return label;
 		}
+		// THE SPELLING KIND ASKS NOTHING BUT ITS ICONS (docs/superpowers/specs/2026-11-06-kfc-label-spelling-runscript-design.md SP3): Find:"[Spelling]", as Warichu's.
+		if (mode == kKFCSpellingSearchMode)
+		{
+			label.Append(" Find:\"[Spelling]\"");
+			return label;
+		}
 		// THE KENTEN KIND'S THE SAME: Find:"base<mark>" as its rows draw it; Find:"base(kenten nashi)" for its none; [subete no kenten] with nothing asked - in Japanese since 2026-11-03 (the author: "the
 		// Find"" on the panel in Japanese"; KFCJapanese.h - the part's own words: its list's first entry, its none).
 		if (mode == kKFCKentenSearchMode)

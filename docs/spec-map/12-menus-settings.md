@@ -17,7 +17,6 @@
   Previous Result
   Change All in Book
   Clear Results
-  Copy Results
   Run Saved Queries...
   ──────────
   Book Scope
@@ -132,7 +131,7 @@
 
 ## 4. キーボードショートカット
 
-- **SET-13** ★ショートカットを割り当てられるのは**8つだけ** ―― `Open Find/Change...`・`Find in …`・`Next Result`・`Previous Result`・`Change All in Book`・`Run Saved Queries...`・`Clear Results`・`Copy Results`
+- **SET-13** ★ショートカットを割り当てられるのは**7つだけ** ―― `Open Find/Change...`・`Find in …`・`Next Result`・`Previous Result`・`Change All in Book`・`Run Saved Queries...`・`Clear Results`（⛔`Copy Results` は 2026-11-06 に撤去＝ROW-48）
   （`Next Result`・`Previous Result` は 2026-10-30 に足した＝JMP-35。**既定のショートカットは付けない**＝利用者が選ぶ・本体の「次を検索」とぶつけない。）
   （`Find Objects on Active Layer` は 2026-10-18 午後に外れた＝パネルメニューから段の見出しの Narrow Down ▸ On Active Layer へ移した・Narrow Down は段の上でしか押せないので割り当てない＝ROW-46。ほかに本体の決まりで、ウィンドウメニューの `Kohaku Find/Change`〈パネルを出す〉も割り当てられる＝KIDMCP の `inspect_ui actions` の shortcuts の列で確かめた・2026-10-18。）
   （`Copy Results` は 2026-10-18 に足した＝作者の決定「だしましょう」。行の `Copy Rows`・段の `Copy These Results` は出さない＝押した行・段が要る。一覧の中の Ctrl+C は Copy Rows と同じ＝ショートカットの設定とは別。）

@@ -43,7 +43,7 @@ namespace KFCResultTree
 		PMReal		shift;		// how far right of the list's outermost level; a tier's own level is not counted
 		PMString	label;		// a book, document, story or tier row's "<name>  (R/N)"
 		PMString	name;		// ...its <name> alone - no counts, no note after it (" (no window)"):
-								//   the Document column of Copy Results (KFCCopyResults)
+								//   what KFCResultHistory reads of a tier's head and a document row's label
 		PMString	locator;	// a hit row's five parts, as IKFCRowData::SetSegments takes them ("Changed " at the head of
 		PMString	flag;		//   the locator of a row this list has replaced)
 		PMString	pre;
@@ -187,8 +187,7 @@ namespace KFCResultTree
 	bool GetSelectedHitRows(KFCRowsByChapter& outRows, bool* outObjects = nil);
 
 	/** Is the row (chapter, hit) one of these rows? The one question the selection's doors (RowsOfRightClick,
-	    LastSelectedHit, FollowModifiedClick) and Copy Rows (KFCCopyResults) ask of a list of rows
-	    (KFCResultTreeController.cpp). */
+	    LastSelectedHit, FollowModifiedClick) ask of a list of rows (KFCResultTreeController.cpp). */
 	bool RowsHold(const KFCRowsByChapter& rows, int32 chapter, int32 hit);
 
 	/** THE ROWS A RIGHT-CLICK'S REPLACE WRITES: every row selected together, by document in the order drawn, when
@@ -325,6 +324,14 @@ namespace KFCResultTree
 
 	/** Can Remove Label be offered on these rows (KFCRuns()->CanRemoveLabelHit - read only)? The menu's grey. */
 	bool CanRemoveLabelAny(const KFCRowsByChapter& rows);
+
+	/** SPECIAL OPERATIONS > LABEL > ADD KEY... / EDIT VALUE... / REMOVE KEY... ON THE ROWS (docs/superpowers/specs/2026-11-06-kfc-label-spelling-runscript-design.md
+	    LB5 - op a KFCLabelOp, edits what the dialog answered): the rows' items given the edits by the model (KFCRuns()->WriteLabelRows), one Ctrl+Z; the rows drawn
+	    again (WriteRowsInPlace - a script label list's rows read their labels again). True = something written. */
+	bool LabelRows(int32 op, const KFCRowsByChapter& rows, const std::vector<KFCLabelEdit>& edits);
+
+	/** Can Special Operations > Label be offered on these rows - does one stand for an item that holds labels (KFCRuns()->CanLabelHit - read only)? */
+	bool CanLabelAny(const KFCRowsByChapter& rows);
 
 	/** SPECIAL OPERATIONS > RUN SCRIPT... ON THE ROWS (docs/superpowers/specs/2026-11-06-kfc-run-script-on-rows-design.md - KFCRowScript): the person's script run once on each
 	    row's object (kfcResult), one Ctrl+Z; the rows drawn again, no word on them. True = it ran on one row at least. */

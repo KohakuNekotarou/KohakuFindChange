@@ -103,6 +103,7 @@
 #include "KFCWarichuSearch.h"	// the Warichu kind's
 #include "KFCScriptLabelSearch.h"	// the Script Label kind's
 #include "KFCStorySearch.h"		// the Story kind's
+#include "KFCSpellingSearch.h"	// the Spelling kind's (2026-11-06)
 #include "KFCTextCut.h"			// KFCSafeCut - where a row's line may be cut (the rule the panel's own cuts follow)
 #include "KFCFindChangeCmds.h"	// the find/change settings' commands, one at a time
 #include "KFCQueryCopy.h"		// the query copied in memory - onto each new list (the tier switch); the spike (DiagProbe)
@@ -3107,7 +3108,8 @@ void WriteListHeader(bool fromBook, bool allDocuments, KFCResultModel::SearchSco
 const char* RowWords(bool frames)
 {
 	return KFCResultModel::ListIsQRCodes() ? " QR code(s)" : KFCResultModel::ListIsTables() ? " table(s)"
-		: KFCResultModel::ListIsScriptLabels() ? " label(s)" : KFCResultModel::ListIsStory() ? " story(s)" : frames ? " frame(s)" : " hit(s)";
+		: KFCResultModel::ListIsScriptLabels() ? " label(s)" : KFCResultModel::ListIsStory() ? " story(s)"
+		: KFCResultModel::ListIsSpelling() ? " word(s)" : frames ? " frame(s)" : " hit(s)";
 }
 
 // WHAT A NARROWED LIST'S WALKS OWE ITS SUMMARY (Narrow Down - nothing for any other list), said by the same two: the
@@ -3632,7 +3634,8 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 		: KFCResultModel::ListIsKenten() ? static_cast<int32>(kKFCKentenSearchMode)
 		: KFCResultModel::ListIsWarichu() ? static_cast<int32>(kKFCWarichuSearchMode)
 		: KFCResultModel::ListIsScriptLabels() ? static_cast<int32>(kKFCScriptLabelSearchMode)
-		: KFCResultModel::ListIsStory() ? static_cast<int32>(kKFCStorySearchMode) : KFCSearchEngine::FindChangeMode();
+		: KFCResultModel::ListIsStory() ? static_cast<int32>(kKFCStorySearchMode)
+		: KFCResultModel::ListIsSpelling() ? static_cast<int32>(kKFCSpellingSearchMode) : KFCSearchEngine::FindChangeMode();
 	if (!KFCSearchEngine::CanSearchTab(tab))
 	{
 		outSummary.Append("The Find/Change dialog is on the ");
@@ -3653,14 +3656,15 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	const bool warichuTab = (tab == kKFCWarichuSearchMode);				// KFC's Warichu kind - KFCWarichuSearch: the text set as warichu
 	const bool labelTab = (tab == kKFCScriptLabelSearchMode);			// KFC's Script Label kind - KFCScriptLabelSearch: page items by their labels
 	const bool storyTab = (tab == kKFCStorySearchMode);					// KFC's Story kind - KFCStorySearch: every story, the internal ones too
+	const bool spellingTab = (tab == kKFCSpellingSearchMode);			// KFC's Spelling kind - KFCSpellingSearch: the words Dynamic Spelling underlines
 	// SEARCH TEXT IN THESE OBJECTS walks text: on the Object tab (or the QR Code tab) it was refused before it came here
 	// (SearchTextInObjects), and a search again of its list runs under the list's own query, its tab stated first
 	// (KFCUnderListQuery) - this stays for a caller that did neither.
 	const bool inObjects = (again != nil && again->inObjects);
-	if (inObjects && (objectTab || qrTab || tableTab || rubyTab || kentenTab || warichuTab || labelTab || storyTab))
+	if (inObjects && (objectTab || qrTab || tableTab || rubyTab || kentenTab || warichuTab || labelTab || storyTab || spellingTab))
 	{
 		outSummary.Append("Search Text in These Objects: Find/Change is on the ");
-		outSummary.Append((qrTab || tableTab || rubyTab || kentenTab || warichuTab || labelTab || storyTab) ? "Kohaku+" : KFCSearchEngine::TabName(tab));
+		outSummary.Append((qrTab || tableTab || rubyTab || kentenTab || warichuTab || labelTab || storyTab || spellingTab) ? "Kohaku+" : KFCSearchEngine::TabName(tab));
 		outSummary.Append(" tab - switch it to Text, GREP, Glyph or Transliterate.");
 		return 0;
 	}
@@ -3677,9 +3681,16 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	//  frame of the Type, the way InDesign's own Find Next walks them; the regression case obj-empty-find.)
 	// (The QR Code tab has no query at all - it lists every QR code: the author's call. The Table tab's is its own face's: no
 	//  condition lists every table.)
-	if (!objectTab && !qrTab && !tableTab && !rubyTab && !kentenTab && !warichuTab && !labelTab && !storyTab && !HasFindQuery())
+	if (!objectTab && !qrTab && !tableTab && !rubyTab && !kentenTab && !warichuTab && !labelTab && !storyTab && !spellingTab && !HasFindQuery())
 	{
 		AppendNothingToFind(outSummary, tab);
+		return 0;
+	}
+	// THE SPELLING KIND WITH DYNAMIC SPELLING OFF (docs/superpowers/specs/2026-11-06-kfc-label-spelling-runscript-design.md SP4): InDesign then underlines no word and
+	// checks none for a line - nothing to list. Said, the setting left as the person has it.
+	if (spellingTab && !KFCSpellingSearch::DynamicSpellingIsOn())
+	{
+		outSummary.Append("Spelling: Dynamic Spelling is off - turn it on (Edit > Spelling) and search again.");
 		return 0;
 	}
 	// THE SCRIPT LABEL KIND'S GREP THAT IS NO REGULAR EXPRESSION (the author, 11-04 - GREP): said, before anything is walked or set aside, as nothing to find is. A search
@@ -3763,7 +3774,7 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	// mode commit below, in the order the two always had. (Not for the QR Code tab: its walk is no walker of Find/Change's,
 	// and its search touches no setting at all - QR-10. Nor for the Table tab: KFCTableSearch reads each story's own table list - but over part of a document it asks InDesign's own scope, which reads
 	// the direction: To End of Story, backwards, is the text before the caret.)
-	KFCForwardSearchScope forward((!qrTab && !tableTab && !rubyTab && !kentenTab && !warichuTab && !labelTab && !storyTab) || selectionScope != IWalkerScopeFactoryUtils::kDocumentScope);
+	KFCForwardSearchScope forward((!qrTab && !tableTab && !rubyTab && !kentenTab && !warichuTab && !labelTab && !storyTab && !spellingTab) || selectionScope != IWalkerScopeFactoryUtils::kDocumentScope);
 
 	// State the tab before anything is walked. A walk runs in the mode last COMMITTED through
 	// kFindSearchModeCmdBoss - not in the one IFindChangeOptions merely reports - so without this a
@@ -3779,7 +3790,7 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	// away by design. Measured: KT's object walks found the Object tab's matches with no mode committed and the
 	// dialog's mode on Text (the object search plan's Task 1 M4 - docs/superpowers/plans/2026-10-09-kfc-object-search.md).
 	// (Nor for the QR Code tab: its walk is KFC's own object walker, which no mode steers - KFCQRCodes. Nor for the Table tab.)
-	if (!objectTab && !qrTab && !tableTab && !rubyTab && !kentenTab && !warichuTab && !labelTab && !storyTab && !KFCSearchEngine::CommitSearchMode())
+	if (!objectTab && !qrTab && !tableTab && !rubyTab && !kentenTab && !warichuTab && !labelTab && !storyTab && !spellingTab && !KFCSearchEngine::CommitSearchMode())
 	{
 		outSummary.Append("The Find/Change tab could not be set - nothing was searched. Try reopening Edit > Find/Change.");
 		return 0;
@@ -3787,7 +3798,7 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 
 	// OVER PART OF THE FRONT DOCUMENT ON THE TABLE OR RUBY KIND (Search: Story, To End of Story, Selection): what InDesign's own scope holds, read here - one that cannot be read leaves the list standing.
 	std::vector<ListedPlace> ownKindPart;
-	const bool ownKindOverPart = (tableTab || rubyTab || kentenTab || warichuTab) && selectionScope != IWalkerScopeFactoryUtils::kDocumentScope;
+	const bool ownKindOverPart = (tableTab || rubyTab || kentenTab || warichuTab || spellingTab) && selectionScope != IWalkerScopeFactoryUtils::kDocumentScope;
 	if (ownKindOverPart)
 	{
 		IDocument* const front = KFCBookScope::ActiveDocument();
@@ -4018,6 +4029,14 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 		else
 			(void)KFCWarichuSearch::IsTabCurrent(&warichuAsked);
 	}
+	KFCSpellingConditions spellingAsked;		// (the Spelling kind's: its icons alone, as the Warichu kind's - docs/superpowers/specs/2026-11-06-kfc-label-spelling-runscript-design.md SP3)
+	if (spellingTab)
+	{
+		if (againCopy != nil && again != nil && !again->freshQuery)
+			spellingAsked.switches = againCopy->ownSwitches;
+		else
+			(void)KFCSpellingSearch::IsTabCurrent(&spellingAsked);
+	}
 	KFCScriptLabelConditions labelAsked;		// (the Script Label kind's: its key, words, Case Sensitive and Whole Label - docs/superpowers/specs/2026-11-04-kfc-script-label-design.md S4)
 	if (labelTab)
 	{
@@ -4054,6 +4073,11 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 		{
 			KFCQueryCopier::CaptureWarichu(copy);
 			copy.ownSwitches = warichuAsked.switches;
+		}
+		else if (spellingTab)
+		{
+			KFCQueryCopier::CaptureSpelling(copy);
+			copy.ownSwitches = spellingAsked.switches;
 		}
 		else if (labelTab)
 			KFCQueryCopier::CaptureScriptLabels(copy, labelAsked);
@@ -4095,6 +4119,8 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 			KFCKentenSearch::CollectTargets(targets, fromBook, unopenable, tally, reserved, kentenAsked, ownKindOverPart ? &ownKindPart : nil);
 		else if (warichuTab)	// THE WARICHU KIND: each story's stretches of warichu.
 			KFCWarichuSearch::CollectTargets(targets, fromBook, unopenable, tally, reserved, warichuAsked, ownKindOverPart ? &ownKindPart : nil);
+		else if (spellingTab)	// THE SPELLING KIND: each story's words Dynamic Spelling underlines.
+			KFCSpellingSearch::CollectTargets(targets, fromBook, unopenable, tally, reserved, spellingAsked, ownKindOverPart ? &ownKindPart : nil);
 		else if (labelTab)		// THE SCRIPT LABEL KIND: every page item whose label its conditions find, read by KFC's own object walk one document at a time.
 			KFCScriptLabelSearch::CollectTargets(targets, fromBook, unopenable, tally, reserved, labelAsked);
 		else if (storyTab)		// THE STORY KIND: every story of each target - the internal ones too - a row each.
@@ -4192,6 +4218,20 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 	AppendSearchErrorNote(chapterNotes, tally.brokeOff);
 	KFCBookScope::AppendUnopenableNote(chapterNotes, unopenable);
 	KFCBookScope::AppendUnclosedNote(chapterNotes, tally.unclosed);
+	// THE SPELLING KIND'S STORIES NOT CHECKED YET (SP4): no line and no row - said whether anything was found or not, so a short or an empty list is not taken for the
+	// whole. An open document's InDesign checks while it is idle; a closed chapter reads as it was saved and goes back at once (measured 2026-11-06 - KFCSpellingSearch.h).
+	if (spellingTab && tally.notChecked > 0)
+	{
+		chapterNotes.Append(" Dynamic Spelling has not checked ");
+		chapterNotes.AppendNumber(tally.notChecked);
+		chapterNotes.Append(" story(s) yet - search again in a moment.");
+	}
+	if (spellingTab && tally.notCheckedClosed > 0)
+	{
+		chapterNotes.Append(" ");
+		chapterNotes.AppendNumber(tally.notCheckedClosed);
+		chapterNotes.Append(" story(s) of the closed chapters had not been checked when they were saved - open the chapter, let InDesign check it, save it, and search again.");
+	}
 
 	// No matches: a plain, friendly line rather than "0 hit(s) in 0 chapter(s)".
 	if (tally.total == 0)
@@ -4292,7 +4332,7 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 		const bool objects = KFCResultModel::ListHoldsObjects();
 		outSummary.Append(" Stopped at the ");
 		outSummary.AppendNumber(KFCResultModel::ListLimit());
-		if (qrTab || tableTab || rubyTab || kentenTab || warichuTab || labelTab || storyTab)
+		if (qrTab || tableTab || rubyTab || kentenTab || warichuTab || labelTab || storyTab || spellingTab)
 			outSummary.Append(" limit.");		// (a QR code, table, ruby, kenten, warichu, script label or story list has no Change All and no Narrow Down to offer)
 		else
 		{
@@ -4321,6 +4361,10 @@ int32 KFCSearchEngine::RunSearch(const AgainTarget* again, PMString& outSummary,
 		outSummary.Append(" Click a row to go to its text.");		// (it changes nothing - as QR Code's)
 	else if (storyTab)
 		outSummary.Append(" Click a row to go to its story.");		// (it changes nothing - docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md ST10)
+	else if (spellingTab)
+	{
+		outSummary.Append(" Click a row to go to its word.");		// (it changes nothing - SP3; what Dynamic Spelling had not checked is said with the notes)
+	}
 	else if (tableTab)
 		outSummary.Append(" Click a row to go to its table. Replace gives it the Kohaku+ tab's Change side.");
 	else if (labelTab)
@@ -4447,6 +4491,7 @@ const char* KFCSearchEngine::TabName(int32 mode)
 		case kKFCWarichuSearchMode:						return "Warichu";	// KFC's own tab (KFCWarichuSearch)
 		case kKFCScriptLabelSearchMode:					return "Script Label";	// KFC's own tab (KFCScriptLabelSearch)
 		case kKFCStorySearchMode:						return "Story";		// KFC's own tab (KFCStorySearch)
+		case kKFCSpellingSearchMode:					return "Spelling";	// KFC's own tab (KFCSpellingSearch)
 		default:										return "";
 	}
 }
@@ -4468,6 +4513,8 @@ int32 KFCSearchEngine::CurrentSearchMode()
 		return kKFCScriptLabelSearchMode;
 	if (KFCStorySearch::IsTabCurrent())
 		return kKFCStorySearchMode;
+	if (KFCSpellingSearch::IsTabCurrent())
+		return kKFCSpellingSearchMode;
 	return FindChangeMode();
 }
 
@@ -4503,6 +4550,9 @@ int32 KFCSearchEngine::CurrentSearchScope()
 	KFCStoryConditions story;		// (and the Story kind's - Document or All Documents, as the QR Code tab's)
 	if (KFCStorySearch::IsTabCurrent(&story))
 		return story.scope;
+	KFCSpellingConditions spelling;		// (and the Spelling kind's - its five, as the Warichu kind's)
+	if (KFCSpellingSearch::IsTabCurrent(&spelling))
+		return spelling.scope;
 	return FindChangeScope();
 }
 
@@ -5827,6 +5877,14 @@ bool KFCSearchEngine::SearchDocumentAgain(int32 chapterIdx, PMString& outStatus)
 			if (asked != nil)
 				listAsked.switches = asked->ownSwitches;
 			walked = KFCWarichuSearch::WalkOneDocument(docRef, name, limit, listAsked, hits, storyVersions, capped, cancelled);
+		}
+		else if (KFCResultModel::ListIsSpelling())		// a spelling list: the same (KFCSpellingSearch) - its icons alone
+		{
+			const std::shared_ptr<const KFCQueryCopy> asked(KFCResultModel::GetQueryCopy());
+			KFCSpellingConditions listAsked;
+			if (asked != nil)
+				listAsked.switches = asked->ownSwitches;
+			walked = KFCSpellingSearch::WalkOneDocument(docRef, name, limit, listAsked, hits, storyVersions, capped, cancelled);
 		}
 		else if (KFCResultModel::ListIsScriptLabels())		// a script label list: what it asked (KFCScriptLabelSearch) - its key, words, case and whole
 		{

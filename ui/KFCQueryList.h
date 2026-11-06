@@ -5,8 +5,9 @@
 //  KohakuFindChange (KFC)
 //
 //  THE QUERY DIALOG'S TWO LISTS, AS WIDGETS: flat tree-view lists of what KFCQueryOrder holds - the saved
-//  queries (kKFCQuerySavedListWidgetID) and the run order (kKFCQueryOrderListWidgetID). One adapter and one row maker
-//  serve both; each asks its own widget id which list it is. Drawing them, and the selection - the dialog's controller
+//  queries (kKFCQuerySavedListWidgetID) and the run order (kKFCQueryOrderListWidgetID) - and since 2026-11-06 a third,
+//  Special Operations > Label's keys (kKFCLabelKeyListWidgetID - KFCLabelDialogs). One adapter and one row maker
+//  serve all three; each asks its own widget id which list it is. Drawing them, and the selection - the dialog's controller
 //  and observer (KFCQueryDialog.cpp) use the functions below.
 //
 //========================================================================================

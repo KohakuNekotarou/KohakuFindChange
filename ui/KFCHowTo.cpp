@@ -31,6 +31,7 @@
 
 #include <string>
 #include <cstdio>
+#include <cwchar>				// wcslen - Run Script's Help's length
 
 // Project includes:
 #include "KFCHowTo.h"
@@ -175,11 +176,11 @@ const wchar_t* const kHowToEN =
 	L"- Book Scope: ON = every document of the book the Book panel is showing (the book whose tab is in front). If no Book panel can be found, the active book is used.\n"
 	L"\n"
 	L"[The Kohaku+ tab]\n"
-	L"- KFC adds a Kohaku+ tab to InDesign's own Find/Change dialog. While it is shown, Find in ... searches what its Find: says: Script Label, QR Code, Table and, in a Japanese InDesign, Kenten, Ruby and Warichu.\n"
-	L"- Search: on the tab says where. QR codes and script labels: All Documents or Document. Tables, ruby, kenten and warichu: those, Story, To End of Story or Selection - one the selection does not offer searches the document, and says so. With Book Scope ON, every document of the book is listed.\n"
+	L"- KFC adds a Kohaku+ tab to InDesign's own Find/Change dialog. While it is shown, Find in ... searches what its Find: says: QR Code, Script Label, Spelling, Story, Table and, in a Japanese InDesign, Kenten, Ruby and Warichu.\n"
+	L"- Search: on the tab says where. QR codes, script labels and stories: All Documents or Document. Tables, ruby, kenten, warichu and spelling: those, Story, To End of Story or Selection - one the selection does not offer searches the document, and says so. With Book Scope ON, every document of the book is listed.\n"
 	L"- Find in KFC, at the top of the tab's buttons, runs this panel's Find in ... with what the tab asks - the panel opened first when it is closed. What a button or the panel said stands on the two lines at the tab's foot.\n"
 	L"\n"
-	L"- Saving what the tab asks: Save Query on Find/Change's Query line. It is then on Find/Change's Query menu (as \"Table - <name>\", \"Kenten - <name>\" and so on) - pick it, and this tab opens and is set - and in Run Saved Queries...: its Find lists, its Run writes the Change side with no list, among the other queries. QR Code and Warichu queries, Ruby's with Find Only, and Script Label's with an empty Change Label: (it would take every label off) change nothing: a Run passes them by, and says so.\n"
+	L"- Saving what the tab asks: Save Query on Find/Change's Query line. It is then on Find/Change's Query menu (as \"Table - <name>\", \"Kenten - <name>\" and so on) - pick it, and this tab opens and is set - and in Run Saved Queries...: its Find lists, its Run writes the Change side with no list, among the other queries. QR Code, Warichu, Story and Spelling queries, Ruby's with Find Only, and Script Label's with an empty Change Label: (it would take every label off) change nothing: a Run passes them by, and says so.\n"
 	L"\n"
 	L"[Listing QR codes (Find: QR Code)]\n"
 	L"- Find in ... lists the QR codes in the scope, with their kind (Web, Text, SMS, Email, vCard) and what they hold.\n"
@@ -204,7 +205,7 @@ const wchar_t* const kHowToEN =
 	L"- Inconsistent Ruby lists each place of a base text read two or more ways in Search: (the book, with Book Scope on), under a heading for each reading of each word, the most read first. Base Text narrows it to the words that contain it; Find's Ruby: boxes are grey. Readings are compared as the boxes are, with no regard to group or per-character ruby. A heading's or a row's right-click offers the word's other readings: the rows under the heading, or the rows selected, take the one chosen. It has no Change side: Replace and Return on its rows and the tab's Change buttons are grey.\n"
 	L"- Find Next, Change, Change All and Change/Find work on ruby as on tables: Find Next goes to the next place the tab finds and selects it, Change gives it the Change side - the boxes' reading, the list's, or the marks' - and Change All every place of the Search:. One Ctrl+Z takes each back.\n"
 	L"- Find Only, there with Text With Ruby and Text Without Ruby alone (hidden with the other Look Fors, its check kept), makes the part find alone: the Change Ruby To boxes and Change, Change All and Change/Find grey, and Replace on a row writes nothing and says why.\n"
-	L"- The icons under Search: do what they do on InDesign's Text tab: locked layers and objects, locked stories (both Search Only), hidden layers and objects, parent pages, footnotes, and Kana and Width Sensitive. Ruby, Kenten and Warichu each hold their own.\n"
+	L"- The icons under Search: do what they do on InDesign's Text tab: locked layers and objects, locked stories (both Search Only), hidden layers and objects, parent pages, footnotes, and Kana and Width Sensitive. Ruby, Kenten, Warichu and Spelling each hold their own.\n"
 	L"- How to Use..., under Choose List... and Save List... at the tab's right, says how the marks are written (in Japanese).\n"
 	L"\n"
 	L"[Finding and setting kenten (Find: Kenten - a Japanese InDesign)]\n"
@@ -227,6 +228,12 @@ const wchar_t* const kHowToEN =
 	L"- Find Next, Change, Change All and Change/Find work on labels as on tables: Find Next goes to the next item with a matching label and selects it, Change gives its label the Change side while it is what stands selected, Change/Find does that and goes on, and Change All gives every matching label of the Search: the Change side. One Ctrl+Z takes each back. The label Find Next found shows in the box under the part, on several lines.\n"
 	L"- Special Operations and Create Outlines on a row's right-click menu work on the items as on the Object tab's rows - label items in InDesign, list them here, then change them together.\n"
 	L"\n"
+	L"[Listing the words a wavy line is under (Find: Spelling)]\n"
+	L"- Find in ... lists the words InDesign's Dynamic Spelling underlines in the scope, in tables and footnotes too: a row for each wavy line (a repeated pair is one), its kind after its page - misspelled, repeated, uncapitalized or uncapitalized sentence, as Preferences > Spelling names them. A word is checked in the language its text has (the Character panel's Language).\n"
+	L"- With Dynamic Spelling off (Edit > Spelling > Dynamic Spelling) nothing is searched, and that is said. InDesign checks the words while it is idle: text it has not checked yet has no row, and the line after the search says how many stories - search again in a moment. A book's closed chapter reads as it was saved: one saved before InDesign checked it is said too - open it, let InDesign check it, and save it.\n"
+	L"- It changes nothing: the tab has no Change buttons, and Replace on its rows is greyed. Clicking a row selects its word; Find Next goes to the next underlined word and selects it.\n"
+	L"- The icons under Search: work as on the Text tab, but for Kana and Width Sensitive, which are not shown: no text is compared.\n"
+	L"\n"
 	L"[Reading the results]\n"
 	L"- Right-click menu\n"
 	L"- The up and down arrow keys walk the whole tree.\n"
@@ -234,7 +241,6 @@ const wchar_t* const kHowToEN =
 	L"- Ctrl+Return takes the selected result rows off the list and moves to the row below.\n"
 	L"- Narrow Down on a results heading's right-click menu searches those results again with one more condition, into new results at the bottom.\n"
 	L"- Search Text in These Objects on the heading of an object search's results searches the text inside those objects - each frame's own part of its story, with its tables, footnotes, anchored frames and text on a path - with the query of the tab Find/Change is on (Text, GREP, Glyph or Transliterate), into new results at the bottom. Rows taken off the list with Clear from Results are not searched.\n"
-	L"- Copy Results on the panel menu copies every row of the current results, Copy Rows on a row's right-click menu that row, and Copy These Results on a results heading's right-click menu those results, to the clipboard as tab-separated text. Ctrl+C on the rows selected in the list does the same.\n"
 	L"- Hide Previous Chapter: ON closes, after a jump, the windows of the searched book's other chapters that have nothing to save. A document that is not in the book, or that has been edited or never saved, is left open.\n"
 	L"\n"
 	L"[Selecting and replacing several rows at once]\n"
@@ -251,6 +257,10 @@ const wchar_t* const kHowToEN =
 	L"- Apply Object Style (an object row's) lists the front document's object styles, as the Object Styles panel does, and gives the one you choose to the selected rows' objects - in every document by its name (a row whose document has no style of that name is left as it is, and said). Their overrides are kept, as a plain click in the Object Styles panel keeps them; Clear Object Style Overrides after it clears them. One Ctrl+Z takes it back.\n"
 	L"- Apply Cell Style (a row of List Rows of These Tables) lists the front document's cell styles, as the Cell Styles panel does, and gives the one you choose to the selected rows' cells - in every document by its name (a row whose document has no style of that name is left as it is, and said). Their overrides are kept and the style's paragraph style is given, as a plain click in the Cell Styles panel does. One Ctrl+Z takes it back.\n"
 	L"- Tate-chu-yoko (a Japanese InDesign) sets the selected text rows' matches tate-chu-yoko, InDesign's own character setting. One Ctrl+Z takes back the rows set together; a match already tate-chu-yoko is left as it is, and said.\n"
+	L"- Label (an object row's, a story row's, a table's or a cell's - not a text match's) works on the script labels of the selected rows' items, as a script's insertLabel(key, value) does: Add Key... gives them a key with a value (an item that has the key already has its value replaced); Edit Value... lists the keys they have - pick one and type its value (an item without that key is left as it is; an empty value takes the key away); Remove Key... takes away the key you pick. The Script Label panel's own label is [Script Label panel] on the lists. A locked item is left as it is, and said. One Ctrl+Z takes it back.\n"
+	L"\n"
+	L"[Running a script on rows (Special Operations > Run Script...)]\n"
+	L"- Special Operations > Run Script... on a result row's right-click menu runs an ExtendScript of yours once for each selected row - the row's text, item, story, table or cell given to it as kfcResult. Help... in its window says what the script is given, with examples, and how to use UXP from it. Load... and Save As... keep scripts in files; the last one run is in the box the next time.\n"
 	L"\n"
 	L"[Running saved queries in order (Run Saved Queries...)]\n"
 	L"- Run Saved Queries... on the panel menu opens a dialog that lines up the queries saved in Find/Change and runs them in order.\n"
@@ -282,11 +292,11 @@ const wchar_t* const kHowToJA =
 	L"・Book Scope: ON＝ブックパネルに表示しているブック（タブが手前にあるブック）の全ドキュメント。ブックパネルが見つからないときは、アクティブなブックを対象にします。\n"
 	L"\n"
 	L"【Kohaku+ タブ】\n"
-	L"・InDesign 本体の「検索と置換」に Kohaku+ タブが加わります。このタブを選んでいる間、Find in … は、タブの Find: で選んだものを探します（Script Label／QR Code／Table／Kenten／Ruby／Warichu）。\n"
-	L"・タブの Search: で範囲を選びます。QR コードとスクリプトラベルは All Documents／Document。表とルビと圏点と割注はそれに加えて Story／To End of Story／Selection。今の選択で選べない範囲はドキュメント全体を探し、そう書きます。Book Scope: ON なら、ブックの全ドキュメントが対象です。\n"
+	L"・InDesign 本体の「検索と置換」に Kohaku+ タブが加わります。このタブを選んでいる間、Find in … は、タブの Find: で選んだものを探します（QR Code／Script Label／Spelling／Story／Table／Kenten／Ruby／Warichu）。\n"
+	L"・タブの Search: で範囲を選びます。QR コードとスクリプトラベルとストーリーは All Documents／Document。表とルビと圏点と割注と波線の語（Spelling）はそれに加えて Story／To End of Story／Selection。今の選択で選べない範囲はドキュメント全体を探し、そう書きます。Book Scope: ON なら、ブックの全ドキュメントが対象です。\n"
 	L"・タブのボタンの一番上の Find in KFC で、このパネルの Find in … をタブの条件で走らせます（パネルが閉じていれば開きます）。ボタンやパネルの言ったことは、タブの下の2行に出ます。\n"
 	L"\n"
-	L"・タブの条件を保存するには、検索と置換のクエリの行の保存ボタンを押します。本体のクエリのメニューに「Table - 名前」「Kenten - 名前」のように並び、選ぶとこのタブが開いて条件が入ります。Run Saved Queries... の一覧にも出て、Find は一覧を作り、Run は一覧を作らずに Change 側を書きます（他のクエリと一緒に回せます）。QR Code と Warichu のクエリ、Find Only を入れた Ruby のクエリ、Change Label: が空の Script Label のクエリ（走らせただけで全部のラベルが外れるため）は書き換えないので、Run では飛ばして、そう言います。\n"
+	L"・タブの条件を保存するには、検索と置換のクエリの行の保存ボタンを押します。本体のクエリのメニューに「Table - 名前」「Kenten - 名前」のように並び、選ぶとこのタブが開いて条件が入ります。Run Saved Queries... の一覧にも出て、Find は一覧を作り、Run は一覧を作らずに Change 側を書きます（他のクエリと一緒に回せます）。QR Code・Warichu・Story・Spelling のクエリ、Find Only を入れた Ruby のクエリ、Change Label: が空の Script Label のクエリ（走らせただけで全部のラベルが外れるため）は書き換えないので、Run では飛ばして、そう言います。\n"
 	L"\n"
 	L"【QR コードの一覧（Find: QR Code）】\n"
 	L"・Find in … で、範囲の中の QR コードを、種類（Web・Text・SMS・Email・vCard）と中身つきで一覧にします。\n"
@@ -311,7 +321,7 @@ const wchar_t* const kHowToJA =
 	L"・「ルビ揺れ」は、Search の範囲（Book Scope が入っていればブック）で、同じ親文字に2通り以上の読みがある箇所を、読みごとの見出し（太郎《たろう》など）にまとめて一覧にします。親文字の欄で語を絞れます（ルビの欄は灰色）。読みは欄と同じく、グループルビかモノルビかを見ずに比べます。見出しか行の右クリックに出る「《読み》」で、その語のほかの読みにそろえます。「置換」のルビの欄は無く、行の Replace と Return、タブの Change 系のボタンは灰色です。\n"
 	L"・タブのボタン（Find Next／Change／Change All／Change/Find）は表と同じ働きです。Find Next で次の箇所へ行って選び、Change で見つけた箇所に置換の側（欄の読み・リストの読み・印の読み）を付け、Change All は範囲の全部に付けます。どれも Ctrl+Z 1回で戻ります。\n"
 	L"・「検索のみ」（「検索」の一覧がルビ有・ルビ無のときだけ出ます）を入れると、探すだけになります。「置換」のルビの欄と Change／Change All／Change/Find が灰色になり、行の Replace は書かずに理由を言います。\n"
-	L"・Search の下のアイコンは本体のテキストタブと同じ働きです。Ruby・Kenten・Warichu で別々に覚えます。\n"
+	L"・Search の下のアイコンは本体のテキストタブと同じ働きです。Ruby・Kenten・Warichu・Spelling で別々に覚えます。\n"
 	L"・タブの右の Choose List... と Save List... の下の How to Use... に印の書き方があります。\n"
 	L"\n"
 	L"【圏点で探す・圏点を付ける（Find: Kenten）】\n"
@@ -334,6 +344,12 @@ const wchar_t* const kHowToJA =
 	L"・タブのボタン（Find Next／Change／Change All／Change/Find）は表と同じ働きです。Find Next で次のラベルの物へ行って選び、Change はそれが選ばれている間、そのラベルに Change 側を書き、Change/Find は書いて次へ進み、Change All は範囲の合うラベル全部に書きます。どれも Ctrl+Z 1回で戻ります。Find Next で見つけた物のラベルは、欄の下の枠に複数行で出ます。\n"
 	L"・行の右クリックの特殊操作とアウトライン作成は、オブジェクトタブの行と同じく、その物に効きます。InDesign でラベルを付け、ここで一覧にし、まとめて変える使い方ができます。\n"
 	L"\n"
+	L"【波線の語を一覧にする（Find: Spelling）】\n"
+	L"・Find in … で、範囲の中で InDesign の自動スペルチェックが波線を引いている語を一覧にします（表のセルや脚注の中も）。波線1本ごとに1行で（繰り返した2語は1行）、ページの後ろに種類が出ます（misspelled＝スペルミス・repeated＝繰り返した語・uncapitalized＝大文字で始まらない語・uncapitalized sentence＝大文字で始まらない文。環境設定のスペルチェックの4つの名前です）。語は、その文字の言語（文字パネルの言語）で調べられます。\n"
+	L"・自動スペルチェック（編集＞スペルチェック＞自動スペルチェック）が切れていると探さず、そう言います。InDesign は手の空いたときに語を調べるので、まだ調べていない文字は行にならず、検索の後の行がそのストーリーの数を言います（少し待ってからもう一度探してください）。ブックの閉じた章は保存したときの状態で読みます。調べる前に保存された章もそう言うので、その章を開いて InDesign に調べさせ、保存してください。\n"
+	L"・探すだけで、書き換えはしません。タブに Change のボタンは無く、行の Replace は灰色です。行をクリックするとその語を選びます。Find Next で次の波線の語へ行って選びます。\n"
+	L"・Search の下のアイコンは本体のテキストタブと同じ働きです。文字を比べないので、Kana Sensitive と Width Sensitive は出ません。\n"
+	L"\n"
 	L"【結果の見方】\n"
 	L"・右クリックメニュー\n"
 	L"・上下の矢印キーで、ツリー全体を巡回できます。\n"
@@ -341,7 +357,6 @@ const wchar_t* const kHowToJA =
 	L"・Ctrl＋リターンで、選んだ結果の行を一覧から外し、下の行に移動します。\n"
 	L"・結果の見出しの右クリックの Narrow Down で、その結果を条件を1つ足して探し直し、一番下に新しい結果として出します。\n"
 	L"・オブジェクト検索の結果の見出しの右クリックの Search Text in These Objects で、そのオブジェクトの中の文字（枠に入っている部分だけ。表・脚注・アンカー付きの枠・パス上の文字も）を、「検索と置換」で開いているタブ（テキスト／正規表現／字形／文字種変換）の条件で探し、一番下に新しい結果として出します。Clear from Results で外した行は探しません。\n"
-	L"・パネルメニューの Copy Results で、いまの結果の行を全部、行の右クリックの Copy Rows でその行、結果の見出しの右クリックの Copy These Results でその結果の行を、タブ区切りのテキストとしてクリップボードにコピーします。一覧で行を選んで Ctrl＋C でも同じです。\n"
 	L"・Hide Previous Chapter: ON にすると、ジャンプ後に、検索したブックのジャンプ先以外の章のうち、保存するものが無いドキュメントウィンドウを閉じます。ブックに入っていないドキュメント、編集されたもの、一度も保存していないものは、そのまま残します。\n"
 	L"\n"
 	L"【複数の行をまとめて選ぶ・置換する】\n"
@@ -358,6 +373,10 @@ const wchar_t* const kHowToJA =
 	L"・Apply Object Style（物の行）に、前面の文書のオブジェクトスタイルがオブジェクトスタイルパネルと同じ並びで出ます。選ぶと、選んだ行の物にそのスタイルを当てます（どの文書でも名前で当てます。その名前のスタイルが無い文書の行はそのままにして、そう言います）。オーバーライドは、オブジェクトスタイルパネルで普通にクリックしたときと同じく残ります。消すには続けて Clear Object Style Overrides を使います。Ctrl+Z 1回で戻ります。\n"
 	L"・Apply Cell Style（List Rows of These Tables の行）に、前面の文書のセルスタイルがセルスタイルパネルと同じ並びで出ます。選ぶと、選んだ行のセルにそのスタイルを当てます（どの文書でも名前で当てます。その名前のスタイルが無い文書の行はそのままにして、そう言います）。オーバーライドは残り、スタイルの段落スタイルも当たります（セルスタイルパネルで普通にクリックしたときと同じ）。Ctrl+Z 1回で戻ります。\n"
 	L"・Tate-chu-yoko（日本語版）で、選んだテキストの行の一致した文字を縦中横にします（本体の文字の設定）。一緒に当てた行は Ctrl+Z 1回で戻ります。すでに縦中横の文字はそのままにして、そう言います。\n"
+	L"・Label（物の行・ストーリーの行・表の行・セルの行。文字の一致の行には出ません）で、選んだ行の物のスクリプトラベルを、スクリプトの insertLabel(キー, 値) と同じ形で扱います。Add Key... はキーと値を付けます（そのキーをもう持つ物は値を置き換えます）。Edit Value... は物が持つキーを並べ、選んだキーの値を書き換えます（そのキーを持たない物はそのまま・空の値はキーを外します）。Remove Key... は選んだキーを外します。スクリプトラベルパネルのラベルは一覧に [Script Label panel] と出ます。ロックした物はそのままにして、そう言います。Ctrl+Z 1回で戻ります。\n"
+	L"\n"
+	L"【行に台本を走らせる（Special Operations ▸ Run Script...）】\n"
+	L"・結果の行の右クリックの Special Operations ▸ Run Script... で、あなたの ExtendScript を選んだ行ごとに1回ずつ走らせます。行の文字・物・ストーリー・表・セルが kfcResult として渡ります。窓の Help... に、台本に渡されるもの・例・UXP の使い方があります。Load... と Save As... で台本をファイルにしまえます。最後に走らせた台本は、次に開いたときも欄に入っています。\n"
 	L"\n"
 	L"【保存したクエリを順に実行（Run Saved Queries...）】\n"
 	L"・パネルメニューの Run Saved Queries... で、「検索と置換」で保存したクエリを並べて順に実行するダイアログが開きます。\n"
@@ -375,6 +394,83 @@ const wchar_t* const kHowToJA =
 	L"【アプリケーションバーの検索欄（Link the Application Bar's Search Field to This Panel）】\n"
 	L"・ON にすると、InDesign 本体のアプリケーションバーの検索欄（Adobe Stock／Adobe Help の検索欄）に、「検索と置換」でいま選んでいるタブの内容を表示します。テキスト／正規表現は検索文字列、字形は字形（文字・GID・フォント）、文字種変換は文字種です。オブジェクト／カラーのタブでは欄は変わりません。\n"
 	L"・検索欄で Enter を押すと、ブラウザ（Adobe Stock／Adobe Help）を開かずに、KFC で検索します。テキスト／正規表現のタブでは、欄の文字を「検索と置換」に入れてから検索します。それ以外のタブでは検索しません。";
+
+// RUN SCRIPT'S HELP... (the author, 11-06: "the // lines explain it now - put in a Help button and explain it there" -
+// docs/superpowers/specs/2026-11-06-kfc-label-spelling-runscript-design.md RH1, RH3; UXP through app.doScript - the author: "if you want
+// UXP, use it through DoScript"). Shown by the Run Script window's own script (KFCRowScript), in the UI language.
+const wchar_t* const kRunScriptHelpEN =
+	L"Run Script runs your ExtendScript (JavaScript) once for each row: the row you right-clicked, or every row selected together with it.\n"
+	L"\n"
+	L"[What the script is given]\n"
+	L"- kfcResult: what the row stands for.\n"
+	L"    a text match's row: its text (a Text; an insertion point for a match with no width; a match in a table's cell is that cell's text)\n"
+	L"    an object row (the Object tab, QR Code, Script Label): the page item\n"
+	L"    a Story row: the story (an internal story: its XmlStory)\n"
+	L"    a Table row: the table; a row of a table row list: its Row; a cell's label row: the Cell\n"
+	L"- kfcIndex: the row's place among them, from 0.\n"
+	L"- kfcCount: how many rows it runs on.\n"
+	L"\n"
+	L"[Undo]\n"
+	L"- One Ctrl+Z undoes everything the run did (its name: KFC Run Script).\n"
+	L"\n"
+	L"[Rows it does not run on]\n"
+	L"- A row whose document is not open (a book's closed chapter), and a row that is no longer found, is counted, not run.\n"
+	L"- An error on one row is counted and the other rows go on; the status line names the first error.\n"
+	L"\n"
+	L"[The window's buttons]\n"
+	L"- Load... reads a script file into the box; Save As... writes the box to a file.\n"
+	L"- The script run last is in the box again the next time.\n"
+	L"\n"
+	L"[Examples]\n"
+	L"kfcResult.underline = true;                       // a text match: underline it\n"
+	L"kfcResult.label = \"checked \" + (kfcIndex + 1);    // a page item: its script label\n"
+	L"kfcResult.insertLabel(\"status\", \"done\");          // a page item, story or table: a label under a key of its own\n"
+	L"if (kfcIndex == kfcCount - 1) alert(kfcCount + \" rows done\");   // once, on the last row\n"
+	L"\n"
+	L"[Using UXP]\n"
+	L"Run Script runs ExtendScript. To use UXP, call it from the script with app.doScript:\n"
+	L"var src = \"const { script } = require('uxp');\\n\" +\n"
+	L"          \"script.setResult(String(Number(script.args[0]) * 2));\";\n"
+	L"var answer = app.doScript(src, ScriptLanguage.UXPSCRIPT, [kfcIndex]);\n"
+	L"- The UXP script's value comes back through require('uxp').script.setResult, as a string; its arguments are script.args (a number arrives as a string).\n"
+	L"- What it changes is undone by the same one Ctrl+Z - except what it changes after an await: doScript returns at the first await, and the rest runs later, outside the run's undo step.";
+
+const wchar_t* const kRunScriptHelpJA =
+	L"Run Script は、行ごとに1回ずつ、ここに書いた ExtendScript（JavaScript）を走らせます。対象は、右クリックした行、またはその行と一緒に選んだ行すべてです。\n"
+	L"\n"
+	L"【台本に渡されるもの】\n"
+	L"・kfcResult … その行が表すもの\n"
+	L"　　文字の一致の行：その文字（Text。幅の無い一致は挿入点。表のセルの中の一致はそのセルの文字）\n"
+	L"　　物の行（Object タブ・QR Code・Script Label）：そのページアイテム\n"
+	L"　　Story の行：そのストーリー（内部のストーリーは XmlStory）\n"
+	L"　　Table の行：その表／表の行の一覧の行：その Row／セルのラベルの行：その Cell\n"
+	L"・kfcIndex … その行が何番目か（0 から）\n"
+	L"・kfcCount … 走らせる行の数\n"
+	L"\n"
+	L"【取り消し】\n"
+	L"・Ctrl＋Z を1回押すと、走らせた全部が戻ります（取り消しの名前は KFC Run Script）。\n"
+	L"\n"
+	L"【走らせない行】\n"
+	L"・ドキュメントが開いていない行（ブックの閉じた章）と、見つからなくなった行は、数えるだけで走らせません。\n"
+	L"・ある行でエラーが出ても、ほかの行は走ります。最初のエラーを状態行に書きます。\n"
+	L"\n"
+	L"【窓のボタン】\n"
+	L"・Load... … 台本のファイルを欄に読み込みます。Save As... … 欄の台本をファイルに保存します。\n"
+	L"・最後に走らせた台本は、次に開いたときも欄に入っています。\n"
+	L"\n"
+	L"【例】\n"
+	L"kfcResult.underline = true;                       // 文字の一致：下線を付ける\n"
+	L"kfcResult.label = \"checked \" + (kfcIndex + 1);    // ページアイテム：スクリプトラベルを書く\n"
+	L"kfcResult.insertLabel(\"status\", \"done\");          // ページアイテム・ストーリー・表：キーを付けてラベルを書く\n"
+	L"if (kfcIndex == kfcCount - 1) alert(kfcCount + \" 行が済みました\");   // 最後の行で一度だけ知らせる\n"
+	L"\n"
+	L"【UXP を使うとき】\n"
+	L"Run Script は ExtendScript で走ります。UXP を使いたいときは、台本の中から app.doScript で呼びます。\n"
+	L"var src = \"const { script } = require('uxp');\\n\" +\n"
+	L"          \"script.setResult(String(Number(script.args[0]) * 2));\";\n"
+	L"var answer = app.doScript(src, ScriptLanguage.UXPSCRIPT, [kfcIndex]);\n"
+	L"・UXP 側の値は require('uxp').script.setResult で返します（文字列）。引数は script.args です（数も文字列で届きます）。\n"
+	L"・UXP の中の変更も、同じ Ctrl＋Z 1回で戻ります。ただし await より後の変更は別です：doScript は最初の await の所で戻り、続きは後から走るので、取り消しの1段の外に出ます。";
 
 //========================================================================================
 // Helpers
@@ -437,6 +533,15 @@ void KFCHowTo::ShowRubyMarks()
 void KFCHowTo::ShowKenten()
 {
 	ShowPage(kKentenTitle, kKentenJA);
+}
+
+int32 KFCHowTo::AppendRunScriptHelpJS(std::string& out, bool& outJapanese)
+{
+	// The UI language, as Show() asks it.
+	outJapanese = (LocaleSetting::GetLocale().GetUserInterfaceId() == k_jaJP);
+	const wchar_t* const text = outJapanese ? kRunScriptHelpJA : kRunScriptHelpEN;
+	AppendJSEscaped(out, text);
+	return static_cast<int32>(std::wcslen(text));
 }
 
 namespace

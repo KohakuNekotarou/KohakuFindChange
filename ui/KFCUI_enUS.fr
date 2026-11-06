@@ -69,9 +69,6 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCCreateOutlinesMenuKey,	"Create Outlines",
                 kKFCRestoreOriginalMenuKey,	"Restore from Copy",
                 kKFCClearRowsMenuKey,			"Clear from Results",
-                kKFCCopyResultsMenuKey,			"Copy Results",
-                kKFCCopyRowsMenuKey,			"Copy Rows",
-                kKFCCopyTierResultsMenuKey,		"Copy These Results",
                 kKFCNextResultMenuKey,			"Next Result",
                 kKFCPreviousResultMenuKey,		"Previous Result",
                 kKFCNarrowDownSubmenuKey,		"Narrow Down",
@@ -119,6 +116,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCApplyTableStyleSubmenuKey,		"Apply Table Style",
                 kKFCRemoveLabelMenuKey,				"Remove Label",
                 kKFCRunScriptMenuKey,				"Run Script...",
+                kKFCEditInStoryEditorMenuKey,		"Edit in Story Editor",		// (2026-11-06 - a Story row's Special Operations; InDesign's own Edit menu's words)
                 kKFCDeleteMenuKey,					"Delete",
                 kKFCMoveMenuKey,					"Move...",
                 kKFCScaleMenuKey,					"Scale...",
@@ -186,6 +184,25 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCValueNoPagesKey,			"Type the pages - for example 1-5, 8.",
                 kKFCQueryNameDialogKey,			kKFCDisplayName " - Save Query",
                 kKFCQueryNameFieldKey,			"Query Name:",
+                // Special Operations > Label (2026-11-06 - KFCLabelDialogs; the author left the names to me: docs/superpowers/specs/
+                // 2026-11-06-kfc-label-spelling-runscript-design.md LB1).
+                kKFCLabelSubmenuKey,			"Label",
+                kKFCLabelAddKeyMenuKey,			"Add Key...",
+                kKFCLabelEditValueMenuKey,		"Edit Value...",
+                kKFCLabelRemoveKeyMenuKey,		"Remove Key...",
+                kKFCLabelAddDialogKey,			kKFCDisplayName " - Add Key",
+                kKFCLabelEditDialogKey,			kKFCDisplayName " - Edit Value",
+                kKFCLabelRemoveDialogKey,			kKFCDisplayName " - Remove Key",
+                kKFCLabelKeyFieldKey,			"Key:",
+                kKFCLabelValueFieldKey,			"Value:",
+                kKFCLabelKeysListKey,			"Keys:",
+                kKFCLabelEmptyValueNoteKey,		"An empty value takes the key away.",
+                kKFCLabelNoKeyKey,				"Type a key.",
+                kKFCLabelNoValueKey,			"Type a value - InDesign keeps no key with an empty value.",
+                kKFCLabelPickKeyKey,			"Pick a key.",
+                kKFCLabelValuesDifferKey,		"Its values differ among the items - what you type replaces them all.",
+                kKFCLabelSomeHaveKey,			"Not every item has this key - the others are left as they are.",
+                kKFCLabelPanelKeyKey,			"[Script Label panel]",
                 kKFCQueryNameBlankKey,			"Type a name for the query.",
                 kKFCQueryNameCharsKey,			"A query's name cannot have these in it: \" * / : < > ? \\ |",
                 kKFCQueryNameTooLongKey,		"That name is too long for a query.",
@@ -219,6 +236,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCKentenTabAnyMarkKey,		"[Any Kenten]",
                 kKFCKohakuTabScriptLabelKey,	"Script Label",
                 kKFCKohakuTabStoryKindKey,		"Story",			// (Find:'s Story kind - docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md ST1)
+                kKFCKohakuTabSpellingKindKey,	"Spelling",			// (Find:'s Spelling kind - docs/superpowers/specs/2026-11-06-kfc-label-spelling-runscript-design.md SP1)
                 kKFCLabelTabKeyKey,				"Script Key:",		// (the author, 11-04: "Key alone is hard to follow - Script Key or the like")
                 kKFCLabelTabFindKey,			"Find Label:",
                 kKFCLabelTabChangeKey,			"Change Label:",

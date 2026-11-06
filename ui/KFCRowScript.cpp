@@ -39,7 +39,8 @@
 
 // Project includes:
 #include "KFCRowScript.h"
-#include "KFCDiag.h"				// the test build's fault switch run-script-source
+#include "KFCDiag.h"				// the test build's fault switches run-script-source, run-script-help
+#include "KFCHowTo.h"				// AppendRunScriptHelpJS - the Help window's text (RH1)
 #include "KFCModelAccess.h"			// KFCResults, KFCRuns
 
 namespace
@@ -274,8 +275,11 @@ RowTarget TargetOf(const EngineContext& context, int32 chapter, int32 hit)
 	return out;
 }
 
-// THE WINDOW'S FIRST WORDS - the first time, before any script was run (RS2).
-const char* const kSample =
+// THE WINDOW'S FIRST WORDS UNTIL 11-06 (RS2) - a sample in // lines, which the author asked to go into a Help... button instead
+// (docs/superpowers/specs/2026-11-06-kfc-label-spelling-runscript-design.md RH1, RH2: the box is empty at first now). Kept for one thing: a
+// saved script that is still this sample - a run of it saved it - opens the box empty, as if nothing had been saved (compared with its
+// line breaks made one kind and its end's blanks dropped: the box hands Windows' line breaks back).
+const char* const kOldSample =
 	"// Run Script on Rows - KFC runs this once for each selected row.\n"
 	"// kfcResult = what the row stands for: a match's text, an object row's page item,\n"
 	"//             a Story row's story, a Table row's table (or its row, or a cell).\n"
@@ -288,10 +292,14 @@ const char* const kSample =
 	"// $.writeln(kfcResult.constructor.name);             // what kind of object it is\n";
 
 // THE SCRIPT THAT ASKS AND RUNS (RS2 - RS8): the rows' expressions and words, the window (or a test build's source), each row run inside one undo step. It answers
-// "CANCEL", "SYNTAX<tab>why", or "DONE<tab>ran<tab>failed<tab>gone<tab>first error".
-std::string ScriptFor(const std::vector<RowTarget>& targets, const PMString* testSource)
+// "CANCEL<tab>empty" or "CANCEL<tab>kept" (what the box opened with - RH2), "SYNTAX<tab>why", or "DONE<tab>ran<tab>failed<tab>gone<tab>first error".
+// helpJS = the Help window's text as a JavaScript string's body (KFCHowTo::AppendRunScriptHelpJS - RH1); helpFirst = a test build's run-script-help: the Help
+// window shown before the main one.
+// THE ROWS AS A SCRIPT HOLDS THEM - KFC_ROWS, a function a row that makes its object; KFC_WORDS, the row's words for a message - the rows with an object alone
+// (Run's script and Edit in Story Editor's).
+std::string RowsJS(const std::vector<RowTarget>& targets)
 {
-	std::string js("(function () {\nvar KFC_ROWS = [");
+	std::string js("var KFC_ROWS = [");
 	bool first = true;
 	for (size_t t = 0; t < targets.size(); ++t)
 	{
@@ -311,34 +319,65 @@ std::string ScriptFor(const std::vector<RowTarget>& targets, const PMString* tes
 		AppendJSString(js, targets[t].words);
 		first = false;
 	}
-	js += "];\nvar KFC_TEST = ";
+	js += "];\n";
+	return js;
+}
+
+std::string ScriptFor(const std::vector<RowTarget>& targets, const PMString* testSource, const std::string& helpJS, bool helpFirst)
+{
+	std::string js("(function () {\n");
+	js += RowsJS(targets);
+	js += "var KFC_TEST = ";
 	if (testSource != nil)
 		AppendJSString(js, *testSource);
 	else
 		js += "null";
-	js += ";\nvar KFC_SAMPLE = ";
-	AppendJSString(js, kSample);
+	js += ";\nvar KFC_OLD_SAMPLE = ";
+	AppendJSString(js, kOldSample);
+	js += ";\nvar KFC_HELP = \"";
+	js += helpJS;
+	js += "\";\nvar KFC_HELP_FIRST = ";
+	js += helpFirst ? "true" : "false";
 	js +=
 		";\n"
 		"function kfcRead(f) { try { f.encoding = \"UTF-8\"; if (!f.open(\"r\")) return null; var s = f.read(); f.close(); return s; } catch (e) { return null; } }\n"
 		"function kfcWrite(f, s) { try { f.encoding = \"UTF-8\"; if (!f.open(\"w\")) return false; f.write(s); f.close(); return true; } catch (e) { return false; } }\n"
+		"function kfcBare(s) { return String(s).replace(/\\r\\n?/g, \"\\n\").replace(/\\s+$/, \"\"); }\n"
+		// THE HELP WINDOW (RH1): its text to read, select and copy - an editable box, as How to Use's page (KFCHowTo.cpp's ShowPage: an editable field is
+		// guaranteed selectable; what is typed in it goes with the window).
+		"function kfcHelp() {\n"
+		"  var h = new Window(\"dialog\", \"Run Script on Rows - Help\");\n"
+		"  h.orientation = \"column\"; h.alignChildren = \"fill\";\n"
+		"  var t = h.add(\"edittext\", undefined, KFC_HELP, { multiline: true, scrolling: true });\n"
+		"  t.preferredSize = [640, 480];\n"
+		"  var hg = h.add(\"group\"); hg.alignment = \"right\";\n"
+		"  hg.add(\"button\", undefined, \"OK\", { name: \"ok\" });\n"
+		"  h.show();\n"
+		"}\n"
 		"var src = KFC_TEST;\n"
 		"if (src === null) {\n"
 		"  var keep = new File(app.scriptPreferences.scriptsFolder.parent.parent.fullName + \"/KFCRunScript.jsx\");\n"
 		"  var last = keep.exists ? kfcRead(keep) : null;\n"
+		"  var kept = (last !== null && kfcBare(last) !== \"\" && kfcBare(last) !== kfcBare(KFC_OLD_SAMPLE));\n"
 		"  var w = new Window(\"dialog\", \"Run Script on Rows\");\n"
 		"  w.orientation = \"column\"; w.alignChildren = \"fill\";\n"
 		"  w.add(\"statictext\", undefined, \"kfcResult = each selected row's object - \" + KFC_ROWS.length + \" row(s). One Ctrl+Z undoes the whole run.\");\n"
-		"  var box = w.add(\"edittext\", undefined, (last !== null && last !== \"\") ? last : KFC_SAMPLE, { multiline: true, scrolling: true, wantReturn: true });\n"
+		"  var box = w.add(\"edittext\", undefined, kept ? last : \"\", { multiline: true, scrolling: true, wantReturn: true });\n"
 		"  box.preferredSize = [620, 320];\n"
-		"  var g = w.add(\"group\"); g.alignment = \"right\";\n"
-		"  var load = g.add(\"button\", undefined, \"Load...\");\n"
-		"  var save = g.add(\"button\", undefined, \"Save As...\");\n"
-		"  g.add(\"button\", undefined, \"Cancel\", { name: \"cancel\" });\n"
-		"  g.add(\"button\", undefined, \"Run\", { name: \"ok\" });\n"
+		// Help... on the left, the rest on the right (InDesign's own dialogs keep their help apart from OK and Cancel).
+		"  var g = w.add(\"group\"); g.orientation = \"row\"; g.alignment = \"fill\";\n"
+		"  var gl = g.add(\"group\"); gl.alignment = [\"left\", \"center\"];\n"
+		"  var help = gl.add(\"button\", undefined, \"Help...\");\n"
+		"  var gr = g.add(\"group\"); gr.alignment = [\"right\", \"center\"];\n"
+		"  var load = gr.add(\"button\", undefined, \"Load...\");\n"
+		"  var save = gr.add(\"button\", undefined, \"Save As...\");\n"
+		"  gr.add(\"button\", undefined, \"Cancel\", { name: \"cancel\" });\n"
+		"  gr.add(\"button\", undefined, \"Run\", { name: \"ok\" });\n"
+		"  help.onClick = function () { kfcHelp(); };\n"
 		"  load.onClick = function () { var f = File.openDialog(\"Load a Script\", \"JavaScript:*.jsx;*.js,All files:*.*\"); if (f) { var s = kfcRead(f); if (s !== null) box.text = s; } };\n"
 		"  save.onClick = function () { var f = File.saveDialog(\"Save the Script As\", \"JavaScript:*.jsx\"); if (f) kfcWrite(f, box.text); };\n"
-		"  if (w.show() != 1) return \"CANCEL\";\n"
+		"  if (KFC_HELP_FIRST) kfcHelp();\n"
+		"  if (w.show() != 1) return \"CANCEL\\t\" + (kept ? \"kept\" : \"empty\");\n"
 		"  src = box.text;\n"
 		"  kfcWrite(keep, src);\n"
 		"}\n"
@@ -360,6 +399,28 @@ std::string ScriptFor(const std::vector<RowTarget>& targets, const PMString* tes
 	js +=
 		");\n"
 		"return \"DONE\\t\" + ran + \"\\t\" + failed + \"\\t\" + gone + \"\\t\" + firstError;\n"
+		"})();\n";
+	return js;
+}
+
+// EDIT IN STORY EDITOR'S SCRIPT (2026-11-06): each row's story's storyEdit() - the Story Editor's window, and nothing else of the document's opened (measured on a
+// document opened hidden). No undo step: a window is no change to the document. It answers "DONE<tab>opened<tab>failed<tab>gone<tab>first error", Run's way.
+std::string StoryEditorScriptFor(const std::vector<RowTarget>& targets)
+{
+	std::string js("(function () {\n");
+	js += RowsJS(targets);
+	js +=
+		"var opened = 0, failed = 0, gone = 0, firstError = \"\";\n"
+		"for (var i = 0; i < KFC_ROWS.length; i++) {\n"
+		"  var r = null;\n"
+		"  try { r = KFC_ROWS[i](); } catch (e) { r = null; }\n"
+		"  var valid = (r !== null && r !== undefined);\n"
+		"  if (valid) { try { valid = r.isValid; } catch (ev) { valid = true; } }\n"
+		"  if (!valid) { gone++; if (firstError === \"\") firstError = KFC_WORDS[i] + \": not there now\"; continue; }\n"
+		"  try { r.storyEdit(); opened++; }\n"
+		"  catch (e2) { failed++; if (firstError === \"\") firstError = KFC_WORDS[i] + \": \" + ((e2 && e2.message) ? e2.message : String(e2)); }\n"
+		"}\n"
+		"return \"DONE\\t\" + opened + \"\\t\" + failed + \"\\t\" + gone + \"\\t\" + firstError;\n"
 		"})();\n";
 	return js;
 }
@@ -434,8 +495,19 @@ bool KFCRowScript::Run(const KFCRowsByChapter& rows, PMString& outStatus)
 		test = true;
 	}
 #endif
+	// THE HELP WINDOW'S TEXT (RH1), in the UI language; a test build's run-script-help shows it before the main window.
+	std::string helpJS;
+	bool helpJapanese = false;
+	const int32 helpChars = KFCHowTo::AppendRunScriptHelpJS(helpJS, helpJapanese);
+	bool helpFirst = false;
+#ifdef KFC_DIAG
+	helpFirst = KFC_DIAG_FAULT("run-script-help");
+#endif
+	KFC_DIAG_LOG("RUNSCRIPT HELP lang=%s chars=%d first=%d", helpJapanese ? "ja" : "en", static_cast<int>(helpChars), helpFirst ? 1 : 0);
+	(void)helpChars;
+	(void)helpJapanese;
 	PMString scriptText;
-	scriptText.SetUTF8String(ScriptFor(targets, test ? &testSource : nil));
+	scriptText.SetUTF8String(ScriptFor(targets, test ? &testSource : nil, helpJS, helpFirst));
 	scriptText.SetTranslatable(kFalse);
 	ScriptData script;
 	script.SetPMString(scriptText);
@@ -458,7 +530,7 @@ bool KFCRowScript::Run(const KFCRowsByChapter& rows, PMString& outStatus)
 		return false;
 	}
 	const std::string said(answer.GetUTF8String());
-	if (said == "CANCEL")
+	if (said.compare(0, 6, "CANCEL") == 0)		// (followed by what the box opened with - "<tab>empty" or "<tab>kept": the trace's, RH2)
 	{
 		outStatus.Append("Run Script: cancelled - nothing was run.");
 		return false;
@@ -523,6 +595,134 @@ bool KFCRowScript::Run(const KFCRowsByChapter& rows, PMString& outStatus)
 		outStatus.Append(".");
 	outStatus.SetTranslatable(kFalse);
 	return done > 0;
+}
+
+bool KFCRowScript::EditInStoryEditor(const KFCRowsByChapter& rows, PMString& outStatus)
+{
+	outStatus.Clear();
+	outStatus.SetTranslatable(kFalse);
+	// ExtendScript's own context, as Run's: the rows' objects are made in its words.
+	Utils<IScriptUtils> scriptUtils;
+	InterfacePtr<IScriptManager> manager(scriptUtils.Exists() ? scriptUtils->QueryScriptManager(kJavaScriptMgrBoss) : nil);
+	InterfacePtr<IScriptEngine> engine((manager != nil) ? manager->QueryDefaultEngine() : nil);
+	Utils<IExtendScriptUtils> esUtils;
+	if (engine == nil || !esUtils.Exists() || !Utils<ITextScriptUtils>().Exists())
+	{
+		outStatus.Append("Edit in Story Editor: ExtendScript could not be reached - nothing was opened.");
+		return false;
+	}
+	const EngineContext context = engine->GetRequestContext();
+	std::vector<RowTarget> targets;
+	int32 openable = 0, notOpen = 0, gone = 0, internal = 0, total = 0;
+	for (size_t c = 0; c < rows.size(); ++c)
+		for (size_t h = 0; h < rows[c].hits.size(); ++h)
+		{
+			++total;
+			// ITS OWN STORIES ALONE: an internal story (the XML structure's) is no story a person writes - counted, not opened. (A row of any other kind - none
+			// is on a Story list - the same.)
+			if (KFCResults()->GetHitHolderKind(rows[c].chapter, rows[c].hits[h]) != kKFCHolderStory)
+			{
+				++internal;
+				continue;
+			}
+			targets.push_back(TargetOf(context, rows[c].chapter, rows[c].hits[h]));
+			const int32 why = targets.back().why;
+			if (why == kWhyNone)
+				++openable;
+			else if (why == kWhyNotOpen)
+				++notOpen;
+			else
+				++gone;
+		}
+	int32 opened = 0, failed = 0, goneNow = 0;
+	std::string firstError;
+	if (openable > 0)
+	{
+		PMString scriptText;
+		scriptText.SetUTF8String(StoryEditorScriptFor(targets));
+		scriptText.SetTranslatable(kFalse);
+		ScriptData script;
+		script.SetPMString(scriptText);
+		ScriptRecordData arguments;
+		ScriptData result;
+		PMString error;
+		PMString engineName(kEngineName);
+		engineName.SetTranslatable(kFalse);
+		const ErrorCode ran = esUtils->RunScriptInEngine(engineName, script, arguments, result, error, kFalse /*showErrorAlert*/, kFalse /*invokeDebugger*/);
+		error.SetTranslatable(kFalse);
+		PMString answer;
+		(void)result.GetPMString(answer);
+		answer.SetTranslatable(kFalse);
+		KFC_DIAG_LOG("STORYEDIT rows=%d openable=%d notopen=%d gone=%d internal=%d err=%d answer=%s error=%s", static_cast<int>(total), static_cast<int>(openable),
+			static_cast<int>(notOpen), static_cast<int>(gone), static_cast<int>(internal), static_cast<int>(ran), answer.GetUTF8String().c_str(), error.GetUTF8String().c_str());
+		if (ran != kSuccess || !error.IsEmpty())
+		{
+			outStatus.Append("Edit in Story Editor: the Story Editor could not be opened - ");
+			outStatus.Append(error.IsEmpty() ? PMString("no reason given") : error);
+			outStatus.SetTranslatable(kFalse);
+			return false;
+		}
+		// "DONE<tab>opened<tab>failed<tab>gone<tab>first error"
+		const std::string said(answer.GetUTF8String());
+		if (said.compare(0, 5, "DONE\t") == 0)
+		{
+			std::vector<std::string> parts;
+			size_t from = 5;
+			for (int32 k = 0; k < 3; ++k)
+			{
+				const size_t tab = said.find('\t', from);
+				parts.push_back(said.substr(from, (tab == std::string::npos) ? std::string::npos : tab - from));
+				from = (tab == std::string::npos) ? said.size() : tab + 1;
+			}
+			opened = std::atoi(parts[0].c_str());
+			failed = std::atoi(parts[1].c_str());
+			goneNow = std::atoi(parts[2].c_str());
+			firstError = said.substr(from);
+		}
+	}
+	else
+		KFC_DIAG_LOG("STORYEDIT rows=%d openable=0 notopen=%d gone=%d internal=%d", static_cast<int>(total), static_cast<int>(notOpen), static_cast<int>(gone),
+			static_cast<int>(internal));
+	// "Edit in Story Editor: opened 2 of 3 row(s); 1 row(s) whose documents are not open." - what was not opened, each said.
+	outStatus.Append("Edit in Story Editor: opened ");
+	outStatus.AppendNumber(opened);
+	outStatus.Append(" of ");
+	AppendRows(outStatus, total);
+	if (failed > 0)
+	{
+		outStatus.Append("; ");
+		outStatus.AppendNumber(failed);
+		outStatus.Append(failed == 1 ? " error" : " errors");
+	}
+	if (goneNow + gone > 0)
+	{
+		outStatus.Append("; ");
+		AppendRows(outStatus, goneNow + gone);
+		outStatus.Append(" not found - search again");
+	}
+	if (notOpen > 0)
+	{
+		outStatus.Append("; ");
+		AppendRows(outStatus, notOpen);
+		outStatus.Append(" whose documents are not open");
+	}
+	if (internal > 0)
+	{
+		outStatus.Append("; ");
+		AppendRows(outStatus, internal);
+		outStatus.Append(" of InDesign's own (internal) stories, which open in no Story Editor");
+	}
+	if (!firstError.empty())
+	{
+		PMString first;
+		first.SetUTF8String(firstError);
+		outStatus.Append(" - ");
+		outStatus.Append(first);
+	}
+	else
+		outStatus.Append(".");
+	outStatus.SetTranslatable(kFalse);
+	return opened > 0;
 }
 
 // End, KFCRowScript.cpp.

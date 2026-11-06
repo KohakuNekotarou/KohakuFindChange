@@ -278,6 +278,8 @@ namespace KFCResultModel
 		UID			tableUID;	// A TABLE KIND'S ROW: its table (KFCTableSearch - Search Text in These Tables searches the text in it); kInvalidUID for any other row
 								// (a table row list's row, a script label list's table or cell label row: its table too)
 		int32		holderKind;	// WHAT A TEXT ROW STANDS FOR BEYOND ITS TEXT (KFCHolderKind): a table row list's row, a table's or a cell's label row - kKFCHolderNone for the rest
+		int32		spellKind;	// A SPELLING LIST'S ROW (KFCSpellingSearch - 2026-11-06): which of Dynamic Spelling's wavy lines its word has (the strand's SpellingState -
+								// misspelled, repeated, uncapitalized, an uncapitalized sentence), its word on the locator (BuildHitLocator); 0 for any other row
 
 		Hit() : pageIndex(-1), isOverset(false), isLocked(false), isHidden(false), onHiddenSpread(false),
 				fontGroup(-1), fontGroupPos(-1), storyUID(kInvalidUID),
@@ -287,7 +289,7 @@ namespace KFCResultModel
 				frameLayer(kInvalidUID), outcome(kOutcomeNone),
 				pageOrdinal(0), storyOrdinal(-1),
 				itemUID(kInvalidUID), onPasteboard(false), isMaster(false), isGrouped(false), isInline(false),
-				isAnchored(false), itemPrint(0), itemPrintLength(0), itemGone(false), tableUID(kInvalidUID), holderKind(0) {}
+				isAnchored(false), itemPrint(0), itemPrintLength(0), itemGone(false), tableUID(kInvalidUID), holderKind(0), spellKind(0) {}
 	};
 
 	/** One STORY of a chapter's hits - one story row in the tree. The struct keeps the name it had when
@@ -479,6 +481,10 @@ namespace KFCResultModel
 	    search made it - a query run's list's way: not searched again, not narrowed, its rows not replaced; a row is written by its Special Operations > Apply
 	    Cell Style alone (KFCReplaceEngine::CellStyleHits). Not a Kohaku+ kind's (ListIsOwnKind). */
 	bool ListIsTableRows();
+	/** Is the list A SPELLING LIST - the Spelling kind's (KFCSpellingSearch: its search mode kKFCSpellingSearchMode - docs/superpowers/specs/
+	    2026-11-06-kfc-label-spelling-runscript-design.md SP1 - SP6)? Text rows, one a word Dynamic Spelling underlines (Hit::spellKind which line) - nothing
+	    writes them but a text row's Special Operations (no Replace - SP3), as a warichu list's. */
+	bool ListIsSpelling();
 	/** Is the list A KOHAKU+ KIND'S, with a Change side or not (ListHasOwnChangeTab, or a warichu list)? Its conditions are its tab's: not searched again by story or over part of a document, not
 	    narrowed, and its rows are counted as the object lists' (one a thing). */
 	bool ListIsOwnKind();

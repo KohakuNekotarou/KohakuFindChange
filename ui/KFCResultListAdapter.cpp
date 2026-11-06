@@ -13,7 +13,9 @@
 //  Under a document, a STORY node per group, each holding that story's hits - the code calls the level
 //  FONT, the name it had when it held the fonts of the Find Missing Glyphs scan (since removed).
 //  A text search's hits are all grouped; an OBJECT search's rows have no story and hang off their document row
-//  directly - the branches below for a node that names no group (KFCResultModel's BuildFontGroups).
+//  directly - the branches below for a node that names no group (KFCResultModel's BuildFontGroups). A STORY list's
+//  rows the same since 2026-11-06 (the author: "the document, the story under it, and no more"): each row is a story,
+//  and says which one itself (KFCResultModel::GetHitRow).
 //
 //  WHILE THE RESULTS ARE KEPT IN TIERS (KFCResultHistory - docs/superpowers/specs/2026-10-14-kfc-stacked-results-design.md
 //  section 3-3) the root's children are the TIERS: the kept ones, oldest first, each over its copy of the rows it had, and

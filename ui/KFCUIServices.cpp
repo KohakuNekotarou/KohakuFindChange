@@ -613,6 +613,11 @@ public:
 	{
 		return KFCKohakuTab::IsStoryCurrent(outConditions);
 	}
+
+	virtual bool SpellingTabConditions(KFCSpellingConditions& outConditions)
+	{
+		return KFCKohakuTab::IsSpellingCurrent(outConditions);
+	}
 };
 
 CREATE_PMINTERFACE(KFCUIServices, kKFCUIServicesImpl)

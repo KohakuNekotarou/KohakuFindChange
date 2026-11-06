@@ -122,6 +122,9 @@ DECLARE_PMID(kClassIDSpace, kKFCKohakuSaveFilterBoss, kKFCUIPrefix + 35)
 DECLARE_PMID(kClassIDSpace, kKFCSwitchIconWidgetBoss, kKFCUIPrefix + 37)
 // A branch row's label, drawn by hand (KFCColorTextView.cpp): a tier's name fades the words around what it asked.
 DECLARE_PMID(kClassIDSpace, kKFCBranchLabelWidgetBoss, kKFCUIPrefix + 38)
+// Special Operations > Label's dialogs - Add Key..., Edit Value..., Remove Key... (2026-11-06 - KFCLabelDialogs.cpp, docs/superpowers/specs/
+// 2026-11-06-kfc-label-spelling-runscript-design.md LB4): one boss for the three, each its own view, as the value dialogs. + 39: the next after the highest spent.
+DECLARE_PMID(kClassIDSpace, kKFCLabelDialogBoss, kKFCUIPrefix + 39)
 
 
 // InterfaceIDs:
@@ -256,6 +259,9 @@ DECLARE_PMID(kImplementationIDSpace, kKFCKohakuTabSelectionObserverImpl, kKFCUIP
 // (+ 67 was the Kenten part's sample's view - retired 2026-11-03 with it.)
 DECLARE_PMID(kImplementationIDSpace, kKFCSwitchIconTipImpl, kKFCUIPrefix + 68)
 DECLARE_PMID(kImplementationIDSpace, kKFCBranchLabelViewImpl, kKFCUIPrefix + 69)
+// Special Operations > Label's dialogs (KFCLabelDialogs.cpp): their controller and observer. + 70, + 71: the next after the highest spent.
+DECLARE_PMID(kImplementationIDSpace, kKFCLabelDialogControllerImpl, kKFCUIPrefix + 70)
+DECLARE_PMID(kImplementationIDSpace, kKFCLabelDialogObserverImpl, kKFCUIPrefix + 71)
 
 
 // ActionIDs:
@@ -469,12 +475,14 @@ DECLARE_PMID(kActionIDSpace, kKFCNarrowPagesActionID, kKFCUIPrefix + 99)
 DECLARE_PMID(kActionIDSpace, kKFCNarrowOnPasteboardActionID, kKFCUIPrefix + 100)
 //DECLARE_PMID(kActionIDSpace, kKFCNarrowSep2ActionID, kKFCUIPrefix + 101)
 DECLARE_PMID(kActionIDSpace, kKFCNarrowFramesActionID, kKFCUIPrefix + 102)
-// COPY RESULTS (docs/superpowers/specs/2026-10-18-kfc-copy-results-progress-share-design.md): the panel menu's (every row of
-// the live list), a row's Copy Rows (the rows Clear from Results would take off; the book row's: every row) and a tier
-// heading's Copy These Results - the rows as text on the clipboard (KFCCopyResults). + 103 ... + 105.
-DECLARE_PMID(kActionIDSpace, kKFCCopyResultsActionID, kKFCUIPrefix + 103)
-DECLARE_PMID(kActionIDSpace, kKFCCopyRowsActionID, kKFCUIPrefix + 104)
-DECLARE_PMID(kActionIDSpace, kKFCCopyTheseResultsActionID, kKFCUIPrefix + 105)
+// RETIRED (never reuse - a keyboard shortcut is recorded against the ActionID; Copy Results was in the Keyboard Shortcuts
+// editor): COPY RESULTS, 2026-10-18 to 11-06 (docs/superpowers/specs/2026-10-18-kfc-copy-results-progress-share-design.md) - the
+// panel menu's, a row's Copy Rows and a tier heading's Copy These Results, the rows as text on the clipboard. Gone at the
+// author's word, 11-06: "the search results' Copy mechanism is not needed" (docs/superpowers/specs/2026-11-06-kfc-label-spelling-
+// runscript-design.md CR1). + 103 ... + 105.
+//DECLARE_PMID(kActionIDSpace, kKFCCopyResultsActionID, kKFCUIPrefix + 103)
+//DECLARE_PMID(kActionIDSpace, kKFCCopyRowsActionID, kKFCUIPrefix + 104)
+//DECLARE_PMID(kActionIDSpace, kKFCCopyTheseResultsActionID, kKFCUIPrefix + 105)
 // NARROW DOWN > ON ACTIVE LAYER (the author's call: Find Objects on Active Layer moved off the panel menu into Narrow
 // Down, text tiers too): the tier's rows kept to the front document's active layer, by its name. + 106.
 DECLARE_PMID(kActionIDSpace, kKFCNarrowOnLayerActionID, kKFCUIPrefix + 106)
@@ -577,6 +585,18 @@ DECLARE_PMID(kActionIDSpace, kKFCRemoveLabelActionID, kKFCUIPrefix + 123)
 // SPECIAL OPERATIONS > RUN SCRIPT... on a text row's and an object row's menu (the author, 2026-11-06: "run a script on the row - a variable kfcResult" -
 // docs/superpowers/specs/2026-11-06-kfc-run-script-on-rows-design.md RS1 - KFCRowScript): the person's script run once on each row's object. + 124.
 DECLARE_PMID(kActionIDSpace, kKFCRunScriptActionID, kKFCUIPrefix + 124)
+// SPECIAL OPERATIONS > LABEL > ADD KEY... / EDIT VALUE... / REMOVE KEY... on an object row's and a text row's menu, over a row whose item can hold a label
+// (2026-11-06 - the author: "labels on the Story and Object rows found - add a key, remove a key, edit its value"; docs/superpowers/specs/
+// 2026-11-06-kfc-label-spelling-runscript-design.md LB1 - KFCLabelDialogs, the model's KFCReplaceEngine::WriteLabelRows). Put on the menu as it pops
+// (KFCResultNodeEH's PopRowMenu - one action, on the path of the row popping). + 125 ... + 127: the UI band's last.
+DECLARE_PMID(kActionIDSpace, kKFCLabelAddKeyActionID, kKFCUIPrefix + 125)
+DECLARE_PMID(kActionIDSpace, kKFCLabelEditValueActionID, kKFCUIPrefix + 126)
+DECLARE_PMID(kActionIDSpace, kKFCLabelRemoveKeyActionID, kKFCUIPrefix + 127)
+// SPECIAL OPERATIONS > EDIT IN STORY EDITOR on a Story row's menu (2026-11-06 - the author: "a document made hidden, its stories searched - opened in the
+// Story Editor, only the story is edited while the document stays hidden"; KFCRowScript::EditInStoryEditor - the story's storyEdit(), measured to open the
+// Story Editor's window alone on a document with none). The UI band is spent (+ 125 ... + 127 its last; its gaps retired): the model band's ActionIDs
+// after the style items (+ 64 ... + 103) are free - + 120, away from them should the style items grow.
+DECLARE_PMID(kActionIDSpace, kKFCEditInStoryEditorActionID, kKFCPrefix + 120)
 
 
 // WidgetIDs:
@@ -778,6 +798,13 @@ DECLARE_PMID(kWidgetIDSpace, kKFCRubyLookForLabelWidgetID, kKFCPrefix + 89)
 DECLARE_PMID(kWidgetIDSpace, kKFCKentenBaseLabelWidgetID, kKFCPrefix + 90)
 DECLARE_PMID(kWidgetIDSpace, kKFCKentenMarkLabelWidgetID, kKFCPrefix + 91)
 DECLARE_PMID(kWidgetIDSpace, kKFCKentenChangeLabelWidgetID, kKFCPrefix + 92)
+// Special Operations > Label's dialogs (2026-11-06 - KFCLabelDialogs.cpp): the dialog, Key:, Value:, the keys' list (the query dialog's list - KFCQueryList's
+// adapter tells it apart by this id) and the note under Value:. + 93 ... + 97 (the model band's - the UI band is spent).
+DECLARE_PMID(kWidgetIDSpace, kKFCLabelDialogWidgetID, kKFCPrefix + 93)
+DECLARE_PMID(kWidgetIDSpace, kKFCLabelKeyFieldWidgetID, kKFCPrefix + 94)
+DECLARE_PMID(kWidgetIDSpace, kKFCLabelValueFieldWidgetID, kKFCPrefix + 95)
+DECLARE_PMID(kWidgetIDSpace, kKFCLabelKeyListWidgetID, kKFCPrefix + 96)
+DECLARE_PMID(kWidgetIDSpace, kKFCLabelNoteWidgetID, kKFCPrefix + 97)
 
 
 // "About Plug-ins" sub-menu:
@@ -865,11 +892,26 @@ DECLARE_PMID(kWidgetIDSpace, kKFCKentenChangeLabelWidgetID, kKFCPrefix + 92)
 #define kKFCApplyTableStyleSubmenuKey	kKFCStringPrefix "kKFCApplyTableStyleSubmenuKey"	// "Apply Table Style"
 #define kKFCRemoveLabelMenuKey			kKFCStringPrefix "kKFCRemoveLabelMenuKey"			// "Remove Label"
 #define kKFCRunScriptMenuKey			kKFCStringPrefix "kKFCRunScriptMenuKey"				// "Run Script..." (2026-11-06 - KFCRowScript)
-// ...and Copy Results: the panel menu's, a row's Copy Rows, a tier heading's Copy These Results (measured against every
-// other key - key_collisions.py).
-#define kKFCCopyResultsMenuKey			kKFCStringPrefix "kKFCCopyResultsMenuKey"
-#define kKFCCopyRowsMenuKey				kKFCStringPrefix "kKFCCopyRowsMenuKey"
-#define kKFCCopyTierResultsMenuKey		kKFCStringPrefix "kKFCCopyTierResultsMenuKey"
+#define kKFCEditInStoryEditorMenuKey	kKFCStringPrefix "kKFCEditInStoryEditorMenuKey"		// "Edit in Story Editor" (2026-11-06 - InDesign's own Edit menu's words; KFCRowScript)
+// ...and Special Operations > Label's submenu, its three items and their dialogs' words (2026-11-06 - KFCLabelDialogs; measured against every other key -
+// key_collisions.py).
+#define kKFCLabelSubmenuKey				kKFCStringPrefix "kKFCLabelSubmenuKey"				// "Label"
+#define kKFCLabelAddKeyMenuKey			kKFCStringPrefix "kKFCLabelAddKeyMenuKey"			// "Add Key..."
+#define kKFCLabelEditValueMenuKey		kKFCStringPrefix "kKFCLabelEditValueMenuKey"		// "Edit Value..."
+#define kKFCLabelRemoveKeyMenuKey		kKFCStringPrefix "kKFCLabelRemoveKeyMenuKey"		// "Remove Key..."
+#define kKFCLabelAddDialogKey				kKFCStringPrefix "kKFCLabelAddDialogKey"				// "... - Add Key"
+#define kKFCLabelEditDialogKey			kKFCStringPrefix "kKFCLabelEditDialogKey"			// "... - Edit Value"
+#define kKFCLabelRemoveDialogKey			kKFCStringPrefix "kKFCLabelRemoveDialogKey"			// "... - Remove Key"
+#define kKFCLabelKeyFieldKey			kKFCStringPrefix "kKFCLabelKeyFieldKey"				// "Key:"
+#define kKFCLabelValueFieldKey			kKFCStringPrefix "kKFCLabelValueFieldKey"			// "Value:"
+#define kKFCLabelKeysListKey			kKFCStringPrefix "kKFCLabelKeysListKey"				// "Keys:"
+#define kKFCLabelEmptyValueNoteKey		kKFCStringPrefix "kKFCLabelEmptyValueNoteKey"		// "An empty value takes the key away."
+#define kKFCLabelNoKeyKey				kKFCStringPrefix "kKFCLabelNoKeyKey"				// "Type a key."
+#define kKFCLabelNoValueKey				kKFCStringPrefix "kKFCLabelNoValueKey"				// "Type a value - ..."
+#define kKFCLabelPickKeyKey				kKFCStringPrefix "kKFCLabelPickKeyKey"				// "Pick a key."
+#define kKFCLabelValuesDifferKey		kKFCStringPrefix "kKFCLabelValuesDifferKey"			// "The items' values of this key differ - ..."
+#define kKFCLabelSomeHaveKey			kKFCStringPrefix "kKFCLabelSomeHaveKey"				// "Not every item has this key - ..."
+#define kKFCLabelPanelKeyKey			kKFCStringPrefix "kKFCLabelPanelKeyKey"				// "[Script Label panel]"
 // ...and Next Result / Previous Result - the panel menu's (measured against every other key - key_collisions.py).
 #define kKFCNextResultMenuKey			kKFCStringPrefix "kKFCNextResultMenuKey"
 #define kKFCPreviousResultMenuKey		kKFCStringPrefix "kKFCPreviousResultMenuKey"
@@ -1029,6 +1071,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCKentenChangeLabelWidgetID, kKFCPrefix + 92)
 #define kKFCKohakuTabScriptLabelKey		kKFCStringPrefix "kKFCKohakuTabScriptLabelKey"
 // The Story kind (docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md ST1): Find:'s entry after Table in every language (Search:'s own Story entry is kKFCKohakuStoryEntryKey).
 #define kKFCKohakuTabStoryKindKey		kKFCStringPrefix "kKFCKohakuTabStoryKindKey"
+// The Spelling kind (docs/superpowers/specs/2026-11-06-kfc-label-spelling-runscript-design.md SP1): Find:'s entry between Script Label and Story in every language - the words Dynamic Spelling underlines.
+#define kKFCKohakuTabSpellingKindKey	kKFCStringPrefix "kKFCKohakuTabSpellingKindKey"
 #define kKFCLabelTabKeyKey				kKFCStringPrefix "kKFCLabelTabKeyKey"
 #define kKFCLabelTabFindKey				kKFCStringPrefix "kKFCLabelTabFindKey"
 #define kKFCLabelTabChangeKey			kKFCStringPrefix "kKFCLabelTabChangeKey"
@@ -1105,6 +1149,12 @@ DECLARE_PMID(kWidgetIDSpace, kKFCKentenChangeLabelWidgetID, kKFCPrefix + 92)
 // ...and a script label list's TABLE row's Special Operations > Apply Table Style (the script-label-tables-cells spec's L7): Apply Cell Style's shape, over such a row alone.
 #define kKFCApplyTableStyleSubmenuPath		kKFCHitSpecialOpsSubmenuPath kSDKDefDelimitMenuPath kKFCApplyTableStyleSubmenuKey
 #define kKFCApplyTableStyleSubmenuEntry		kKFCApplyTableStyleSubmenuPath kSDKDefDelimitMenuPath
+// Special Operations > Label > (2026-11-06 - KFCLabelDialogs): an object row's and a text row's - put and taken off as the menu pops (KFCResultNodeEH's
+// PopRowMenu), as Apply Cell Style's: the entry first (a path and a delimiter), then its three items on the path.
+#define kKFCObjLabelSubmenuPath				kKFCSpecialOpsSubmenuPath kSDKDefDelimitMenuPath kKFCLabelSubmenuKey
+#define kKFCObjLabelSubmenuEntry			kKFCObjLabelSubmenuPath kSDKDefDelimitMenuPath
+#define kKFCHitLabelSubmenuPath				kKFCHitSpecialOpsSubmenuPath kSDKDefDelimitMenuPath kKFCLabelSubmenuKey
+#define kKFCHitLabelSubmenuEntry			kKFCHitLabelSubmenuPath kSDKDefDelimitMenuPath
 // A tier heading's Narrow Down submenu (the narrow-down spec's N1) - named by KFC's own key, as Fitting is.
 #define kKFCNarrowDownSubmenuPath			kKFCResultTierMenuName kSDKDefDelimitMenuPath kKFCNarrowDownSubmenuKey
 
@@ -1135,8 +1185,6 @@ DECLARE_PMID(kWidgetIDSpace, kKFCKentenChangeLabelWidgetID, kKFCPrefix + 92)
 // Change All in Book under Find, then Clear Results (the spec's section 4).
 #define kKFCChangeAllMenuItemPosition		1.1
 #define kKFCClearResultsMenuItemPosition	1.25
-// Copy Results under Clear Results: the list's rows as text on the clipboard (the copy-results spec).
-#define kKFCCopyResultsMenuItemPosition		1.27
 // Run Saved Queries... last in the block (the author's call): the other command that writes with InDesign's Change
 // All and leaves no list.
 #define kKFCRunSavedQueriesMenuItemPosition	1.3
@@ -1183,14 +1231,12 @@ DECLARE_PMID(kWidgetIDSpace, kKFCKentenChangeLabelWidgetID, kKFCPrefix + 92)
 #define kKFCReplaceAllRowsMenuItemPosition		0.5		// Replace All Rows (a story or document row's) - first as well (2026-11-04)
 #define kKFCClearFromResultsMenuItemPosition	1.0		// Clear from Results
 #define kKFCClearTheseResultsMenuItemPosition	2.0		// Clear These Results
-#define kKFCCopyRowsMenuItemPosition			3.0		// Copy Rows
-#define kKFCCopyTheseResultsMenuItemPosition	4.0		// Copy These Results
 #define kKFCNarrowDownSubmenuPosition			5.0		// Narrow Down >
 // (6.0 was Replace's place in the abc order until 2.1.1.)
 #define kKFCRestoreOriginalMenuItemPosition		7.0		// Restore from Copy
 #define kKFCSearchTextInObjectsMenuItemPosition	7.5		// Search Text in These Objects
 #define kKFCSearchTextInTablesMenuItemPosition	7.6		// Search Text in These Tables
-#define kKFCListTableRowsMenuItemPosition		4.5		// List Rows of These Tables (2026-11-05 - the abc order, ROW-32: after Copy These Results, before Narrow Down)
+#define kKFCListTableRowsMenuItemPosition		4.5		// List Rows of These Tables (2026-11-05 - the abc order, ROW-32: after Clear These Results, before Narrow Down)
 #define kKFCSearchTierAgainMenuItemPosition		8.0		// Search These Results Again
 #define kKFCSearchDocumentAgainMenuItemPosition	9.0		// Search This Document Again
 #define kKFCSearchStoryAgainMenuItemPosition	10.0	// Search This Story Again
@@ -1214,6 +1260,11 @@ DECLARE_PMID(kWidgetIDSpace, kKFCKentenChangeLabelWidgetID, kKFCPrefix + 92)
 #define kKFCApplyTableStyleSubmenuPosition		0.6		// Apply Table Style > (a script label list's table row's - after Apply Cell Style, were both there)
 #define kKFCRemoveLabelMenuItemPosition			8.5		// Remove Label (a script label list's rows - an object row's after Move to Active Layer, before Show; a text row's after Create Outlines, before Tate-chu-yoko)
 #define kKFCRunScriptMenuItemPosition			8.7		// Run Script... (2026-11-06 - every row's: after Remove Label, before Show / Tate-chu-yoko)
+#define kKFCEditInStoryEditorMenuItemPosition	4.0		// Edit in Story Editor (2026-11-06 - a Story row's text menu: after Create Outlines' 3.0, before Label's 6.5 - the abc order)
+#define kKFCLabelSubmenuPosition				6.5		// Label > (2026-11-06 - an object row's after Hide, before Lock; a text row's after Create Outlines, before Remove Label)
+#define kKFCLabelAddKeyMenuItemPosition			1.0		// ...its Add Key...
+#define kKFCLabelEditValueMenuItemPosition		2.0		// ...Edit Value...
+#define kKFCLabelRemoveKeyMenuItemPosition		3.0		// ...Remove Key...
 #define kKFCArrangeSubmenuPosition				1.0		// Arrange >
 #define kKFCClearStyleOverridesMenuItemPosition	2.0		// Clear Object Style Overrides
 #define kKFCClearTextOverridesMenuItemPosition	2.0		// Clear Overrides (a text row's menu - its own path, so no clash with the 2.0 above)
@@ -1274,6 +1325,10 @@ DECLARE_PMID(kWidgetIDSpace, kKFCKentenChangeLabelWidgetID, kKFCPrefix + 92)
 #define kKFCShearDialogRsrcID				(kSDKDefDialogResourceID + 16)
 #define kKFCPagesDialogRsrcID				(kSDKDefDialogResourceID + 18)
 #define kKFCQueryNameDialogRsrcID			(kSDKDefDialogResourceID + 20)
+// Special Operations > Label's views (KFCLabelDialogs.cpp - 2026-11-06), after the value dialogs', two apart as theirs.
+#define kKFCAddKeyDialogRsrcID				(kSDKDefDialogResourceID + 22)
+#define kKFCEditValueDialogRsrcID			(kSDKDefDialogResourceID + 24)
+#define kKFCRemoveKeyDialogRsrcID			(kSDKDefDialogResourceID + 26)
 // The Kohaku tab's face (KFCKohakuTab.cpp): its view (a LocaleIndex here, its body at + index_enUS - clear of the result rows'
 // and the query row's, + 20 to + 23), and its offer to Find/Change (IDList / IDListPair - the id
 // IPanelCreator::GetPanelRsrcID hands back).

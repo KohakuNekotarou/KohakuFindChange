@@ -12,7 +12,9 @@
 //  resolve() turns back into the object (IScriptUtils::GenerateSpecifier; a text range through ITextScriptUtils::QueryTextObject; a table's is its story's and
 //  its UID, which GenerateSpecifier does not make - measured 2026-11-06). kfcIndex and kfcCount say the row's place among them.
 //  The script is asked in a window of ExtendScript's own (ScriptUI - no widget of the UI band's, which is spent), the last one run kept in InDesign's user
-//  folder (KFCRunScript.jsx) for the next. The rows run inside ONE undo step (app.doScript, UndoModes.ENTIRE_SCRIPT, "KFC Run Script"): one row's error is
+//  folder (KFCRunScript.jsx) for the next. The window opens empty the first time; its Help... button explains it in the UI language (the author, 11-06:
+//  "not with // lines - a Help button"; KFCHowTo::AppendRunScriptHelpJS - docs/superpowers/specs/2026-11-06-kfc-label-spelling-runscript-design.md RH1 -
+//  RH3), UXP through app.doScript among it (the author: "if you want UXP, use it through DoScript" - KFC runs ExtendScript alone). The rows run inside ONE undo step (app.doScript, UndoModes.ENTIRE_SCRIPT, "KFC Run Script"): one row's error is
 //  counted and the rest go on. Rows whose documents are not open (a book's closed chapter) are counted, not run. No row is marked: what a script changed is not
 //  KFC's to know - the rows are drawn again. The UI half's, as InDesign's own Scripts panel runs scripts; a private engine name keeps it out of the person's
 //  own #targetengine sessions. The main thread only.
@@ -31,6 +33,13 @@ namespace KFCRowScript
 	    on how many, the first error, the rows not run and why; "cancelled" when the window's Cancel was pressed. False = nothing was run. A test build's fault switch
 	    run-script-source gives the script and no window is shown (RS9). */
 	bool Run(const KFCRowsByChapter& rows, PMString& outStatus);
+
+	/** SPECIAL OPERATIONS > EDIT IN STORY EDITOR ON STORY ROWS (2026-11-06 - the author: "a document made hidden, its stories searched - opened in the Story Editor, only
+	    the story is edited while the document stays hidden"): each row's own story (an internal one's, the XML structure's, is not opened) - its scripting object's
+	    storyEdit(), the same row-to-object road as Run, measured to open the Story Editor's window ALONE on a document opened with no window (layoutWindows 0,
+	    storyWindows 1 - work/note-scripts/2026-11-06-kfc-label-spelling/se-windowless.jsx). A window, no change to the document: no undo step. outStatus = how
+	    many were opened, and why the rest were not (a document not open, a story not found, an internal story). False = nothing was opened. */
+	bool EditInStoryEditor(const KFCRowsByChapter& rows, PMString& outStatus);
 }
 
 #endif // __KFCRowScript_h__

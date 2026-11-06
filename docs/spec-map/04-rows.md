@@ -158,28 +158,22 @@
   ```
   ヒットの行       Replace（2.1.1 から一番上）
                    Clear from Results（2026-10-18＝ROW-47）
-                   Copy Rows（2026-10-18＝ROW-48）
                    Restore from Copy（2026-10-17＝REP-38・最初の名前 Restore Original）
                    Special Operations ▸ Clear Overrides（文字の行・2026-10-30＝REP-40）・Create Outlines（文字の行・2026-10-18＝REP-39）
   （物の行）       Replace（2.1.1 から一番上）
                    Clear from Results
-                   Copy Rows
                    Special Operations ▸ Arrange ▸・Clear Object Style Overrides・Create Outlines（OBJ-19）・Delete・Fitting ▸・
                                         Hide・Lock・Move to Active Layer・Show・Transform ▸・Unlock（OBJ-20）
   ストーリーの行   Replace All Rows（2026-11-04 から一番上＝ROW-50）
                    Clear from Results
-                   Copy Rows
                    Search This Story Again
                    Select All Rows
   文書の行         Replace All Rows（2026-11-04 から一番上＝ROW-50）
                    Clear from Results
-                   Copy Rows
                    Search This Document Again
                    Select All Rows
-  ブックの行       Copy Rows
-                   Select All Rows
+  ブックの行       Select All Rows
   段の見出しの行   Clear These Results（ROW-43）
-                   Copy These Results（ROW-48）
                    Narrow Down ▸ Frames of These Matches・In Endnotes・In Footnotes・On Active Layer・On Pasteboard・Pages...・With Overrides（ROW-46）
                    Search Text in These Objects（ROW-49・物の段だけ――文字の段では灰色）
                    Search These Results Again（ROW-44）
@@ -333,7 +327,7 @@
   ✅ 実機（2026-10-18・`k1.ps1`）＝1行・まとめて3行・ストーリーの行・文書の行・置換2つの後に1行外して Ctrl+Z／Redo（外した行は戻らない・段は置換の2つだけ）・Ctrl+Return（下の行が選ばれ文書の一致が選ばれる・最後の行は上へ・Ctrl+Shift+Return は何もしない）・探し直しで戻る・物の行（Ctrl+Return で下の物がレイアウトで選ばれる・灰色にしてから戻っても外れたまま）・4つのメニューの区切り。✅（2026-10-18 午後）押したまま＝KIDMCP の `send_input` の `CTRL+ENTER*3`（Windows と同じ自動反復の印・10-09 から有った）で外れたのは1行（`work/note-scripts/2026-10-18-kfc-narrow/km1.ps1`・記録 RETFOCUS の repeat=0 の後に repeat=1）。⬜まだ＝本文にキーボードがあるときの Ctrl+Return。
   - 訂正:
 
-- **ROW-48** ★**Copy Results**（パネルメニュー・Clear Results の下）・**Copy Rows**（ヒット・物・ストーリー・文書・ブックの行の右クリック）・**Copy These Results**（段の見出しの右クリック）・**Ctrl+C**（2026-10-18 作者「Copy Results やりましょう」・設計書 `docs/superpowers/specs/2026-10-18-kfc-copy-results-progress-share-design.md`）――
+- **ROW-48** ⛔**2026-11-06 に撤去**（作者「検索結果のCopyの仕組み要らないので削除を」＝設計書 `2026-11-06-kfc-label-spelling-runscript-design.md` CR1・ActionID +103〜+105 は退役・一覧の Ctrl+C は本体の「コピー」に戻った＝回帰 `copy-gone-actions`・`copy-gone-ctrl-c`・`copy-gone-object-menu`・Restore from Copy〈REP-38〉は別の仕組みで残る）。以下は 10-18〜11-06 の記録＝★**Copy Results**（パネルメニュー・Clear Results の下）・**Copy Rows**（ヒット・物・ストーリー・文書・ブックの行の右クリック）・**Copy These Results**（段の見出しの右クリック）・**Ctrl+C**（2026-10-18 作者「Copy Results やりましょう」・設計書 `docs/superpowers/specs/2026-10-18-kfc-copy-results-progress-share-design.md`）――
   行を**タブ区切りのテキストでクリップボードへ写す**（本体のリンクパネルの「選択したリンクの情報をコピー」と同じ形＝1行目に列の名前・列の間にタブ・行の間に改行）。列＝`Document`・`Page`・`Status`・`Text`。Document＝文書の名前だけ（All Documents の窓の無い文書の行が後ろに付ける ` (no window)` は付けない＝2026-10-19 ブロック7の再検査 D7-5・回帰 `copy-results-nowindow`／`-armed`）。Page＝行の場所の語のまま（`P1(2)`・`P2 overset` など）／Status＝`Changed`・`Outlined`・特殊操作の語・`Missing` など（無ければ空）／Text＝行と同じ「前[一致]後」（本文のタブは »・改行は空白）・物の行は物の名前。一覧から外した行（ROW-47）は写さない。文書は変えない（取り消しの段にならない）。
   Copy Results＝今の段の行全部／Copy Rows＝その行（まとめて選んだ行の1つなら選んだ行すべて・ストーリーと文書の行はその下の行全部・ブックの行は全部）／Copy These Results＝その段の行（灰色の段も）／Ctrl+C＝一覧にキーボードがあるとき選んだ行（Copy Rows と同じ・本体の「コピー」は走らない）。メッセージ欄 `Copied 4 rows to the clipboard.`（1行は `Copied 1 row to the clipboard.`）。灰色＝写す行が無いとき。
   ★`Copy Results` はキーボードショートカットに割り当てられる（SET-13・2026-10-18 作者「だしましょう」）。

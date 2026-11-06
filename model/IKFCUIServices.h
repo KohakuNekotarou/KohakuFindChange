@@ -184,6 +184,9 @@ public:
 	/** IS THE KOHAKU+ TAB'S STORY KIND FIND/CHANGE'S NOW (appended - docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md; KFCStorySearch::IsTabCurrent asks it) - the same for its
 	    conditions (its Search: alone). */
 	virtual bool				StoryTabConditions(KFCStoryConditions& outConditions) = 0;
+	/** IS THE KOHAKU+ TAB'S SPELLING KIND FIND/CHANGE'S NOW (appended - revision 55, docs/superpowers/specs/2026-11-06-kfc-label-spelling-runscript-design.md SP1;
+	    KFCSpellingSearch::IsTabCurrent asks it) - the same for its conditions (its icons and its Search:). */
+	virtual bool				SpellingTabConditions(KFCSpellingConditions& outConditions) = 0;
 };
 
 /** HOW THE MODEL HALF ASKS FOR IKFCUIServices - the only way. IKFCUIServices has no kDefaultIID, so a Query of its

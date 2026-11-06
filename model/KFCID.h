@@ -234,6 +234,11 @@ DECLARE_PMID(kImplementationIDSpace, kKFCCopyStoreImpl, kKFCPrefix + 47)
 #define kKFCApplyObjStyleStepKey			kKFCStringPrefix "kKFCApplyObjStyleStepKey"		// Apply Object Style (2026-11-05)
 #define kKFCApplyCellStyleStepKey			kKFCStringPrefix "kKFCApplyCellStyleStepKey"	// a table row's Apply Cell Style (2026-11-05 - KFCReplaceEngine::CellStyleHits)
 #define kKFCLabelRemoveStepKey			kKFCStringPrefix "kKFCLabelRemoveStepKey"		// a script label row's Remove Label (2026-11-05)
+// Special Operations > Label > Add Key... / Edit Value... / Remove Key... (2026-11-06 - KFCReplaceEngine::WriteLabelRows, docs/superpowers/specs/
+// 2026-11-06-kfc-label-spelling-runscript-design.md LB5; measured against every other key - key_collisions.py).
+#define kKFCLabelAddKeyStepKey			kKFCStringPrefix "kKFCLabelAddKeyStepKey"
+#define kKFCLabelEditValueStepKey		kKFCStringPrefix "kKFCLabelEditValueStepKey"
+#define kKFCLabelRemoveKeyStepKey		kKFCStringPrefix "kKFCLabelRemoveKeyStepKey"
 #define kKFCDeleteStepKey					kKFCStringPrefix "kKFCDeleteStepKey"
 #define kKFCMoveStepKey						kKFCStringPrefix "kKFCMoveStepKey"
 #define kKFCScaleStepKey					kKFCStringPrefix "kKFCScaleStepKey"

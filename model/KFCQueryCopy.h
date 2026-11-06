@@ -142,6 +142,10 @@ namespace KFCQueryCopier
 	/** A STORY LIST'S (KFCStorySearch - docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md): the mode, kKFCStorySearchMode - it asks nothing (ST3). */
 	void CaptureStories(KFCQueryCopy& out);
 
+	/** A SPELLING LIST'S (KFCSpellingSearch - docs/superpowers/specs/2026-11-06-kfc-label-spelling-runscript-design.md SP3): the mode, kKFCSpellingSearchMode - it asks nothing but
+	    its icons (ownSwitches, set by the caller), as a warichu list's. */
+	void CaptureSpelling(KFCQueryCopy& out);
+
 	/** State `copy` back into Find/Change: the tab, then every field that differs from what the dialog holds now, with the
 	    dialog's own commands (KFCFindChangeCmds; the formats with kClearFindFormatCmdBoss / kClearChangeFormatCmdBoss and
 	    kFindChangeFormatCmdBoss). False = a command failed - outWhat names the field; the ones before it went through

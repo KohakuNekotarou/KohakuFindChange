@@ -1388,6 +1388,18 @@ PMString KFCScriptLabelSearch::HolderLabel(IDataBase* db, const Holder& holder, 
 	return label;
 }
 
+void KFCScriptLabelSearch::HolderLabels(IDataBase* db, const Holder& holder, std::vector<std::pair<PMString, PMString> >& out)
+{
+	// Every key's (PickLabels with no key asked): the Script Label panel's first, then each one a script put under a key of its own.
+	InterfacePtr<IScriptLabel> tags(QueryHolderLabels(db, holder));
+	PickLabels(tags, KFCScriptLabelConditions(), out);
+}
+
+bool KFCScriptLabelSearch::IsPanelLabelKey(const PMString& key)
+{
+	return IsPanelKey(key);
+}
+
 ErrorCode KFCScriptLabelSearch::WriteHolder(IDataBase* db, const Holder& holder, const PMString& key, const PMString& value)
 {
 	if (db == nil)

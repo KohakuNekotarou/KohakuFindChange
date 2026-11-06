@@ -39,6 +39,7 @@
 // Project includes:
 #include "KFCQueryContents.h"
 #include "KFCQueryOrder.h"
+#include "KFCLabelDialogs.h"		// KeyRowTip - Special Operations > Label's keys (2026-11-06)
 #include "KFCUIID.h"
 
 /** The row cell's tooltip: what the row's saved query does, read off its file. */
@@ -69,6 +70,9 @@ PMString KFCQueryRowTip::GetTipText(const PMPoint& /*mouseLocation*/)
 		return none;
 	TreeNodePtr<ListIndexNodeID> node(nodeData->Get());
 	const int32 index = (node != nil) ? node->GetIndex() : -1;
+	// Special Operations > Label's keys (2026-11-06 - the third list): the key's value as it reads, or that the items' values differ.
+	if (list->GetWidgetID() == kKFCLabelKeyListWidgetID)
+		return KFCLabelDialogs::KeyRowTip(index);
 	const std::vector<KFCSavedQuery>& rows = (list->GetWidgetID() == kKFCQueryOrderListWidgetID)
 		? KFCQueryOrder::Order() : KFCQueryOrder::Saved();
 	if (index < 0 || index >= static_cast<int32>(rows.size()))

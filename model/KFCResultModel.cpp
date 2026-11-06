@@ -29,6 +29,7 @@
 #include "KFCModelTypes.h"		// kKFCQRCodeSearchMode - ListIsQRCodes reads the list's search mode
 #include "KFCResultModel.h"
 #include "KFCRowFoci.h"	// the rows' text foci - attached where a chapter is bound, let go with the rows
+#include "KFCSpellingSearch.h"	// KindWord - a spelling list's row's word on its locator (2026-11-06)
 
 namespace
 {
@@ -190,6 +191,25 @@ namespace
 			c->storyVersions.erase(v.story);
 	}
 
+}	// anonymous namespace
+
+// A STORY LIST'S ROW (KFCStorySearch - its holder the story itself): the row IS a story.
+static bool IsStoryRow(const KFCResultModel::Hit& hit)
+{
+	return hit.holderKind == kKFCHolderStory || hit.holderKind == kKFCHolderInternalStory;
+}
+
+// A ROW THAT HANGS OFF ITS DOCUMENT ROW DIRECTLY - in no story group: an object row, which has no story; and a Story list's row, which is
+// the story (the author, 11-06: "the document, the story under it, and no more - a search of the stories alone, shown simply" - a group
+// over each story held its one row under it). Asked where the groups are made (BuildFontGroups) and where the document's own rows are
+// counted out (GetObjectRowHit).
+static bool HangsOffItsDocument(const KFCResultModel::Hit& hit)
+{
+	return hit.itemUID != kInvalidUID || IsStoryRow(hit);
+}
+
+namespace
+{
 	// GROUP A CHAPTER'S HITS BY STORY (the author's call) - the tree's middle level.
 	// One group per story in first-appearance (page) order - so the stories read in the order their
 	// first matches stand - and every hit given its group. The row reads "ID<the story's UID>: <the story's
@@ -197,7 +217,7 @@ namespace
 	// for a story that begins on page 1, measured - does not name it). The UID is the number the scripting DOM
 	// gives the story (Story.id). (The "font" in
 	// the names is the level's old name: it held the fonts of Find Missing Glyphs, since removed; the level is
-	// the story's alone.)
+	// the story's alone.) An object row and a Story list's row are in no group (HangsOffItsDocument).
 	//
 	// The groups are rebuilt from scratch, and every hit's fontGroup / fontGroupPos written, whatever
 	// the hit held before.
@@ -220,10 +240,10 @@ namespace
 				hit.fontGroupPos = -1;
 				continue;
 			}
-			// AN OBJECT ROW has no story: it hangs off its document row directly (the adapter's branch for a
-			// chapter with no groups, KFCResultListAdapter.cpp) - at its place among the chapter's object rows the list
-			// shows (GetObjectRowHit; its index, while no row is taken off).
-			if (hit.itemUID != kInvalidUID)
+			// AN OBJECT ROW has no story, and A STORY LIST'S ROW is the story (11-06): either hangs off its document row directly
+			// (the adapter's branch for a chapter with no groups, KFCResultListAdapter.cpp) - at its place among the chapter's
+			// such rows the list shows (GetObjectRowHit; its index, while no row is taken off).
+			if (HangsOffItsDocument(hit))
 			{
 				hit.fontGroup = -1;
 				hit.fontGroupPos = objectPos++;
@@ -562,6 +582,11 @@ bool KFCResultModel::ListIsTableRows()
 	return gHeader.searchMode == static_cast<int32>(kKFCTableRowsSearchMode);
 }
 
+bool KFCResultModel::ListIsSpelling()
+{
+	return gHeader.searchMode == static_cast<int32>(kKFCSpellingSearchMode);
+}
+
 bool KFCResultModel::ListHasOwnChangeTab()
 {
 	return ListIsTables() || ListIsRuby() || ListIsKenten();
@@ -569,7 +594,7 @@ bool KFCResultModel::ListHasOwnChangeTab()
 
 bool KFCResultModel::ListIsOwnKind()
 {
-	return ListHasOwnChangeTab() || ListIsWarichu() || ListIsScriptLabels() || ListIsStory();
+	return ListHasOwnChangeTab() || ListIsWarichu() || ListIsScriptLabels() || ListIsStory() || ListIsSpelling();
 }
 
 bool KFCResultModel::ListDrawsTwoLines()
@@ -790,7 +815,7 @@ int32 KFCResultModel::GetObjectRowHit(int32 chapterIdx, int32 nth)
 	if (c == nil || nth < 0)
 		return -1;
 	for (size_t i = 0; i < c->hits.size(); ++i)
-		if (!c->hits[i].cleared && c->hits[i].itemUID != kInvalidUID && c->hits[i].fontGroupPos == nth)
+		if (!c->hits[i].cleared && HangsOffItsDocument(c->hits[i]) && c->hits[i].fontGroupPos == nth)
 			return static_cast<int32>(i);
 	return -1;
 }
@@ -971,6 +996,20 @@ bool KFCResultModel::GetHitRow(int32 chapterIdx, int32 hitIdx, RowDisplay& out)
 	out.runChain = h.runChain;
 	out.runNames = h.runNames;
 	out.upper = h.upper;
+	// A STORY LIST'S ROW hangs off its document row with no story row above it (HangsOffItsDocument - the author, 11-06): it says which story it is
+	// as that row did - "ID260: first words" before its facts - made from its storyLead NOW, as GetFontDisplay makes a story row's (a Replace reads
+	// a story's first words into its rows again, and an Undo puts the rows back with theirs).
+	if (IsStoryRow(h))
+	{
+		PMString lead(h.storyLead);
+		MarkUpBreaksForDisplay(lead);
+		out.preText = PMString("ID");
+		out.preText.AppendNumber(static_cast<int32>(h.storyUID.Get()));
+		out.preText.Append(": ");
+		out.preText.Append(lead);
+		out.preText.Append("  ");
+		out.preText.SetTranslatable(kFalse);
+	}
 	return true;
 }
 
@@ -1571,6 +1610,12 @@ void KFCResultModel::BuildHitLocator(Hit& hit)
 		// An overset hit carries the "+" indicator's page and sorts by it; a trailing " overset"
 		// (after the page and ordinal) marks it as overset -> e.g. "P1(2) overset".
 		AppendPageWords(hit);
+	}
+	// A SPELLING LIST'S ROW (KFCSpellingSearch - 2026-11-06): which wavy line its word has, as InDesign's Preferences > Spelling names them ("P1(2) repeated").
+	if (hit.spellKind != 0)
+	{
+		hit.locator.Append(" ");
+		hit.locator.Append(KFCSpellingSearch::KindWord(hit.spellKind));
 	}
 	// What the row cannot show any other way, each separated by a space. The tests below ARE the list -
 	// two kinds of word, kept in two strings:

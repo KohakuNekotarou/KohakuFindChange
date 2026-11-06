@@ -229,6 +229,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCKentenMark.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCStyleMenu.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCRowScript.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCLabelDialogs.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCSwitchIcon.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCFindChangeMinimize.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCAlertAnswer.cpp"/>
@@ -238,7 +239,6 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCSpecialDialogs.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCKohakuTab.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCKohakuQueryMenu.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCCopyResults.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultStep.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCIconTip.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCJump.cpp"/>

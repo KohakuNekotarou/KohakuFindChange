@@ -13,6 +13,9 @@
   - 訂正:
 
 - **RUN-02** ★押すと**スクリプトを書く窓**（ScriptUI＝スクリプトの窓）＝説明の1行（`kfcResult = each selected row's object - N row(s). One Ctrl+Z undoes the whole run.`）・複数行の欄（前に走らせたスクリプト・初めては使い方の見本のコメント）・`Load...`（.jsx を読む）・`Save As...`（.jsx に書く）・`Cancel`・`Run`。前に走らせたスクリプトは InDesign の利用者のフォルダの `KFCRunScript.jsx` に残る（次の起動でも出る）。Cancel＝`Run Script: cancelled - nothing was run.`。回帰 `rs-window-cancel`
+  - 訂正: 2026-11-06 朝 作者「いま//で説明されていますが、Helpボタンをいれて説明はそちらでしてほしい」＝欄は初めは空・説明は Help... の窓へ（RUN-03）。
+
+- **RUN-03** ★**窓の左下に `Help...`**（右に Load... / Save As... / Cancel / Run）＝押すと説明の窓（`Run Script on Rows - Help`・読むだけの複数行の欄・選んでコピーできる・OK で閉じる）。**日本語の InDesign では日本語**（How to Use と同じ＝UI の言語）。中身＝kfcResult が行ごとに何か・kfcIndex・kfcCount・Ctrl+Z 1回・走らせない行・ボタン・例4つ・**UXP は台本の中から `app.doScript(…, ScriptLanguage.UXPSCRIPT, …)` で**（値は `script.setResult`・引数は `script.args`・await より後の変更は取り消しの1段の外）。★**欄は初めは空**・前に保存された台本が 11-06 までの見本（// の行）と同じなら空として開く（改行の種類と末尾の空白は見ない）・自分の台本は残る。（設計書 `2026-11-06-kfc-label-spelling-runscript-design.md` RH1〜RH3・作者「UXPつかいたければDoScritでUXPをつかえばいい」＝Run Script 自体は ExtendScript だけ）回帰 `rs-help-window`・`rs-box-old-sample`・`rs-box-kept`・`rs-box-none`
   - 訂正:
 
 ## 2. kfcResult

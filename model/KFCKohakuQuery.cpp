@@ -245,7 +245,7 @@ bool KFCKohakuQuery::Read(const IDFile& file, KFCKohakuQueryData& out)
 		if (key == "kind")
 		{
 			const int32 modes[] = { kKFCQRCodeSearchMode, kKFCTableSearchMode, kKFCRubySearchMode, kKFCKentenSearchMode, kKFCWarichuSearchMode, kKFCScriptLabelSearchMode,
-				kKFCStorySearchMode };		// (a Story query holds its kind alone - docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md ST11)
+				kKFCStorySearchMode, kKFCSpellingSearchMode };		// (a Story query holds its kind alone; a Spelling query its icons - SP6 - docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md ST11)
 			for (size_t m = 0; m < sizeof(modes) / sizeof(modes[0]); ++m)
 				if (value == KFCSavedQueries::KindName(modes[m]))
 					out.mode = modes[m];
@@ -274,6 +274,7 @@ bool KFCKohakuQuery::Read(const IDFile& file, KFCKohakuQueryData& out)
 			out.ruby.switches.SetBits(number);
 			out.kenten.switches.SetBits(number);
 			out.warichu.switches.SetBits(number);
+			out.spelling.switches.SetBits(number);
 		}
 		else if (key == "rubyBase")
 			out.ruby.base = Words(value);
@@ -395,6 +396,8 @@ std::string KFCKohakuQuery::FileText(const KFCKohakuQueryData& query)
 	}
 	else if (query.mode == kKFCWarichuSearchMode)
 		Attribute(element, "switches", query.warichu.switches.Bits());		// (its icons alone - docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md A6)
+	else if (query.mode == kKFCSpellingSearchMode)
+		Attribute(element, "switches", query.spelling.switches.Bits());		// (its icons alone, as Warichu's - SP6)
 	else if (query.mode == kKFCScriptLabelSearchMode)
 	{
 		Attribute(element, "labelKey", query.label.key);

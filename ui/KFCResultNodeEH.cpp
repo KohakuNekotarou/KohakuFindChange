@@ -115,6 +115,11 @@ void PopRowMenu(const char* menuName, IEvent* e, IPMUnknown* widget)
 		menuMgr->RemoveMenuItem(path, kKFCTcyTextActionID);
 		if (KFCKohakuTab::IsJapaneseUI())
 			menuMgr->AddMenuItem(kKFCTcyTextActionID, path, kKFCTcyTextMenuItemPosition, kFalse);
+		// EDIT IN STORY EDITOR (2026-11-06 - the author: "a document made hidden, its stories searched - opened in the Story Editor, only the story is edited"): over a
+		// Story row - its own story's, not an internal one's (the XML structure's - no story a person writes) - taken off first, then put, as Tate-chu-yoko.
+		menuMgr->RemoveMenuItem(path, kKFCEditInStoryEditorActionID);
+		if (HolderOfRow(widget) == kKFCHolderStory)
+			menuMgr->AddMenuItem(kKFCEditInStoryEditorActionID, path, kKFCEditInStoryEditorMenuItemPosition, kFalse);
 	}
 	// UNIFY TO A READING (2026-11-03 - the author: an Inconsistent Ruby list's heading and rows offer their word's other readings, "<<tarou>> ni soroeru"): on a hit row's and a story row's menus,
 	// under Replace, an item a reading the row's word has besides its own - taken off first, then put, as Tate-chu-yoko; named as the menu draws them (KFCActionComponent's UpdateActionStates).
@@ -183,6 +188,33 @@ void PopRowMenu(const char* menuName, IEvent* e, IPMUnknown* widget)
 		if (KFCResults()->ListIsScriptLabels())
 			menuMgr->AddMenuItem(kKFCRemoveLabelActionID, (std::strcmp(menuName, kKFCResultHitMenuName) == 0) ? textPath : objectPath,
 				PMReal(kKFCRemoveLabelMenuItemPosition), kFalse);
+	}
+	// SPECIAL OPERATIONS > LABEL > (2026-11-06 - docs/superpowers/specs/2026-11-06-kfc-label-spelling-runscript-design.md LB2): over a row whose item can hold a label - an
+	// object row (any list's), a Story row, a Kohaku+ Table row, a script label list's table or cell row (KFCRuns()->CanLabelHit) - on the path of the menu popping: the
+	// submenu's entry put first, then its three items (Apply Cell Style's way: the entry translatable, the items' path not). Both paths' submenus taken off first every
+	// time, so neither is ever put twice and an action stands on one path alone.
+	if (std::strcmp(menuName, kKFCResultHitMenuName) == 0 || std::strcmp(menuName, kKFCResultObjectMenuName) == 0)
+	{
+		PMString hitEntry(kKFCHitLabelSubmenuEntry), objectEntry(kKFCObjLabelSubmenuEntry);
+		menuMgr->RemoveSubmenuAndChildren(hitEntry);
+		menuMgr->RemoveSubmenuAndChildren(objectEntry);
+		InterfacePtr<const ITreeNodeIDData> nodeData(widget, UseDefaultIID());
+		bool labels = false;
+		if (nodeData != nil)
+		{
+			TreeNodePtr<KFCResultNodeID> row(nodeData->Get());
+			labels = (row != nil && row->IsHitRow() && KFCRuns()->CanLabelHit(row->GetChapter(), row->GetHit()));
+		}
+		if (labels)
+		{
+			const bool objectMenu = (std::strcmp(menuName, kKFCResultObjectMenuName) == 0);
+			PMString path(objectMenu ? kKFCObjLabelSubmenuPath : kKFCHitLabelSubmenuPath);
+			path.SetTranslatable(kFalse);
+			menuMgr->AddMenuItem(kInvalidActionID, objectMenu ? objectEntry : hitEntry, PMReal(kKFCLabelSubmenuPosition), kFalse);
+			menuMgr->AddMenuItem(kKFCLabelAddKeyActionID, path, PMReal(kKFCLabelAddKeyMenuItemPosition), kFalse);
+			menuMgr->AddMenuItem(kKFCLabelEditValueActionID, path, PMReal(kKFCLabelEditValueMenuItemPosition), kFalse);
+			menuMgr->AddMenuItem(kKFCLabelRemoveKeyActionID, path, PMReal(kKFCLabelRemoveKeyMenuItemPosition), kFalse);
+		}
 	}
 	menuMgr->HandlePopupMenu(menuName, e->GlobalWhere(), e->GlobalWhere(), removeDisabledItems, widget);
 }

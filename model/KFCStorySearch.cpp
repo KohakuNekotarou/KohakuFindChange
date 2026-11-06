@@ -251,7 +251,8 @@ bool WalkDoc(const UIDRef& docRef, size_t limit, std::vector<KFCResultModel::Hit
 		outHits[h].runChain = words[h];
 		outHits[h].runChain.SetTranslatable(kFalse);
 		outHits[h].holderKind = holders[h];
-		// THE ROW READS ITS FACTS ALONE: no line around them (a story row's text is the story whole - its first words are its branch's).
+		// THE ROW READS ITS FACTS ALONE: no line around them (a story row's text is the story whole). Its "ID<n>: first words" go before them as it is
+		// drawn (KFCResultModel::GetHitRow - 11-06: the row hangs off its document row, no story row above it to say them).
 		outHits[h].preText = PMString();
 		outHits[h].preText.SetTranslatable(kFalse);
 		outHits[h].postText = PMString();

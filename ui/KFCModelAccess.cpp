@@ -237,6 +237,10 @@ namespace
 		virtual bool RemoveLabelRows(const KFCRowsByChapter&, PMString& outStatus) { SayWhy(outStatus); return false; }
 		virtual bool CanRemoveLabelHit(int32, int32) { return false; }
 		virtual UIDRef ChapterDocNow(int32) { return UIDRef::gNull; }
+		virtual bool LabelKeysOfRows(const KFCRowsByChapter&, bool, std::vector<KFCLabelKey>& outKeys, int32& outHolders, int32& outUnread, PMString& outWhy)
+			{ outKeys.clear(); outHolders = 0; outUnread = 0; SayWhy(outWhy); return false; }
+		virtual bool WriteLabelRows(const KFCRowsByChapter&, int32, const std::vector<KFCLabelEdit>&, PMString& outStatus) { SayWhy(outStatus); return false; }
+		virtual bool CanLabelHit(int32, int32) { return false; }
 	};
 
 	class KFCChaptersStandInImpl : public IKFCChapters

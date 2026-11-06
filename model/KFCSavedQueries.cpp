@@ -64,6 +64,7 @@ namespace
 		{ "Warichu",		kKFCWarichuSearchMode },
 		{ "Script Label",	kKFCScriptLabelSearchMode },	// (docs/superpowers/specs/2026-11-04-kfc-script-label-design.md S10 - every language's, as QR Code's and Table's)
 		{ "Story",			kKFCStorySearchMode },			// (docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md ST11 - every language's)
+		{ "Spelling",		kKFCSpellingSearchMode },		// (docs/superpowers/specs/2026-11-06-kfc-label-spelling-runscript-design.md SP6 - every language's)
 	};
 	const int32 kKindCount = static_cast<int32>(sizeof(kKinds) / sizeof(kKinds[0]));
 	const int32 kFolderKinds = 5;	// the first five: the kinds with a folder
@@ -142,6 +143,7 @@ namespace
 		const bool japanese = !KFC_DIAG_FAULT("not-japanese") && LocaleSetting::GetLocale().GetUserInterfaceId() == k_jaJP;
 		for (size_t k = 0; k < found.size(); ++k)
 			if (found[k].mode == kKFCQRCodeSearchMode || found[k].mode == kKFCTableSearchMode || found[k].mode == kKFCScriptLabelSearchMode || found[k].mode == kKFCStorySearchMode
+				|| found[k].mode == kKFCSpellingSearchMode
 				|| (japanese && (found[k].mode == kKFCRubySearchMode || found[k].mode == kKFCKentenSearchMode || found[k].mode == kKFCWarichuSearchMode)))
 				out.push_back(found[k]);
 	}

@@ -140,6 +140,13 @@ namespace KFCScriptLabelSearch
 	/** The holder's label under `key` (an item's: LabelOf's) - untranslatable; empty for none. */
 	PMString HolderLabel(IDataBase* db, const Holder& holder, const PMString& key);
 
+	/** EVERY LABEL OF THE HOLDER, (key, label), none empty - the Script Label panel's first, then each key a script put one under (docs/superpowers/specs/2026-11-06-
+	    kfc-label-spelling-runscript-design.md LB4 - Special Operations > Label's keys). Untranslatable. Empty for none, or for no such holder. */
+	void HolderLabels(IDataBase* db, const Holder& holder, std::vector<std::pair<PMString, PMString> >& out);
+
+	/** Is `key` the Script Label panel's own (IScriptLabel::kDefaultScriptLabelKey)? */
+	bool IsPanelLabelKey(const PMString& key);
+
 	/** ONE HOLDER'S LABEL WRITTEN inside the caller's step - an empty value takes the key away (insertLabel(key, "")): an item's (Write); a cell's by its label attribute - its tags
 	    now, that key set - handed to ITableCommands::ApplyCellOverrides; a table's by IScriptUtils::SetScriptingTag on its scripting object, made with the table's
 	    story for its parent (one made without took InDesign down - memory table-label-write-crash-and-cell-label-write). Read back after. kSuccess = done. */

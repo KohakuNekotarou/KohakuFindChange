@@ -336,6 +336,11 @@ int32 KFCChangeAll::Run(const PMString& listWords, PMString& outSummary)
 		outSummary.Append("Change All: the Find/Change dialog is on Story on the Kohaku+ tab. This panel lists the stories there - nothing to change.");
 		return 0;
 	}
+	if (KFCSearchEngine::CurrentSearchMode() == kKFCSpellingSearchMode)	// (the Spelling kind's the same - docs/superpowers/specs/2026-11-06-kfc-label-spelling-runscript-design.md SP3)
+	{
+		outSummary.Append("Change All: the Find/Change dialog is on Spelling on the Kohaku+ tab. This panel lists the words Dynamic Spelling underlines - nothing to change.");
+		return 0;
+	}
 	if (KFCSearchEngine::CurrentSearchMode() == kKFCKentenSearchMode)	// (the Kenten kind's the same)
 	{
 		outSummary.Append("Change All: the Find/Change dialog is on Kenten on the Kohaku+ tab. List the text and Replace its rows.");

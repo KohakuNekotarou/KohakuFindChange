@@ -99,7 +99,10 @@ DECLARE_PMID(kInterfaceIDSpace, IID_IKFCUIBOUNDARY, kKFCPrefix + 14)
 // (52, 2026-11-06: Find: Story on the Kohaku+ tab - commit 4c6d711.)
 // (53, 2026-11-06: IKFCRuns::ChapterDocNow appended - Run Script asks for a row's document by its file, not by the address the results hold
 //  (the since-2.1.0 re-inspection's D20-a).)
-#define kKFCBoundaryRevision	"53"
+// (54, 2026-11-06: Special Operations > Label > Add Key... / Edit Value... / Remove Key... - IKFCRuns::LabelKeysOfRows / WriteLabelRows / CanLabelHit
+//  appended, the types KFCLabelKey, KFCLabelEdit and KFCLabelOp - docs/superpowers/specs/2026-11-06-kfc-label-spelling-runscript-design.md LB6.)
+// (55, 2026-11-06: Find: Spelling on the Kohaku+ tab - IKFCUIServices::SpellingTabConditions appended, the type KFCSpellingConditions (SP1).)
+#define kKFCBoundaryRevision	"55"
 #define kKFCBoundaryStamp		kKFCVersion "/" kKFCBoundaryRevision
 
 #endif // __KFCBoundaryID_h__
