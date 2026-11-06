@@ -17,8 +17,9 @@
 - **DOC-10** ★**Kohaku+ の Find: の一番上に Document**（どの言語でも・ABC 順＝KOHAKU-03）。面＝欄もアイコンも無い。Search: は **All Documents だけ**（前面の文書1つを並べても見つけることにならない＝私の判断）。右の列＝**Find in KFC** と **Open Hidden...**（Find Next・Change は無い＝窓なしの文書には着地できない）。回帰 `kh-kind-order`・`doc-openhidden`
   - 訂正:
 
-- **DOC-11** **一覧＝開いている文書を1つ1行**、段（ブックならブックの行）の直下に並ぶ（文書の行の枝は作らない）。行の字＝`<名前>  [<窓>, <保存>]` と保存先 ` - <フルパス>`。窓＝`no window`／`1 window`／`<n> windows`（レイアウトの窓）、ストーリーエディターの窓があれば `, <n> Story Editor`（ストーリーエディターの窓だけなら `no layout window, 1 Story Editor`＝11-06 の再検査）。保存＝`not saved`／`modified`（保存済みで変更なしは書かない）。段の名前＝`[Document/All Documents] Find:"[All Documents]"`。Book Scope ON＝ブックの章のうち開いているものだけ（閉じた章は開かない・並べない）。メッセージ欄の要約＝`<n> document(s).` の後に ` Click a row to bring its document to the front (one with no window: Special Operations > Show).`。Show／Save の後は、その文書の行を作り直して今の窓と保存の状態を書く（Search This Document Again と同じ道）。回帰 `doc-list`・`doc-list-saved`・`doc-show`・`doc-save-modified`
+- **DOC-11** **一覧＝開いている文書を1つ1行**、段（ブックならブックの行）の直下に並ぶ（文書の行の枝は作らない）。行の字＝`<名前>  [<窓>, <保存>]` と保存先 ` - <フルパス>`。窓＝`no window`／`1 window`／`<n> windows`（レイアウトの窓）、ストーリーエディターの窓があれば `, <n> Story Editor`（ストーリーエディターの窓だけなら `no layout window, 1 Story Editor`＝11-06 の再検査）。保存＝`not saved`／`modified`（保存済みで変更なしは書かない）。段の名前＝`[Document/All Documents] Find:"[All Documents]"`（ブックは `[Document/Book]`）。Book Scope ON＝ブックの章のうち開いているものだけ（閉じた章は開かない・並べない）＝要約は `<n> document(s) in <m> of <t> chapter(s).`。メッセージ欄の要約＝`<n> document(s).` の後に ` Click a row to bring its document to the front (one with no window: Special Operations > Show).`。Show／Save の後は、その文書の行を作り直して今の窓と保存の状態を書く（Search This Document Again と同じ道）。回帰 `doc-list`・`doc-list-saved`・`doc-show`・`doc-save-modified`・`doc-book`
   - 訂正: 11-06 の再検査＝①Book Scope で開いている章が1つも並ばなかった（章の `docRef` は空で渡る＝ファイルで聞き直す）②Show／Save の後も行が「no window」「modified」のままだった ③要約に窓なしの文書への道を足した
+  - 訂正: 11-07 ブロック8の再検査（D8-a）＝**Book Scope ON の Find: Document は一度も走らなかった**＝本の扉（`KFCSearchEngine::ResolveRunScope`）がほかの種類と同じに Search: を聞き、この種類の Search: は All Documents だけなので、いつも `Book Scope is on, and Search: is All Documents. Set Search: to Document in Edit > Find/Change, or turn Book Scope off.` で断った（この種類に Document の項目は無い＝言う直し方が出来ない）＝11-06 の①の直しは届いていなかった。→ この種類では本の扉は Search: を聞かない（実機で RED→GREEN＝`doc-book`）
 
 - **DOC-12** **行のクリック**＝その文書の窓を前に出す。**窓なしの文書は窓を開かない**＝メッセージ欄 `<名前> has no window - Special Operations > Show opens one.`（作者の Show を明示の操作にするため・私の判断）。回帰 `doc-click-hidden`
   - 訂正:
@@ -56,5 +57,4 @@
 ## ⬜ この章で未確認
 
 - 窓なしの・まだ保存していない文書の Save（本体の「別名で保存」の窓）を実機で出していない（`doc-close-modified` は保存済みで変更のある文書の「保存しますか」だけ）。
-- Book Scope ON の Find: Document（ブックの開いている章だけ）は回していない。
 - 開いている文書が多い（数十）ときの行の並びと速さ。

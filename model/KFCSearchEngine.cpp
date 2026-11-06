@@ -3251,9 +3251,16 @@ bool KFCSearchEngine::ResolveRunScope(RunScope& out, PMString& outRefusal, bool 
 	// the query tab's Document and change every open document (regression case qr-query-run-scope; QR-25).
 	const int32 searchScope = forQueries ? KFCSearchEngine::FindChangeScope() : KFCSearchEngine::CurrentSearchScope();
 	const char* const scopeName = KFCSearchEngine::SearchScopeName(searchScope);	// "" = none this panel follows
+	// THE DOCUMENT KIND'S Search: IS ALL DOCUMENTS ALONE (CurrentSearchScope) - it has no Document to be set
+	// to. With Book Scope on it lists the book's chapters that are open (KFCDocumentSearch::CollectTargets - the
+	// windowless-documents spec's W3, docs/superpowers/specs/2026-11-06-kfc-windowless-documents-design.md), so its
+	// All Documents is no reason to refuse the book: asked as the other kinds' Search: is, every such Find was
+	// refused, in words it cannot follow.
+	const bool documentKind = !forQueries && KFCDocumentSearch::IsTabCurrent();
 	// (asked of Search: as the selection makes it - what the dialog shows: Story with nothing selected IS
 	//  Document there, so it is no reason to refuse a book)
-	if (fromBook && KFCSearchEngine::SearchScopeForSelection(searchScope) != IWalkerScopeFactoryUtils::kDocumentScope)
+	if (fromBook && !documentKind
+		&& KFCSearchEngine::SearchScopeForSelection(searchScope) != IWalkerScopeFactoryUtils::kDocumentScope)
 	{
 		outRefusal.Append("Book Scope is on, and Search: is ");
 		outRefusal.Append(*scopeName != '\0' ? scopeName : "not Document");
