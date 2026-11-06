@@ -2473,8 +2473,9 @@ resource ActionDef (kSDKDefActionResourceID)
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
 
-		// A Find: Document row's Special Operations > Show / Close / Save / Revert (2026-11-06 - W3, KFCDocumentOps). No MenuDef node: KFCResultNodeEH's PopRowMenu
-		// puts them on a Document row's menu as it pops. Show greys over a document with a layout window (the author); Close, Save, Revert as InDesign's File menu.
+		// A Find: Document row's Special Operations > Show / Close / Save (2026-11-06 - W3, KFCDocumentOps; Revert taken out the same night - the author: "no Revert").
+		// No MenuDef node: KFCResultNodeEH's PopRowMenu puts them on a Document row's menu as it pops. Show greys over a document with a layout window (the author);
+		// Close, Save as InDesign's File menu.
 		kKFCActionComponentBoss,
 		kKFCDocShowActionID,
 		kKFCDocShowMenuKey,			// "Show"
@@ -2496,15 +2497,6 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKFCActionComponentBoss,
 		kKFCDocSaveActionID,
 		kKFCDocSaveMenuKey,			// "Save"
-		kOtherActionArea,
-		kNormalAction,
-		kCustomEnabling|kDisableIfLowMem,
-		kInvalidInterfaceID,
-		kSDKDefInvisibleInKBSCEditorFlag,
-
-		kKFCActionComponentBoss,
-		kKFCDocRevertActionID,
-		kKFCDocumentRevertMenuKey,		// "Revert"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,

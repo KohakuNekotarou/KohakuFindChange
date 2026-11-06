@@ -47,8 +47,16 @@ namespace KFCKohakuQuery
 	/** Is this file in the folder a query of KFC's is kept in? (Asked before a file is read for one: its kind's folder says what any other file is.) */
 	bool IsInItsFolder(const IDFile& file);
 
-	/** Does it write anything? (A query with nothing on its Change side is skipped by a run - "nothing to change to".) */
+	/** Does it write anything? (A query with nothing on its Change side is searched by a run, not written - FindDocument; until 2026-11-06 it was skipped,
+	    "nothing to change to".) */
 	bool HasChangeSide(const KFCKohakuQueryData& query);
+
+	/** THE RUN'S SEARCH OF ONE DOCUMENT for a query that changes nothing (2026-11-06 - docs/superpowers/specs/2026-11-06-kfc-run-search-only-queries-design.md RF2): the
+	    document walked as its kind's own search walks one (WalkOneDocument - Search This Document Again's door), with the query's conditions, up to
+	    `limit` rows, into outHits. QR Code, Table, Ruby, Kenten, Warichu, Script Label, Story and Spelling; false for another kind, or a walk that stopped
+	    (outCancelled = its Cancel). The rows are the document's whole - the caller keeps the part a run over part of it asked for. */
+	bool FindDocument(const UIDRef& docRef, const PMString& name, const KFCKohakuQueryData& query, size_t limit, std::vector<KFCResultModel::Hit>& outHits,
+		bool& outCancelled);
 
 	/** THE RUN'S WRITE OF ONE DOCUMENT: what the query's kind lists - of part alone, given one (KFCSearchEngine::PartStretches) - given its Change side, a locked one and one that already reads so left. Inside
 	    the caller's command sequence. outCount = what was written. False = InDesign would not write one. ioBookSeen: the query's one set over a book's documents - a ruby list's First in Book (KFCRubySearch::WriteDocument). */

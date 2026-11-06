@@ -13,7 +13,7 @@
 // Interface includes:
 #include "IApplication.h"			// QueryDocumentList - is a chosen file open already
 #include "IDataBase.h"
-#include "IDocFileHandler.h"		// Close / Save / Revert and their Can... - InDesign's own file doors
+#include "IDocFileHandler.h"		// Close / Save and their Can... - InDesign's own file doors
 #include "IDocument.h"
 #include "IDocumentCommands.h"		// Open - showInWindow kFalse (Open Hidden...)
 #include "IDocumentList.h"
@@ -69,14 +69,12 @@ bool CanDoDoc(KFCDocumentOps::Op op, const UIDRef& docRef)
 		return false;
 	if (op == KFCDocumentOps::kClose)
 		return handler->CanClose(docRef) != kFalse;
-	if (op == KFCDocumentOps::kSave)
-		return handler->CanSave(docRef) != kFalse;
-	return handler->CanRevert(docRef) != kFalse;
+	return handler->CanSave(docRef) != kFalse;
 }
 
 const char* OpName(KFCDocumentOps::Op op)
 {
-	return (op == KFCDocumentOps::kShow) ? "Show" : (op == KFCDocumentOps::kClose) ? "Close" : (op == KFCDocumentOps::kSave) ? "Save" : "Revert";
+	return (op == KFCDocumentOps::kShow) ? "Show" : (op == KFCDocumentOps::kClose) ? "Close" : "Save";
 }
 
 // "1 document(s)" in the status line's way.
@@ -170,15 +168,13 @@ bool KFCDocumentOps::Do(Op op, const KFCRowsByChapter& rows, PMString& outStatus
 			++failed;
 			continue;
 		}
-		// InDesign's own doors, with their own questions (kFullUI): a document holding changes asks "save?" on Close; one never saved asks for a file on Save; Revert
-		// asks first. Close is SCHEDULED - the official way from a UI's call (memory book-chapter-windowless-open): it closes once this press is over, its rows going
+		// InDesign's own doors, with their own questions (kFullUI): a document holding changes asks "save?" on Close; one never saved asks for a file on Save.
+		// Close is SCHEDULED - the official way from a UI's call (memory book-chapter-windowless-open): it closes once this press is over, its rows going
 		// off the list then (LIFE-01). No interface on the document is held here (memory close-doc-while-holding-interface).
 		if (op == kClose)
 			handler->Close(docRef, kFullUI, kTrue, IDocFileHandler::kSchedule);
-		else if (op == kSave)
-			handler->Save(docRef, kFullUI);
 		else
-			handler->Revert(docRef, kFullUI);
+			handler->Save(docRef, kFullUI);
 		const ErrorCode said = ErrorUtils::PMGetGlobalErrorCode();
 		if (said != kSuccess && op != kClose)
 		{
@@ -193,7 +189,7 @@ bool KFCDocumentOps::Do(Op op, const KFCRowsByChapter& rows, PMString& outStatus
 	// "Show: opened a window on 1 of 2 document(s); 1 has one already." - what was not done, each said.
 	outStatus.Append(OpName(op));
 	outStatus.Append(": ");
-	outStatus.Append((op == kShow) ? "opened a window on " : (op == kClose) ? "closing " : (op == kSave) ? "saved " : "reverted ");
+	outStatus.Append((op == kShow) ? "opened a window on " : (op == kClose) ? "closing " : "saved ");
 	outStatus.AppendNumber(done);
 	outStatus.Append(" of ");
 	AppendDocs(outStatus, total);
@@ -201,7 +197,7 @@ bool KFCDocumentOps::Do(Op op, const KFCRowsByChapter& rows, PMString& outStatus
 	{
 		outStatus.Append("; ");
 		outStatus.AppendNumber(cannot);
-		outStatus.Append((op == kShow) ? " with a window already" : (op == kRevert) ? " with nothing to revert to" : (op == kSave) ? " with nothing to save" : " that cannot be closed");
+		outStatus.Append((op == kShow) ? " with a window already" : (op == kSave) ? " with nothing to save" : " that cannot be closed");
 	}
 	if (failed > 0)
 	{

@@ -23,10 +23,14 @@
 // Project includes:
 #include "KFCKohakuQuery.h"
 #include "KFCKentenSearch.h"
+#include "KFCQRSearch.h"			// WalkOneDocument - a QR Code query's search in a run (FindDocument)
 #include "KFCScriptLabelSearch.h"	// WriteDocument - a Script Label query's run
 #include "KFCRubySearch.h"
 #include "KFCSavedQueries.h"	// KindName - a kind's word, the one table of them
+#include "KFCSpellingSearch.h"		// WalkOneDocument - FindDocument
+#include "KFCStorySearch.h"			// WalkOneDocument - FindDocument
 #include "KFCTableSearch.h"
+#include "KFCWarichuSearch.h"		// WalkOneDocument - FindDocument
 #include "KFCUtf8.h"			// KFCIsWellFormedUtf8 - a file asked whole before its words are read (Read)
 
 namespace
@@ -476,6 +480,37 @@ bool KFCKohakuQuery::WriteDocument(const UIDRef& docRef, const KFCKohakuQueryDat
 	if (query.mode == kKFCScriptLabelSearchMode)
 		return KFCScriptLabelSearch::WriteDocument(docRef, query.label, outCount);		// (no part: a label is no story's text - Search: is Document or All Documents)
 	return false;
+}
+
+bool KFCKohakuQuery::FindDocument(const UIDRef& docRef, const PMString& name, const KFCKohakuQueryData& query, size_t limit, std::vector<KFCResultModel::Hit>& outHits,
+	bool& outCancelled)
+{
+	outHits.clear();
+	outCancelled = false;
+	// (Each kind's walk reads its stories' versions for a list of its own; the run's list reads its own when it files its rows - KFCRunList.)
+	std::map<UID, uint32> versions;
+	bool capped = false;
+	switch (query.mode)
+	{
+		case kKFCQRCodeSearchMode:
+			return KFCQRSearch::WalkOneDocument(docRef, name, limit, outHits, capped, outCancelled);
+		case kKFCTableSearchMode:
+			return KFCTableSearch::WalkOneDocument(docRef, name, limit, query.table.findStyle, query.table.overridesOnly, outHits, versions, capped, outCancelled);
+		case kKFCRubySearchMode:
+			return KFCRubySearch::WalkOneDocument(docRef, name, limit, query.ruby, outHits, versions, capped, outCancelled);
+		case kKFCKentenSearchMode:
+			return KFCKentenSearch::WalkOneDocument(docRef, name, limit, query.kenten, outHits, versions, capped, outCancelled);
+		case kKFCWarichuSearchMode:
+			return KFCWarichuSearch::WalkOneDocument(docRef, name, limit, query.warichu, outHits, versions, capped, outCancelled);
+		case kKFCScriptLabelSearchMode:
+			return KFCScriptLabelSearch::WalkOneDocument(docRef, name, limit, query.label, outHits, versions, capped, outCancelled);
+		case kKFCStorySearchMode:
+			return KFCStorySearch::WalkOneDocument(docRef, name, limit, query.story, outHits, versions, capped, outCancelled);
+		case kKFCSpellingSearchMode:
+			return KFCSpellingSearch::WalkOneDocument(docRef, name, limit, query.spelling, outHits, versions, capped, outCancelled);
+		default:
+			return false;		// (a Document query lists the open documents: a run skips it - RF6)
+	}
 }
 
 // End, KFCKohakuQuery.cpp.

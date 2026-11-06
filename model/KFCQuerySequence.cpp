@@ -164,12 +164,17 @@ void AppendSkipped(PMString& s, const char* why, const std::vector<PMString>& na
 // included - the spec map's QRY-22 - and an Object query with no Find Object Format); a file InDesign's query reader
 // could not read (it read "nothing to find" too); and an Object query on a run over part of a document and one with
 // nothing to change to (O14 - docs/superpowers/specs/2026-10-09-kfc-object-search-design.md).
+// (2026-11-06 - docs/superpowers/specs/2026-11-06-kfc-run-search-only-queries-design.md: a query with nothing to change to is searched now, not
+// skipped (RF1) - kSkipNoChangeTo stays for its words, said by no run since - but a Document query, which lists the open documents (RF6), and a
+// QR Code, Story or Script Label query on a run over part of the front document (RF7).)
 enum SkipReason
 {
 	kSkipNothingToFind,
 	kSkipUnread,
 	kSkipPartOfDocument,
 	kSkipNoChangeTo,
+	kSkipDocument,
+	kSkipWholeDocuments,
 	kSkipReasons			// how many there are
 };
 const char* const kSkipWords[] =
@@ -178,8 +183,25 @@ const char* const kSkipWords[] =
 	"the file could not be read",
 	"an Object query runs on whole documents",
 	"nothing to change to",
+	"a Document query lists the open documents - use Find",
+	"a QR Code, Story or Script Label query runs on whole documents",
 };
 static_assert(sizeof(kSkipWords) / sizeof(kSkipWords[0]) == kSkipReasons, "each skip reason has its words");
+
+// A RUN OVER PART OF THE FRONT DOCUMENT (2026-11-06 - RF7): a found row is kept when what it stands on lies inside one of the part's stretches - its story
+// and its range (a table's row: where its table is anchored); any other row goes.
+void KeepPart(std::vector<KFCResultModel::Hit>& hits, const std::vector<KFCSearchEngine::ListedPlace>& part)
+{
+	std::vector<KFCResultModel::Hit> kept;
+	for (size_t h = 0; h < hits.size(); ++h)
+		for (size_t p = 0; p < part.size(); ++p)
+			if (hits[h].storyUID == part[p].story && hits[h].textStart >= part[p].start && hits[h].textEnd <= part[p].end)
+			{
+				kept.push_back(hits[h]);
+				break;
+			}
+	hits.swap(kept);
+}
 
 // THE RUN: these queries, in this order - each one with InDesign's own Change All, a document at a time. outSummary =
 // the panel's message line. Returns how many were replaced (0 for a refusal, a cancel or a failure). Its ways in are
@@ -281,6 +303,7 @@ int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 
 	// ===== ONE SEQUENCE AROUND EVERY QUERY (one Ctrl+Z - the query-sequence spec's D5).
 	std::vector<int32> perQuery(queries.size(), -1);
+	std::vector<int32> perFound(queries.size(), -1);		// a query that changes nothing: the rows it found (RF1, RF9); -1 = none searched
 	std::vector<PMString> skipped[kSkipReasons];		// the queries skipped, by their reason (kSkipWords)
 	bool objectRan = false;					// an Object query aimed the shared object walker at the run's documents
 	std::vector<bool> wroteTo(targets.size(), false);		// by target: did any query's Change All write anything there
@@ -345,7 +368,8 @@ int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 				break;
 			}
 			// A QUERY OF THE KOHAKU+ TAB (KFCKohakuQuery.h): no field of Find/Change's holds it, and its write is KFC's own - read here, written below where a text query's Change All is. One with nothing on its
-			// Change side (a QR code's list has none) is skipped, as an Object query with none is.
+			// Change side (a QR code's list has none) is SEARCHED there instead (2026-11-06 - RF1: its rows go into the run's list), as an Object query with none is - but a Document query (RF6), and a
+			// QR Code, Story or Script Label query on a run over part of the front document (RF7: they list whole documents' items - the Object query's rule below).
 			KFCSavedQuery described;
 			KFCSavedQueries::Describe(query.file, described);
 			const bool ownQuery = KFCIsKohakuQueryMode(described.mode);
@@ -355,9 +379,16 @@ int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 				skip(kSkipUnread);
 				continue;
 			}
-			if (ownQuery && !KFCKohakuQuery::HasChangeSide(own))
+			const bool ownFinds = ownQuery && !KFCKohakuQuery::HasChangeSide(own);
+			if (ownFinds && own.mode == kKFCDocumentSearchMode)
 			{
-				skip(kSkipNoChangeTo);
+				skip(kSkipDocument);
+				continue;
+			}
+			if (ownFinds && !wholeDocuments
+				&& (own.mode == kKFCQRCodeSearchMode || own.mode == kKFCStorySearchMode || own.mode == kKFCScriptLabelSearchMode))
+			{
+				skip(kSkipWholeDocuments);
 				continue;
 			}
 			// A RUBY LIST'S QUERY: its file read once, here, for every document of the run - and one that cannot be read, or has a wrong line, skipped and said, as a query file of InDesign's that cannot be read is.
@@ -390,11 +421,9 @@ int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 				skip(kSkipPartOfDocument);
 				continue;
 			}
-			if (objectQuery && !KFCObjectSearch::HasChangeObjectFormat())
-			{
-				skip(kSkipNoChangeTo);
-				continue;
-			}
+			// ...ONE WITH NOTHING TO CHANGE TO IS SEARCHED (RF1 - skipped until 2026-11-06, as Change All in Book refuses it): its items' rows go into the run's list.
+			const bool objectFinds = objectQuery && !KFCObjectSearch::HasChangeObjectFormat();
+			const bool finds = ownFinds || objectFinds;
 			// The tab and the change side are stated for a text query only: an Object query's write is the service's own
 			// object replace, which no text walker mode steers (CommitSearchMode turns that tab away by design - as in
 			// KFCSearchEngine::SearchBook and Change All in Book).
@@ -405,7 +434,10 @@ int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 				why.Append(query.name);
 				break;
 			}
-			perQuery[q] = 0;
+			if (finds)
+				perFound[q] = 0;
+			else
+				perQuery[q] = 0;
 			// THE CHANGE SIDE, STATED HERE - inside the run's sequence (the query run's one exception to CommitReplaceSide's
 			// rule): a Ctrl+Z of the run takes the whole of it back, the stated side included.
 			if (!objectQuery && !ownQuery && !KFCSearchEngine::CommitReplaceSide())
@@ -492,32 +524,65 @@ int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 				// docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md): no rows collected, no
 				// limit - over writeScope (asked once, above the loops).
 				int32 count = 0, partial = 0;
-				if (!objectQuery && !ownQuery)
-					runList.RecordBefore(d, static_cast<int32>(q), writeScope, scopeOptions);		// (just before: the same text, the same walk)
-				const bool wrote = ownQuery
-					? KFCKohakuQuery::WriteDocument(targets[d].docRef, own, ownOverPart ? &ownPart : nil, count, scope.fromBook ? &bookSeen : nil)
-					: objectQuery
-					? KFCObjectReplace::ReplaceAllInDoc(targets[d].docRef, count, partial)
-					: KFCChangeAll::WriteDocument(targets[d].docRef, writeScope, scopeOptions, count);
-				if (objectQuery)
-					objectRan = true;
-				if (!wrote)
+				if (finds)
 				{
-					failed = true;
-					why = ownQuery ? "InDesign would not write " : "InDesign's Change All failed for ";
-					why.Append(query.name);
-					break;
+					// A QUERY THAT CHANGES NOTHING (2026-11-06 - RF1-RF3, RF7): the document searched as its kind's own search walks one, at this query's turn -
+					// on a run over part of the front document, the rows of that part alone - and its rows laid into the run's list. Nothing is written.
+					std::vector<KFCResultModel::Hit> hits;
+					bool walkCancelled = false, capped = false;
+					const size_t limit = static_cast<size_t>(KFCResultModel::kKFCCollectObjectLimit);		// (the run's list's rows - R9, RF11)
+					const bool walked = objectFinds
+						? KFCObjectSearch::WalkOneDocument(targets[d].docRef, targets[d].shortName, limit, hits, capped, walkCancelled)
+						: KFCKohakuQuery::FindDocument(targets[d].docRef, targets[d].shortName, own, limit, hits, walkCancelled);
+					if (objectFinds)
+						objectRan = true;
+					if (walkCancelled)
+					{
+						cancelled = true;
+						break;
+					}
+					if (!walked)
+					{
+						failed = true;
+						why = "the search of ";
+						why.Append(query.name);
+						why.Append(" stopped");
+						break;
+					}
+					if (ownOverPart)
+						KeepPart(hits, ownPart);
+					runList.RecordFound(d, static_cast<int32>(q), hits);
+					perFound[q] += static_cast<int32>(hits.size());
 				}
-				if (objectQuery)
-					runList.NoteObjectQuery();
-				else if (ownQuery)
-					runList.NoteKohakuQuery();
 				else
-					runList.RecordAfter(d, static_cast<int32>(q), count);
-				perQuery[q] += count;
-				replaced += count;
-				if (count > 0)
-					wroteTo[d] = true;
+				{
+					if (!objectQuery && !ownQuery)
+						runList.RecordBefore(d, static_cast<int32>(q), writeScope, scopeOptions);		// (just before: the same text, the same walk)
+					const bool wrote = ownQuery
+						? KFCKohakuQuery::WriteDocument(targets[d].docRef, own, ownOverPart ? &ownPart : nil, count, scope.fromBook ? &bookSeen : nil)
+						: objectQuery
+						? KFCObjectReplace::ReplaceAllInDoc(targets[d].docRef, count, partial)
+						: KFCChangeAll::WriteDocument(targets[d].docRef, writeScope, scopeOptions, count);
+					if (objectQuery)
+						objectRan = true;
+					if (!wrote)
+					{
+						failed = true;
+						why = ownQuery ? "InDesign would not write " : "InDesign's Change All failed for ";
+						why.Append(query.name);
+						break;
+					}
+					if (objectQuery)
+						runList.NoteObjectQuery();
+					else if (ownQuery)
+						runList.NoteKohakuQuery();
+					else
+						runList.RecordAfter(d, static_cast<int32>(q), count);
+					perQuery[q] += count;
+					replaced += count;
+					if (count > 0)
+						wroteTo[d] = true;
+				}
 #ifdef KFC_DIAG
 				if (diagCancelStep > 0 && unit == diagCancelStep)		// unit = this step's number (1-based), counted above
 				{
@@ -596,15 +661,11 @@ int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 		return 0;
 	}
 
-	// ===== AFTER THE SEQUENCE: windows for the held chapters written to, the rest handed back - Change All in Book's rule
-	// (KFCChangeAll::LeaveRunDocuments - its header says why a document not written is made clean again first).
-	std::vector<PMString> unclosed;
-	KFCChangeAll::LeaveRunDocuments(targets, wasModified, wroteTo, unclosed);
-
-	// ===== THE LIST IT LEAVES (the run list spec's section 6): a new list of what it wrote, made here - past the write, with the
-	// chapters written given their windows - and kept with the run's Undo step (recorder.Keep: its Redo puts this list back). Making
-	// rows writes nothing, as a search's do. With no row, the panel is left EMPTY as it always was (no header either: a book's row
-	// would read "(0)"). NoteRun keeps the panel's icon on "a command ran".
+	// ===== THE LIST IT LEAVES (the run list spec's section 6): a new list of what it wrote - and what its queries that change nothing found (RF1) -
+	// made here, past the write, and kept with the run's Undo step (recorder.Keep: its Redo puts this list back). Making rows writes nothing, as a
+	// search's do. With no row, the panel is left EMPTY as it always was (no header either: a book's row would read "(0)"). NoteRun keeps the panel's
+	// icon on "a command ran". MADE BEFORE THE CHAPTERS ARE LEFT (2026-11-06 - RF8; until then after): a book's chapter a query only found in is
+	// handed back closed below, its rows kept as a book search keeps them - made after, it would be closed and its rows never made.
 	KFCResultModel::Clear();
 	KFCSearchEngine::ForgetSearchedFindFormat();
 	KFCResultModel::NoteRun();
@@ -617,16 +678,45 @@ int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 		: KFCResultModel::kScopeDocument;
 	PMString listWords;
 	(void)runList.FileList(scope.fromBook, scope.allDocuments, listScope, bookName, listWords);
+
+	// ===== AFTER THE SEQUENCE: windows for the held chapters written to, the rest handed back - Change All in Book's rule
+	// (KFCChangeAll::LeaveRunDocuments - its header says why a document not written is made clean again first).
+	std::vector<PMString> unclosed;
+	KFCChangeAll::LeaveRunDocuments(targets, wasModified, wroteTo, unclosed);
 	recorder.Keep();
 
-	// ===== THE MESSAGE (the no-track spec's section 5).
+	// ===== THE MESSAGE (the no-track spec's section 5): what was replaced - and, when queries that change nothing ran, what they found (RF9: the
+	// replaced part said when a query wrote, or nothing was found - a run of queries that only find says what they found alone).
+	bool anyWrote = false, anyFound = false;
+	int32 found = 0;
+	for (size_t q = 0; q < queries.size(); ++q)
+	{
+		anyWrote = anyWrote || perQuery[q] >= 0;
+		if (perFound[q] >= 0)
+		{
+			anyFound = true;
+			found += perFound[q];
+		}
+	}
 	outSummary.Append("Ran ");
 	outSummary.AppendNumber(static_cast<int32>(queries.size()));
 	outSummary.Append(queries.size() == 1 ? " query: " : " queries: ");
-	outSummary.AppendNumber(replaced);
-	outSummary.Append(" replaced (");
-	AppendPerQuery(outSummary, perQuery);
-	outSummary.Append(")");
+	if (anyWrote || !anyFound)
+	{
+		outSummary.AppendNumber(replaced);
+		outSummary.Append(" replaced (");
+		AppendPerQuery(outSummary, perQuery);
+		outSummary.Append(")");
+		if (anyFound)
+			outSummary.Append("; ");
+	}
+	if (anyFound)
+	{
+		outSummary.AppendNumber(found);
+		outSummary.Append(" found (");
+		AppendPerQuery(outSummary, perFound);
+		outSummary.Append(")");
+	}
 	if (selection.selected > 0)
 	{
 		// the Book panel's selected documents alone (the query dialog's spec, section 4-4 - KFCQuerySequence.h names it):

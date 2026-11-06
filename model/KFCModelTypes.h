@@ -245,7 +245,7 @@ enum KFCHolderKind
 	kKFCHolderStory,		// a Story list's row (KFCStorySearch - docs/superpowers/specs/2026-11-06-kfc-story-kind-design.md ST5): the story whole - a click selects its text as it is now
 	kKFCHolderInternalStory,	// ...of an INTERNAL story (IStoryList's kNotUserAccessible - the XML structure's backing store): on no page - a click selects nothing (ST6)
 	kKFCHolderDocument		// a Document list's row (KFCDocumentSearch - docs/superpowers/specs/2026-11-06-kfc-windowless-documents-design.md W3): the document itself - no
-							// story, no item; its row hangs off the list's top, its click fronts its window (none opened), its Special Operations Show, Close, Save, Revert
+							// story, no item; its row hangs off the list's top, its click fronts its window (none opened), its Special Operations Show, Close, Save (Revert taken out the night it came - the author)
 };
 
 /** WHAT A SPECIAL OPERATION IS GIVEN besides its rows (IKFCRuns::SpecialRows). x, y: Move - the horizontal and vertical

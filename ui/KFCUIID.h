@@ -598,13 +598,14 @@ DECLARE_PMID(kActionIDSpace, kKFCLabelRemoveKeyActionID, kKFCUIPrefix + 127)
 // after the style items (+ 64 ... + 103) are free - + 120, away from them should the style items grow.
 DECLARE_PMID(kActionIDSpace, kKFCEditInStoryEditorActionID, kKFCPrefix + 120)
 // WINDOWLESS DOCUMENTS (2026-11-06 - docs/superpowers/specs/2026-11-06-kfc-windowless-documents-design.md): the book row's Open Without a Window toggle (W2 -
-// the author: "on the book row's right-click, when a book is searched"), and a Find: Document row's Special Operations Show, Close, Save and Revert (W3 - the
+// the author: "on the book row's right-click, when a book is searched"), and a Find: Document row's Special Operations Show, Close and Save (W3 - the
 // author: "Special Operations: Close", "Show, for a hidden document - grey for a shown one"). The model band's, after Edit in Story Editor's.
 DECLARE_PMID(kActionIDSpace, kKFCOpenWithoutWindowActionID, kKFCPrefix + 121)
 DECLARE_PMID(kActionIDSpace, kKFCDocShowActionID, kKFCPrefix + 122)
 DECLARE_PMID(kActionIDSpace, kKFCDocCloseActionID, kKFCPrefix + 123)
 DECLARE_PMID(kActionIDSpace, kKFCDocSaveActionID, kKFCPrefix + 124)
-DECLARE_PMID(kActionIDSpace, kKFCDocRevertActionID, kKFCPrefix + 125)
+// + 125: RETIRED - Revert, taken out the night it was made (2026-11-06 - the author: "no Revert"; InDesign's own revert opens the document again
+// with a window). Counted as used: not given to anything else.
 
 
 // WidgetIDs:
@@ -909,7 +910,6 @@ DECLARE_PMID(kWidgetIDSpace, kKFCLabelNoteWidgetID, kKFCPrefix + 97)
 #define kKFCDocShowMenuKey				kKFCStringPrefix "kKFCDocShowMenuKey"				// "Show"
 #define kKFCDocCloseMenuKey				kKFCStringPrefix "kKFCDocCloseMenuKey"				// "Close"
 #define kKFCDocSaveMenuKey				kKFCStringPrefix "kKFCDocSaveMenuKey"				// "Save"
-#define kKFCDocumentRevertMenuKey			kKFCStringPrefix "kKFCDocumentRevertMenuKey"				// "Revert"
 #define kKFCDocumentOpenHiddenKey		kKFCStringPrefix "kKFCDocumentOpenHiddenKey"		// "Open Hidden..."
 #define kKFCDocumentOpenHiddenTitleKey	kKFCStringPrefix "kKFCDocumentOpenHiddenTitleKey"	// "Open Hidden" (its file dialog's title)
 // ...and Special Operations > Label's submenu, its three items and their dialogs' words (2026-11-06 - KFCLabelDialogs; measured against every other key -
@@ -1282,10 +1282,9 @@ DECLARE_PMID(kWidgetIDSpace, kKFCLabelNoteWidgetID, kKFCPrefix + 97)
 #define kKFCRemoveLabelMenuItemPosition			8.5		// Remove Label (a script label list's rows - an object row's after Move to Active Layer, before Show; a text row's after Create Outlines, before Tate-chu-yoko)
 #define kKFCRunScriptMenuItemPosition			8.7		// Run Script... (2026-11-06 - every row's: after Remove Label, before Show / Tate-chu-yoko)
 #define kKFCEditInStoryEditorMenuItemPosition	4.0		// Edit in Story Editor (2026-11-06 - a Story row's text menu: after Create Outlines' 3.0, before Label's 6.5 - the abc order)
-// A Document row's four (2026-11-06 - W3), in the abc order among the text menu's: Close after Clear Overrides, before Create Outlines; Revert after Remove Label, before
-// Run Script...; Save and Show after it, before Tate-chu-yoko.
+// A Document row's three (2026-11-06 - W3; Revert taken out the same night - the author), in the abc order among the text menu's: Close after Clear Overrides,
+// before Create Outlines; Save and Show after Run Script..., before Tate-chu-yoko.
 #define kKFCDocCloseMenuItemPosition			2.5
-#define kKFCDocRevertMenuItemPosition			8.6
 #define kKFCDocSaveMenuItemPosition				8.8
 #define kKFCDocShowMenuItemPosition				8.9
 #define kKFCOpenWithoutWindowMenuItemPosition	12.0	// Open Without a Window (2026-11-06 - W2: the book row's menu, after Select All Rows' 11.0)

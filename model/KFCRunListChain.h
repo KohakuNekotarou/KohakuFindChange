@@ -38,6 +38,9 @@ namespace KFCRunListChain
 		int32_t				start;
 		int32_t				end;
 		std::vector<Step>	steps;
+		int32_t				tag = -1;	// a place a query that changes nothing found, alone (2026-11-06 - RF3): its row's own index in its document's
+										// found rows (KFCRunList); -1 for any other - a written place, or one a write or another find joined (Apply makes a
+										// joined place anew, and carries a place it moves whole)
 	};
 
 	/** What a place read once query `query` had gone by: its last step at or before it. */

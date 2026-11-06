@@ -37,8 +37,8 @@
 - **DOC-22** **Save**＝本体の保存（灰色は本体の判定）。窓なしの文書は本体のファイル ▸ 保存では保存できない（前面の文書にしか効かない）。回帰 `doc-save-modified`
   - 訂正:
 
-- **DOC-23** **Revert**＝本体の復帰（本体の問いが先に出る）。回帰 `doc-revert-modified`
-  - 訂正:
+- ~~**DOC-23** **Revert**＝本体の復帰（本体の問いが先に出る）。~~
+  - 訂正: 2026-11-06 夜＝**外した**（作者「Revertは無しで」）。本体の復帰は文書を閉じて開き直すので、窓なしの文書にも窓が付き、一覧の行は消えた（実測）。ActionID `kKFCPrefix + 125` は欠番。回帰 `doc-revert-modified` は外し、`doc-show-grey` は Revert が無いことを見る。
 
 - **DOC-24** **Run Script...**＝`kfcResult` はその文書（`Document`）。**Label**＝文書のスクリプトラベル（`doc.insertLabel` と同じ）。文字の一致の操作（Clear Overrides・Create Outlines・Tate-chu-yoko）と Restore from Copy は灰色・行の Replace と Return は灰色（扉の文 `Replace: Find: Document lists the open documents and changes nothing - a row is not replaced.`）。回帰 `doc-runscript`・`doc-label-add`
   - 訂正:
@@ -56,6 +56,5 @@
 ## ⬜ この章で未確認
 
 - 窓なしの・まだ保存していない文書の Save（本体の「別名で保存」の窓）を実機で出していない（`doc-close-modified` は保存済みで変更のある文書の「保存しますか」だけ）。
-- Revert の後の文書の行（文書の番地が変わる）を Run Script・Label で使ったときは回していない。
 - Book Scope ON の Find: Document（ブックの開いている章だけ）は回していない。
 - 開いている文書が多い（数十）ときの行の並びと速さ。

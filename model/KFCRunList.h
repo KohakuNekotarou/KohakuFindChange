@@ -23,6 +23,7 @@
 #include "WalkerScopeOptions.h"
 #include "KFCBookScope.h"		// ChapterDoc - the run's documents
 #include "KFCModelTypes.h"		// KFCResultModel::SearchScopeKind
+#include "KFCResultModel.h"		// KFCResultModel::Hit - a query that changes nothing: the rows it found (RecordFound)
 #include "KFCRunListChain.h"
 
 #include <map>
@@ -55,7 +56,16 @@ namespace KFCRunList
 		/** A query of the Kohaku+ tab ran: the same (it writes tables and marks, not a text's Change All's places) - said. */
 		void NoteKohakuQuery();
 
-		/** The run stands, its documents left as they are left (LeaveRunDocuments): each place read against the text as it
+		/** A QUERY THAT CHANGES NOTHING ran in document `target` (2026-11-06 - docs/superpowers/specs/2026-11-06-kfc-run-search-only-queries-design.md RF1-RF5:
+		    searched at its turn, not skipped), `hits` its own search's rows there. A text match - a story's [start, end) and no item: a ruby, kenten,
+		    warichu or spelling row's - joins the places as a write that left its text as it was (KFCRunListChain::Apply with one text before and after),
+		    so every later write carries it as it carries a written place, and one written over joins it (D2); found alone to the end, its row is the row
+		    it was found as, standing where its place stands then. Anything else - an item, a story, a table, a cell - is kept as its row and filed with
+		    the list if what it names is still there. A document whose text cannot be laid is left out, said (R4). Leaves no error standing. */
+		void RecordFound(size_t target, int32 query, const std::vector<KFCResultModel::Hit>& hits);
+
+		/** The run stands - before its book's chapters it did not write are handed back (LeaveRunDocuments - RF8: a chapter a query only found
+		    in keeps its rows, as a book search's chapters do): each place read against the text as it
 		    stands, a row made of it and filed into the model - which the caller has just cleared - under a header naming the
 		    list a query run's (kKFCRunListSearchMode, RunNames), up to the rows a list holds (R9). Returns the rows filed;
 		    none: no header, the panel stays empty. outWords = what the message line says of it, each sentence with a space
@@ -81,6 +91,8 @@ namespace KFCRunList
 			bool					walked;		// RecordBefore kept them
 			KFCRunListAlign::Writes	writes;		// what this query writes
 			std::map<UID, Story>	stories;
+			std::vector<KFCResultModel::Hit>	foundText;	// the text rows found, each its place's tag (KFCRunListChain::Place::tag - RecordFound)
+			std::vector<std::pair<int32, KFCResultModel::Hit> >	foundItems;	// the other rows found, each with its query
 			Doc() : target(0), out(false), found(0), walked(false), writes(KFCRunListAlign::kAnyLength) {}
 		};
 		Doc& DocOf(size_t target);
@@ -92,6 +104,7 @@ namespace KFCRunList
 		std::vector<size_t>							fDocOfTarget;
 		bool										fObjectQuery;
 		bool										fKohakuQuery;
+		std::vector<bool>							fFound;			// by query: it found and wrote nothing (RecordFound) - its steps are no write's
 		bool										fByChangeAll;	// Change All in Book's list (the constructor's byChangeAll)
 
 		Recorder(const Recorder&);

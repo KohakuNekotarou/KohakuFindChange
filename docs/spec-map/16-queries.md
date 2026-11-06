@@ -264,7 +264,10 @@
 - **QRY-91** Find＝タブに条件を入れて（`Runs on:` の範囲で）一覧を作る。ダブルクリック＝本体の欄で選ぶのと同じ（タブが開き、欄がその名前を言う）。回帰 `kq-qd-find`・`kq-qd-dbl`
   - 訂正:
 
-- **QRY-92** Run＝一覧を作らずに Change 側を書く（Remove も）。全部を Ctrl+Z 1回で戻す一本の中。Change 側が無いクエリ（QR Code を含む）は飛ばして言う（`nothing to change to`）。範囲が物語・選択範囲なら、その中だけ。一覧には載せない（`Kohaku+ queries are not listed.`）。回帰 `kq-qd-run`・`kq-qd-run-remove`・`kq-qd-run-qr`
+- **QRY-92** Run＝一覧を作らずに Change 側を書く（Remove も）。全部を Ctrl+Z 1回で戻す一本の中。範囲が物語・選択範囲なら、その中だけ。書いた所は一覧には載せない（`Kohaku+ queries are not listed.`）。回帰 `kq-qd-run`・`kq-qd-run-remove`
+  - 訂正: 2026-11-06 夜＝**Change 側が無いクエリは飛ばさず、探して一覧に出す**（QRY-94）。前は `nothing to change to` で飛ばしていた（`kq-qd-run-qr`・`kq-qd-run-ruby-findonly` は探す期待に直した）。
+
+- **QRY-94** ★**Run で Change 側が無いクエリを探す**（2026-11-06 夜・作者「Kohaku＋のクエリのRunなど、検索だけでもRunできるようにしておいてほしい」→「すすめてください」・設計 `docs/superpowers/specs/2026-11-06-kfc-run-search-only-queries-design.md` RF1〜RF12）。対象＝QR Code・Warichu・Story・Spelling（いつも）、Ruby・Kenten・Table・Script Label（Change が空）、Object（Change の書式が無い）。**その順番の時点で**各文書をその種類の1文書の歩きで探し、見つけた行を Run の一覧に足す（行の後ろにクエリの名前・「Changed」なし・目玉なし）。文字の場所（ルビ・圏点・割注・スペルの語）は後のクエリの書き込みにも付いていき、書き込みが重なれば1つの場所にまとまる（連鎖と両方の名前・Changed）。見つけただけの場所の行は見つけた行のまま（ルビの読み・スペルの種類）。物の行（QR コード・物・ストーリー・表）は見つけた行のまま。**Document のクエリは飛ばす**（`a Document query lists the open documents - use Find`）。範囲が物語・選択範囲なら文字の種類と表はその中だけ、QR Code・Story・Script Label は飛ばす（`a QR Code, Story or Script Label query runs on whole documents`）。ブックの Run は一覧を作ってから書かなかった章を返す（見つけただけの章は閉じても行が残る）。メッセージ＝`Ran N queries: X replaced (…); Y found (…).`（書いたクエリが無ければ found だけ）。書かなかった Run は取り消しの段を作らない。回帰 `rf-cases.tsv`（10件）・`kq-qd-run-qr`・`kq-qd-run-ruby-findonly`・`oqs-object-nochange`・`sp-q-run`・`st-q-run`・`wr-q-run`
   - 訂正:
 
 - **QRY-93** ファイルの数字がタブの一覧に無い値（手で直したファイルなど）は、その一覧の先頭として読む。回帰 `kq-bad-values`

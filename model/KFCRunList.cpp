@@ -175,12 +175,31 @@ void AppendStep(PMString& out, const std::u32string& words, int32 chars)
 	out.Append(s);
 }
 
-// The chain as its row draws it (D1, D3): the steps joined by an arrow, the budget shared among them.
-PMString ChainWords(const Place& place)
+// IS THIS STEP A FIND'S (2026-11-06 - RF3): its query wrote nothing - the text it read is the step before it, no step of the chain.
+bool FoundStep(const KFCRunListChain::Step& step, const std::vector<bool>& found)
+{
+	return step.query >= 0 && static_cast<size_t>(step.query) < found.size() && found[static_cast<size_t>(step.query)];
+}
+
+// DID A QUERY WRITE THIS PLACE - or only find it (RF3: a found place's row is no written row - no "Changed", no eye, no chain).
+bool WrittenPlace(const Place& place, const std::vector<bool>& found)
+{
+	for (size_t s = 1; s < place.steps.size(); ++s)
+		if (!FoundStep(place.steps[s], found))
+			return true;
+	return false;
+}
+
+// The chain as its row draws it (D1, D3): the steps joined by an arrow, the budget shared among them - a find's step left out (RF3).
+PMString ChainWords(const Place& place, const std::vector<bool>& found)
 {
 	PMString out;
 	out.SetTranslatable(kFalse);
-	const int32 steps = static_cast<int32>(place.steps.size());
+	std::vector<size_t> shown;
+	for (size_t s = 0; s < place.steps.size(); ++s)
+		if (s == 0 || !FoundStep(place.steps[s], found))
+			shown.push_back(s);
+	const int32 steps = static_cast<int32>(shown.size());
 	int32 each = (steps > 0) ? kChainChars / steps : kChainChars;
 	if (each < kChainStepFloor)
 		each = kChainStepFloor;
@@ -188,7 +207,30 @@ PMString ChainWords(const Place& place)
 	{
 		if (s > 0)
 			AppendStep(out, U" \u2192 ", 3);
-		AppendStep(out, KFCRunListChain::StepWords(place, static_cast<size_t>(s)), each);
+		AppendStep(out, KFCRunListChain::StepWords(place, shown[static_cast<size_t>(s)]), each);
+	}
+	return out;
+}
+
+// A FOUND ROW THAT STANDS ON TEXT ALONE (RF3): a story's [start, end) and nothing else it names - a ruby, kenten, warichu or spelling row (an item's,
+// a story's, a table's or a cell's row names what it stands for: kept as it is - RF4).
+bool IsTextPlace(const KFCResultModel::Hit& hit)
+{
+	return hit.holderKind == kKFCHolderNone && hit.itemUID == kInvalidUID && hit.storyUID != kInvalidUID && hit.textEnd > hit.textStart;
+}
+
+// "a, b" - the run's names of the queries a row stands for, in the run's order.
+PMString NamesOf(const std::vector<int32_t>& queries, const std::vector<PMString>& names)
+{
+	PMString out;
+	out.SetTranslatable(kFalse);
+	for (size_t q = 0; q < queries.size(); ++q)
+	{
+		if (queries[q] < 0 || static_cast<size_t>(queries[q]) >= names.size())
+			continue;
+		if (!out.IsEmpty())
+			out.Append(", ");
+		out.Append(names[static_cast<size_t>(queries[q])]);
 	}
 	return out;
 }
@@ -196,7 +238,7 @@ PMString ChainWords(const Place& place)
 
 KFCRunList::Recorder::Recorder(const std::vector<PMString>& queryNames, const std::vector<KFCBookScope::ChapterDoc>& targets,
 	bool byChangeAll)
-	: fNames(queryNames), fTargets(targets), fObjectQuery(false), fKohakuQuery(false), fByChangeAll(byChangeAll)
+	: fNames(queryNames), fTargets(targets), fObjectQuery(false), fKohakuQuery(false), fFound(queryNames.size(), false), fByChangeAll(byChangeAll)
 {
 	fDocOfTarget.reserve(targets.size());
 	for (size_t t = 0; t < targets.size(); ++t)
@@ -354,6 +396,90 @@ void KFCRunList::Recorder::NoteObjectQuery()
 	fObjectQuery = true;
 }
 
+void KFCRunList::Recorder::RecordFound(size_t target, int32 query, const std::vector<KFCResultModel::Hit>& hits)
+{
+	if (query >= 0 && static_cast<size_t>(query) < fFound.size())
+		fFound[static_cast<size_t>(query)] = true;
+	Doc& doc = DocOf(target);
+	if (doc.out)
+		return;
+	IDataBase* const db = fTargets[target].docRef.GetDataBase();
+	// THE TEXT MATCHES BY STORY (RF3); the other rows kept as they were found (RF4).
+	std::map<UID, std::vector<size_t> > byStory;
+	for (size_t h = 0; h < hits.size(); ++h)
+	{
+		if (IsTextPlace(hits[h]))
+			byStory[hits[h].storyUID].push_back(h);
+		else
+			doc.foundItems.push_back(std::make_pair(query, hits[h]));
+	}
+	for (std::map<UID, std::vector<size_t> >::iterator s = byStory.begin(); s != byStory.end(); ++s)
+	{
+		Story& story = doc.stories[s->first];
+		std::u32string now;
+		// ITS TEXT READ, AND THE PLACES SO FAR READ IN IT AS THEY SAY THEY DO (R4 - a write the run did not follow moved it: no row of this document stands on anything).
+		if (db == nil || !ReadStoryText(UIDRef(db, s->first), now) || !KFCRunListChain::ReadsAsKept(story.places, now))
+		{
+			PMString why(" The list leaves out ");
+			why.SetTranslatable(kFalse);
+			why.Append(fTargets[doc.target].shortName);
+			why.Append(" - the found text of ");
+			why.Append(fNames[static_cast<size_t>(query)]);
+			why.Append(" could not be placed.");
+			LeaveOut(doc, why);
+			return;
+		}
+		// IN PLACE ORDER, OVERLAPS JOINED (Apply lays matches that do not overlap): a match alone keeps its row (its tag); one joined is the text it covers.
+		std::vector<size_t>& at = s->second;
+		std::sort(at.begin(), at.end(), [&](size_t a, size_t b)
+			{ return hits[a].textStart != hits[b].textStart ? hits[a].textStart < hits[b].textStart : hits[a].textEnd < hits[b].textEnd; });
+		const int32_t length = static_cast<int32_t>(now.size());
+		std::vector<Match> matches;
+		std::vector<int32_t> tags;
+		for (size_t i = 0; i < at.size(); ++i)
+		{
+			const KFCResultModel::Hit& hit = hits[at[i]];
+			const int32_t start = std::max<int32_t>(0, static_cast<int32_t>(hit.textStart));
+			const int32_t end = std::min<int32_t>(length, static_cast<int32_t>(hit.textEnd));
+			if (end <= start)
+				continue;
+			if (!matches.empty() && start < matches.back().end)
+			{
+				matches.back().end = std::max(matches.back().end, end);
+				tags.back() = -1;
+				continue;
+			}
+			matches.push_back(Match{ start, end });
+			doc.foundText.push_back(hit);
+			tags.push_back(static_cast<int32_t>(doc.foundText.size() - 1));
+		}
+		if (matches.empty())
+			continue;
+		// LAID AS A WRITE THAT LEFT THE TEXT AS IT WAS: each match where it stands, before and after the same.
+		std::vector<Placed> placed;
+		for (size_t m = 0; m < matches.size(); ++m)
+			placed.push_back(Placed{ static_cast<int32_t>(m), static_cast<int32_t>(m), matches[m].start, matches[m].end });
+		KFCRunListChain::Apply(story.places, query, now, now, matches, placed);
+		// A MATCH OVER NO PLACE is a place of its own now, where it stands, of two steps - its row's tag on it (one laid over a place joined it: no tag).
+		for (size_t m = 0; m < matches.size(); ++m)
+		{
+			if (tags[m] < 0)
+				continue;
+			for (size_t p = 0; p < story.places.size(); ++p)
+			{
+				Place& place = story.places[p];
+				if (place.start == matches[m].start && place.end == matches[m].end && place.steps.size() == 2 && place.steps.back().query == query)
+				{
+					place.tag = tags[m];
+					break;
+				}
+			}
+		}
+	}
+	KFC_DIAG_LOG("RUNLIST found query=%d hits=%d text=%d items=%d", static_cast<int>(query), static_cast<int>(hits.size()),
+		static_cast<int>(doc.foundText.size()), static_cast<int>(doc.foundItems.size()));
+}
+
 int32 KFCRunList::Recorder::FileList(bool fromBook, bool allDocuments, KFCResultModel::SearchScopeKind scope, const PMString& bookName,
 	PMString& outWords)
 {
@@ -366,6 +492,7 @@ int32 KFCRunList::Recorder::FileList(bool fromBook, bool allDocuments, KFCResult
 		size_t										doc;
 		std::vector<KFCSearchEngine::ListedPlace>	places;
 		std::vector<const Place*>					from;
+		std::vector<const std::pair<int32, KFCResultModel::Hit>*>	items;		// the other rows a query that changes nothing found (RF4)
 	};
 	std::vector<Rows> rows;
 	for (size_t d = 0; d < fDocs.size(); ++d)
@@ -428,9 +555,26 @@ int32 KFCRunList::Recorder::FileList(bool fromBook, bool allDocuments, KFCResult
 			LeaveOut(doc, why);
 			continue;
 		}
+		// THE OTHER ROWS FOUND (RF4): each whose item - or, with none, its story - is still there; one gone is counted with the places gone.
+		for (size_t f = 0; f < doc.foundItems.size(); ++f)
+		{
+			const KFCResultModel::Hit& hit = doc.foundItems[f].second;
+			const bool there = (db != nil) && ((hit.itemUID != kInvalidUID) ? db->IsValidUID(hit.itemUID)
+				: (hit.storyUID == kInvalidUID || db->IsValidUID(hit.storyUID)));
+			if (!there)
+			{
+				++docGone;
+				continue;
+			}
+			++docTotal;
+			if (listed >= cap)
+				continue;
+			++listed;
+			mine.items.push_back(&doc.foundItems[f]);
+		}
 		total += docTotal;
 		gone += docGone;
-		if (!mine.places.empty())
+		if (!mine.places.empty() || !mine.items.empty())
 			rows.push_back(std::move(mine));
 	}
 
@@ -450,12 +594,17 @@ int32 KFCRunList::Recorder::FileList(bool fromBook, bool allDocuments, KFCResult
 		// (The queries the rows name, in the run's order: what its heading names the list by - R7.)
 		std::vector<bool> queryListed(fNames.size(), false);
 		for (size_t r = 0; r < rows.size(); ++r)
+		{
 			for (size_t p = 0; p < rows[r].from.size(); ++p)
 			{
 				const std::vector<int32_t> queries(KFCRunListChain::QueriesOf(*rows[r].from[p]));
 				for (size_t q = 0; q < queries.size(); ++q)
 					queryListed[static_cast<size_t>(queries[q])] = true;
 			}
+			for (size_t i = 0; i < rows[r].items.size(); ++i)
+				if (rows[r].items[i]->first >= 0 && static_cast<size_t>(rows[r].items[i]->first) < queryListed.size())
+					queryListed[static_cast<size_t>(rows[r].items[i]->first)] = true;
+		}
 		PMString names;
 		names.SetTranslatable(kFalse);
 		for (size_t q = 0; q < fNames.size(); ++q)
@@ -477,25 +626,52 @@ int32 KFCRunList::Recorder::FileList(bool fromBook, bool allDocuments, KFCResult
 			KFCSearchEngine::BuildListedHits(target.docRef, rows[r].places, hits, versions);
 			for (size_t h = 0; h < hits.size(); ++h)
 			{
-				KFCResultModel::Hit& hit = hits[h];
 				const Place& place = *rows[r].from[h];
+				// (Change All in Book's rows name no query: there is one, the heading's - 2026-11-04.)
+				const std::vector<int32_t> queries(fByChangeAll ? std::vector<int32_t>() : KFCRunListChain::QueriesOf(place));
+				if (!WrittenPlace(place, fFound))
+				{
+					// A PLACE ONLY FOUND (RF3, RF5): its row read from the text as it stands now - its line, its page, its match's hash: what a landing compares
+					// the document with (RowReadsAsFoundAt reads the line around the match again: a row keeping the line the find read, before a later write,
+					// read "Missing" - GREEN 11-06) - and, found alone, the words its kind drew it with: a ruby's or a kenten's reading (runChain, upper), a word's
+					// spelling (spellKind), a reading's group. Found by two finds over one another: the text it stands on. No "Changed", no eye.
+					if (place.tag >= 0 && static_cast<size_t>(place.tag) < doc.foundText.size())
+					{
+						const KFCResultModel::Hit& found = doc.foundText[static_cast<size_t>(place.tag)];
+						hits[h].runChain = found.runChain;
+						hits[h].upper = found.upper;
+						hits[h].spellKind = found.spellKind;
+						hits[h].groupKey = found.groupKey;
+						hits[h].groupLabel = found.groupLabel;
+						hits[h].otherReadings = found.otherReadings;
+					}
+					hits[h].replaced = false;
+					hits[h].kept = false;
+					hits[h].runNames = NamesOf(queries, fNames);
+					continue;
+				}
+				KFCResultModel::Hit& hit = hits[h];
 				// A ROW THE RUN WROTE (R6): what a Replace leaves on a row, with no copy - "Changed", its eye on, what it wrote, and what
-				// its place has been.
+				// its place has been (a find's step no step of it - RF3).
 				hit.replaced = true;
 				hit.kept = true;
 				hit.replacedText = KFCSearchEngine::ReadText(UIDRef(target.docRef.GetDataBase(), hit.storyUID), hit.textStart, hit.textEnd - hit.textStart);
 				hit.replacedText.SetTranslatable(kFalse);
-				hit.runChain = ChainWords(place);
-				hit.runNames.Clear();
-				hit.runNames.SetTranslatable(kFalse);
-				// (Change All in Book's rows name no query: there is one, the heading's - 2026-11-04.)
-				const std::vector<int32_t> queries(fByChangeAll ? std::vector<int32_t>() : KFCRunListChain::QueriesOf(place));
-				for (size_t q = 0; q < queries.size(); ++q)
-				{
-					if (q > 0)
-						hit.runNames.Append(", ");
-					hit.runNames.Append(fNames[static_cast<size_t>(queries[q])]);
-				}
+				hit.runChain = ChainWords(place, fFound);
+				hit.runNames = NamesOf(queries, fNames);
+			}
+			// THE OTHER ROWS FOUND (RF4): as they were found, named by their query - their stories' versions read now, as the places' are.
+			IDataBase* const db = target.docRef.GetDataBase();
+			for (size_t i = 0; i < rows[r].items.size(); ++i)
+			{
+				KFCResultModel::Hit hit(rows[r].items[i]->second);
+				hit.replaced = false;
+				hit.kept = false;
+				hit.runNames = NamesOf(std::vector<int32_t>(1, rows[r].items[i]->first), fNames);
+				uint32 version = 0;
+				if (hit.storyUID != kInvalidUID && versions.find(hit.storyUID) == versions.end() && KFCSearchEngine::ReadStoryVersion(db, hit.storyUID, version))
+					versions[hit.storyUID] = version;
+				hits.push_back(hit);
 			}
 			KFCSearchEngine::FileChapter(target, hits, tally, &versions);
 		}

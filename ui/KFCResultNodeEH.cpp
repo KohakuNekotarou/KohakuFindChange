@@ -120,11 +120,10 @@ void PopRowMenu(const char* menuName, IEvent* e, IPMUnknown* widget)
 		menuMgr->RemoveMenuItem(path, kKFCEditInStoryEditorActionID);
 		if (HolderOfRow(widget) == kKFCHolderStory)
 			menuMgr->AddMenuItem(kKFCEditInStoryEditorActionID, path, kKFCEditInStoryEditorMenuItemPosition, kFalse);
-		// A DOCUMENT LIST'S ROW'S FOUR (2026-11-06 - W3: "Special Operations: Close", "Show, for a hidden document"; Save and Revert of the ideas): over a Document
-		// row alone - taken off first, then put, as Tate-chu-yoko.
-		static const ActionID kDocOps[] = { kKFCDocShowActionID, kKFCDocCloseActionID, kKFCDocSaveActionID, kKFCDocRevertActionID };
-		static const PMReal kDocOpPlaces[] = { PMReal(kKFCDocShowMenuItemPosition), PMReal(kKFCDocCloseMenuItemPosition), PMReal(kKFCDocSaveMenuItemPosition),
-			PMReal(kKFCDocRevertMenuItemPosition) };
+		// A DOCUMENT LIST'S ROW'S THREE (2026-11-06 - W3: "Special Operations: Close", "Show, for a hidden document"; Save of the ideas - Revert taken out the
+		// same night, the author: "no Revert"): over a Document row alone - taken off first, then put, as Tate-chu-yoko.
+		static const ActionID kDocOps[] = { kKFCDocShowActionID, kKFCDocCloseActionID, kKFCDocSaveActionID };
+		static const PMReal kDocOpPlaces[] = { PMReal(kKFCDocShowMenuItemPosition), PMReal(kKFCDocCloseMenuItemPosition), PMReal(kKFCDocSaveMenuItemPosition) };
 		const bool documentRow = (HolderOfRow(widget) == kKFCHolderDocument);
 		for (size_t k = 0; k < sizeof(kDocOps) / sizeof(kDocOps[0]); ++k)
 		{

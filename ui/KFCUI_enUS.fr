@@ -120,7 +120,6 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCDocShowMenuKey,				"Show",					// (2026-11-06 - a Find: Document row's Special Operations, W3)
                 kKFCDocCloseMenuKey,				"Close",
                 kKFCDocSaveMenuKey,				"Save",
-                kKFCDocumentRevertMenuKey,				"Revert",
                 kKFCDocumentOpenHiddenKey,		"Open Hidden...",		// (2026-11-06 - the Document kind's button: a document opened without a window)
                 kKFCDocumentOpenHiddenTitleKey,	"Open Hidden",			// (its file dialog's title)
                 kKFCEditInStoryEditorMenuKey,		"Edit in Story Editor",		// (2026-11-06 - a Story row's Special Operations; InDesign's own Edit menu's words)
