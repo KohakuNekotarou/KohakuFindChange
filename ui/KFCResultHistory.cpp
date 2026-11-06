@@ -443,6 +443,32 @@ namespace
 		}
 		KFCResultTree::ShowStatus(status);
 	}
+
+	// WHAT FOLLOWS A NAME'S BRACKETED TAB - "Find:"cat" Change:"dog"" of "[Text] Find:"cat" Change:"dog""
+	// (LabelForTab's names all start so): the units after its first "] ", as they stand - NEVER THROUGH UTF-8. A name
+	// holds a person's words - a Find/Change query, a Kohaku+ face's box, a style's name - and those can hold half a
+	// surrogate pair (KFCUtf8.h): GetUTF8String -> SetUTF8String threw on a low half, out of Change All in Book and
+	// List Rows of These Tables (block 0's D0-a, block 6's D6-a - the same family; 2026-11-07, block 7's defect
+	// re-check). false = no such head: outRest empty.
+	bool AfterBracketedTab(const PMString& name, PMString& outRest)
+	{
+		outRest.Clear();
+		outRest.SetTranslatable(kFalse);
+		int32 units = 0;
+		const UTF16TextChar* const buf = name.GrabUTF16Buffer(&units);
+		if (buf == nil || units < 1 || buf[0] != static_cast<UTF16TextChar>('['))
+			return false;
+		for (int32 i = 1; i + 1 < units; ++i)
+		{
+			if (buf[i] != static_cast<UTF16TextChar>(']') || buf[i + 1] != static_cast<UTF16TextChar>(' '))
+				continue;
+			if (i + 2 < units)
+				outRest.AppendW(buf + i + 2, units - i - 2);
+			outRest.SetTranslatable(kFalse);
+			return true;
+		}
+		return false;
+	}
 }	// anonymous namespace
 
 int32 KFCResultHistory::Find(const PMString& label, PMString& outSummary, bool* outCommitted)
@@ -557,12 +583,11 @@ bool KFCResultHistory::ListRowsOfTables(PMString& outSummary)
 	const uint32 setBefore = KFCResults()->GetResultSetId();
 	PMString label("[Table Rows]");
 	label.SetTranslatable(kFalse);
-	if (gLive.set != 0 && gLive.set == setBefore)
+	PMString words;
+	if (gLive.set != 0 && gLive.set == setBefore && AfterBracketedTab(gLive.label, words))
 	{
-		const std::string all(gLive.label.GetUTF8String());
-		const std::string::size_type close = all.find("] ");
-		if (!all.empty() && all[0] == '[' && close != std::string::npos)
-			label.SetUTF8String("[Table Rows] " + all.substr(close + 2));
+		label.Append(" ");
+		label.Append(words);		// (a style's name as the face read it - never through UTF-8: AfterBracketedTab)
 		label.SetTranslatable(kFalse);
 	}
 	KeptTier pending;
@@ -879,15 +904,9 @@ PMString KFCResultHistory::QueryLabel()
 PMString KFCResultHistory::ChangeAllListWords()
 {
 	// "[Text] Find:"cat" Change:"dog"" -> "Find:"cat" Change:"dog"": what follows the bracketed tab and its space (LabelForTab
-	// always starts so).
-	const PMString label(QueryLabel());
-	const std::string all(label.GetUTF8String());
-	const std::string::size_type close = all.find("] ");
+	// always starts so) - the query's words as the person wrote them (AfterBracketedTab).
 	PMString words;
-	words.SetTranslatable(kFalse);
-	if (!all.empty() && all[0] == '[' && close != std::string::npos)
-		words.SetUTF8String(all.substr(close + 2));
-	words.SetTranslatable(kFalse);
+	(void)AfterBracketedTab(QueryLabel(), words);
 	return words;
 }
 

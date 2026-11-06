@@ -66,14 +66,16 @@ bool IsObjectRow(const KFCResultNodeID* node)
 	return node != nil && node->IsHitRow() && KFCResults()->GetHitItem(node->GetChapter(), node->GetHit()) != kInvalidUID;
 }
 
-// CAN TWO ROWS BE SELECTED TOGETHER? Only as hit rows of one kind: a story, document or book row is always alone, and so
-// is a row of the other kind. Any story, spread or document - the page shows the row selected last.
+// CAN TWO ROWS BE SELECTED TOGETHER? Only as hit rows of one kind: a story, document or book row is always alone, and
+// so is a row of the other kind. Any story, spread or document - the page shows the row selected last. (A list of one
+// search's tab holds one kind, but for a Script Label list's: its page items' labels are object rows and its tables'
+// and cells' text rows, one document's of both - KFCScriptLabelSearch.)
 bool Joins(const NodeID& a, const NodeID& b)
 {
 	TreeNodePtr<KFCResultNodeID> first(a), second(b);
 	if (first == nil || second == nil || !first->IsHitRow() || !second->IsHitRow())
 		return false;
-	return IsObjectRow(first) == IsObjectRow(second);		// (a list holds one kind - a search is on one tab; asked anyway)
+	return IsObjectRow(first) == IsObjectRow(second);
 }
 
 // A row named by its chapter and hit - kept as two numbers rather than a NodeID, which owns a heap object (a static
@@ -557,10 +559,19 @@ bool KFCResultTree::SelectAllRows(const NodeID& row)
 	InterfacePtr<ITreeViewMgr> treeMgr(controller, UseDefaultIID());
 	if (controller == nil || adapter == nil || treeMgr == nil)
 		return false;
-	NodeIDList rows;
-	CollectHitRows(adapter, row, rows);
-	if (rows.empty())
+	NodeIDList under;
+	CollectHitRows(adapter, row, under);
+	if (under.empty())
 		return false;
+	// THE ROWS OF ONE KIND (Joins): the first drawn's kind, and the rows of the other left out - and said to be. A
+	// Script Label list's document can hold both (its page items' object rows beside its tables' and cells' text rows):
+	// the controller's Select turned the others away one by one, while the message area counted them as selected and
+	// Return wrote the rest (2026-11-07, block 7's defect re-check - case slt-mixed-selectall).
+	NodeIDList rows;
+	for (size_t k = 0; k < under.size(); ++k)
+		if (rows.empty() || Joins(rows[0], under[k]))
+			rows.push_back(under[k]);
+	const int32 leftOut = static_cast<int32>(under.size() - rows.size());
 	// Drawn first, every branch row under it opened (OpenBranchRows): the list's runs and keys walk what is drawn - and
 	// Return and the right-click Replace ask the selection in the order drawn (GetSelectedItemsDisplayOrder walks the open
 	// rows alone - CTreeViewController.cpp), so a row left under a closed one would be selected and never written.
@@ -587,6 +598,16 @@ bool KFCResultTree::SelectAllRows(const NodeID& row)
 	PMString status("Selected ");
 	status.AppendNumber(static_cast<int32>(rows.size()));
 	status.Append(rows.size() == 1 ? " row. Return replaces it." : " rows. Return replaces them all.");
+	if (leftOut > 0)
+	{
+		TreeNodePtr<KFCResultNodeID> firstID(rows[0]);
+		const char* const other = IsObjectRow(firstID) ? " text row" : " object row";
+		status.Append(" ");
+		status.AppendNumber(leftOut);
+		status.Append(other);
+		status.Append(leftOut == 1 ? " is not among them" : "s are not among them");
+		status.Append(": text rows and object rows are not selected together.");
+	}
 	status.SetTranslatable(kFalse);
 	ShowStatus(status);
 	return true;
@@ -750,7 +771,7 @@ bool KFCResultTree::ExtendSelection(ITreeViewController* controller, bool down)
 	if (!next.IsValid())
 		return true;		// the list's end: nothing to add
 	if (!Joins(anchor, next))
-		return true;		// (never - a list holds one kind; asked anyway)
+		return true;		// a row of the other kind - a Script Label list's (Joins): the run stops at it
 	SelectRun(controller, anchor, next);
 	gRunEnd = RowOf(next);
 	treeMgr->ScrollToNode(next, ITreeViewMgr::eScrollIntoView);

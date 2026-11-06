@@ -15,7 +15,9 @@
 //  A text search's hits are all grouped; an OBJECT search's rows have no story and hang off their document row
 //  directly - the branches below for a node that names no group (KFCResultModel's BuildFontGroups). A STORY list's
 //  rows the same since 2026-11-06 (the author: "the document, the story under it, and no more"): each row is a story,
-//  and says which one itself (KFCResultModel::GetHitRow).
+//  and says which one itself (KFCResultModel::GetHitRow). A SCRIPT LABEL LIST'S document can hold BOTH kinds - its page
+//  items' labels object rows, its tables' and cells' labels text rows under their story's row (KFCScriptLabelSearch):
+//  the rows hung off it directly come first, then its story rows (RowsOffTheDocument).
 //
 //  WHILE THE RESULTS ARE KEPT IN TIERS (KFCResultHistory - docs/superpowers/specs/2026-10-14-kfc-stacked-results-design.md
 //  section 3-3) the root's children are the TIERS: the kept ones, oldest first, each over its copy of the rows it had, and
@@ -89,6 +91,26 @@ bool DocumentRow(int32 nth, int32& outChapter, int32& outHit)
 		++n;
 	}
 	return false;
+}
+
+// THE ROWS HUNG OFF A DOCUMENT ROW BEFORE ITS STORY ROWS: a Script Label list's document whose page items AND tables or
+// cells carry labels - its page items' object rows (KFCResultModel's HangsOffItsDocument) beside the text rows its
+// story rows hold. Until 2026-11-07 a document row drew its story rows OR its object rows, and such a document's page
+// items were drawn nowhere (block 7's defect re-check - case slt-mixed-list). FIRST, for the order the rows' own
+// numbers read in: the search walks a page's items before its tables (KFCScriptLabelSearch), so on each page an item's
+// "P1(1)" comes before a table's "P1(2)". How many: the rows it shows less those its story rows hold. Any other list is
+// of one kind (ROW-35) and answers 0 without a walk of its groups - a text list's document row is asked for every child
+// it draws (KFCResultModel::GetDisplayFontCount).
+int32 RowsOffTheDocument(int32 chapter)
+{
+	if (!KFCResults()->ListIsScriptLabels())
+		return 0;
+	const int32 groups = KFCResults()->GetDisplayFontCount(chapter);
+	int32 grouped = 0;
+	for (int32 g = 0; g < groups; ++g)
+		grouped += KFCResults()->GetDisplayFontHitCount(chapter, g);
+	const int32 rest = KFCResults()->GetDisplayHitCount(chapter) - grouped;
+	return (rest > 0) ? rest : 0;
 }
 
 int32 DocumentRowPos(int32 chapter)
@@ -232,12 +254,13 @@ public:
 			// A DOCUMENT LIST'S ROW: its place among the list's top's rows (W3 - DocumentRow's reverse).
 			if (KFCResults()->ListIsDocuments())
 				return DocumentRowPos(childID->GetChapter());
-			// Its place under its story ("font") row - an object row's among its document's rows (GetNthChild's reverse); -1
-			// for a row taken off the list (Clear from Results), which is no row's child now.
+			// Its place under its story ("font") row - an object row's among its document's rows, which come before the
+			// document's story rows when it has any (RowsOffTheDocument) - GetNthChild's reverse; -1 for a row taken
+			// off the list (Clear from Results), which is no row's child now.
 			return KFCResults()->GetHitFontGroupPos(childID->GetChapter(), childID->GetHit());
 		}
-		if (childID->IsFontRow())
-			return childID->GetFont();		// under its document row: the group itself
+		if (childID->IsFontRow())		// under its document row: the group itself, after the rows hung off it directly
+			return RowsOffTheDocument(childID->GetChapter()) + childID->GetFont();
 		if (childID->IsBookRow())
 			return 0;		// the only child of the list's top
 		return KFCResults()->GetShownChapterPos(childID->GetChapter());	// GetNthChild's reverse
@@ -268,11 +291,12 @@ int32 KFCResultTree::LiveRowCount(const NodeID& node)
 	if (nodeID->IsFontRow())
 		return KFCResults()->GetDisplayFontHitCount(nodeID->GetChapter(), nodeID->GetFont());
 
-	// A document row: its story ("font") rows - its hits directly for a chapter with no groups, an object search's
-	// (see GetParentNode).
+	// A document row: the rows hung off it directly, then its story ("font") rows (RowsOffTheDocument - a Script Label
+	// list's page items beside its tables' and cells' labels) - its hits directly for a chapter with no groups, an
+	// object search's (see GetParentNode).
 	const int32 fonts = KFCResults()->GetDisplayFontCount(nodeID->GetChapter());
 	if (fonts > 0)
-		return fonts;
+		return fonts + RowsOffTheDocument(nodeID->GetChapter());
 	return KFCResults()->GetDisplayHitCount(nodeID->GetChapter());
 }
 
@@ -313,14 +337,19 @@ NodeID_rv KFCResultTree::LiveRow(const NodeID& node, int32 nth)
 		return KFCResultNodeID::Create(nodeID->GetChapter(), hit);
 	}
 
-	// A document row. Every story group shows (GetDisplayFontCount), so the nth displayed group
-	// is simply the nth group.
+	// A document row. The rows hung off it directly first (RowsOffTheDocument - none but in a Script Label list's
+	// document of both kinds), then every story group - each shows (GetDisplayFontCount), so the nth displayed group is
+	// simply the nth group.
 	const int32 fonts = KFCResults()->GetDisplayFontCount(nodeID->GetChapter());
 	if (fonts > 0)
 	{
-		if (nth < 0 || nth >= fonts)
+		const int32 direct = RowsOffTheDocument(nodeID->GetChapter());
+		if (nth < 0 || nth >= direct + fonts)
 			return kInvalidNodeID;
-		return KFCResultNodeID::CreateFont(nodeID->GetChapter(), nth);
+		if (nth >= direct)
+			return KFCResultNodeID::CreateFont(nodeID->GetChapter(), nth - direct);
+		const int32 off = KFCResults()->GetObjectRowHit(nodeID->GetChapter(), nth);
+		return (off >= 0) ? KFCResultNodeID::Create(nodeID->GetChapter(), off) : kInvalidNodeID;
 	}
 	// ...its rows directly for a chapter with no groups (an object search's): the nth row it SHOWS, which is row nth until a
 	// row is taken off the list (Clear from Results - KFCResultModel::GetObjectRowHit).

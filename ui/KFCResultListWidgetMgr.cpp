@@ -153,11 +153,14 @@ namespace
 		return KFCResults()->IsFromBook() ? kBookLevelIndent : PMReal(0.0);
 	}
 
-	// How far right this chapter's HIT rows sit because of the levels above them: one step for the story row every TEXT
-	// hit sits under; none for an OBJECT chapter, whose rows hang off the document row directly.
-	PMReal FontShift(int32 chapterIdx)
+	// How far right a HIT row sits because of the story row above it - asked of the row (its node's group, GetFont),
+	// not of its chapter: one step for a row under a story row, every TEXT hit; none for a row hung off its document
+	// row directly - an object row, a Story list's row. A Script Label list's document can hold both (its page items
+	// beside its tables' and cells' labels - KFCResultListAdapter's RowsOffTheDocument), and a chapter's answer put its
+	// object rows one step too far.
+	PMReal FontShift(int32 font)
 	{
-		return (KFCResults()->GetDisplayFontCount(chapterIdx) > 0) ? kFontLevelIndent : PMReal(0.0);
+		return (font >= 0) ? kFontLevelIndent : PMReal(0.0);
 	}
 
 	// THE TIERS' OWN LEVEL (the stacked results' spec, section 2-2): while the results are kept in tiers, the live list's
@@ -496,7 +499,7 @@ bool KFCResultTree::GetRowLook(const NodeID& node, RowLook& out)
 		if (!KFCResults()->GetHitRow(nodeID->GetChapter(), nodeID->GetHit(), row))
 			return false;
 		out.hit = true;
-		out.shift = LevelShift() + FontShift(nodeID->GetChapter());
+		out.shift = LevelShift() + FontShift(nodeID->GetFont());
 		// "Changed" FIRST ON A ROW THIS LIST HAS REPLACED (the author's call: nothing else on the row tells a
 		// written row from one still as the search found it - without it a replaced row looks like the rest).
 		// Part of the locator run - its colour, and the label a reader walks starts with it. An Undo of the
@@ -1278,23 +1281,25 @@ bool KFCResultTree::UnifyReadingsOf(const NodeID& row, PMString& outWord, std::v
 	PMString joined;
 	if (!KFCResults()->GetUnifyFacts(node->GetChapter(), node->GetFont(), node->IsHitRow() ? node->GetHit() : -1, outWord, joined))
 		return false;
-	// Tab-separated (KFCResultModel::Hit::otherReadings): split as UTF-8 - a tab is one byte there, never part of another character's.
-	const std::string all(joined.GetUTF8String());
-	std::string::size_type from = 0;
-	while (from <= all.size())
+	// Tab-separated (KFCResultModel::Hit::otherReadings): split as its UTF-16 units stand - NEVER THROUGH UTF-8. The
+	// page's readings can hold half a surrogate pair (KFCUtf8.h): GetUTF8String -> SetUTF8String threw on a low half -
+	// out of the row's right-click menu as it popped, and out of the menu's names - and took a high half together with
+	// the tab after it, two readings read as one (block 0's D0-a, block 6's D6-a - the same family).
+	int32 units = 0;
+	const UTF16TextChar* const buf = joined.GrabUTF16Buffer(&units);
+	int32 from = 0;
+	for (int32 i = 0; buf != nil && i <= units; ++i)
 	{
-		const std::string::size_type tab = all.find('\t', from);
-		const std::string one(all.substr(from, (tab == std::string::npos) ? std::string::npos : tab - from));
-		if (!one.empty())
+		if (i < units && buf[i] != static_cast<UTF16TextChar>('\t'))
+			continue;
+		if (i > from)
 		{
 			PMString reading;
-			reading.SetUTF8String(one);
+			reading.AppendW(buf + from, i - from);
 			reading.SetTranslatable(kFalse);
 			outReadings.push_back(reading);
 		}
-		if (tab == std::string::npos)
-			break;
-		from = tab + 1;
+		from = i + 1;
 	}
 	return !outReadings.empty();
 }
