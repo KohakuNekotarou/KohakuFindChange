@@ -98,8 +98,8 @@
 - **TBL-65** ★**Change All**＝範囲の条件に合う表全部に Change 側（全部で Ctrl+Z 1回）。アラート `Search is completed. N table(s) changed.`（本体の文に合わせる）。一致なしは `Cannot find a match.`。ロック・既にそのとおり・その名前が無い文書の表は飛ばし、面の行で数えて言う。押せるのは Change 側に何かあるとき。（F7）回帰 `tb-btn-change-all`・`tb-btn-change-all-style`
   - 訂正:
 
-- **TBL-66** ★一覧に同じ表の行があれば、行も `Styled`＋書いた後の字になり Ctrl+Z で一緒に戻る（行の Replace と同じ＝一覧とページを食い違わせない）。**別の種類の一覧・一覧なしのときは一覧に触らない**（一覧を捨てない）。（F8）回帰 `tb-btn-rows-follow`
-  - 訂正:
+- **TBL-66** ★一覧に同じ表の行があれば、行も `Styled`＋書いた後の字になり Ctrl+Z で一緒に戻る（行の Replace と同じ＝一覧とページを食い違わせない）。**別の種類の一覧・一覧なしのときは一覧に触らない**（一覧を捨てない）。（F8）回帰 `tb-btn-rows-follow`・`tb-face-book-other-chapter`
+  - 訂正: 11-07 ブロック9の再検査（D9-c）＝一覧の章を一覧が持つ UIDRef（文書のアドレス）で突き合わせていた（`KFCReplaceEngine::WriteFaceTables`）＝本の一覧で、検索の後に閉じた章のアドレスを後から開いた文書が受け取ると、その章の同じ UID の表の行まで `Styled` になった（書いていない表・ストーリーの版もその文書から取った）。→ 章の文書は今開いているものをファイルで引く（`KFCSearchEngine::ChapterDocNow`）。回帰 `tb-face-book-other-chapter`（6章の本の1章目を開き直して面の Change All＝RED は直す前のビルドで章3の行が `Styled`・記録で使い回しのアドレスを確かめた）
 
 - **TBL-67** 別の種類で窓を開いてから Table にしても押せる（列の大きさを支柱で持つ＝KOHAKU-02 と同じ守り）。走っている最中は断り、面の1行目で言う。（Review Focus）回帰 `tb-btn-after-another-kind`
 

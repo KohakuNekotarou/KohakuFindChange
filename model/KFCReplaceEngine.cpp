@@ -6083,15 +6083,20 @@ bool KFCReplaceEngine::WriteFaceTables(const std::vector<FaceTable>& tables, boo
 	std::vector<ListRow> listRows;
 	std::vector<int32> chapterIdxs;
 	std::map<int32, std::set<UID> > storiesOfChapter;
+	std::map<int32, IDataBase*> dbOfChapter;	// the document each chapter's rows were matched in (its versions)
 	std::set<IDataBase*> followed;
 	if (KFCResultModel::ListIsTables())
 	{
 		const int32 chapterCount = KFCResultModel::GetChapterCount();
 		for (int32 c = 0; c < chapterCount; ++c)
 		{
-			UIDRef chapterDoc;
-			IDFile file;
-			if (!KFCResultModel::GetChapterLocation(c, chapterDoc, file))
+			// A CHAPTER'S DOCUMENT AS IT IS OPEN NOW, FOUND BY ITS FILE (KFCSearchEngine::ChapterDocNow - the
+			// open responder's rule) - never the UIDRef the list holds. A chapter the search handed back keeps the
+			// address its document had, and a document opened since can be given it (memory
+			// uidref-reuse-after-close): that chapter's row of a table of the same UID was marked Styled for a write
+			// in the other document, and its story versions were taken there (case tb-face-book-other-chapter).
+			const UIDRef chapterDoc(KFCSearchEngine::ChapterDocNow(c));
+			if (chapterDoc.GetDataBase() == nil)
 				continue;
 			std::map<UID, size_t> theirs;
 			for (size_t t = 0; t < tables.size(); ++t)
@@ -6113,6 +6118,7 @@ bool KFCReplaceEngine::WriteFaceTables(const std::vector<FaceTable>& tables, boo
 			{
 				chapterIdxs.push_back(c);
 				followed.insert(chapterDoc.GetDataBase());
+				dbOfChapter[c] = chapterDoc.GetDataBase();
 			}
 		}
 	}
@@ -6162,12 +6168,7 @@ bool KFCReplaceEngine::WriteFaceTables(const std::vector<FaceTable>& tables, boo
 		return false;
 	}
 	for (std::map<int32, std::set<UID> >::const_iterator c = storiesOfChapter.begin(); c != storiesOfChapter.end(); ++c)
-	{
-		UIDRef chapterDoc;
-		IDFile file;
-		if (KFCResultModel::GetChapterLocation(c->first, chapterDoc, file))
-			NoteStoryVersions(c->first, chapterDoc.GetDataBase(), c->second);	// as KFC left them
-	}
+		NoteStoryVersions(c->first, dbOfChapter[c->first], c->second);	// as KFC left them, where they were matched
 	recorder.Keep();
 	for (size_t d = 0; d < docs.size(); ++d)
 	{
@@ -6211,9 +6212,10 @@ bool KFCReplaceEngine::WriteFaceLabels(const std::vector<FaceLabel>& labels, PMS
 		const int32 chapterCount = KFCResultModel::GetChapterCount();
 		for (int32 c = 0; c < chapterCount; ++c)
 		{
-			UIDRef chapterDoc;
-			IDFile file;
-			if (!KFCResultModel::GetChapterLocation(c, chapterDoc, file))
+			// (A chapter's document as it is open now, by its file - WriteFaceTables' rule: never the UIDRef the
+			// list holds.)
+			const UIDRef chapterDoc(KFCSearchEngine::ChapterDocNow(c));
+			if (chapterDoc.GetDataBase() == nil)
 				continue;
 			// (a row stands for its item's label of ITS key: an empty Script Key: lists an item once for each key - Hit::labelKey)
 			std::map<std::pair<UID, std::string>, size_t> theirs;
@@ -6456,10 +6458,10 @@ bool KFCReplaceEngine::PreviewHit(int32 chapterIdx, int32 hitIdx, PMString& outA
 	// (InDesign's own mode - the list's query stated - not a QR Code tab the dialog may be showing: FindChangeMode.)
 	if (KFCSearchEngine::FindChangeMode() != IFindChangeOptions::kGrepSearch || !QueryUnchangedSinceSearch())
 		return false;
-	UIDRef docRef;
-	IDFile file;
-	if (!KFCResultModel::GetChapterLocation(chapterIdx, docRef, file) || !KFCBookScope::IsDocStillOpen(docRef))
-		return false;
+	// Its document open now, found by its file (KFCSearchEngine::ChapterDocNow - WriteFaceTables' rule): never the
+	// UIDRef the list holds, which a document opened since its chapter was handed back can be given - the write would
+	// be tried there.
+	const UIDRef docRef(KFCSearchEngine::ChapterDocNow(chapterIdx));
 	IDataBase* const db = docRef.GetDataBase();
 	UID story = kInvalidUID;
 	TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;

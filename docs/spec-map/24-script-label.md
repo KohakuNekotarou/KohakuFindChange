@@ -71,7 +71,7 @@
   - 訂正: 2026-11-04 の再検査＝前に見つけた物を一致の一覧の中だけで探していたので、書き換えた後の Find Next は最初の一致へ戻っていた（`sl-btn-changefind` は最初の物で試していて通っていた）。
   - 訂正:
 
-- **SL-41** Change／Change/Find＝Find Next が見つけた物に今の面の Change 側。押せるのは、選択が Find Next の着地が残したとおりの間だけ（別の物を選ぶと灰色＝表の Change と同じ・選べなかった物＝ロック・非表示は、着地が残した選択のままなら押せる）。Change All＝範囲の一致の全部（ロックは残す）・Ctrl+Z 1回・アラート `Search is completed. N label(s) changed.`・面の行 `N of M label(s) changed.`。一覧の同じ物の行は `Labeled` になる。回帰 `sl-btn-change`・`sl-btn-changefind`・`sl-btn-changeall`・`sl-btn-change-moved`
+- **SL-41** Change／Change/Find＝Find Next が見つけた物に今の面の Change 側。押せるのは、選択が Find Next の着地が残したとおりの間だけ（別の物を選ぶと灰色＝表の Change と同じ・選べなかった物＝ロック・非表示は、着地が残した選択のままなら押せる）。Change All＝範囲の一致の全部（ロックは残す）・Ctrl+Z 1回・アラート `Search is completed. N label(s) changed.`・面の行 `N of M label(s) changed.`。一覧の同じ物の行は `Labeled` になる（その行の章は今開いている文書をファイルで引く＝11-07 ブロック9の D9-c・表の TBL-66 と同じ直し・`WriteFaceLabels`）。回帰 `sl-btn-change`・`sl-btn-changefind`・`sl-btn-changeall`・`sl-btn-change-moved`
   - 訂正:
 
 ## 6. クエリ・効かない操作
