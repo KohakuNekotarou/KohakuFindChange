@@ -232,6 +232,16 @@
 //    table-cap  KFCTableSearch::CollectTargets lists at most 2 tables (tb-cap)
 //    ruby-tab  KFCRubySearch::IsTabCurrent the same for KFC's Ruby tab; the file's lines kind=without, base=, ruby=, change=, remove=1, findonly=1, scope=all|story|toend|selection (work\kbs-regress\rb-cases.tsv)
 //    kenten-tab  KFCKentenSearch::IsTabCurrent the same for the Kenten kind; the file's lines kind=without, base=, mark=<n>, change=<n>, remove=1, markchar=<hex>, changechar=<hex>, scope=all|story|toend|selection (work\kbs-regress\kt-cases.tsv)
+//    warichu-tab  KFCWarichuSearch::IsTabCurrent the same for the Warichu kind; the file's lines scope=all|story|toend|selection and the icons' words
+//                (KFCOwnScopeDiagLine) (work\kbs-regress\wr-cases.tsv)
+//    label-tab   KFCScriptLabelSearch::IsTabCurrent the same for the Script Label kind; the file's lines key=, find=, change=, whole=1, grep=1, scope=all
+//                (work\kbs-regress\sl-cases.tsv)
+//    story-tab   KFCStorySearch::IsTabCurrent the same for the Story kind; its line scope=all (work\kbs-regress\st-cases.tsv)
+//    spelling-tab  KFCSpellingSearch::IsTabCurrent the same for the Spelling kind; the file's lines scope=all|story|toend|selection and the icons'
+//                words (KFCOwnScopeDiagLine) (work\kbs-regress\sp-cases.tsv)
+//    spelling-off  KFCSpellingSearch takes Dynamic Spelling as off (SP4's case) - no setting of the person's touched (sp-cases.tsv)
+//    document-tab  KFCDocumentSearch::IsTabCurrent takes the Document kind for Find/Change's kind (the model's cases, which need no dialog -
+//                work\kbs-regress\doc-cases.tsv)
 //    kohaku-tab-reset  (UI half) what the Kohaku+ tab keeps as at launch, and the switch off again - one use (a case's saved query left its conditions on the tab)
 //    query-menu-pass  (UI half) KFCKohakuQueryMenu's watch lets InDesign's reader load a query of the Kohaku+ tab - what a person with no KFC gets from its file
 //    not-japanese  (UI half) the Kohaku tab's Find: as in an InDesign of another language - no Ruby (ui/KFCKohakuTab.cpp's JapaneseKinds; kh-not-japanese)
@@ -239,6 +249,17 @@
 //                (ui/KFCJump.cpp's ArmNativeScopeKeep) - keeps no Search: of InDesign's own tab: what the open dialog does
 //                to it when the landing selects (qr-findnext-native-scope-armed). Measured: it does nothing while
 //                the QR Code face is shown, so that case does not arm (work\kbs-regress\unarmed-qr-cases.tsv)
+//    ruby-list-file  (UI half) the file's first line is the ruby list Choose List... takes, in place of Windows' Open dialog, which a test
+//                cannot press (ui/KFCKohakuTab.cpp's ChooseRubyList - rb-cases.tsv)
+//    ruby-list-save  (UI half) the file's first line is the file Save List... writes, in place of Windows' Save dialog (ui/KFCKohakuTab.cpp -
+//                rb-cases.tsv)
+//    label-answer  (UI half) Special Operations > Label's dialogs answered by the file's lines instead of the window - key=, value=, pick=<key>,
+//                edit=<key>=<value>, cancel (ui/KFCLabelDialogs.cpp's TestAnswer - the lbl cases)
+//    run-script-source  (UI half) Run Script... runs the file's lines as its script, the window not shown (ui/KFCRowScript.cpp - rs-cases.tsv)
+//    run-script-help  (UI half) Run Script...'s Help window shown before the main one (ui/KFCRowScript.cpp - rs-cases.tsv)
+//    story-edit-fails  (UI half) each row's storyEdit() made to throw: a row that opens nothing, so a book's closed chapter opened for it is seen
+//                closed again (ui/KFCRowScript.cpp - wl-cases.tsv, wl-book-se-fails)
+//    open-hidden-file  (UI half) Open Hidden... opens the files the lines name, the dialog not shown (ui/KFCDocumentOps.cpp - doc-cases.tsv)
 //
 //  AND TIMERS: KFC_CLOCK / KFC_SPENT add up the milliseconds a stretch of code takes, and KFCDiagPhase
 //  writes "PHASE <name> begin" and "PHASE <name> end <ms>" around a scope - all of it nothing without KFC_DIAG.

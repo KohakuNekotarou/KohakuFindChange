@@ -1182,8 +1182,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCLabelNoteWidgetID, kKFCPrefix + 97)
 // Menu item positions:
 //
 // The flyout, as KFCUI.fr lays it out (the author's arrangement):
-//    0.5 - 1.3    the commands: Open Find/Change..., Find in <scope>, Change All in Book, Clear Results,
-//                 Copy Results, Run Saved Queries... (the two that write to the DOCUMENTS among them)
+//    0.5 - 1.3    the commands: Open Find/Change..., Find in <scope>, Next Result, Previous Result, Change All in
+//                 Book, Clear Results, Run Saved Queries... (the two that write to the DOCUMENTS among them)
 //   ---- 2.0
 //    2.2 - 2.9    the check-mark toggles (Block 3 below)
 //   ---- 3.0
@@ -1193,7 +1193,7 @@ DECLARE_PMID(kWidgetIDSpace, kKFCLabelNoteWidgetID, kKFCPrefix + 97)
 // Positions that a new order allowed to stay were left where they were, so only the items that
 // actually moved carry new numbers.
 
-// Block 1 - the search, then Change All in Book, Clear Results, Copy Results and Run Saved Queries...
+// Block 1 - the search, then Change All in Book, Clear Results and Run Saved Queries...
 // with no rule between (the author's call), then a rule. The scope the search runs on is set by Book Scope
 // (Change All runs on the book alone - F18).
 // Open Find/Change... leads the block: open the dialog, type the query, then search.
@@ -1287,7 +1287,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCLabelNoteWidgetID, kKFCPrefix + 97)
 #define kKFCDocCloseMenuItemPosition			2.5
 #define kKFCDocSaveMenuItemPosition				8.8
 #define kKFCDocShowMenuItemPosition				8.9
-#define kKFCOpenWithoutWindowMenuItemPosition	12.0	// Open Without a Window (2026-11-06 - W2: the book row's menu, after Select All Rows' 11.0)
+#define kKFCOpenWithoutWindowMenuItemPosition	6.5		// Open Without a Window (W2 - the book row's menu): its name's place in the abc order (ROW-32), between Narrow
+														// Down's 5.0 and Restore from Copy's 7.0 - so before Select All Rows
 #define kKFCLabelSubmenuPosition				6.5		// Label > (2026-11-06 - an object row's after Hide, before Lock; a text row's after Create Outlines, before Remove Label)
 #define kKFCLabelAddKeyMenuItemPosition			1.0		// ...its Add Key...
 #define kKFCLabelEditValueMenuItemPosition		2.0		// ...Edit Value...

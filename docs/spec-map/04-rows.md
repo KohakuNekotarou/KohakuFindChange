@@ -172,7 +172,8 @@
                    Clear from Results
                    Search This Document Again
                    Select All Rows
-  ブックの行       Select All Rows
+  ブックの行       Open Without a Window（2026-11-06＝DOC-30・トグル・abc 順で Select All Rows の前＝11-06 夜のブロック2の再検査で直した）
+                   Select All Rows
   段の見出しの行   Clear These Results（ROW-43）
                    Narrow Down ▸ Frames of These Matches・In Endnotes・In Footnotes・On Active Layer・On Pasteboard・Pages...・With Overrides（ROW-46）
                    Search Text in These Objects（ROW-49・物の段だけ――文字の段では灰色）
