@@ -21,6 +21,7 @@
   - 訂正: 11-06 の再検査＝①Book Scope で開いている章が1つも並ばなかった（章の `docRef` は空で渡る＝ファイルで聞き直す）②Show／Save の後も行が「no window」「modified」のままだった ③要約に窓なしの文書への道を足した
   - 訂正: 11-07 ブロック8の再検査（D8-a）＝**Book Scope ON の Find: Document は一度も走らなかった**＝本の扉（`KFCSearchEngine::ResolveRunScope`）がほかの種類と同じに Search: を聞き、この種類の Search: は All Documents だけなので、いつも `Book Scope is on, and Search: is All Documents. Set Search: to Document in Edit > Find/Change, or turn Book Scope off.` で断った（この種類に Document の項目は無い＝言う直し方が出来ない）＝11-06 の①の直しは届いていなかった。→ この種類では本の扉は Search: を聞かない（実機で RED→GREEN＝`doc-book`）
   - 訂正: 11-07 ブロック11の再検査（D11-a）＝**別名で保存しても行が検索した時の名前・パス・状態のままだった**（LIFE-14 の「その文書の行の名前が新しいファイル名になる」が、行そのものが名前を持つこの一覧に届いていなかった＝今朝のブロック7の回の観察 O7-c）→ 別名で保存の時に行を作り直す（生きている一覧・段とその灰色の写し・取り消し用の写し）。回帰 `doc-saveas-row`／`doc-saveas-grey`／`doc-saveas-tier`／`doc-saveas-undo`
+  - 訂正: ★2026-11-07 作者の決定（ブロック11の観察 O11-6「おすすめの今のままで」）＝**人の普通の保存（Ctrl+S）・窓を開く／閉じるでは行を作り直さない**（`modified`・`no window` のまま）＝行は検索した時の写し。作り直すのは KFC の操作（Special Operations ▸ Show／Save）・別名で保存（LIFE-14）・Search This Document Again だけ＝LIFE-14 の「保存しても結果は何も変わらない」の例外を増やさない（作り直すなら `kAfterSaveDoc` の応答と窓の知らせが要る＝作らない）
 
 - **DOC-12** **行のクリック**＝その文書の窓を前に出す。**窓なしの文書は窓を開かない**＝メッセージ欄 `<名前> has no window - Special Operations > Show opens one.`（作者の Show を明示の操作にするため・私の判断）。回帰 `doc-click-hidden`
   - 訂正:
