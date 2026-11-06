@@ -1356,6 +1356,34 @@ void KFCResultHistory::KeptChapterRenamed(uint32 set, int32 chapterIdx, const PM
 	}
 }
 
+void KFCResultHistory::KeptDocumentRow(uint32 set, int32 chapterIdx, const KFCDocumentRowWords& words)
+{
+	const int32 tier = TierOfSet(set);
+	if (tier < 0)
+		return;
+	KeptTier& kept = gKept[static_cast<size_t>(tier)];
+	InterfacePtr<ITreeViewMgr> treeMgr(KFCResultTree::QueryResultTreeMgr());
+	// THE TREE IS TOLD ONLY WHERE THE LAST REBUILD DREW THIS TIER, AT THIS PLACE (KeptChapterGone says why).
+	const bool drawn = treeMgr != nil && tier < static_cast<int32>(gDrawnSets.size())
+		&& gDrawnSets[static_cast<size_t>(tier)] == set;
+	for (size_t r = 0; r < kept.rows.size(); ++r)
+	{
+		KeptRow& copy = kept.rows[r];
+		TreeNodePtr<KFCResultNodeID> id(copy.live);
+		if (id == nil || !id->IsHitRow() || id->GetChapter() != chapterIdx || !copy.look.hit)
+			continue;
+		// A hit row's parts as GetRowLook draws a Find: Document row: its name before, its facts where a match
+		// stands, its file after (KFCDocumentSearch::RowOf's words).
+		copy.look.pre = words.pre;
+		copy.look.match = words.facts;
+		copy.look.post = words.post;
+		if (drawn)
+			treeMgr->NodeChanged(KFCResultNodeID::CreateKept(tier, static_cast<int32>(r)));
+		KFC_DIAG_LOG("STACK kept document row set=%u chapter=%d row=%d", set, static_cast<int>(chapterIdx),
+			static_cast<int>(r));
+	}
+}
+
 void KFCResultHistory::RenameLiveFromQuery(uint32 set)
 {
 	if (set == 0 || set != gLive.set || gLive.set != KFCResults()->GetResultSetId() || gLive.label.IsEmpty())

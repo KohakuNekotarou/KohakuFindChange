@@ -1214,7 +1214,7 @@ void KFCResultModel::ChapterDocumentClosing(const UIDRef& closingDocRef)
 	}
 }
 
-int32 KFCResultModel::RenameDocumentChapters(const UIDRef& docRef, const PMString& newName)
+int32 KFCResultModel::RenameDocumentChapters(const UIDRef& docRef, const PMString& newName, const Hit* documentRow)
 {
 	if (IsFromBook())
 		return 0;
@@ -1222,13 +1222,37 @@ int32 KFCResultModel::RenameDocumentChapters(const UIDRef& docRef, const PMStrin
 	for (size_t i = 0; i < gChapters.size(); ++i)
 	{
 		Chapter& c = gChapters[i];
-		if (c.docRef != docRef || c.name.IsEqual(newName))
+		if (c.docRef != docRef)
+			continue;
+		// A Find: Document list's rows say the name themselves (and the file, which a Save As moves too): made again.
+		if (documentRow != nil)
+			renamed += TakeDocumentRow(c, *documentRow);
+		if (c.name.IsEqual(newName))
 			continue;
 		c.name = newName;
 		c.name.SetTranslatable(kFalse);
 		++renamed;
 	}
 	return renamed;
+}
+
+int32 KFCResultModel::TakeDocumentRow(Chapter& chapter, const Hit& documentRow)
+{
+	int32 remade = 0;
+	for (size_t h = 0; h < chapter.hits.size(); ++h)
+	{
+		Hit& hit = chapter.hits[h];
+		if (hit.holderKind != kKFCHolderDocument)
+			continue;
+		if (hit.preText.IsEqual(documentRow.preText) && hit.runChain.IsEqual(documentRow.runChain)
+			&& hit.postText.IsEqual(documentRow.postText))
+			continue;
+		hit.preText = documentRow.preText;
+		hit.runChain = documentRow.runChain;
+		hit.postText = documentRow.postText;
+		++remade;
+	}
+	return remade;
 }
 
 bool KFCResultModel::GetStoryVersion(int32 chapterIdx, UID story, uint32& outVersion)

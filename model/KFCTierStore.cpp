@@ -174,7 +174,7 @@ void KFCTierStore::ForgetDocument(IDataBase* db)
 	}
 }
 
-void KFCTierStore::RenameDocument(const UIDRef& docRef, const PMString& newName)
+void KFCTierStore::RenameDocument(const UIDRef& docRef, const PMString& newName, const KFCResultModel::Hit* documentRow)
 {
 	for (size_t t = 0; t < gTiers.size(); ++t)
 	{
@@ -185,6 +185,16 @@ void KFCTierStore::RenameDocument(const UIDRef& docRef, const PMString& newName)
 		{
 			if (chapters[c].docRef != docRef)
 				continue;
+			// A Find: Document tier's rows say the name, the file and the facts themselves - made again, and its grey
+			// copy told at once, as of the name below (D11-a).
+			if (documentRow != nil && KFCResultModel::TakeDocumentRow(chapters[c], *documentRow) > 0)
+			{
+				KFCDocumentRowWords words;
+				words.pre = documentRow->preText;
+				words.facts = documentRow->runChain;
+				words.post = documentRow->postText;
+				KFCNotifyKeptDocumentRow(gTiers[t].set, static_cast<int32>(c), words);
+			}
 			chapters[c].name = newName;
 			chapters[c].name.SetTranslatable(kFalse);
 			// ...and the panel's grey copy of the tier reads it now, not at the next switch (the author's call).

@@ -72,6 +72,10 @@ void KFCModelObserver::Update(const ClassID& theChange, ISubject* /*theSubject*/
 			if (payload->text != nil)
 				KFCResultHistory::KeptChapterRenamed(payload->set, payload->chapterIdx, *payload->text);
 			break;
+		case KFCNotifyPayload::kKeptDocumentRow:
+			if (payload->row != nil)
+				KFCResultHistory::KeptDocumentRow(payload->set, payload->chapterIdx, *payload->row);
+			break;
 		default:
 			break;
 	}

@@ -36,7 +36,8 @@ namespace KFCDocumentSearch
 	    as unopenable) - filed a chapter each (KFCSearchEngine::FileChapter). Nothing is opened, composed or written. */
 	void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBook, KFCSearchEngine::CollectTally& out);
 
-	/** ONE DOCUMENT'S ROW (a run's, and Search This Document Again's): false = it is not open. */
+	/** ONE DOCUMENT'S ROW (a run's, Search This Document Again's, and a Save As's - the lists' rows of the
+	    document saved as another file made again: KFCSaveAsDocResponder, D11-a): false = it is not open. */
 	bool RowOf(const UIDRef& docRef, const PMString& name, KFCResultModel::Hit& outHit);
 }
 

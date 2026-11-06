@@ -58,6 +58,7 @@
 #include <vector>
 
 class IDataBase;
+namespace KFCResultModel { struct Hit; }	// RenameDocument's Find: Document row (KFCResultModel.h)
 
 namespace KFCUndoFollow
 {
@@ -186,8 +187,10 @@ namespace KFCUndoFollow
 	/** A DOCUMENT SAVED AS ANOTHER FILE (KFCSaveAsDocResponder - the spec map's LIFE-14): its chapter in each kept whole
 	    result set takes its new name too, as KFCResultModel::RenameDocumentChapters renames the list's - an Undo or a Redo
 	    of a query run puts a kept list back, and would bring the old name back with it. Found by the binding, as
-	    ForgetDocument finds them; a set of a book's list keeps its names (ModelSnapshot's header.fromBook). */
-	void RenameDocument(const UIDRef& docRef, const PMString& newName);
+	    ForgetDocument finds them; a set of a book's list keeps its names (ModelSnapshot's header.fromBook).
+	    A Find: Document list's rows take `documentRow`'s words as well, the row made again now
+	    (KFCResultModel::TakeDocumentRow - D11-a): the list a query run found can be one. */
+	void RenameDocument(const UIDRef& docRef, const PMString& newName, const KFCResultModel::Hit* documentRow = nil);
 
 	/** A DOCUMENT IS CLOSING, WHATEVER THE LIST SHOWS. The observer attached to it is taken off while the
 	    document is still whole - what is attached is detached. Called by KFCCloseDocResponder for every close,

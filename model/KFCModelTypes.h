@@ -684,6 +684,16 @@ enum
 	kKFCAlertLeaveToDefault = -1
 };
 
+/** A FIND: DOCUMENT ROW'S WORDS, MADE AGAIN (KFCDocumentSearch::RowOf - the block 11 defect re-check's D11-a): what a
+    kept tier's grey copy of the row draws - the parts KFCResultTree::RowLook takes from the row (KFCResultModel::Hit's
+    preText, runChain and postText). */
+struct KFCDocumentRowWords
+{
+	PMString	pre;		// "<name>  " (Hit::preText)
+	PMString	facts;		// "1 window, modified" (Hit::runChain - drawn where a match stands)
+	PMString	post;		// " - <its file's path>" (Hit::postText)
+};
+
 /** What one notification from the model half to the UI half carries (the model/UI split; sent by
     KFCModelNotify.h, received by KFCModelObserver.cpp). The model never calls the panel: it
     says what happened on the session's subject, and the panel - when there is one listening - does the
@@ -700,17 +710,21 @@ struct KFCNotifyPayload
 		kKeptChapterGone,	// kept tier `set`'s chapter chapterIdx was emptied - its document closed: its grey copy
 							// lets that document's rows go, and its heading reads `replaced` of `hits`
 							// (KFCResultHistory::KeptChapterGone)
-		kKeptChapterRenamed	// kept tier `set`'s chapter chapterIdx's document saved as another file: its grey copy's
-							// document row reads *text (KFCResultHistory::KeptChapterRenamed)
+		kKeptChapterRenamed,	// kept tier `set`'s chapter chapterIdx's document saved as another file: its grey
+							// copy's document row reads *text (KFCResultHistory::KeptChapterRenamed)
+		kKeptDocumentRow	// ...and when that tier is a Find: Document list, the grey copy's rows of chapter
+							// chapterIdx read *row (KFCResultHistory::KeptDocumentRow - D11-a)
 	};
 	Kind				kind;
 	int32				chapterIdx;
 	const PMString*		text;		// kStatus' words, kKeptChapterRenamed's name - read while Change delivers it
-	uint32				set;		// kKeptChapterGone, kKeptChapterRenamed: the kept tier's result set
+	uint32				set;		// kKeptChapterGone, kKeptChapterRenamed, kKeptDocumentRow: the kept tier's
+									// result set
 	int32				replaced;	// kKeptChapterGone: the kept list's counts now - its hits replaced, of how many
 	int32				hits;
+	const KFCDocumentRowWords*	row;	// kKeptDocumentRow's words - read while Change delivers them
 
-	explicit KFCNotifyPayload(Kind k) : kind(k), chapterIdx(-1), text(nil), set(0), replaced(0), hits(0) {}
+	explicit KFCNotifyPayload(Kind k) : kind(k), chapterIdx(-1), text(nil), set(0), replaced(0), hits(0), row(nil) {}
 };
 
 /** One saved Find/Change query as the query dialog shows it (KFCSavedQueries;

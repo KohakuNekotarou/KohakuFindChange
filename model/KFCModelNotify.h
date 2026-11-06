@@ -31,6 +31,8 @@
 
 #include "PMString.h"
 
+struct KFCDocumentRowWords;		// KFCModelTypes.h
+
 /** The result set changed shape - build the panel's tree again. */
 void KFCNotifyRebuild();
 
@@ -50,6 +52,11 @@ void KFCNotifyKeptChapterGone(uint32 set, int32 chapterIdx, int32 replaced, int3
     (KFCTierStore::RenameDocument): the grey copy's document row reads it at once
     (KFCResultHistory::KeptChapterRenamed). */
 void KFCNotifyKeptChapterRenamed(uint32 set, int32 chapterIdx, const PMString& name);
+
+/** Kept tier `set` is a Find: Document list, and the rows of its chapter chapterIdx were made again - their
+    document saved as another file (KFCTierStore::RenameDocument - D11-a): the grey copy's rows of that chapter
+    read `row` at once (KFCResultHistory::KeptDocumentRow). */
+void KFCNotifyKeptDocumentRow(uint32 set, int32 chapterIdx, const KFCDocumentRowWords& row);
 
 /** Say this on the panel's message line. */
 void KFCNotifyStatus(const PMString& message);

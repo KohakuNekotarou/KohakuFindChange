@@ -70,8 +70,10 @@ namespace KFCTierStore
 	    (KFCResultModel::RenameDocumentChapters) and the lists kept for a query run's Undo
 	    (KFCUndoFollow::RenameDocument), so a switch back to a tier does not bring the old name back. The panel's grey
 	    copy of each such tier is told as well (KFCNotifyKeptChapterRenamed - the author's call): it reads the new name
-	    at once. A book's tier keeps its names (LIFE-14's rule: its rows stand for the book's chapters). */
-	void RenameDocument(const UIDRef& docRef, const PMString& newName);
+	    at once. A book's tier keeps its names (LIFE-14's rule: its rows stand for the book's chapters).
+	    A FIND: DOCUMENT TIER'S ROWS take `documentRow`'s words as well, the row made again now
+	    (KFCResultModel::TakeDocumentRow - D11-a), and its grey copy reads them at once (KFCNotifyKeptDocumentRow). */
+	void RenameDocument(const UIDRef& docRef, const PMString& newName, const KFCResultModel::Hit* documentRow = nil);
 
 	/** The chapters of kept tier `set`'s list that are the document `db` - by file first, as ForgetDocument finds them (the
 	    document is still open at the close signal). Appended to `out`; nothing when there is no such tier. For the Undo

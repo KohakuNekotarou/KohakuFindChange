@@ -13,6 +13,11 @@
 //  The kept tiers' lists take the name as well (KFCTierStore::RenameDocument - and their grey copies on the panel at
 //  once), and the lists kept for a query run's Undo (KFCUndoFollow::RenameDocument) - a switch back or an Undo does not
 //  bring the old name back.
+//  A FIND: DOCUMENT LIST (W3 - docs/superpowers/specs/2026-11-06-kfc-windowless-documents-design.md) draws no
+//  chapter row: its row says the name itself, with the document's file and facts (KFCDocumentSearch::RowOf). That
+//  row is made again here, as Search This Document Again makes it, and every one of the lists above takes its words
+//  (the block 11 defect re-check of 2026-11-07, D11-a: the rows read the old name and the old file - the chapter's
+//  new name drawn nowhere).
 //  The name is read the way the SDK's docwatch reads it (DocWchUtils::DwAlert: IDocumentSignalData::GetDocument, then
 //  IDocument::GetName).
 //
@@ -31,6 +36,7 @@
 
 // Project includes:
 #include "KFCDiag.h"			// KFC_DIAG_LOG - what was renamed, in a test build (compiled out of a shipping one)
+#include "KFCDocumentSearch.h"	// RowOf - a Find: Document row made again (D11-a)
 #include "KFCID.h"
 #include "KFCModelNotify.h"		// KFCNotifyRefreshRows - the rows repaint in place
 #include "KFCResultModel.h"
@@ -78,10 +84,14 @@ void KFCSaveAsDocResponder::Respond(ISignalMgr* signalMgr)
 		return;
 	PMString name;
 	doc->GetName(name);
-	const int32 renamed = KFCResultModel::RenameDocumentChapters(savedRef, name);
-	KFCUndoFollow::RenameDocument(savedRef, name);
-	KFCTierStore::RenameDocument(savedRef, name);
-	KFC_DIAG_LOG("SAVEAS doc=%p uid=%u renamed=%d", (void*)savedRef.GetDataBase(), savedRef.GetUID().Get(), renamed);
+	// The document's Find: Document row as it is now - its name, its file and its facts (the file header says why).
+	KFCResultModel::Hit documentRow;
+	const KFCResultModel::Hit* const row = KFCDocumentSearch::RowOf(savedRef, name, documentRow) ? &documentRow : nil;
+	const int32 renamed = KFCResultModel::RenameDocumentChapters(savedRef, name, row);
+	KFCUndoFollow::RenameDocument(savedRef, name, row);
+	KFCTierStore::RenameDocument(savedRef, name, row);
+	KFC_DIAG_LOG("SAVEAS doc=%p uid=%u renamed=%d row=%d", (void*)savedRef.GetDataBase(), savedRef.GetUID().Get(),
+		renamed, row != nil ? 1 : 0);
 	if (renamed > 0)
 		KFCNotifyRefreshRows();
 }

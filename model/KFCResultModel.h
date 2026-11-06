@@ -746,9 +746,19 @@ namespace KFCResultModel
 	    the chapter of a document-scope list bound to it takes its new name - the row's, and a status line's that names it
 	    (a close's). A book's list keeps its names: its rows stand for the book's chapters, still the files the book lists.
 	    Asked of the list (IsFromBook), as KFCCloseDocResponder asks it - not of a chapter's file, which a book's entry can
-	    lack too (KFCBookScope::ChapterDoc). The UIDRef is compared, never dereferenced (IsDocStillOpen's rule). Returns
-	    how many it renamed. */
-	int32 RenameDocumentChapters(const UIDRef& docRef, const PMString& newName);
+	    lack too (KFCBookScope::ChapterDoc). The UIDRef is compared, never dereferenced (IsDocStillOpen's rule).
+	    A FIND: DOCUMENT LIST'S ROW holds the name itself, with the document's file and facts
+	    (KFCDocumentSearch::RowOf - the list draws no chapter row): given `documentRow`, the row made again now, that
+	    chapter's rows take its words (TakeDocumentRow - the block 11 defect re-check's D11-a). Returns how many
+	    chapters it renamed and rows it remade. */
+	int32 RenameDocumentChapters(const UIDRef& docRef, const PMString& newName, const Hit* documentRow = nil);
+
+	/** A FIND: DOCUMENT ROW MADE AGAIN (D11-a): this chapter's Document rows (kKFCHolderDocument) take the words
+	    of `documentRow` - its name, its facts and its file (preText, runChain, postText) - and keep the rest of what
+	    they are (the row eye, the word of a Special Operation written last). For a chapter of the list, of a kept
+	    tier and of a kept whole result set alike (RenameDocumentChapters, KFCTierStore::RenameDocument,
+	    KFCUndoFollow::RenameDocument). Returns how many rows changed. */
+	int32 TakeDocumentRow(Chapter& chapter, const Hit& documentRow);
 
 	/** A story's VERSION where KFC last knew the chapter's rows in it to stand:
 	    ITextModel::GetChangeCount (KFCSearchEngine::ReadStoryVersion), taken by the search

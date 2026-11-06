@@ -1211,7 +1211,8 @@ void KFCUndoFollow::ForgetBookChapter(const UIDRef& docRef)
 	KFC_DIAG_STEPS("chapter closing");
 }
 
-void KFCUndoFollow::RenameDocument(const UIDRef& docRef, const PMString& newName)
+void KFCUndoFollow::RenameDocument(const UIDRef& docRef, const PMString& newName,
+	const KFCResultModel::Hit* documentRow)
 {
 	// Its chapter in each kept whole result set - by the binding, as ForgetDocument finds them. A set of a book's list keeps
 	// its names (KFCResultModel::RenameDocumentChapters' rule, asked of the set as that asks it of the list).
@@ -1227,6 +1228,9 @@ void KFCUndoFollow::RenameDocument(const UIDRef& docRef, const PMString& newName
 				KFCResultModel::Chapter& chapter = sets[s]->chapters[c];
 				if (chapter.docRef != docRef)
 					continue;
+				// a Find: Document list's rows say the name themselves (D11-a)
+				if (documentRow != nil)
+					(void)KFCResultModel::TakeDocumentRow(chapter, *documentRow);
 				chapter.name = newName;
 				chapter.name.SetTranslatable(kFalse);
 			}

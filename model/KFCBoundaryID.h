@@ -106,7 +106,10 @@ DECLARE_PMID(kInterfaceIDSpace, IID_IKFCUIBOUNDARY, kKFCPrefix + 14)
 //  appended, KFCHolderKind gained kKFCHolderDocument - docs/superpowers/specs/2026-11-06-kfc-windowless-documents-design.md W3.)
 // (57, 2026-11-06: IKFCRuns::KohakuQueryText answers empty for a query a word of which holds half of a surrogate pair - no UTF-8, no file: block 0's D0-a,
 //  where its SetUTF8String threw out of the door.)
-#define kKFCBoundaryRevision	"57"
+// (58, 2026-11-07: KFCNotifyPayload gained kKeptDocumentRow and its row, the type KFCDocumentRowWords - a Find:
+//  Document row's words made again when its document is saved as another file, in a grey tier as well: block 11's
+//  D11-a.)
+#define kKFCBoundaryRevision	"58"
 #define kKFCBoundaryStamp		kKFCVersion "/" kKFCBoundaryRevision
 
 #endif // __KFCBoundaryID_h__
