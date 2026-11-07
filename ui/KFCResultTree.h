@@ -145,7 +145,8 @@ namespace KFCResultTree
 	void DropRowPreview();
 
 	/** REPLACE THE ROWS (docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md F16 / F17 for one row;
-	    the author's calls for rows selected together: hit rows of one kind, of one document or several). Return on the
+	    the author's calls for rows selected together: hit rows of one kind - of both in a Script Label list,
+	    2026-11-07 - of one document or several). Return on the
 	    selected rows and a hit row's right-click Replace (RowsOfRightClick) both come here. Writes nothing while a run of
 	    ours is up (RefusedWhileRunning says so) or when none of them can be replaced (CanReplaceAny - the question the row
 	    menu greys Replace by); then their Replace in one undo step, no prompt, the panel following Ctrl+Z and Redo -
@@ -181,10 +182,10 @@ namespace KFCResultTree
 	    menu greys the item by (KFCActionComponent). */
 	bool CanReplaceAllRows(const KFCRowsByChapter& rows);
 
-	/** THE HIT ROWS SELECTED TOGETHER now: by document, in the order drawn; outObjects (optional) = object rows
-	    rather than text rows. false when nothing is selected, or a story, document or book row is
-	    (KFCResultTreeController.cpp). */
-	bool GetSelectedHitRows(KFCRowsByChapter& outRows, bool* outObjects = nil);
+	/** THE HIT ROWS SELECTED TOGETHER now: by document, in the order drawn - of one kind, or of both in a Script
+	    Label list (the author's call of 2026-11-07 - KFCResultTreeController.cpp's Joins). false when nothing is
+	    selected, or a story, document or book row is. */
+	bool GetSelectedHitRows(KFCRowsByChapter& outRows);
 
 	/** Is the row (chapter, hit) one of these rows? The one question the selection's doors (RowsOfRightClick,
 	    LastSelectedHit, FollowModifiedClick) ask of a list of rows (KFCResultTreeController.cpp). */

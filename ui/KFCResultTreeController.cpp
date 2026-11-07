@@ -13,7 +13,8 @@
 //  KFC's rule on top: ROWS ARE SELECTED TOGETHER WHEN THEY ARE HIT ROWS OF ONE KIND - text rows of any story, object rows
 //  of any spread, of any document (the author's calls: NOT kept to one document, nor object rows to one spread, though
 //  InDesign selects in one document and page items on one spread at a time - the rows selected together are replaced
-//  together in one undo step, KFCResultTree::ReplaceRows).
+//  together in one undo step, KFCResultTree::ReplaceRows). A Script Label list's rows are selected together whatever
+//  their kind (the author's call of 2026-11-07, block 7's O7-a - Joins).
 //  THE PAGE SHOWS THE ROW SELECTED LAST, as a click does - its match, or its item, selected alone (FollowModifiedClick,
 //  ExtendSelection): the rows selected together are the list's, not the page's.
 //  A story, document or book row is always selected alone, and so is the live tier's own row (the author's call); a
@@ -69,13 +70,16 @@ bool IsObjectRow(const KFCResultNodeID* node)
 // CAN TWO ROWS BE SELECTED TOGETHER? Only as hit rows of one kind: a story, document or book row is always alone, and
 // so is a row of the other kind. Any story, spread or document - the page shows the row selected last. (A list of one
 // search's tab holds one kind, but for a Script Label list's: its page items' labels are object rows and its tables'
-// and cells' text rows, one document's of both - KFCScriptLabelSearch.)
+// and cells' text rows, one document's of both - KFCScriptLabelSearch.) A SCRIPT LABEL LIST'S ROWS JOIN WHATEVER THEIR
+// KIND (the author's call of 2026-11-07, block 7's O7-a): a label's write is one write for either - the model's label
+// rows take Replace, Remove Label and Label > on both - and an operation of one kind's (an object row's Lock, a table
+// row's Apply Table Style) leaves the other kind's rows and counts them (their doors: "not an object row").
 bool Joins(const NodeID& a, const NodeID& b)
 {
 	TreeNodePtr<KFCResultNodeID> first(a), second(b);
 	if (first == nil || second == nil || !first->IsHitRow() || !second->IsHitRow())
 		return false;
-	return IsObjectRow(first) == IsObjectRow(second);
+	return IsObjectRow(first) == IsObjectRow(second) || KFCResults()->ListIsScriptLabels();
 }
 
 // A row named by its chapter and hit - kept as two numbers rather than a NodeID, which owns a heap object (a static
@@ -170,7 +174,7 @@ private:
 	// controller keeps its mode with the panel's saved state (CTreeViewController::ReadWrite): a panel saved by 1.3,
 	// one row at a time, would otherwise come back that way whatever KFCUI.fr now says. Several parents: a text row hangs
 	// off its story row (KFCResultListAdapter), and the rows of two stories - or of two documents - are selected
-	// together; Joins keeps them to one kind.
+	// together; Joins keeps them to one kind (to either, in a Script Label list).
 	void ForceMultipleSelection()
 	{
 		fNumSelectableItems = eAllowMultipleSelection;
@@ -276,17 +280,14 @@ bool KFCResultTree::RowsHold(const KFCRowsByChapter& rows, int32 chapter, int32 
 	return false;
 }
 
-bool KFCResultTree::GetSelectedHitRows(KFCRowsByChapter& outRows, bool* outObjects)
+bool KFCResultTree::GetSelectedHitRows(KFCRowsByChapter& outRows)
 {
 	outRows.clear();
-	if (outObjects != nil)
-		*outObjects = false;
 	InterfacePtr<ITreeViewController> controller(QueryListController());
 	if (controller == nil)
 		return false;
 	NodeIDList selected;
 	controller->GetSelectedItemsDisplayOrder(selected);
-	bool objects = false;
 	for (size_t k = 0; k < selected.size(); ++k)
 	{
 		TreeNodePtr<KFCResultNodeID> nodeID(selected[k]);
@@ -295,18 +296,13 @@ bool KFCResultTree::GetSelectedHitRows(KFCRowsByChapter& outRows, bool* outObjec
 			outRows.clear();
 			return false;		// a story, document or book row selected: not a selection of hit rows
 		}
-		const bool object = IsObjectRow(nodeID);
-		if (k == 0)
-			objects = object;
-		if (object != objects)
+		if (k > 0 && !Joins(selected[0], selected[k]))
 		{
 			outRows.clear();
-			return false;		// (never - the rules keep one kind; asked anyway)
+			return false;		// (never - the rules keep rows that join; asked anyway)
 		}
 		AddToRows(outRows, nodeID->GetChapter(), nodeID->GetHit());
 	}
-	if (outObjects != nil)
-		*outObjects = objects;
 	return !outRows.empty();
 }
 
@@ -355,6 +351,18 @@ void OpenBranchRows(ITreeViewHierarchyAdapter* adapter, ITreeViewMgr* treeMgr, c
 		if (childID != nil && !childID->IsHitRow())
 			OpenBranchRows(adapter, treeMgr, child);
 	}
+}
+
+// WHAT RETURN DOES, SAID ONLY WHEN IT DOES SOMETHING (the author's call of 2026-11-07, block 7's O7-b):
+// " Return replaces it." / " Return replaces them all." after the count of the rows selected - when Return would
+// write one of them (CanReplaceAllRows: any can be replaced, none an Inconsistent Ruby row - ReplaceRows' own
+// doors). A list with no Change side - Story, Document, QR Code, Warichu, Spelling, Inconsistent Ruby - and rows
+// replaced already or locked get the count alone: Return writes nothing on them, and the line said it replaced
+// them all.
+void AppendWhatReturnDoes(PMString& status, const KFCRowsByChapter& rows, int32 count)
+{
+	if (KFCResultTree::CanReplaceAllRows(rows))
+		status.Append(count == 1 ? " Return replaces it." : " Return replaces them all.");
 }
 }	// anonymous namespace
 
@@ -563,10 +571,12 @@ bool KFCResultTree::SelectAllRows(const NodeID& row)
 	CollectHitRows(adapter, row, under);
 	if (under.empty())
 		return false;
-	// THE ROWS OF ONE KIND (Joins): the first drawn's kind, and the rows of the other left out - and said to be. A
-	// Script Label list's document can hold both (its page items' object rows beside its tables' and cells' text rows):
-	// the controller's Select turned the others away one by one, while the message area counted them as selected and
-	// Return wrote the rest (2026-11-07, block 7's defect re-check - case slt-mixed-selectall).
+	// THE ROWS THAT JOIN (Joins): the first drawn's, and the rows that cannot join it left out - and said to be.
+	// A Script Label list's document holds both kinds (its page items' object rows beside its tables' and
+	// cells' text rows), and its rows join whatever their kind (the author's call of 2026-11-07, block 7's
+	// O7-a - case slt-mixed-selectall): every row under it is selected. No other list holds both; the rows left
+	// out are said if one ever does (before that day the controller's Select turned them away one by one while
+	// the message area counted them as selected - block 7's D7-c).
 	NodeIDList rows;
 	for (size_t k = 0; k < under.size(); ++k)
 		if (rows.empty() || Joins(rows[0], under[k]))
@@ -597,7 +607,15 @@ bool KFCResultTree::SelectAllRows(const NodeID& row)
 	(void)TakeKeyboard();
 	PMString status("Selected ");
 	status.AppendNumber(static_cast<int32>(rows.size()));
-	status.Append(rows.size() == 1 ? " row. Return replaces it." : " rows. Return replaces them all.");
+	status.Append(rows.size() == 1 ? " row." : " rows.");
+	KFCRowsByChapter chosen;
+	for (size_t k = 0; k < rows.size(); ++k)
+	{
+		TreeNodePtr<KFCResultNodeID> rowID(rows[k]);
+		if (rowID != nil)
+			AddToRows(chosen, rowID->GetChapter(), rowID->GetHit());
+	}
+	AppendWhatReturnDoes(status, chosen, static_cast<int32>(rows.size()));
 	if (leftOut > 0)
 	{
 		TreeNodePtr<KFCResultNodeID> firstID(rows[0]);
@@ -657,7 +675,8 @@ bool KFCResultTree::DeselectRowsUnder(const NodeID& closedRow)
 	{
 		status.Append(". Selected ");
 		status.AppendNumber(left);
-		status.Append(left == 1 ? " row. Return replaces it." : " rows. Return replaces them all.");
+		status.Append(left == 1 ? " row." : " rows.");
+		AppendWhatReturnDoes(status, rows, left);
 	}
 	else
 		status.Append(" - none is selected now.");
@@ -771,7 +790,7 @@ bool KFCResultTree::ExtendSelection(ITreeViewController* controller, bool down)
 	if (!next.IsValid())
 		return true;		// the list's end: nothing to add
 	if (!Joins(anchor, next))
-		return true;		// a row of the other kind - a Script Label list's (Joins): the run stops at it
+		return true;		// a row that cannot join the run (Joins - no list holds one today): the run stops at it
 	SelectRun(controller, anchor, next);
 	gRunEnd = RowOf(next);
 	treeMgr->ScrollToNode(next, ITreeViewMgr::eScrollIntoView);
