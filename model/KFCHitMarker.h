@@ -13,7 +13,11 @@
 //  of a match. An adornment is handed each wax run as the text engine draws it, so the marker lands
 //  on the characters themselves in every one of those cases, and on every line of a match that runs
 //  over several. Same as KCM's Story-mode marker (KCMStoryMarker.h), which was built first (the
-//  author's instruction).
+//  author's instruction). TEXT ON A PATH is laid on each character's own quadrilateral instead of a
+//  straight box (IWaxRunShape::GetWaxBounds - such a run stands at the path's origin, its glyphs each
+//  with a matrix of their own: the box went up on the path's top-left corner - 2026-11-07, KFCHitMarker.cpp).
+//  A TABLE'S CHARACTER gets nothing: it has no glyph to lay it on (measured the same day) - a locked
+//  table's landing shows the table and says why.
 //
 //  THE LOOK: WHITE OVER DIFFERENCE, AN INVERSION. KCM moved its marker to a
 //  coloured wash because an inversion cannot be printed; this one is never printed, and on screen

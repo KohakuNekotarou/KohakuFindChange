@@ -21,6 +21,7 @@
 #include "IWaxLine.h"
 #include "IWaxRenderData.h"
 #include "IWaxRun.h"
+#include "IWaxRunShape.h"			// GetWaxBounds - text on a path, a quadrilateral a character
 
 // General includes:
 #include "AutoGSave.h"
@@ -29,11 +30,14 @@
 #include "GraphicsData.h"
 #include "GraphicTypes.h"			// kPMBlendDifference
 #include "IDFile.h"
+#include "K2Vector.h"
+#include "PMPolygon4.h"
 #include "PMRect.h"
 #include "TextDrawPriority.h"		// kTAPassPriForeground
 
 #include <boost/thread/recursive_mutex.hpp>
 #include <atomic>					// gHasMark - read off the main thread without the lock
+#include <cmath>					// std::sqrt - a bar's direction on a path
 
 // Project includes:
 #include "KFCID.h"
@@ -169,15 +173,98 @@ bool KFCHitMarkerRunPart(const IWaxRun* waxRun, int32& outCharStart, int32& outC
 	return true;
 }
 
-// The rectangle to invert in this run, in the run's own coordinates (what Draw is handed). False when the run gives
-// nothing to measure (no render data, no glyphs). AN INLINE MATCH GETS NO BOX, ON PURPOSE (the author's call): its
-// landing selects it - the anchor and the object with it, as Find Next does - and the marker is for a match that cannot
-// be selected. Not for want of a way to measure one: IInlineData::GetGlyphBoundingBox does.
+// What the marker fills in one run: its rectangle - or, for text on a path, one quadrilateral a character instead
+// (KFCHitMarkerShapeOnPath), the rectangle then what they reach. The ink bounds read the rectangle either way.
+struct KFCMarkShape
+{
+	PMRect					box;
+	K2Vector<PMPolygon4>	quads;
+};
+
+// A ZERO-WIDTH MARKER ON A PATH: a bar as tall as the character's quadrilateral and leaning the way it leans,
+// standing at the edge the place is at and running on in the reading direction - what the bar is on a straight
+// line, turned to the path. KCM's KCMStoryMarkerBarOf, where it was measured: the corners run with the text
+// whichever way up it stands - 0 start and top, 1 end and top, 2 end and bottom, 3 start and bottom.
+// after = at the character's far edge rather than its near one.
+PMPolygon4 KFCHitMarkerBarOf(const PMPolygon4& quad, bool after, const PMReal& width)
+{
+	const PMPoint top = quad[after ? 1 : 0];
+	const PMPoint bottom = quad[after ? 2 : 3];
+	// A character with no width has no top edge to read the direction off: square to its side instead.
+	double dx = ::ToDouble(quad[1].X() - quad[0].X());
+	double dy = ::ToDouble(quad[1].Y() - quad[0].Y());
+	if (dx == 0.0 && dy == 0.0)
+	{
+		dx = ::ToDouble(quad[3].Y() - quad[0].Y());
+		dy = ::ToDouble(quad[0].X() - quad[3].X());
+	}
+	const double length = std::sqrt(dx * dx + dy * dy);
+	const double scale = (length > 0.0) ? ::ToDouble(width) / length : 0.0;
+	const PMReal alongX = dx * scale;
+	const PMReal alongY = dy * scale;
+	PMPolygon4 bar;
+	bar[0] = top;
+	bar[1] = PMPoint(top.X() + alongX, top.Y() + alongY);
+	bar[2] = PMPoint(bottom.X() + alongX, bottom.Y() + alongY);
+	bar[3] = bottom;
+	return bar;
+}
+
+// TEXT ON A PATH (IWaxRun::IsTOPRun): the marked characters' own quadrilaterals.
+// ***** A STRAIGHT BOX CANNOT DO IT *****: such a run stands at the path's own origin and each glyph carries its
+// own matrix, so the run's x and the glyphs' widths are not where the characters are. Measured on 2026-11-07 (the
+// block 12 re-inspection - work/note-scripts/2026-11-07-kfc-block12, jump_mark_probe.cpp and live_slot.ps1): for
+// "cat" on an oval's text path the box came out at 0,-9.6 to 13.2,-0.2 and the characters' quadrilaterals at
+// 136,190 to 150,200 - on screen the marker went up on the oval's top-left corner, the words at its bottom.
+// IWaxRunShape::GetWaxBounds answers in the space Draw is handed ("Used mostly for selection and highlighting" -
+// IWaxRunShape.h); KCM's marker took this road first (KCMStoryMarkerBoxOnPath - KCM's M10 re-inspection: 4% of
+// its wash near the ink before, 99% after). A zero-width marker is a bar at its character's near edge - or at the
+// far edge of the one before it, when its own character gives no shape. False when the run gives no shape there.
+bool KFCHitMarkerShapeOnPath(const IWaxRun* waxRun, int32 charStart, int32 charCount, const PMReal& barWidth,
+	KFCMarkShape& out)
+{
+	InterfacePtr<const IWaxRunShape> shape(waxRun, UseDefaultIID());
+	if (shape == nil)
+		return false;
+	K2Vector<PMPolygon4> quads;
+	bool after = false;
+	shape->GetWaxBounds(charStart, (charCount > 0) ? charCount : 1, &quads);
+	if (quads.empty() && charCount == 0 && charStart > 0)
+	{
+		shape->GetWaxBounds(charStart - 1, 1, &quads);
+		after = true;
+	}
+	if (quads.empty())
+		return false;
+	if (charCount == 0)
+	{
+		const PMPolygon4 bar = KFCHitMarkerBarOf(after ? quads.back() : quads.front(), after, barWidth);
+		quads.clear();
+		quads.push_back(bar);
+	}
+	PMRect box = quads.front().GetContainingRect();
+	for (K2Vector<PMPolygon4>::const_iterator q = quads.begin(); q != quads.end(); ++q)
+		box.Union(q->GetContainingRect());
+	out.box = box;
+	out.quads.swap(quads);
+	return true;
+}
+
+// The shape to invert in this run, in the run's own coordinates (what Draw is handed): a rectangle, or - on a
+// path - one quadrilateral a character (KFCHitMarkerShapeOnPath). False when the run gives nothing to measure (no
+// render data, no glyphs). AN INLINE MATCH GETS NO BOX, ON PURPOSE (the author's call): its landing selects it -
+// the anchor and the object with it, as Find Next does - and the marker is for a match that cannot be selected.
+// Not for want of a way to measure one: IInlineData::GetGlyphBoundingBox does.
+// NOR DOES A TABLE'S CHARACTER, BY ITS NATURE: it has no glyph to lay the inversion on. Measured on 2026-11-07
+// (the same re-inspection): the run that holds a table's two characters gives no glyph for them
+// (QueryRunByTextOffset's glyph offset -1), and a locked table's landing drew nothing (no "MARKER draw" in the test
+// build's trace) - the view shows the table and the row's note, or the face's line, says why (the spec map's
+// TBL-20, TBL-63; KCM's SMK-26 records the same of its marks).
 // CHARACTERS ARE NOT GLYPHS. The range is mapped with MapCharsToGlyphs before any width
 // is added up - the call the product's spelling squiggle makes (DynamicSpellCheckAdornment.cpp), and
 // KCM's GetMarkBoxes after it.
 bool KFCHitMarkerBox(const IWaxRun* waxRun, const IWaxRenderData* renderData,
-	const IWaxGlyphs* waxGlyphs, PMRect& outBox)
+	const IWaxGlyphs* waxGlyphs, KFCMarkShape& out)
 {
 	if (waxRun == nil || renderData == nil || waxGlyphs == nil)
 		return false;
@@ -192,6 +279,10 @@ bool KFCHitMarkerBox(const IWaxRun* waxRun, const IWaxRenderData* renderData,
 	const int32 glyphCount = waxGlyphs->GetGlyphCount();
 	if (glyphCount <= 0)
 		return false;
+
+	const PMReal size = renderData->GetFontMatrix().GetYScale();
+	if (waxRun->IsTOPRun())
+		return KFCHitMarkerShapeOnPath(waxRun, charStart, charCount, size * PMReal(kCaretWidthFraction), out);
 
 	int32 glyphIndex = -1, glyphLength = 0;
 	waxGlyphs->MapCharsToGlyphs(charStart, (charCount > 0) ? charCount : 1, &glyphIndex, &glyphLength);
@@ -208,16 +299,16 @@ bool KFCHitMarkerBox(const IWaxRun* waxRun, const IWaxRenderData* renderData,
 	for (int32 i = glyphIndex; i < glyphIndex + glyphLength; ++i)
 		width += waxGlyphs->GetWidthAt(i);
 
-	const PMReal size = renderData->GetFontMatrix().GetYScale();
 	if (charCount == 0 || width <= 0.0)
 		width = size * PMReal(kCaretWidthFraction);	// a zero-width hit still has a place
 
 	const PMReal x = waxRun->GetXPosition() + offset;
 	const PMReal y = waxRun->GetYPosition();		// the baseline
-	outBox.Left(x);
-	outBox.Right(x + width);
-	outBox.Top(y - size * PMReal(kAscentFraction));
-	outBox.Bottom(y + size * PMReal(kDescentFraction));
+	out.quads.clear();
+	out.box.Left(x);
+	out.box.Right(x + width);
+	out.box.Top(y - size * PMReal(kAscentFraction));
+	out.box.Bottom(y + size * PMReal(kDescentFraction));
 	return true;
 }
 
@@ -271,9 +362,9 @@ public:
 	virtual void GetInkBounds(PMRect* inkBounds, const IWaxRun* waxRun,
 		const IWaxRenderData* renderData, const IWaxGlyphs* waxGlyphs)
 	{
-		PMRect box;
-		if (inkBounds != nil && KFCHitMarkerBox(waxRun, renderData, waxGlyphs, box))
-			*inkBounds = box;
+		KFCMarkShape shape;
+		if (inkBounds != nil && KFCHitMarkerBox(waxRun, renderData, waxGlyphs, shape))
+			*inkBounds = shape.box;
 	}
 
 	virtual void Draw(GraphicsData* gd, int32 iShapeFlags, const IWaxRun* waxRun,
@@ -296,10 +387,13 @@ public:
 			return;
 		}
 
-		PMRect box;
-		if (!KFCHitMarkerBox(waxRun, renderData, waxGlyphs, box))
+		KFCMarkShape shape;
+		if (!KFCHitMarkerBox(waxRun, renderData, waxGlyphs, shape))
 			return;
-		KFC_DIAG_LOG("MARKER draw flags=0x%x view=%d", (unsigned)iShapeFlags, gd->GetView() != nil ? 1 : 0);
+		KFC_DIAG_LOG("MARKER draw flags=0x%x view=%d quads=%d box=%.1f,%.1f %.1f,%.1f", (unsigned)iShapeFlags,
+			gd->GetView() != nil ? 1 : 0, (int)shape.quads.size(),
+			::ToDouble(shape.box.Left()), ::ToDouble(shape.box.Top()),
+			::ToDouble(shape.box.Right()), ::ToDouble(shape.box.Bottom()));
 
 		IGraphicsPort* gPort = gd->GetGraphicsPort();
 		if (gPort == nil)
@@ -311,7 +405,26 @@ public:
 		AutoGSave ag(gPort);
 		gPort->setblendingmode(kPMBlendDifference);
 		gPort->setrgbcolor(PMReal(1.0), PMReal(1.0), PMReal(1.0));
-		gPort->rectfill(box.Left(), box.Top(), box.Width(), box.Height());
+		if (shape.quads.empty())
+			gPort->rectfill(shape.box.Left(), shape.box.Top(), shape.box.Width(), shape.box.Height());
+		else
+		{
+			// TEXT ON A PATH - ONE PATH, ONE FILL. The quadrilaterals overlap where the path bends, and an
+			// inversion laid twice is no inversion: filled one by one (KCM's wash fills them so - opaque, it
+			// shows no overlap) the overlaps would come back un-inverted. Filled as one path under the
+			// non-zero rule (fill), every point inside is inverted once - the quadrilaterals all turn the
+			// same way, the text's.
+			gPort->newpath();
+			for (K2Vector<PMPolygon4>::const_iterator q = shape.quads.begin(); q != shape.quads.end(); ++q)
+			{
+				gPort->moveto((*q)[0].X(), (*q)[0].Y());
+				gPort->lineto((*q)[1].X(), (*q)[1].Y());
+				gPort->lineto((*q)[2].X(), (*q)[2].Y());
+				gPort->lineto((*q)[3].X(), (*q)[3].Y());
+				gPort->closepath();
+			}
+			gPort->fill();
+		}
 		gPort->newpath();
 	}
 

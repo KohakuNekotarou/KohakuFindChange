@@ -46,7 +46,7 @@
 ## 3. 行
 
 - **TBL-20** ★行は**文字の行**（表の文字＝`ITableTextContainer` の錨に立つ）。一致の部分に `2x2 <表スタイル>`（上書きがあれば ` +`）を描く＝`Hit::runChain`。ページ・ロック・非表示・overset・編集に付いていく・段の Copy／Clear はふつうの文字の行のまま。（T5）回帰 `tb-copy`・`tb-clear`・`tb-edit-moved`
-  - 訂正:
+  - 訂正: 2026-11-07（ブロック12 の再検査・D12-c）＝**ロックした表の行のクリックは、印を出さない**（「ふつうの文字の行のまま」のロックの扱いのうち、印だけは届かない＝表の錨の字に重ねる字形が無い・実測＝着地で印は1度も描かれなかった）＝表を窓の真ん中に見せ、選ばず、行の注が `That match is locked - it cannot be selected.` と言う（JMP-20）。回帰＝`tb-locked-row-nomark`。
 
 - **TBL-21** クリックと Next Result＝表の文字を選ぶ（本体で文字として選んだのと同じ）。文字のタブと同じに本体のタブの Search: を守る。（T5）回帰 `tb-click`・`tb-next`・`tb-click-native-scope`
   - 訂正:
@@ -90,7 +90,7 @@
   - 訂正:
 
 - **TBL-63** 着地＝行のクリックと同じ＝表の文字を選ぶ（Type ツール）。ロック＝見せて印、選ばない。非表示のスプレッド＝何も動かさない。overset・非表示のレイヤー＝選んで言う。理由は面の2行目。（F5）回帰 `tb-btn-locked`・`tb-btn-overset`・`tb-btn-hidden-layer`
-  - 訂正:
+  - 訂正: 2026-11-07（ブロック12 の再検査・D12-c）＝「ロック＝見せて印」の**印は出ない**（表の錨の字に重ねる字形が無い＝JMP-20）＝見せて（表を窓の真ん中に）、選ばず、面の2行目が `That table is locked - not selected.` と言う。それまでの回帰 `tb-btn-locked` は2行目と選択だけを見ていて、印が出たかは誰も測っていなかった。
 
 - **TBL-64** ★**Change**＝見つけた表に Change 側（1回の Ctrl+Z）。押せるのは見つけた表を選んでいて Change 側に何かあるとき＝選択を動かすと灰色（`ActiveSelectionObserver`＝選択が前の着地のままかを読む）・当てた後も灰色（本体の Text タブと同じ）。**Change/Find**＝当てて次へ（当てられなくても次へ・理由は2行目）。既にそのとおり・文書にその名前が無い・ロックは面の行で言う。（F6）回帰 `tb-btn-grey`・`tb-btn-change`・`tb-btn-change-find`・`tb-btn-change-as-asked`・`tb-btn-doc-closed`
   - 訂正:
@@ -102,13 +102,17 @@
   - 訂正: 11-07 ブロック9の再検査（D9-c）＝一覧の章を一覧が持つ UIDRef（文書のアドレス）で突き合わせていた（`KFCReplaceEngine::WriteFaceTables`）＝本の一覧で、検索の後に閉じた章のアドレスを後から開いた文書が受け取ると、その章の同じ UID の表の行まで `Styled` になった（書いていない表・ストーリーの版もその文書から取った）。→ 章の文書は今開いているものをファイルで引く（`KFCSearchEngine::ChapterDocNow`）。回帰 `tb-face-book-other-chapter`（6章の本の1章目を開き直して面の Change All＝RED は直す前のビルドで章3の行が `Styled`・記録で使い回しのアドレスを確かめた）
 
 - **TBL-67** 別の種類で窓を開いてから Table にしても押せる（列の大きさを支柱で持つ＝KOHAKU-02 と同じ守り）。走っている最中は断り、面の1行目で言う。（Review Focus）回帰 `tb-btn-after-another-kind`
+  - 訂正:
 
 ## 8. 表の行の一覧と Apply Cell Style（作者 11-05「テーブルを検索した後、ROWの一覧を作るのが欲しい。そのあとそのROWにSPオペレーションでセルスタイルを当てたい」＝設計書 `docs/superpowers/specs/2026-11-05-kfc-table-rows-cell-style-design.md` T1〜T11・コード＝`model/KFCTableRows.*`・`model/KFCReplaceEngine.cpp` の `kCellStyleOp`／`ApplyCellStyleRow`・`ui/KFCResultHistory.cpp` の `ListRowsOfTables`・`ui/KFCJump.cpp` の `TableOfRowAt`・`ui/KFCStyleMenu.*` の `kCellStyles`・回帰の表＝`work/kbs-regress/trw-cases.tsv`）
 
 - **TBL-70** ★Table の一覧の見出しの右クリック **List Rows of These Tables**＝一覧の表（Clear で外した行の表を除く）の行を、表ごとに上から1行ずつ新しい段に出す（`[Table Rows/Document]`・元の表の一覧は段として残る）。Table の一覧以外では灰色。行の語＝`Row <n>[ (header)| (footer)]: <セル> | <セル>`（n は1から・セルは24字・行は100字で切る）。上限 1000 行。ブックの閉じた章は開いて読んで閉じる・ほかの一覧の閉じた文書は名前を言って飛ばす。（T1〜T4）回帰 `trw-list`・`trw-list-grey`
+  - 訂正:
 - **TBL-71** ★行は**文字の行**＝その行に左上のあるセルの文字の範囲（`GetTextChunk`・11-05 実測で1行1続き・縦の結合は上の行だけ・表の中の表の文字は外の表の範囲の外）＋`Hit::tableUID`。左上のセルが1つも無い行は載せずに数えて言う。（T3）回帰 `trw-merged`
+  - 訂正:
 - **TBL-72** ★行のクリック＝**その行のセルを選ぶ**（`ITableSelectionSuite::SelectRows`＝11-05 実測で文字の選択は最初のセルに縮むため・結合で覆われた行は覆うセルを除く＝本体と同じ）。（T5）回帰 `trw-click`。★これは**行の**問い＝表の行の一覧が出ていても、面の Find Next（TBL-61）の着地は見つけた物（表の字・文字）を選ぶ。回帰 `trw-face-findnext`
   - 訂正: 2026-11-06（2.1.0 からの変更の再検査・ブロック12 の D12-a）＝それまでは「パネルの一覧が表の行の一覧か」で聞いていたため、表の行の一覧が出ている間は面の Table の Find Next が見つけた表を選ばなかった（表の字はどのセルにも無い）。
 - **TBL-73** ★行の Special Operations の一番上 **Apply Cell Style ▸**＝前面の文書のセルスタイル（パネルの並び・`[なし]` も・グループは `G:S`）。当てると選んだ行のセルに**名前で**当てる（その名前の無い文書の行は断って数える）・上書きは残り・スタイルの段落スタイルも当たる（DOM の `appliedCellStyle =` と同じ＝11-05 実測）・取り消し1段 `Apply Cell Style`・行の語 `Styled`。当てる行は書く時に範囲の頭の文字のセルの行を読み直す（後から行を足しても元の行に当たる）。ロックの行は灰色。編集した行は「cells edited since」で断る（一覧を作り直す）。文字の一覧の行のこの子メニューは空。（T6・T7）回帰 `trw-style`・`trw-style-all`・`trw-style-undo`・`trw-style-group`・`trw-style-twin`・`trw-style-twodocs`・`trw-style-after-insert`・`trw-style-nested`・`trw-style-locked`・`trw-menu-text-list`
+  - 訂正:
 - **TBL-74** 表の行の一覧は検索が作らない（Run の一覧と同じ）＝Replace・Narrow Down・Search These Results Again・Search This Story／Document Again・List Rows of These Tables は灰色・Special Operations の Clear Overrides／Create Outlines／Tate-chu-yoko も灰色（行は一致ではない）。Clear from Results・目玉は使える（Copy Rows は 2026-11-06 に撤去＝ROW-48）。（T8）回帰 `trw-list-again-grey`・`trw-replace-grey`・`trw-textops-grey`
   - 訂正:

@@ -55,6 +55,7 @@
 #include "IWaxLine.h"
 #include "IWaxRun.h"
 #include "IWaxGlyphs.h"
+#include "IWaxRunShape.h"			// GetWaxBounds - the characters of text on a path (PathChunkPasteboardRect)
 #include "IXMLUtils.h"				// GetBackingStore - a Story list's internal row: the XML structure's, said so (InternalStoryWhy)
 
 // General includes:
@@ -73,8 +74,10 @@
 #include "K2SmartPtr.h"				// K2::scoped_ptr
 #include "TransformUtils.h"			// InnerToPasteboardMatrix - an object row's item in pasteboard coordinates
 #include "PMPoint.h"
+#include "PMPolygon4.h"
 #include "PMRect.h"
 #include "PMMatrix.h"
+#include "K2Vector.h"
 
 // Project includes:
 #include "KFCJump.h"
@@ -207,8 +210,59 @@ namespace
 		return true;
 	}
 
+	// TEXT ON A PATH (IWaxRun::IsTOPRun): the pasteboard rectangle round the characters of [from, to) that a
+	// line's runs on a path hold - false when none of them holds any (the straight reading below then).
+	// ***** THE ESCAPEMENT THROUGH THE RUN'S MATRIX IS NOT WHERE THEY ARE *****: such a run stands at the path's
+	// own origin and each glyph carries its own matrix. Measured on 2026-11-07 (the block 12 re-inspection -
+	// work/note-scripts/2026-11-07-kfc-block12, jump_mark_probe.cpp and live_slot.ps1): the rectangle the
+	// straight reading made for "cat" on an oval's text path was the oval's top-left corner, the words at its
+	// bottom about 240 pt away - at 400% a row's click selected the words and left them off the screen, the view
+	// centred on the corner. The characters' quadrilaterals instead (IWaxRunShape::GetWaxBounds - the marker's
+	// shape too, KFCHitMarker.cpp), given in the space the line draws in and taken through the LINE's
+	// to-pasteboard matrix: so taken they fell on the glyphs (and on the DOM's places of the characters); through
+	// the run's matrix they come out off by the run's own y.
+	bool PathChunkPasteboardRect(const IWaxLine* waxLine, TextIndex from, TextIndex to, PMRect& outRect)
+	{
+		const PMMatrix toPasteboard = waxLine->GetToPasteboardMatrix();
+		bool any = false;
+		PMReal minX(0.0), minY(0.0), maxX(0.0), maxY(0.0);
+		const int32 runs = waxLine->GetRunCount();
+		for (int32 r = 0; r < runs; ++r)
+		{
+			InterfacePtr<IWaxRun> run(waxLine->QueryRun(r));
+			if (run == nil || !run->IsTOPRun())
+				continue;
+			const TextIndex runStart = run->TextOrigin();
+			const TextIndex runEnd = runStart + run->GetCharCount();
+			const TextIndex a = (from > runStart) ? from : runStart;
+			const TextIndex b = (to < runEnd) ? to : runEnd;
+			if (b <= a)
+				continue;
+			InterfacePtr<IWaxRunShape> shape(run, UseDefaultIID());
+			if (shape == nil)
+				continue;
+			K2Vector<PMPolygon4> quads;
+			shape->GetWaxBounds(static_cast<int32>(a - runStart), static_cast<int32>(b - a), &quads);
+			for (K2Vector<PMPolygon4>::const_iterator q = quads.begin(); q != quads.end(); ++q)
+				for (int32 c = 0; c < 4; ++c)
+				{
+					PMPoint p = (*q)[c];
+					toPasteboard.Transform(&p);
+					if (!any || p.X() < minX) minX = p.X();
+					if (!any || p.X() > maxX) maxX = p.X();
+					if (!any || p.Y() < minY) minY = p.Y();
+					if (!any || p.Y() > maxY) maxY = p.Y();
+					any = true;
+				}
+		}
+		if (any)
+			outRect = PMRect(minX, minY, maxX, maxY);
+		return any;
+	}
+
 	// Pasteboard rectangle around the FIRST chunk of the match [start, end): the part on the wax
 	// line containing 'start'. Returns false if the position is overset or geometry is unavailable.
+	// Text on a path is read off its characters' own shapes (PathChunkPasteboardRect, above).
 	//
 	// Assumes the caller has already run RecomposeIfDamaged on this story - the wax read below is a
 	// reading of the composition, and so is the overset test the caller made before choosing to come
@@ -239,6 +293,9 @@ namespace
 		if (chunkEnd > lineEnd) chunkEnd = lineEnd;
 		if (chunkEnd <= start)  chunkEnd = start + 1;
 		const int32 offEnd = static_cast<int32>(chunkEnd - lineOrigin);
+
+		if (PathChunkPasteboardRect(waxLine, start, chunkEnd, outRect))
+			return true;		// text on a path - its characters' own shapes (above)
 
 		PMReal xLeft = 0, xRight = 0;
 		PMMatrix mLeft, mRight;

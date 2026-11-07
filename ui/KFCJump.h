@@ -93,7 +93,10 @@ namespace KFCJump
 	bool LandOnQRCode(const UIDRef& frameRef, int32 reach, PMString& outNote);
 
 	/** THE FACE'S FIND NEXT LANDS - Table's (docs/superpowers/specs/2026-11-01-kfc-kohaku-trial-fixes-design.md F5), Ruby's and Kenten's (2026-11-02-kfc-kohaku-face-buttons-design.md B4): as its row's click lands - its document in front, the view on it, [start, end) selected
-	    (a table's character, or the text). `reach` = what keeps it from being selected (kKFCQRReach* bits): locked = shown and marked, not selected; on a hidden spread = nothing moves; overset or on a hidden layer = selected, and said.
+	    (a table's character, or the text). `reach` = what keeps it from being selected (kKFCQRReach* bits):
+    locked = shown and marked, not selected (text is marked; a table's character has no glyph to mark - the view
+    shows the table and the line says why: KFCHitMarker.cpp); on a hidden spread = nothing moves; overset or on a
+    hidden layer = selected, and said.
 	    `what` names it in what is said ("table", "text"). outNote = the face's second line for all of them. outSelected = it is selected now. */
 	void LandOnPlace(const UIDRef& storyRef, TextIndex start, TextIndex end, int32 reach, const char* what, PMString& outNote, bool& outSelected);
 
