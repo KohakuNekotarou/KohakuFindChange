@@ -49,6 +49,7 @@
 // Project includes:
 #include "KFCAppBarSearchEnter.h"
 #include "KFCBookPanelLookup.h"	// QueryPanelManager
+#include "KFCJump.h"			// IsLanding - a landing under way turns Return's search away (RunPendingSearch)
 #include "KFCKohakuTab.h"		// YieldToTextSearch - the Kohaku+ tab steps aside for Return's Text search
 #include "KFCModelAccess.h"		// KFCRuns()->SetQuery - the Find/Change settings are the model half's
 #include "KFCResultTree.h"		// ShowStatus - a query that could not be set is said
@@ -468,10 +469,25 @@ static uint32 RunPendingSearch(void* /*refPtr*/)
 	if (panelMgr != nil && !panelMgr->IsPanelWithWidgetIDShown(kKFCPanelWidgetID))
 		panelMgr->ShowPanelByWidgetID(kKFCPanelWidgetID, kFalse);
 
+	// NOTHING OF FIND/CHANGE IS CHANGED FOR A SEARCH ITS DOOR TURNS AWAY - while a landing or a run of KFC's is
+	// under way (the list's keys ask the same two - KFCResultTreeEH.cpp). This runs at an idle, and an idle callback
+	// can come inside a landing's or a run's message loop (KFCBookWatch.cpp's note): there, the field's text put on
+	// the Text tab was left on Find/Change by a search the door then dropped (landing-appbar-return), and is the
+	// query a row's Replace walks and writes with once the closed chapter it is opening is open (its query is
+	// checked before it opens one). The search is still asked for: the door below drops it, or says why - as it
+	// does a menu's.
+	bool underWay = KFCJump::IsLanding() || KFCRuns()->IsAnyRunning();
+#ifdef KFC_DIAG
+	// (Test builds only) Fault switch appbar-busy-off: not asked, the old way (bar-landing-return-armed).
+	if (KFC_DIAG_FAULT("appbar-busy-off"))
+		underWay = false;
+	KFC_DIAG_LOG("APPBARRUN units=%d underway=%d", static_cast<int>(text.size()), underWay ? 1 : 0);
+#endif
+
 	// KFC's Kohaku+ tab steps aside (as for a saved query that states a tab of its own - until its face is shown
 	// again): while it is Find/Change's tab, this panel's Find lists its kind. (Asked after the shutdown test: the
 	// model is not asked anything once the session is going.)
-	if (KFCIsKohakuQueryMode(KFCRuns()->CurrentSearchMode()))
+	if (!underWay && KFCIsKohakuQueryMode(KFCRuns()->CurrentSearchMode()))
 		KFCKohakuTab::YieldToTextSearch();
 
 	// The field's text on the Text tab, that tab made Find/Change's - unless it is that tab already and holds the
@@ -479,7 +495,7 @@ static uint32 RunPendingSearch(void* /*refPtr*/)
 	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
 	const bool asIs = opts != nil && opts->GetSearchMode() == IFindChangeOptions::kTextSearch
 		&& TextTabFindWhat(opts) == text;
-	if (!asIs)
+	if (!underWay && !asIs)
 	{
 		// No key: the wchar_t constructor makes a string Translate leaves alone (PMString.h - for strings that are not
 		// keys; wchar_t is UTF-16 here), the header's form in place of SetTranslatable(kFalse).
@@ -632,6 +648,21 @@ void KFCMirrorAppBarFieldNow()
 	MirrorFindChangeIntoField();
 #endif
 }
+
+#ifdef KFC_DIAG
+void KFCDiagRunAppBarSearchNow()
+{
+#ifdef WINDOWS
+	// (Test builds only - the fault switch landing-appbar-return, KFCDiag.h) What a Return in the field books, run at
+	// once with the field's text - from inside a landing (ui/KFCJump.cpp's JumpToHit), whose message loop can run it.
+	const HWND field = AppBarField();
+	sPendingText = (field != nullptr) ? FieldText(field) : std::wstring();
+	KFC_DIAG_LOG("APPBARRUN fault landing-appbar-return: the booked search inside the landing, units=%d",
+		static_cast<int>(sPendingText.size()));
+	(void)RunPendingSearch(nil);
+#endif
+}
+#endif
 
 // The observer that keeps the field following the dialog. An AddIn onto kActiveContextBoss under its own IID
 // (KFCUI.fr), as the panel-visibility and Book-panel observers are: that boss carries observers that are not

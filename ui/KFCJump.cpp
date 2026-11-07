@@ -85,6 +85,7 @@
 #include "KFCModelAccess.h"		// the model half, through its session interfaces (the model/UI split)
 #include "KFCBookPanelLookup.h"		// BringBookTabForward - a book row's tab
 #include "KFCResultTree.h"			// RefreshRows / ShowStatus - telling the panel what was found here
+#include "KFCAppBarSearchEnter.h"	// KFCDiagRunAppBarSearchNow - a test build's fault switch landing-appbar-return
 #include "KFCDiag.h"				// KFC_DIAG_LOG / KFC_DIAG_FAULT - test builds only
 #include "IKFCUIServices.h"			// CountDocWindows - a document's layout windows (W2, W3)
 #include <chrono>					// how soon after a click Search: changed (KeepSearchScopeAfterClick)
@@ -1490,6 +1491,11 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx, NotSelected& outWhy)
 		const bool wrote = KFCResultTree::ReplaceRows(KFCRowsByChapter(1, KFCChapterRows(chapterIdx, hitIdx)));
 		KFC_DIAG_LOG("FAULT landing-return: the row's Replace inside the landing wrote=%d", wrote ? 1 : 0);
 	}
+	// (Fault switch landing-appbar-return, the same - the Application Bar's booked search, which the same loop can
+	// run at an idle, run here with the field's text. It must leave Find/Change as it was: its door drops it -
+	// RunPendingSearch.)
+	if (KFC_DIAG_FAULT("landing-appbar-return"))
+		KFCDiagRunAppBarSearchNow();
 #endif
 
 	// A CLICK LEAVES ITS ROW'S MATCH SELECTED, OR NOTHING (the author's call: whatever Search: is, as Find Next does).

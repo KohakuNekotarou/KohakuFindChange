@@ -124,6 +124,13 @@
 //                inside the landing's dirty guard, is marked clean when the landing ends, and the next landing's
 //                Hide Previous Chapter sweep closes it unsaved - the case that shows the written-document check
 //                catching it (landing-return-armed)
+//    landing-appbar-return  (UI half) ui/KFCJump.cpp's JumpToHit runs the Application Bar's booked search
+//                (ui/KFCAppBarSearchEnter.cpp's RunPendingSearch) with the field's text once its window is in
+//                front - the booked search a landing's message loop can run at an idle: Find/Change is left as it
+//                was, the search dropped by its door (bar-landing-return)
+//    appbar-busy-off  (UI half) RunPendingSearch puts the field's text on the Text tab without asking whether a
+//                landing or a run of KFC's is under way, the old way: with landing-appbar-return the dropped search
+//                leaves Find/Change on the Text tab (bar-landing-return-armed)
 //    select-all-expand-once  (UI half) Select All Rows opens the rows under its row with one ITreeViewMgr::ExpandNode with
 //                all its descendants, the old way (ui/KFCResultTreeController.cpp): on a book result as the search left it -
 //                the book row open, its chapters closed - the rows under them would be selected and not drawn, and Return,

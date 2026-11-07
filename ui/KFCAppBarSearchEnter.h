@@ -13,7 +13,9 @@
 //      reported - when a menu is used), unless the person is in the field (the WRITE-BACK - a WH_CALLWNDPROCRET hook);
 //    . Return in the field searches with this panel instead of Adobe Stock / Help - A TEXT SEARCH, whatever tab the
 //      dialog is on: the field's text put on the Text tab and that tab made Find/Change's (KFCSearchEngine::SetQuery),
-//      KFC's Kohaku+ tab stepped aside first (KFCKohakuTab::YieldToTextSearch).
+//      KFC's Kohaku+ tab stepped aside first (KFCKohakuTab::YieldToTextSearch). Not while a landing or a run of
+//      KFC's is under way: Find/Change is then left as it is, and the search's door drops it or says why, as it does
+//      a menu's (RunPendingSearch).
 //    (Until 2026-11-07 the field showed the query of the tab the dialog was on - the glyph on Glyph, the character type
 //     on Transliterate, nothing on KFC's Kohaku+ tab (QR-22) - and Return searched on the Text and GREP tabs alone,
 //     said why on the others, and listed the Kohaku+ tab's kind there.)
@@ -86,5 +88,11 @@ bool	KFCFindChangeChangeWords(PMString& outWords);
 // change of tab that sends no notification of Find/Change's settings: the write-back's hold let go. Nothing while the
 // link is off.
 void	KFCMirrorAppBarFieldNow();
+
+#ifdef KFC_DIAG
+// (Test builds only) What a Return in the field books, run at once with the field's text - the fault switch
+// landing-appbar-return's, from inside a landing (ui/KFCJump.cpp).
+void	KFCDiagRunAppBarSearchNow();
+#endif
 
 #endif // __KFCAppBarSearchEnter_h__
