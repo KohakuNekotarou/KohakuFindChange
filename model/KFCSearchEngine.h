@@ -375,8 +375,9 @@ namespace KFCSearchEngine
 
 	/** Put `text` into Edit > Find/Change on the tab `mode` names - IFindChangeOptions::kTextSearch or
 	    kGrepSearch, nothing else: that tab made current, and its Find what set to `text`. For "Link the
-	    Application Bar's Search Field to This Panel" (the author's design): Return in that field on the
-	    Text or GREP tab - the tab the dialog is on - with text that differs from the tab's.
+	    Application Bar's Search Field to This Panel" (the author's design): Return in that field puts its text on
+	    the Text tab, whatever tab the dialog is on (the author's call of 2026-11-07 - until then on the Text or GREP
+	    tab the dialog was on).
 	    Through the dialog's own commands, kFindSearchModeCmdBoss and kFindStringCmdBoss, in the shape
 	    SnpFindAndReplace gives them (ProcessFindChangeCommandInt32 / ProcessFindChangeCommandString) - so the
 	    dialog shows what will be searched, and the search that follows reads it like any other. The other

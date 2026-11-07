@@ -94,7 +94,7 @@ git log -p -- docs/spec-map/        # コミット済みの書き込み
 | 12 | [フライアウトと設定の保存](12-menus-settings.md)（項目の並び・灰色の規則・右クリックメニュー（4種類の行）・ショートカット・保存するもの／しないもの・JSON の置き場・選んだ文書のトグル・外した Keep Previous Results） | `SET-` | 4・5・3 | ✅ |
 | 13 | [窓の工夫（Windows）― Translucent Panel・Translucent Find/Change・Minimizable Find/Change](13-windows.md)（薄さと戻り方・効く場所・影・浮いた組・ダイアログの見つけ方・最小化ボタンとタスクバー・後始末） | `WIN-` | 14・15 | ✅ |
 | 14 | [ブックパネルの位置を覚える（Remember Book Panel Placement）](14-book-panel.md)（測る瞬間・戻す瞬間・浮いているとき・ドックの隣で覚える・放り出されたとき・ホーム画面・選択を読む） | `BPP-` | 16・11 | ✅ |
-| 15 | [アプリケーションバーの検索欄（Link the Application Bar's Search Field to This Panel）](15-app-bar.md)（欄に映すもの・書き戻し・Return で検索・テキストと正規表現だけ・見えないとき） | `BAR-` | 17 | ✅ |
+| 15 | [アプリケーションバーの検索欄（Link the Application Bar's Search Field to This Panel）](15-app-bar.md)（欄に映すもの・書き戻し・Return で検索・どのタブでもテキスト（11-07）・見えないとき） | `BAR-` | 17 | ✅ |
 | 16 | [保存したクエリを順に実行（Run Saved Queries...）](16-queries.md)（入口・モードレスのダイアログ・左の一覧・右の並びとボタン・並びのファイル・Runs on: の行・Run・Find（1本ずつ検索して段に積む）） | `QRY-` | 19・18 | ✅（2026-10-07） |
 | 17 | [オブジェクトの検索（Object タブ）](17-objects.md)（4つの機能・本体の照合・範囲・歩き方・選択を戻す・行の形・クリック・行の置換と断る順・Undo・指紋・Change All in Book・クエリの実行・版・文書の中の Cancel・まとめて選ぶ・まとめて置換する） | `OBJ-` | ―（未記入） | ✅（2026-10-10・1.4.0／2026-10-11・10-13 追記） |
 | 29 | [開いている文書を一覧にする（Kohaku+ タブの Find: Document・窓なしの文書）](29-document.md)（窓なしの文書を探す・面と一覧・Special Operations・ブックの行の Open Without a Window） | `DOC-` | — | ⬜（2026-11-06・試験を書いて実機待ち） |

@@ -107,6 +107,7 @@ const int32 kEntriesInAStory = 5;
 bool gShown = false;		// the face is shown - from its AutoAttach to its AutoDetach
 bool gClosedOnIt = false;	// the dialog closed with the face shown - until the face is shown again
 bool gYield = false;		// a saved query loaded since states its own tab (YieldToSavedQuery) - until the face is shown again, or Find: picked
+							// (the Application Bar's Return searching the Text tab the same - YieldToTextSearch)
 bool gStated = false;		// a saved query of this tab's Find is under way (StateQuery) - until EndStatedFind
 int32 gStatedScope = IWalkerScopeFactoryUtils::kDocumentScope;	// ...over this Search:
 IPMUnknown* gShownFace = nil;	// the face, while shown - from its AutoAttach to its AutoDetach (not AddRef'd): a query stated with it shown writes its widgets
@@ -2094,6 +2095,12 @@ void KFCKohakuTab::YieldToSavedQuery()
 {
 	gYield = true;
 	KFC_DIAG_LOG("%s yield (a saved query states its own tab)", KindWord());
+}
+
+void KFCKohakuTab::YieldToTextSearch()
+{
+	gYield = true;
+	KFC_DIAG_LOG("%s yield (the Application Bar's Return searches the Text tab)", KindWord());
 }
 
 bool KFCKohakuTab::OffersQuery(const KFCKohakuQueryData& query)

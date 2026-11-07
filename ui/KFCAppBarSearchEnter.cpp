@@ -49,6 +49,7 @@
 // Project includes:
 #include "KFCAppBarSearchEnter.h"
 #include "KFCBookPanelLookup.h"	// QueryPanelManager
+#include "KFCKohakuTab.h"		// YieldToTextSearch - the Kohaku+ tab steps aside for Return's Text search
 #include "KFCModelAccess.h"		// KFCRuns()->SetQuery - the Find/Change settings are the model half's
 #include "KFCResultTree.h"		// ShowStatus - a query that could not be set is said
 #include "KFCUIID.h"			// kKFCSearchBookActionID, kKFCPanelWidgetID
@@ -184,13 +185,15 @@ static std::wstring FieldText(HWND field)
 }
 
 // THE FIELD SHOWS WHAT EDIT > FIND/CHANGE HOLDS (the author's design).
-// While the toggle is ON, the field carries the query of the tab the dialog is on - the find string of Text and
-// GREP, the glyph of Glyph, the character type of Transliterate - and follows it as it changes (Object and
-// Colour, which this panel does not search, leave the field alone). Measured in a spike (branch
+// While the toggle is ON, the field carries THE TEXT TAB'S FIND WHAT, whatever tab the dialog is on (the
+// author's call of 2026-11-07: "whatever tab it is on, a Text search - show the Text input"; Return is a Text
+// search too, RunPendingSearch) - and follows it as it changes. (Until that day it carried the query of the tab
+// the dialog was on - the find string of Text and GREP, the glyph of Glyph, the character type of
+// Transliterate, Object and Colour left alone, nothing on KFC's Kohaku+ tab.) Measured in a spike (branch
 // spike/2026-10-03-appbar-mirror): a settings change arrives on IID_IFINDCHANGEOPTIONS for every keystroke in
 // Find what, not only at Done; the field's usual "Adobe Stock" is real text in the Edit (so a cue banner shows
-// only while the field is focused and empty), and WM_SETTEXT shows at once. InDesign's own text written into the
-// field again is written over (the write-back - see the second hook, above).
+// only while the field is focused and empty), and WM_SETTEXT shows at once. InDesign's own text written into
+// the field again is written over (the write-back - see the second hook, above).
 // (A design that took the tab from the field's triangle - Adobe Stock = Text, Adobe Help = GREP - was dropped
 //  once the field showed the dialog's own query. What it measured stays in the note:
 //  kSessionBoss's IID_IBOOLDATA, kStockSearchPrefImpl, is true for Adobe HELP.)
@@ -386,20 +389,22 @@ static HWND AppBarField()
 	return sField;
 }
 
-// Write the dialog's query into the field. Only what changed is written: an unchanged write would still move
-// the caret of a field the user is in. True = it wrote.
+// The Text tab's Find what, as the field shows it and as Return compares the field with it.
+static std::wstring TextTabFindWhat(const IFindChangeOptions* opts)
+{
+	return (opts != nil) ? WideOf(PMString(opts->GetFindString(IFindChangeOptions::kTextSearch))) : std::wstring();
+}
+
+// Write the Text tab's Find what into the field - whatever tab the dialog is on (above). Only what changed is
+// written: an unchanged write would still move the caret of a field the user is in. True = it wrote.
 static bool MirrorFindChangeIntoField()
 {
 	if (sShutdown || !sAppBarSearchEnter)
 		return false;
-	// THE QR CODE TAB (KFCKohakuTab - QR-22): the field shows nothing - the tab has no query in words, and a Return
-	// there lists the QR codes whatever is typed (RunPendingSearch).
-	const int32 ownTab = KFCRuns()->CurrentSearchMode();		// (the Table, Ruby, Kenten and Warichu kinds' the same: no query in words)
-	const bool qrTab = KFCIsKohakuQueryMode(ownTab);
-	PMString query;
-	if (!qrTab && !KFCFindChangeQueryWords(query))
-		return false;	// Object, Colour: not this panel's
-	const std::wstring text = qrTab ? std::wstring() : WideOf(query);
+	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
+	if (opts == nil)
+		return false;
+	const std::wstring text = TextTabFindWhat(opts);
 	const HWND field = AppBarField();
 	if (field == nullptr || FieldText(field) == text)
 		return false;
@@ -452,46 +457,34 @@ static uint32 RunPendingSearch(void* /*refPtr*/)
 {
 	std::wstring text;
 	text.swap(sPendingText);
-	if (sShutdown || !sAppBarSearchEnter)
-		return IIdleTask::kEndOfTime;
-	// THE QR CODE TAB (QR-22): its Return lists the QR codes - the field's text is not used (it shows nothing
-	// there), so an empty field searches too, and nothing is put into Find/Change. (Asked after the shutdown test: the
-	// model is not asked anything once the session is going.)
-	const int32 ownTab = KFCRuns()->CurrentSearchMode();		// (the Table, Ruby, Kenten and Warichu kinds' the same: its Return lists what they find)
-	const bool qrTab = KFCIsKohakuQueryMode(ownTab);
-	if (text.empty() && !qrTab)
+	if (sShutdown || !sAppBarSearchEnter || text.empty())
 		return IIdleTask::kEndOfTime;
 
-	// Return searches on the Text and GREP tabs only - the author's call at the first live check (not the dialog's
-	// own query searched on every other tab). On the others the Return is still stopped (no
-	// browser) and nothing runs; the status line says why - only while the panel is up: ShowStatus also keeps
-	// the line for the panel's next show, where it would stand in place of the last search's report. The panel
-	// is not opened for it. (And on KFC's QR Code tab, above.)
-	InterfacePtr<IPanelMgr> panelMgr(KFCBookPanelLookup::QueryPanelManager());
-	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
-	const IFindChangeOptions::SearchMode mode = (opts != nil) ? opts->GetSearchMode() : IFindChangeOptions::kTextSearch;
-	if (!qrTab && mode != IFindChangeOptions::kTextSearch && mode != IFindChangeOptions::kGrepSearch)
-	{
-		if (panelMgr != nil && panelMgr->IsPanelWithWidgetIDShown(kKFCPanelWidgetID))
-		{
-			KFCResultTree::ShowStatus("Application Bar link: Return searches on the Text and GREP tabs only"
-				" - nothing was searched.");
-		}
-		return IIdleTask::kEndOfTime;
-	}
-
+	// A TEXT SEARCH, WHATEVER TAB FIND/CHANGE IS ON (the author's call of 2026-11-07 - the field shows the Text
+	// tab's Find what, MirrorFindChangeIntoField). Until that day Return searched on the Text and GREP tabs alone,
+	// said on the others that nothing was searched, and listed the kind of KFC's Kohaku+ tab there (QR-22).
 	// The panel up first, so the rows the search draws are seen (kFalse = the key focus stays where it is).
+	InterfacePtr<IPanelMgr> panelMgr(KFCBookPanelLookup::QueryPanelManager());
 	if (panelMgr != nil && !panelMgr->IsPanelWithWidgetIDShown(kKFCPanelWidgetID))
 		panelMgr->ShowPanelByWidgetID(kKFCPanelWidgetID, kFalse);
 
-	// The field's text goes into the dialog only when it differs from what the tab already holds (the field
-	// shows that, so an untouched field changes nothing). Never on the QR Code tab (above).
-	if (!qrTab && (opts == nil || WideOf(opts->GetFindString(mode)) != text))
+	// KFC's Kohaku+ tab steps aside (as for a saved query that states a tab of its own - until its face is shown
+	// again): while it is Find/Change's tab, this panel's Find lists its kind. (Asked after the shutdown test: the
+	// model is not asked anything once the session is going.)
+	if (KFCIsKohakuQueryMode(KFCRuns()->CurrentSearchMode()))
+		KFCKohakuTab::YieldToTextSearch();
+
+	// The field's text on the Text tab, that tab made Find/Change's - unless it is that tab already and holds the
+	// text (the field shows it, so an untouched field on the Text tab changes nothing).
+	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
+	const bool asIs = opts != nil && opts->GetSearchMode() == IFindChangeOptions::kTextSearch
+		&& TextTabFindWhat(opts) == text;
+	if (!asIs)
 	{
 		// No key: the wchar_t constructor makes a string Translate leaves alone (PMString.h - for strings that are not
 		// keys; wchar_t is UTF-16 here), the header's form in place of SetTranslatable(kFalse).
 		const PMString query(text.c_str(), text.size());
-		if (!KFCRuns()->SetQuery(query, mode))
+		if (!KFCRuns()->SetQuery(query, IFindChangeOptions::kTextSearch))
 		{
 			KFCResultTree::ShowStatus("The Application Bar's text could not be put into Find/Change"
 				" - nothing was searched.");
@@ -523,9 +516,10 @@ static LRESULT CALLBACK AppBarGetMsgProc(int code, WPARAM wParam, LPARAM lParam)
 			&& ::GetKeyState(VK_SHIFT) >= 0 && ::GetKeyState(VK_CONTROL) >= 0 && ::GetKeyState(VK_MENU) >= 0
 			&& IsAppBarSearchField(m->hwnd))
 		{
+			// (An empty field is left to InDesign on every tab - KFC's Kohaku+ tab's Return listed its kind from
+			// an empty field until 2026-11-07, QR-22: Return is a Text search now, RunPendingSearch.)
 			const std::wstring text = FieldText(m->hwnd);
-			// (an empty field too on KFC's QR Code tab, whose Return lists the QR codes - QR-22)
-			if (!text.empty() || KFCRuns()->CurrentSearchMode() >= kKFCQRCodeSearchMode)		// (an own tab's mode: KFCModelTypes.h)
+			if (!text.empty())
 			{
 				m->message = WM_NULL;
 				const bool repeat = (m->lParam & 0x40000000) != 0;	// the previous key state: already down
@@ -588,8 +582,9 @@ static bool TabWords(PMString& outWords, bool changeSide)
 	outWords.SetTranslatable(kFalse);
 #ifdef WINDOWS
 	// InDesign's OWN tab - the mode Find/Change is in, also while KFC's QR Code tab is shown (its mode is still the tab shown
-	// before it): the callers ask about the QR Code tab themselves (the field shows nothing there; a tier is named [QR Code]),
-	// and a list's name is read against the query held on InDesign's tab (KFCResultHistory::HeldQueryLabel).
+	// before it): the callers ask about the QR Code tab themselves (a tier is named [QR Code]), and a list's name is
+	// read against the query held on InDesign's tab (KFCResultHistory::HeldQueryLabel). (Not the field's: it shows
+	// the Text tab's Find what since 2026-11-07 - MirrorFindChangeIntoField.)
 	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
 	if (opts == nil)
 		return false;

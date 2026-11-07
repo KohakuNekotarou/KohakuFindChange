@@ -7,16 +7,16 @@
 //  "Link the Application Bar's Search Field to This Panel" - the flyout toggle (the author's design). While
 //  it is ON, the search field of InDesign's APPLICATION BAR (the one with the Adobe Stock / Adobe Help
 //  triangle) and Edit > Find/Change work as one:
-//    . the field SHOWS the query of the tab the dialog is on, and follows it as it is typed (Text / GREP: the
-//      find string; Glyph: the glyph; Transliterate: the character type; Object / Colour: left alone) - and puts
-//      it back when InDesign writes its own "Adobe Stock" there (as it builds the field at startup and - the user
+//    . the field SHOWS THE TEXT TAB'S FIND WHAT, whatever tab the dialog is on (the author's call of 2026-11-07:
+//      "whatever tab it is on, a Text search - show the Text input"), and follows it as it is typed - and puts it
+//      back when InDesign writes its own "Adobe Stock" there (as it builds the field at startup and - the user
 //      reported - when a menu is used), unless the person is in the field (the WRITE-BACK - a WH_CALLWNDPROCRET hook);
-//    . Return in the field searches with this panel instead of Adobe Stock / Help - on the Text and GREP tabs
-//      only, the field's text put into that tab first when it differs (KFCSearchEngine::SetQuery). On the
-//      other tabs Return is still stopped but nothing is searched; the status line says so while the panel
-//      is up (the author's call at the first live check - not the dialog's query searched there).
-//    . On KFC's own QR Code tab (KFCKohakuTab - QR-22) the field shows nothing, and Return - an empty field's
-//      too - lists the QR codes; what was typed is not used and nothing is put into Find/Change.
+//    . Return in the field searches with this panel instead of Adobe Stock / Help - A TEXT SEARCH, whatever tab the
+//      dialog is on: the field's text put on the Text tab and that tab made Find/Change's (KFCSearchEngine::SetQuery),
+//      KFC's Kohaku+ tab stepped aside first (KFCKohakuTab::YieldToTextSearch).
+//    (Until 2026-11-07 the field showed the query of the tab the dialog was on - the glyph on Glyph, the character type
+//     on Transliterate, nothing on KFC's Kohaku+ tab (QR-22) - and Return searched on the Text and GREP tabs alone,
+//     said why on the others, and listed the Kohaku+ tab's kind there.)
 //  (The triangle does not choose the tab - a design tried and dropped.)
 //  OFF by default; OFF = the field is not touched at all.
 //
@@ -69,11 +69,12 @@ bool16	KFCApplyAppBarSearchEnter();
 // .pln - neither may outlive it.
 void	KFCShutdownAppBarSearchEnter();
 
-// THE QUERY OF THE TAB FIND/CHANGE IS ON, AS WORDS - what the field shows while the link is on (Text / GREP: the find
-// string; Glyph: the glyph, its id and its font; Transliterate: the character type, in InDesign's own words) and the Find
-// part of a tier's name (KFCResultHistory::QueryLabel). false for a tab with nothing to say in words (Object, Colour) -
-// and on Mac, where none of this is built. Whether the link is on or not. The tab is InDesign's own - the mode Find/Change
-// is in, also while KFC's QR Code tab is shown (the callers ask about that tab first: it has no words).
+// THE QUERY OF THE TAB FIND/CHANGE IS ON, AS WORDS (Text / GREP: the find string; Glyph: the glyph, its id and
+// its font; Transliterate: the character type, in InDesign's own words) - the Find part of a tier's name
+// (KFCResultHistory::QueryLabel); what the field showed until 2026-11-07 (the Text tab's Find what now,
+// whatever the tab). false for a tab with nothing to say in words (Object, Colour) - and on Mac, where none of
+// this is built. The tab is InDesign's own - the mode Find/Change is in, also while KFC's QR Code tab is shown
+// (the callers ask about that tab first: it has no words).
 bool	KFCFindChangeQueryWords(PMString& outWords);
 
 // ...AND ITS CHANGE SIDE, the same words for what the tab changes to (Text / GREP: the change string; Glyph: the change
@@ -81,9 +82,9 @@ bool	KFCFindChangeQueryWords(PMString& outWords);
 // Change box (a change that deletes the match). false where KFCFindChangeQueryWords is false.
 bool	KFCFindChangeChangeWords(PMString& outWords);
 
-// THE FIELD WRITTEN AGAIN FROM THE TAB FIND/CHANGE IS ON, NOW - for a change of tab that sends no notification of
-// Find/Change's settings: KFC's QR Code face shown (KFCKohakuTab, whose field shows nothing - QR-22). Nothing while
-// the link is off.
+// THE FIELD WRITTEN AGAIN FROM THE TEXT TAB'S FIND WHAT, NOW - asked as KFC's Kohaku+ face is shown (KFCKohakuTab), a
+// change of tab that sends no notification of Find/Change's settings: the write-back's hold let go. Nothing while the
+// link is off.
 void	KFCMirrorAppBarFieldNow();
 
 #endif // __KFCAppBarSearchEnter_h__

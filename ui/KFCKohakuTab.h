@@ -86,6 +86,11 @@ namespace KFCKohakuTab
 	    the Find searches what the query says. */
 	void YieldToSavedQuery();
 
+	/** THE APPLICATION BAR'S RETURN IS A TEXT SEARCH (KFCAppBarSearchEnter - the author's call of 2026-11-07:
+	    Text whatever the tab): the Kohaku tab steps aside as for a saved query, until the person shows its face
+	    again or picks in its Find: - the Find that follows searches the Text tab. */
+	void YieldToTextSearch();
+
 	/** IS THE QUERY'S KIND ONE THIS INDESIGN OFFERS (Ruby and Kenten: a Japanese InDesign's)? */
 	bool OffersQuery(const KFCKohakuQueryData& query);
 
