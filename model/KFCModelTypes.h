@@ -410,7 +410,8 @@ struct KFCRubyListWhy
 		kUnreadable,	// it could not be read
 		kNotText,		// not text in UTF-8, UTF-16 or Shift_JIS
 		kNoReading,		// line `line` has a mark with no reading
-		kBadMark,		// line `line` has a reading with no kanji just before it and no bar where its base starts
+		kBadMark,		// line `line` has a reading with no base just before it (a run of one kind - kanji, kana,
+						// letters or digits) and no bar where its base starts
 		kTwoReadings,	// line `line` gives the word of line `otherLine` another reading
 		kNoWords,		// it holds no words
 		kNoModel		// the model half is not there to read it (the UI half's stand-in): its English words stand

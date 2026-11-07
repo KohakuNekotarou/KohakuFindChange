@@ -281,7 +281,7 @@
   まとめて選んだ行の1つなら選んだ行すべて・文書をまたいでも1つの取り消しの段（Edit メニューの名前 `Tate-chu-yoko`）。1行ずつの扉は Clear Overrides と同じ（REP-40）。**灰色**＝押せる行が1つも無いとき（SET-11）。
   文＝`Set tate-chu-yoko on ID:262 #3.`／1行の断り `Tate-chu-yoko: <理由>`（例 `Tate-chu-yoko: the match is already tate-chu-yoko - left as it is.`）。
   回帰＝`tcy-cases.tsv`（14件）・`wr-tcy`。（作り＝`KFCReplaceEngine::TcyHits`＝Clear Overrides と1つの芯 `TextRowOp`。）
-  - 訂正:
+  - 訂正: ★2026-11-07 作者の決定（判断待ち⑩・「SPOPのけん、でないように」）＝**ルビ・圏点の一覧の行には Tate-chu-yoko を出さない**（メニューを出す直前に足さない＝灰色でなく無い・`IKFCResults::ListIsRubyOrKenten`・境界の版 59）。上の「ルビ・圏点・割注の行にも出る」のうち、割注の行は今のまま出る。回帰＝`tcy-ruby-row`・`tcy-kenten-row`（項目が無いこと）。
 
 ---
 

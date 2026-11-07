@@ -108,12 +108,14 @@ void PopRowMenu(const char* menuName, IEvent* e, IPMUnknown* widget)
 		return;
 	// TATE-CHU-YOKO, A JAPANESE INDESIGN'S ALONE (docs/superpowers/specs/2026-11-02-kfc-warichu-tcy-design.md B1): on a text row's Special Operations as its menu pops, or taken off - asked
 	// each time, so a test build's fault switch not-japanese answers too. Taken off first, then put once (the SDK's AEMUIStartupShutdown.cpp's way: never twice on the menu).
+	// NOT OVER A RUBY OR A KENTEN LIST'S ROWS (2026-11-07 - the author, waiting question 10: "the SP OP one,
+	// not to show").
 	if (std::strcmp(menuName, kKFCResultHitMenuName) == 0)
 	{
 		PMString path(kKFCHitSpecialOpsSubmenuPath);
 		path.SetTranslatable(kFalse);
 		menuMgr->RemoveMenuItem(path, kKFCTcyTextActionID);
-		if (KFCKohakuTab::IsJapaneseUI())
+		if (KFCKohakuTab::IsJapaneseUI() && !KFCResults()->ListIsRubyOrKenten())
 			menuMgr->AddMenuItem(kKFCTcyTextActionID, path, kKFCTcyTextMenuItemPosition, kFalse);
 		// EDIT IN STORY EDITOR (2026-11-06 - the author: "a document made hidden, its stories searched - opened in the Story Editor, only the story is edited"): over a
 		// Story row - its own story's, not an internal one's (the XML structure's - no story a person writes) - taken off first, then put, as Tate-chu-yoko.

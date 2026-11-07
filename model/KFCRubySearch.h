@@ -8,7 +8,8 @@
 //  beside the story (IRubyAttrStrand) and InDesign's Find/Change has no condition for it, nor a change format for its reading. While KFC's own tab in
 //  Edit > Find/Change - "Ruby" - is the tab Find/Change is on (IsTabCurrent), the panel's Find lists the text with ruby (its base and its reading each "contains"), or
 //  the occurrences of a text without ruby, or - Ruby Marks in Text - ruby a manuscript wrote out: a bar, a base, and its reading in book title marks, as Aozora Bunko writes it (the bar
-//  full-width or ASCII; with none, the kanji just before the reading - KFCRubyMarkText.h), or - Words in a Ruby List - the words of a file, each with the readings its line gives it (KFCRubyList.h).
+//  full-width or ASCII; with none, the run of one kind just before the reading, as Aozora Bunko - KFCRubyMarkText.h),
+//  or - Words in a Ruby List - the words of a file, each with the readings its line gives it (KFCRubyList.h).
 //  A row is a TEXT row on the ruby's run (on the mark); what it draws there is the base and the reading
 //  (Hit::runChain - "base<reading>"; a mark's row draws its text - Hit::upper the reading above it).
 //  Its Replace gives the row what the tab's Change boxes say (KFCRubyChangePlan.h - WritePlan), and takes its ruby off when they read nothing (Remove below - KFCReplaceEngine's own-tab rows). A reading a

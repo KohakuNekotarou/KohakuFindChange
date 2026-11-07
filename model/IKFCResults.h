@@ -170,6 +170,10 @@ public:
 	/** = KFCResultModel::ListIsDocuments (appended - revision 56, docs/superpowers/specs/2026-11-06-kfc-windowless-documents-design.md W3): the list is a
 	    Document list - a row a document (kKFCHolderDocument), hanging off the list's top (or the book row), not off a document row. */
 	virtual bool ListIsDocuments() = 0;
+	/** = KFCResultModel::ListIsRuby || ListIsKenten (appended - revision 59, 2026-11-07: the author's answer to waiting
+	    question 10, "the SP OP one, not to show"): the live list is the Ruby or the Kenten kind's - a text row's
+	    Special Operations leaves Tate-chu-yoko off there (KFCResultNodeEH's PopRowMenu). */
+	virtual bool ListIsRubyOrKenten() = 0;
 };
 
 #endif // __IKFCResults_h__

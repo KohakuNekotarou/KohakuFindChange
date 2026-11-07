@@ -6,8 +6,10 @@
 //
 //  RUBY WRITTEN OUT IN TEXT, AS A MANUSCRIPT WRITES IT: a bar, a base, and its reading in book title marks - Aozora Bunko's way
 //  (https://www.aozora.gr.jp/annotation/etc.html) - read one way for the text of a document (Ruby Marks in Text, KFCRubySearch) and a
-//  ruby list's lines (KFCRubyList.h). NARROWER THAN AOZORA BUNKO ON PURPOSE: with no bar it takes one script's run for a base, and here
-//  kanji alone are a base with no bar - the marks of a book's title in a body text would read as ruby over the kana before them.
+//  ruby list's lines (KFCRubyList.h). WITH NO BAR, AOZORA BUNKO'S RULE (the author's call, 2026-11-07): the run of
+//  one kind of character just before the reading is the base (BaseKindOf). Until then kanji alone were, narrower on
+//  purpose: the marks of a book's title in a body text read as ruby over the kana before them now - such a row is
+//  left unchosen (the How to Use page says so).
 //  STD ONLY: its test runs outside InDesign (work/note-scripts/2026-11-02-kfc-ruby-list/list_test.ps1).
 //
 //========================================================================================
@@ -36,6 +38,27 @@ namespace KFCRubyMarkText
 			|| c == 0x3005 || c == 0x3006 || c == 0x3007 || c == 0x30F6;
 	}
 
+	/** THE KINDS A BASE WITH NO BAR IS A RUN OF (Aozora Bunko's, 2026-11-07): kanji (IsKanji); hiragana with its
+	    iteration marks; katakana with the prolonged sound mark and its iteration marks (U+30F6 is kanji's, above);
+	    full-width letters and digits; ASCII letters and digits. Anything else - a bracket, a space, the middle dot,
+	    half-width katakana - is no base: a bar says where such a base starts. */
+	enum BaseKind { kNoBase = 0, kKanjiBase, kHiraganaBase, kKatakanaBase, kFullWidthBase, kAsciiBase };
+
+	inline BaseKind BaseKindOf(char32_t c)
+	{
+		if (IsKanji(c))
+			return kKanjiBase;
+		if ((c >= 0x3041 && c <= 0x3096) || c == 0x309D || c == 0x309E)
+			return kHiraganaBase;
+		if ((c >= 0x30A1 && c <= 0x30FA) || c == 0x30FC || c == 0x30FD || c == 0x30FE)
+			return kKatakanaBase;
+		if ((c >= 0xFF10 && c <= 0xFF19) || (c >= 0xFF21 && c <= 0xFF3A) || (c >= 0xFF41 && c <= 0xFF5A))
+			return kFullWidthBase;
+		if ((c >= 0x30 && c <= 0x39) || (c >= 0x41 && c <= 0x5A) || (c >= 0x61 && c <= 0x7A))
+			return kAsciiBase;
+		return kNoBase;
+	}
+
 	/** No mark runs over these: a paragraph's end, a table's or an anchor's character, anything of InDesign's in the text. */
 	inline bool StopsMark(char32_t c)
 	{
@@ -51,7 +74,7 @@ namespace KFCRubyMarkText
 	};
 
 	/** THE MARK WHOSE READING OPENS AT `open`, if it is one: a reading of something, closed before the line ends, after a base - the text from a bar since the last mark (the bar's reach), or else the
-	    kanji just before it. */
+	    run of one kind just before it (BaseKindOf). */
 	inline bool MarkAtOpen(const std::u32string& text, size_t open, MarkPlace& out)
 	{
 		size_t close = open + 1;
@@ -71,13 +94,14 @@ namespace KFCRubyMarkText
 		}
 		else
 		{
-			size_t kanji = open;
-			while (kanji > 0 && IsKanji(text[kanji - 1]))
-				--kanji;
-			if (kanji == open)
+			const BaseKind kind = (open > 0) ? BaseKindOf(text[open - 1]) : kNoBase;
+			size_t base = open;
+			while (kind != kNoBase && base > 0 && BaseKindOf(text[base - 1]) == kind)
+				--base;
+			if (base == open)
 				return false;		// not the base of anything
-			out.first = kanji;
-			out.baseStart = kanji;
+			out.first = base;
+			out.baseStart = base;
 		}
 		out.open = open;
 		out.close = close;

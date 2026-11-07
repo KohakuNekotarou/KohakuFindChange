@@ -109,7 +109,9 @@ DECLARE_PMID(kInterfaceIDSpace, IID_IKFCUIBOUNDARY, kKFCPrefix + 14)
 // (58, 2026-11-07: KFCNotifyPayload gained kKeptDocumentRow and its row, the type KFCDocumentRowWords - a Find:
 //  Document row's words made again when its document is saved as another file, in a grey tier as well: block 11's
 //  D11-a.)
-#define kKFCBoundaryRevision	"58"
+// (59, 2026-11-07: IKFCResults::ListIsRubyOrKenten appended - a Ruby or Kenten list's text rows go without Special
+//  Operations > Tate-chu-yoko: the author's answer to waiting question 10.)
+#define kKFCBoundaryRevision	"59"
 #define kKFCBoundaryStamp		kKFCVersion "/" kKFCBoundaryRevision
 
 #endif // __KFCBoundaryID_h__

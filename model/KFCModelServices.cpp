@@ -110,6 +110,7 @@ public:
 	virtual bool ListIsTableRows() { return KFCResultModel::ListIsTableRows(); }
 	virtual int32 GetHitHolderKind(int32 chapterIdx, int32 hitIdx) { return KFCResultModel::GetHitHolderKind(chapterIdx, hitIdx); }
 	virtual bool ListIsDocuments() { return KFCResultModel::ListIsDocuments(); }
+	virtual bool ListIsRubyOrKenten() { return KFCResultModel::ListIsRuby() || KFCResultModel::ListIsKenten(); }
 };
 
 CREATE_PMINTERFACE(KFCResultsSession, kKFCResultsImpl)

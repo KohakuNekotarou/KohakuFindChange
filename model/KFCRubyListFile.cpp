@@ -134,7 +134,8 @@ bool KFCRubyListFile::Load(const PMString& path, std::shared_ptr<const KFCRubyLi
 				code = KFCRubyListWhy::kNoReading;
 				break;
 			case KFCRubyList::kBadMark:
-				outWhy.Append(": a reading needs kanji just before it, or a bar where its base starts.");
+				outWhy.Append(": a reading needs kanji, kana, letters or digits just before it,"
+					" or a bar where its base starts.");
 				code = KFCRubyListWhy::kBadMark;
 				break;
 			default:

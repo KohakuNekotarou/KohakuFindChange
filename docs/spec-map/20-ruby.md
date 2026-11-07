@@ -90,7 +90,7 @@
 ## 6. 原稿の印からルビ（Ruby Marks in Text）
 
 - **RUBY-50** ★`Find:` の3つ目。青空文庫の書き方＝`｜漢字《かんじ》`（バーは全角・半角）、バーが無ければ《の直前の漢字（々〆〇ヶを含む）。読みが空・行をまたぐ・親文字が無いものは印でない。★□の欄は隠れ、入っている字では絞らない（作者 11-02「入力欄は必要なのかな？いらなければ、非表示にできれば非表示に」＝読みは印にあり、省きたい印は行を Replace しなければよい）。行は印の範囲（字はふつうの行のまま）。段の名前＝`[Ruby/Document] Find:"[Ruby Marks]"`。（R12）回帰 `rb-marks-no-boxes`・`rb-marks-list`・`rb-marks-not`・`rb-marks-base`・`rb-marks-reading`・`rb-marks-face`
-  - 訂正:
+  - 訂正: ★2026-11-07 作者の決定（判断待ち⑨・「そのように」→問いに「青空文庫の決まりに広げる」）＝**バーが無ければ、《の直前に続く同じ種類の字が親文字**＝漢字（々〆〇ヶを含む）・ひらがな（ゝゞを含む）・カタカナ（ー・ヽヾを含む）・全角の英数字・半角の英数字（`KFCRubyMarkText::BaseKindOf`）。記号・空白・中黒・半角カナの直後の《》は印でない（バーが要る）。ルビ印もルビ一覧の行も同じ口（`MarkAtOpen`）。⚠書名の括弧に《》を使う本文も、直前がかなや英字なら印として一覧に出る＝行を選ばずに Replace（How to Use のルビの窓に1文）。回帰＝`rb-marks-kinds`・`rb-marks-kinds-replace`・`rb-marks-not`（あ《x》は印になった）・単体 `list_test.ps1` の L1b。
 
 - **RUBY-51** ★Replace＝読みを親文字に付け（グループルビ）、印を文字から消す。Change 側は見ない（欄は隠れる）。文字が動くので同じ文書の他の行を運ぶ（`MarksWrite::WriteChapter`＝`OutlineInChapter` の型）。書いた行は親文字に立ち、`Changed`＋`親文字《読み》`。もう一度は「既にそのとおり」。全部で Ctrl+Z 1回＝文字も行も戻る。（R12）回帰 `rb-marks-replace-one`・`rb-marks-replace-all`・`rb-marks-undo`・`rb-marks-again`・`rb-marks-cell`・`rb-marks-book`
   - 訂正:
@@ -109,10 +109,10 @@
   - 訂正:
 
 - **RUBY-60** ★Look For: の4つ目。**Choose List...**（面の右の列＝RUBY-03・他の Look For では灰色＝作者 11-02）でファイルを選ぶ＝1行1語・Ruby Marks in Text と同じ印で書く（`太《た》郎《ろう》`・`太《ふと》る`・`漢字《かんじ》`・`｜食べ物《たべもの》`）。印を除いた字を探し、印の字にだけ付ける（`太《ふと》る`＝太るを探して太にだけ＝作者 11-02）。ファイルでは `＜＜ ＞＞`・`<< >>`・`≪ ≫` も印。空行と `#` の行は飛ばす・CSV とタブ区切りは1列目・UTF-8／UTF-16／Shift_JIS。□の欄は隠れ、`Ruby List:` の右にファイル名、面の1行目に「N words.」か断りの文（KOHAKU-37）。★11-04 作者「ルビ一覧のときコメントが表示されますが、日本語にして欲しい」＝**面の文は日本語**＝「5語を読みました。」／「Choose List... でファイルを選んでください。」／「ファイルを読めません。」／「UTF-8・UTF-16・Shift_JIS のどれでもありません。」／「3行目に読みがありません。」／「3行目の《》の前に、漢字か｜がありません。」／「3行目の語に、1行目と違う読みがあります。」（おかしい行が2つ以上なら「（おかしい行は全部でN行）」）／「語がありません。」＝ファイル名は「一覧:」の横にあるので文に入れない。モデルは事実だけ返す（`IKFCRuns::RubyListFacts`＝`KFCRubyListWhy`・境界の版 45）・パネルの文は英語のまま。★同じ回に**ルビ印の面にも説明**（作者「ルビ印の時にもコメント欲しいかも」）＝面の2行に「本文の｜漢字《かんじ》のような印を探します。」「Replace や Change で、親文字にルビを付けて印を消します。」（ほかの文が出ている間は出さない・Look For を変えると消える）。回帰 `rb-list-msg`・`rb-list-msg-leaves`・`rb-marks-face`。（L1〜L4・L7・L10）回帰 `rb-list-face`・`rb-list-cp932`・`rb-list-msg`
-  - 訂正:
+  - 訂正: ★2026-11-07（判断待ち⑨＝青空文庫の決まり・RUBY-50 の訂正）＝読めない印の行の文は「3行目の《》の前に、漢字・かな・英数字か｜がありません。」（パネルの英語＝`a reading needs kanji, kana, letters or digits just before it, or a bar where its base starts.`）。
 
 - **RUBY-61** ★読めない行が1行でもあればファイルを使わない＝最初の行の番号を言う（印が無い／読みが読めない／同じ語に違う読み＝両方の行）。ファイルを選んでいなければ断る。（L3・L5）回帰 `rb-list-nofile`・`rb-list-bad-line`・`rb-list-bad-mark`・`rb-list-other-reading`
-  - 訂正:
+  - 訂正: ★2026-11-07（判断待ち⑨＝青空文庫の決まり）＝`かな《かな》` の行は読める語になった（`rb-list-kana-word`）。読めない印の例は `「猫」《ねこ》`（`rb-list-bad-mark` のリストを替えた）。
 
 - **RUBY-62** ★Find in … ＝語の出現を全部（Occurrences: が All のとき＝RUBY-65）。**長い語が勝つ**（ファイルの順によらない）。行の上の段に**付く読みを薄く**。段の名前＝`[Ruby/Document] Find:"[Ruby List] 名前.txt"`。★すでにルビが1字でも掛かっている出現は行にせず数を言う（`N already had ruby and are not listed.`＝上書きしない）。隠した条件・削除・ノートの中は出さない。選択範囲は丸ごと入るものだけ。上限 1000。（L6・L9）回帰 `rb-list-find`・`rb-list-longest`・`rb-list-selection`・`rb-list-selection-cut`
   - 訂正:

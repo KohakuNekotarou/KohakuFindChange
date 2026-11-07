@@ -1274,7 +1274,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCLabelNoteWidgetID, kKFCPrefix + 97)
 #define kKFCNarrowOnPasteboardMenuItemPosition	6.0		// On Pasteboard
 #define kKFCNarrowPagesMenuItemPosition			7.0		// Pages...
 #define kKFCNarrowWithOverridesMenuItemPosition	8.0		// With Overrides
-// Special Operations, in abc order (an object row's whole; a text row's holds Clear Overrides, Create Outlines and - in a Japanese InDesign - Tate-chu-yoko).
+// Special Operations, in abc order (an object row's whole; a text row's holds Clear Overrides, Create Outlines and -
+// in a Japanese InDesign - Tate-chu-yoko, not over a Ruby or a Kenten list's rows: 2026-11-07).
 #define kKFCTcyTextMenuItemPosition				9.0		// Tate-chu-yoko (a text row's menu - its own path; after Create Outlines' 3.0)
 #define kKFCApplyObjStyleSubmenuPosition		0.5		// Apply Object Style > (2026-11-05 - first in abc order)
 #define kKFCApplyCellStyleSubmenuPosition		0.5		// Apply Cell Style > (a text row's menu - its own path; first in abc order)

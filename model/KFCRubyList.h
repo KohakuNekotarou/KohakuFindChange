@@ -9,7 +9,8 @@
 //  the characters its mark says - no columns, which could not tell a reading over the kanji of a word from one over the whole of it. A mark's marks may be written in three more ways here, where nothing
 //  else stands to be taken for them. Blank lines and # lines pass; of a CSV or a tab-separated line, the first cell.
 //  THE LONGEST WORD AT A PLACE WINS, whatever the file's order; a word with two readings is said, with both lines - nothing tells which.
-//  STD ONLY: its test runs outside InDesign (work/note-scripts/2026-11-02-kfc-ruby-list/list_test.ps1).
+//  STD ONLY but for the SDK's int32 (Readings' counts, 11-03 - its test names that one): the test runs outside InDesign
+//  (work/note-scripts/2026-11-02-kfc-ruby-list/list_test.ps1).
 //
 //========================================================================================
 
@@ -43,7 +44,8 @@ namespace KFCRubyList
 	{
 		kOk = 0,
 		kNoReading,		// a line with no mark in it
-		kBadMark,		// a mark no reading can be read from: not closed, empty, a bar left over, kana before it with no bar
+		kBadMark,		// a mark no reading can be read from: not closed, empty, a bar left over, no base before it
+						// with no bar (a bracket, a space - KFCRubyMarkText::BaseKindOf)
 		kOtherReading	// a word an earlier line gives another reading
 	};
 
