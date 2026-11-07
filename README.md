@@ -5,11 +5,6 @@ Searches the front document, or every chapter of the active book (.indb) at once
 ## Adobe Exchange
 https://exchange.adobe.com/apps/cc/205698/kohakufindchange
 
-1.2.0 から、SDK の求めに従い**2本1組**です（`KohakuFindChange.pln`＝検索・置換、
-`KohakuFindChangeUI.pln`＝パネル。それぞれの `(… Resources)` フォルダーとともに入れてください）。
-1.0.0 から更新すると、割り当てたキーボードショートカットとパネルの位置がリセットされます
-（ウィンドウ > Kohaku Plug-Ins > Kohaku Find/Change から開き直してください）。
-
 ## Official binaries / 公式バイナリ
 
 The only official builds are the ones distributed through **Adobe Exchange** above.
