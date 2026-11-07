@@ -248,8 +248,8 @@ const wchar_t* const kHowToEN =
 	L"- ON: InDesign's own Book panel opens where it was and at the size it was (collapsed to icons, if it was) when it was last closed. This is recorded when a book is closed and when InDesign quits.\n"
 	L"\n"
 	L"[The application bar's search field (Link the Application Bar's Search Field to This Panel)]\n"
-	L"- ON: the search field on InDesign's application bar (the Adobe Stock / Adobe Help one) shows the find string of Find/Change's Text tab, whichever tab Find/Change is on.\n"
-	L"- Return in the field searches with KFC instead of opening a browser (Adobe Stock / Adobe Help): the field's text is put into Find/Change's Text tab first, and the search is a Text search, whichever tab Find/Change is on.";
+	L"- ON: the search field on InDesign's application bar (the Adobe Stock / Adobe Help one) shows the find string of Find/Change's Text tab.\n"
+	L"- Return in the field puts the field's text into Find/Change's Text tab and then searches, instead of opening a browser (Adobe Stock / Adobe Help).";
 
 const wchar_t* const kHowToJA =
 	L"【免責】 どのような問題が起こっても責任を取れません。ご利用は自己責任でお願いします。\n"
@@ -335,8 +335,8 @@ const wchar_t* const kHowToJA =
 	L"・ON にすると、InDesign 本体のブックパネルが、前回閉じたときの位置と大きさ（アイコン化していたらアイコンのまま）で開きます。これは、ブックを閉じたときと InDesign を終了したときに記録します。\n"
 	L"\n"
 	L"【アプリケーションバーの検索欄（Link the Application Bar's Search Field to This Panel）】\n"
-	L"・ON にすると、InDesign 本体のアプリケーションバーの検索欄（Adobe Stock／Adobe Help の検索欄）に、「検索と置換」のテキストタブの検索文字列を表示します。どのタブを選んでいても同じです。\n"
-	L"・検索欄で Enter を押すと、ブラウザ（Adobe Stock／Adobe Help）を開かずに、KFC で検索します。欄の文字を「検索と置換」のテキストタブに入れてから検索します。どのタブを選んでいても、テキストの検索になります。";
+	L"・ON にすると、InDesign 本体のアプリケーションバーの検索欄（Adobe Stock／Adobe Help の検索欄）に、「検索と置換」のテキストタブの検索文字列を表示します。\n"
+	L"・検索欄で Enter を押すと、ブラウザ（Adobe Stock／Adobe Help）を開かずに欄の文字を「検索と置換」のテキストタブに入れてから検索します。";
 
 // RUN SCRIPT'S HELP... (the author, 11-06: "the // lines explain it now - put in a Help button and explain it there" -
 // docs/superpowers/specs/2026-11-06-kfc-label-spelling-runscript-design.md RH1, RH3; UXP through app.doScript - the author: "if you want
