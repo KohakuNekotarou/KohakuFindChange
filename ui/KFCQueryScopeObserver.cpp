@@ -11,10 +11,12 @@
 //  stands while it is closed: the line then went on naming the document in front when the dialog opened, and Run
 //  would have run on another (measured - spec map QRY-18).
 //
-//  THE SDK'S SHAPE FOR IT: an ActiveSelectionObserver under an IID of its own (IID_IKFCQUERYSCOPEOBSERVER - the
-//  dialog boss's IID_IOBSERVER is the dialog's observer), attached and detached by the dialog's observer as the dialog
-//  opens and closes, as the product's ConditionStaticTextView.cpp drives its selection observer from its own attach
-//  and detach. (No IControlViewObservers would do it on its own: kDialogBoss aggregates none.) The Find/Change
+//  THE SDK'S SHAPE FOR IT: an ActiveSelectionObserver under the SDK's IID_ISELECTIONOBSERVER (widgetid.h - the dialog
+//  boss's IID_IOBSERVER is the dialog's observer): the IID the product gives a selection observer beside a boss's
+//  IID_IOBSERVER (the Layers, Links and Conditional Text panels' bosses, and kObjectExportOptionsDlgBoss, a dialog's;
+//  kDialogBoss carries none), attached and detached by the dialog's observer as the dialog opens and closes, as the
+//  product's ConditionStaticTextView.cpp drives its selection observer from its own attach and detach. (No
+//  IControlViewObservers would do it on its own: kDialogBoss aggregates none.) The Find/Change
 //  settings arrive through their subject, as the panel's observer hears them
 //  (KFCPanelTitle::AttachToFindChangeOptions). Asked on every caret step, as the panel's observer asks: the line is
 //  written only when its words change (KFCQueryDialog.cpp's ShowRunScope), and the words are the model's quick
@@ -26,6 +28,7 @@
 
 // Interface includes:
 #include "TextWalkerServiceProviderID.h"	// IID_IFINDCHANGEOPTIONS - the protocol the settings' changes arrive on
+#include "widgetid.h"						// IID_ISELECTIONOBSERVER - this observer's IID on the dialog's boss
 
 // General includes:
 #include "SelectionObserver.h"				// ActiveSelectionObserver - the front document's selection, followed
@@ -42,7 +45,7 @@ class KFCQueryScopeObserver : public ActiveSelectionObserver
 {
 public:
 	KFCQueryScopeObserver(IPMUnknown* boss) :
-		ActiveSelectionObserver(boss, IID_IKFCQUERYSCOPEOBSERVER), fAttached(false)
+		ActiveSelectionObserver(boss, IID_ISELECTIONOBSERVER), fAttached(false)
 	{
 	}
 	virtual ~KFCQueryScopeObserver() {}
@@ -58,7 +61,7 @@ public:
 		// The selection first - SelectionObserver.h asks for the inherited method before a subclass attaches to
 		// anything of its own.
 		ActiveSelectionObserver::AutoAttach();
-		KFCPanelTitle::AttachToFindChangeOptions(this, true, IID_IKFCQUERYSCOPEOBSERVER);
+		KFCPanelTitle::AttachToFindChangeOptions(this, true, IID_ISELECTIONOBSERVER);
 		KFC_DIAG_LOG("QUERYSCOPE attached");
 	}
 
@@ -67,7 +70,7 @@ public:
 		if (!fAttached)
 			return;
 		fAttached = false;
-		KFCPanelTitle::AttachToFindChangeOptions(this, false, IID_IKFCQUERYSCOPEOBSERVER);
+		KFCPanelTitle::AttachToFindChangeOptions(this, false, IID_ISELECTIONOBSERVER);
 		// The selection last - the mirror of AutoAttach (SelectionObserver.h).
 		ActiveSelectionObserver::AutoDetach();
 		KFC_DIAG_LOG("QUERYSCOPE detached");

@@ -513,8 +513,8 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	 * but Close, and the two lists' selections (KFCQueryDialog.cpp's AutoAttach names them). That observer REPLACES the
 	 * stock CDialogObserver that kDialogBoss carries and calls it, so Cancel (Close) and the close box keep working -
 	 * basicdialog's BscDlgDialogObserver is the same shape - but takes Run (OK) itself. The scope observer beside it
-	 * follows what the Runs on: line is made of while the dialog is open (KFCQueryScopeObserver.cpp - its own IID:
-	 * IID_IOBSERVER is the dialog's observer's), attached and detached by that observer.
+	 * follows what the Runs on: line is made of while the dialog is open (KFCQueryScopeObserver.cpp - the SDK's
+	 * IID_ISELECTIONOBSERVER, as the product's bosses carry one beside IID_IOBSERVER), attached and detached by it.
 	 */
 	Class
 	{
@@ -523,7 +523,7 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 		{
 			IID_IDIALOGCONTROLLER, kKFCQueryDialogControllerImpl,
 			IID_IOBSERVER, kKFCQueryDialogObserverImpl,
-			IID_IKFCQUERYSCOPEOBSERVER, kKFCQueryScopeObserverImpl,
+			IID_ISELECTIONOBSERVER, kKFCQueryScopeObserverImpl,
 		}
 	},
 

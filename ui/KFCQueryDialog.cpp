@@ -629,7 +629,7 @@ public:
 			this->AttachToWidget(kLists[i], IID_ITREEVIEWCONTROLLER, panel);
 		// ...and the Runs on: line's own follower beside this observer (KFCQueryScopeObserver.cpp): attached last and
 		// detached first, as the product's ConditionStaticTextView.cpp drives its selection observer.
-		InterfacePtr<IObserver> scopeObserver(this, IID_IKFCQUERYSCOPEOBSERVER);
+		InterfacePtr<IObserver> scopeObserver(this, IID_ISELECTIONOBSERVER);
 		if (scopeObserver != nil)
 			scopeObserver->AutoAttach();
 	}
@@ -640,7 +640,7 @@ public:
 		InterfacePtr<IPanelControlData> panel(this, UseDefaultIID());
 		if (panel != nil)
 		{
-			InterfacePtr<IObserver> scopeObserver(this, IID_IKFCQUERYSCOPEOBSERVER);
+			InterfacePtr<IObserver> scopeObserver(this, IID_ISELECTIONOBSERVER);
 			if (scopeObserver != nil)
 				scopeObserver->AutoDetach();
 			for (size_t i = 0; i < sizeof(kOrderButtons) / sizeof(kOrderButtons[0]); ++i)

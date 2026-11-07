@@ -148,10 +148,10 @@ DECLARE_PMID(kInterfaceIDSpace, IID_IKFCSTATUSTEXTDATA, kKFCUIPrefix + 9)
 // (KFCAppBarSearchEnter.cpp). Its own IID for the reason the two observers above have one: an AddIn onto
 // kActiveContextBoss.
 DECLARE_PMID(kInterfaceIDSpace, IID_IKFCAPPBARMIRROROBSERVER, kKFCUIPrefix + 10)
-// The query dialog's scope observer (KFCQueryScopeObserver.cpp): it follows what the Runs on: line is made of while the
-// dialog is open. Its own IID: it sits on the dialog's boss beside the dialog's observer (IID_IOBSERVER), which
-// attaches and detaches it. + 11: the next after the highest spent.
-DECLARE_PMID(kInterfaceIDSpace, IID_IKFCQUERYSCOPEOBSERVER, kKFCUIPrefix + 11)
+// RETIRED (not reused): the query dialog's scope observer's own IID (2026-10-23 - 11-08). The observer sits on the
+// dialog's own boss beside the dialog's observer, which an IID of the SDK's is for - IID_ISELECTIONOBSERVER
+// (widgetid.h), as the product's bosses carry theirs (KFCQueryScopeObserver.cpp says where).
+//DECLARE_PMID(kInterfaceIDSpace, IID_IKFCQUERYSCOPEOBSERVER, kKFCUIPrefix + 11)
 // The Kohaku tab's face following the selection while it is shown (KFCKohakuTab.cpp - the Table part's Change greys as the selection leaves what Find Next found): an
 // ActiveSelectionObserver under an IID of its own, beside the face's own observer of its widgets.
 DECLARE_PMID(kInterfaceIDSpace, IID_IKFCKOHAKUSELECTIONOBSERVER, kKFCUIPrefix + 12)
