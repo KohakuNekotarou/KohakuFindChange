@@ -16,7 +16,11 @@
 #include "IFindChangeCmdData.h"
 #include "IFindChangeOptions.h"
 #include "IFindChangeService.h"		// FindChangeResult
+#include "ITableModel.h"			// a row that names a table: where its table stands now (TablePlaceNow - D18-a)
+#include "ITableTextContainer.h"
 #include "ITextModel.h"
+#include "ITextStoryThread.h"		// ...and its cell: the thread its text is in (CellKeyOf)
+#include "ITextStoryThreadDict.h"
 #include "ITextWalker.h"
 #include "ITextWalkerScope.h"
 #include "ITextWalkerSelectionUtils.h"	// TextWalkerSelections_CriticalSection
@@ -25,6 +29,7 @@
 #include "CmdUtils.h"
 #include "ErrorUtils.h"
 #include "PreferenceUtils.h"		// QuerySessionPreferences
+#include "TablesID.h"				// kTableModelBoss
 #include "TextChar.h"				// kTextChar_Ellipse
 #include "TextWalkerServiceProviderID.h"	// kFindTextCmdBoss
 
@@ -212,11 +217,60 @@ PMString ChainWords(const Place& place, const std::vector<bool>& found)
 	return out;
 }
 
-// A FOUND ROW THAT STANDS ON TEXT ALONE (RF3): a story's [start, end) and nothing else it names - a ruby, kenten, warichu or spelling row (an item's,
-// a story's, a table's or a cell's row names what it stands for: kept as it is - RF4).
+// A FOUND ROW THAT STANDS ON TEXT ALONE (RF3): a story's [start, end) and nothing else it names - a ruby, kenten,
+// warichu or spelling row (an item's, a story's, a table's or a cell's row names what it stands for: kept as it is -
+// RF4 - a Table query's too, which names its table by tableUID alone).
 bool IsTextPlace(const KFCResultModel::Hit& hit)
 {
-	return hit.holderKind == kKFCHolderNone && hit.itemUID == kInvalidUID && hit.storyUID != kInvalidUID && hit.textEnd > hit.textStart;
+	return hit.holderKind == kKFCHolderNone && hit.itemUID == kInvalidUID && hit.tableUID == kInvalidUID
+		&& hit.storyUID != kInvalidUID && hit.textEnd > hit.textStart;
+}
+
+// A CELL ROW'S CELL, KEPT WHILE ITS PLACE STILL NAMES IT (D18-a - RecordFound, at the find's turn): the key of
+// the story thread its text is in, in its table - -1 for a row that names no cell, or whose place stands in no
+// thread of its table.
+int64 CellKeyOf(IDataBase* db, const KFCResultModel::Hit& hit)
+{
+	if (db == nil || hit.holderKind != kKFCHolderCell || hit.tableUID == kInvalidUID || hit.storyUID == kInvalidUID
+		|| !db->IsValidUID(hit.storyUID))
+		return -1;
+	InterfacePtr<ITextModel> model(db, hit.storyUID, UseDefaultIID());
+	if (model == nil || hit.textStart < 0 || hit.textStart >= model->TotalLength())
+		return -1;
+	InterfacePtr<ITextStoryThread> thread(model->QueryStoryThread(hit.textStart, nil, nil));
+	return (thread != nil && thread->GetDictUID() == hit.tableUID) ? static_cast<int64>(thread->GetDictKey()) : -1;
+}
+
+// WHERE A ROW THAT NAMES A TABLE STANDS NOW (D18-a - FileList): a table's row on its table's characters, a cell's
+// on its cell's text - asked of the table, the way the Table and Script Label kinds placed them when they found them
+// (KFCTableSearch, KFCScriptLabelSearch). False = its table, or its cell, is gone.
+bool TablePlaceNow(IDataBase* db, const KFCResultModel::Hit& hit, int64 cellKey, KFCSearchEngine::ListedPlace& out)
+{
+	if (db == nil || hit.tableUID == kInvalidUID || !db->IsValidUID(hit.tableUID)
+		|| db->GetClass(hit.tableUID) != kTableModelBoss)
+		return false;
+	InterfacePtr<ITableModel> table(db, hit.tableUID, UseDefaultIID());
+	InterfacePtr<ITableTextContainer> text(table, UseDefaultIID());
+	InterfacePtr<ITextModel> model((text != nil) ? text->QueryTextModel() : nil);
+	if (table == nil || model == nil)
+		return false;
+	out.story = ::GetUID(model);
+	if (hit.holderKind != kKFCHolderCell)
+	{
+		out.start = text->GetAnchorTextIndex();
+		out.end = out.start + text->GetAnchorSpan();
+		return out.start >= 0 && out.end > out.start;
+	}
+	if (cellKey < 0)
+		return false;
+	InterfacePtr<ITextStoryThreadDict> threads(table, UseDefaultIID());
+	InterfacePtr<ITextStoryThread> thread((threads != nil) ? threads->QueryThread(static_cast<uint32>(cellKey)) : nil);
+	if (thread == nil)
+		return false;
+	int32 span = 0;
+	out.start = thread->GetTextStart(&span);
+	out.end = out.start + ((span > 0) ? span : 1);
+	return out.start >= 0;
 }
 
 // "a, b" - the run's names of the queries a row stands for, in the run's order.
@@ -404,14 +458,18 @@ void KFCRunList::Recorder::RecordFound(size_t target, int32 query, const std::ve
 	if (doc.out)
 		return;
 	IDataBase* const db = fTargets[target].docRef.GetDataBase();
-	// THE TEXT MATCHES BY STORY (RF3); the other rows kept as they were found (RF4).
+	// THE TEXT MATCHES BY STORY (RF3); the other rows kept as they were found (RF4) - a cell's with its cell, named now
+	// while its place does (D18-a).
 	std::map<UID, std::vector<size_t> > byStory;
 	for (size_t h = 0; h < hits.size(); ++h)
 	{
 		if (IsTextPlace(hits[h]))
 			byStory[hits[h].storyUID].push_back(h);
 		else
+		{
 			doc.foundItems.push_back(std::make_pair(query, hits[h]));
+			doc.foundCellKeys.push_back(CellKeyOf(db, hits[h]));
+		}
 	}
 	for (std::map<UID, std::vector<size_t> >::iterator s = byStory.begin(); s != byStory.end(); ++s)
 	{
@@ -492,7 +550,10 @@ int32 KFCRunList::Recorder::FileList(bool fromBook, bool allDocuments, KFCResult
 		size_t										doc;
 		std::vector<KFCSearchEngine::ListedPlace>	places;
 		std::vector<const Place*>					from;
-		std::vector<const std::pair<int32, KFCResultModel::Hit>*>	items;		// the other rows a query that changes nothing found (RF4)
+		// The other rows a query that changes nothing found (RF4) - their places in the doc's foundItems - and
+		// where each stands now when it names a table (story kInvalidUID for any other - D18-a).
+		std::vector<size_t>							items;
+		std::vector<KFCSearchEngine::ListedPlace>	itemPlaces;
 	};
 	std::vector<Rows> rows;
 	for (size_t d = 0; d < fDocs.size(); ++d)
@@ -555,12 +616,20 @@ int32 KFCRunList::Recorder::FileList(bool fromBook, bool allDocuments, KFCResult
 			LeaveOut(doc, why);
 			continue;
 		}
-		// THE OTHER ROWS FOUND (RF4): each whose item - or, with none, its story - is still there; one gone is counted with the places gone.
+		// THE OTHER ROWS FOUND (RF4): each whose item - or, with none, its story - is still there; one gone is counted
+		// with the places gone. One that names a table (a Table query's row, a table's or a cell's label) is there
+		// while its table and its cell are, and is filed where they stand now (D18-a: filed where it was found, a
+		// later write of the run in front of it - or in its line - left it reading Missing).
 		for (size_t f = 0; f < doc.foundItems.size(); ++f)
 		{
 			const KFCResultModel::Hit& hit = doc.foundItems[f].second;
-			const bool there = (db != nil) && ((hit.itemUID != kInvalidUID) ? db->IsValidUID(hit.itemUID)
+			KFCSearchEngine::ListedPlace now;
+			now.story = kInvalidUID;
+			now.start = now.end = kInvalidTextIndex;
+			bool there = (db != nil) && ((hit.itemUID != kInvalidUID) ? db->IsValidUID(hit.itemUID)
 				: (hit.storyUID == kInvalidUID || db->IsValidUID(hit.storyUID)));
+			if (there && hit.tableUID != kInvalidUID)
+				there = f < doc.foundCellKeys.size() && TablePlaceNow(db, hit, doc.foundCellKeys[f], now);
 			if (!there)
 			{
 				++docGone;
@@ -570,7 +639,8 @@ int32 KFCRunList::Recorder::FileList(bool fromBook, bool allDocuments, KFCResult
 			if (listed >= cap)
 				continue;
 			++listed;
-			mine.items.push_back(&doc.foundItems[f]);
+			mine.items.push_back(f);
+			mine.itemPlaces.push_back(now);
 		}
 		total += docTotal;
 		gone += docGone;
@@ -601,9 +671,13 @@ int32 KFCRunList::Recorder::FileList(bool fromBook, bool allDocuments, KFCResult
 				for (size_t q = 0; q < queries.size(); ++q)
 					queryListed[static_cast<size_t>(queries[q])] = true;
 			}
+			const std::vector<std::pair<int32, KFCResultModel::Hit> >& foundItems = fDocs[rows[r].doc].foundItems;
 			for (size_t i = 0; i < rows[r].items.size(); ++i)
-				if (rows[r].items[i]->first >= 0 && static_cast<size_t>(rows[r].items[i]->first) < queryListed.size())
-					queryListed[static_cast<size_t>(rows[r].items[i]->first)] = true;
+			{
+				const int32 q = foundItems[rows[r].items[i]].first;
+				if (q >= 0 && static_cast<size_t>(q) < queryListed.size())
+					queryListed[static_cast<size_t>(q)] = true;
+			}
 		}
 		PMString names;
 		names.SetTranslatable(kFalse);
@@ -664,10 +738,31 @@ int32 KFCRunList::Recorder::FileList(bool fromBook, bool allDocuments, KFCResult
 			IDataBase* const db = target.docRef.GetDataBase();
 			for (size_t i = 0; i < rows[r].items.size(); ++i)
 			{
-				KFCResultModel::Hit hit(rows[r].items[i]->second);
+				const std::pair<int32, KFCResultModel::Hit>& item = doc.foundItems[rows[r].items[i]];
+				KFCResultModel::Hit hit(item.second);
+				// ONE THAT NAMES A TABLE, READ AGAIN WHERE IT STANDS NOW (D18-a): its line, its page and its match's
+				// hash from the text as it is - what a landing compares the document with - as the Table and Script
+				// Label kinds make their rows (BuildListedHits), its own words and what it names put back on it. A
+				// Table query's row says its table as its holder: in a run's list no list kind says it (RUN-10).
+				const KFCSearchEngine::ListedPlace& now = rows[r].itemPlaces[i];
+				if (now.story != kInvalidUID)
+				{
+					std::vector<KFCResultModel::Hit> read;
+					const std::vector<KFCSearchEngine::ListedPlace> one(1, now);
+					KFCSearchEngine::BuildListedHits(target.docRef, one, read, versions);
+					if (read.size() == 1)
+					{
+						KFCResultModel::Hit fresh(read[0]);
+						fresh.runChain = hit.runChain;
+						fresh.tableUID = hit.tableUID;
+						fresh.labelKey = hit.labelKey;
+						fresh.holderKind = (hit.holderKind != kKFCHolderNone) ? hit.holderKind : kKFCHolderTable;
+						hit = fresh;
+					}
+				}
 				hit.replaced = false;
 				hit.kept = false;
-				hit.runNames = NamesOf(std::vector<int32_t>(1, rows[r].items[i]->first), fNames);
+				hit.runNames = NamesOf(std::vector<int32_t>(1, item.first), fNames);
 				uint32 version = 0;
 				if (hit.storyUID != kInvalidUID && versions.find(hit.storyUID) == versions.end() && KFCSearchEngine::ReadStoryVersion(db, hit.storyUID, version))
 					versions[hit.storyUID] = version;

@@ -10,8 +10,10 @@
 //  (FileUtils::GetPresetsFolder(.., "Find-Change Queries\<kind>", the UI language)\*.xml - InDesign's put the language's
 //  folder UNDER the kind's). The kinds - Text, GREP, Glyph, Object (O14 of
 //  docs/superpowers/specs/2026-10-09-kfc-object-search-design.md), Transliterate - not Color: the query run skips it
-//  (KFCQuerySequence), so the dialog does not offer it. The one place that knows how those folders are laid out. AND THE KOHAKU+ TAB'S (KFCKohakuQuery.h): the kinds QR Code and Table, and - in a Japanese InDesign, as the tab
-//  offers them - Ruby and Kenten, named by their files in the queries' folder itself.
+//  (KFCQuerySequence), so the dialog does not offer it. The one place that knows how those folders are laid out.
+//  AND THE KOHAKU+ TAB'S (KFCKohakuQuery.h): the kinds QR Code, Table, Script Label, Story, Spelling and
+//  Document, and - in a Japanese InDesign, as the tab offers them - Ruby, Kenten and Warichu, named by their
+//  files in the queries' folder itself.
 //
 //========================================================================================
 
@@ -27,7 +29,7 @@
 namespace KFCSavedQueries
 {
 	/** Every saved query of those kinds, the user's and InDesign's: kind order (Text, GREP, Glyph, Object,
-	    Transliterate), then name (case-insensitive), then the user's before InDesign's. */
+	    Transliterate, then the Kohaku+ tab's), then name (case-insensitive), then the user's before InDesign's. */
 	void List(std::vector<KFCSavedQuery>& out);
 
 	/** One query file as the dialog names it: its name (the file name without .xml), its kind (the folder it is in -
@@ -35,7 +37,9 @@ namespace KFCSavedQueries
 	    and whether it is there now. A path in no kind's folder answers mode -1. */
 	void Describe(const IDFile& file, KFCSavedQuery& out);
 
-	/** "Text", "GREP", "Glyph", "Object", "Transliterate" - the kinds' folder names - "QR Code", "Table", "Ruby", "Kenten" - the Kohaku+ tab's - or "?" for any other mode. */
+	/** "Text", "GREP", "Glyph", "Object", "Transliterate" - the kinds' folder names - "QR Code", "Table",
+	    "Ruby", "Kenten", "Warichu", "Script Label", "Story", "Spelling", "Document" - the Kohaku+ tab's - or "?"
+	    for any other mode. */
 	const char* KindName(int32 mode);
 
 	/** Put one saved query into Edit > Find/Change, whole - its tab, strings, switches and formats - with the SDK's

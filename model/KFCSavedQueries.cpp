@@ -133,7 +133,7 @@ namespace
 	}
 
 	/** THE KOHAKU+ TAB'S QUERIES, of the files in the queries' folder itself: Ruby, Kenten and Warichu in a Japanese InDesign alone, as the tab offers them (KFCKohakuTab.cpp's JapaneseKinds, and its test switch);
-	    QR Code, Table, Script Label and Story in every language. */
+	    QR Code, Table, Script Label, Story, Spelling and Document in every language. */
 	void CollectKohakuQueries(std::vector<KFCSavedQuery>& out)
 	{
 		IDFile folder;

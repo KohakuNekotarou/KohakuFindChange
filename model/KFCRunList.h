@@ -61,7 +61,10 @@ namespace KFCRunList
 		    warichu or spelling row's - joins the places as a write that left its text as it was (KFCRunListChain::Apply with one text before and after),
 		    so every later write carries it as it carries a written place, and one written over joins it (D2); found alone to the end, its row is the row
 		    it was found as, standing where its place stands then. Anything else - an item, a story, a table, a cell - is kept as its row and filed with
-		    the list if what it names is still there. A document whose text cannot be laid is left out, said (R4). Leaves no error standing. */
+		    the list if what it names is still there; one that names a table (a Table query's row, a table's or a
+		    cell's label) where its table or cell stands then, read again from the text as it is (a later write of
+		    the run moves the text in front of it, or edits its line - D18-a). A document whose text cannot be laid
+		    is left out, said (R4). Leaves no error standing. */
 		void RecordFound(size_t target, int32 query, const std::vector<KFCResultModel::Hit>& hits);
 
 		/** The run stands - before its book's chapters it did not write are handed back (LeaveRunDocuments - RF8: a chapter a query only found
@@ -93,6 +96,9 @@ namespace KFCRunList
 			std::map<UID, Story>	stories;
 			std::vector<KFCResultModel::Hit>	foundText;	// the text rows found, each its place's tag (KFCRunListChain::Place::tag - RecordFound)
 			std::vector<std::pair<int32, KFCResultModel::Hit> >	foundItems;	// the other rows found, each with its query
+			// ...each one's cell, while its place still names it: the key of the thread its text is in, in its table -
+			// -1 for a row that names no cell (D18-a: where the cell stands when the list is filed)
+			std::vector<int64>						foundCellKeys;
 			Doc() : target(0), out(false), found(0), walked(false), writes(KFCRunListAlign::kAnyLength) {}
 		};
 		Doc& DocOf(size_t target);
