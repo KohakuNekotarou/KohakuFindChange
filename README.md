@@ -1,6 +1,8 @@
 # Kohaku Find/Change
 Adobe InDesign C++ SDK Plug-In.
-Searches the front document, or every chapter of the active book (.indb) at once.
+
+## Note
+We cannot be held responsible for any issues that may arise; please use this service at your own risk.
 
 ## Adobe Exchange
 https://exchange.adobe.com/apps/cc/205698/kohakufindchange
@@ -15,15 +17,11 @@ https://github.com/KohakuNekotarou/KohakuFindChange/discussions
 This plugin was designed and implemented by **KohakuNekotarou** in collaboration with Anthropic's AI, **Claude (Claude Code)**.
 
 ## License
-
 This source is published to show what can be built with the Adobe InDesign C++
 SDK. See [LICENSE](LICENSE) for the terms. In short: **read it, learn from it, and
 reuse parts of it in your own plug-ins** — that is what this repository is for.
 Please do not redistribute builds of *this* plug-in; a derivative you do
 distribute has to carry its own name and its own ID prefix.
-
-## Note
-We cannot be held responsible for any issues that may arise; please use this service at your own risk.
 
 ## 連絡
 農作業の合間に趣味でInDesignのScriptやPlugInを作っています。
