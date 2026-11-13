@@ -16,13 +16,6 @@ https://github.com/KohakuNekotarou/KohakuFindChange/discussions
 ## About Creation
 This plugin was designed and implemented by **KohakuNekotarou** in collaboration with Anthropic's AI, **Claude (Claude Code)**.
 
-## License
-This source is published to show what can be built with the Adobe InDesign C++
-SDK. See [LICENSE](LICENSE) for the terms. In short: **read it, learn from it, and
-reuse parts of it in your own plug-ins** — that is what this repository is for.
-Please do not redistribute builds of *this* plug-in; a derivative you do
-distribute has to carry its own name and its own ID prefix.
-
 ## 連絡
 農作業の合間に趣味でInDesignのScriptやPlugInを作っています。
 お仕事のお依頼は
